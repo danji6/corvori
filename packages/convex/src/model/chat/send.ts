@@ -22,6 +22,7 @@ import { get as getSettings } from '../settings'
 import { latestHistoryAnchor } from '../stream/historyBoundary'
 import { resolveSender } from './identities'
 import { injectDueReminders } from './reminders'
+import { quoteMessage } from './replies'
 import {
   latestMessageId,
   reserveOrDebounceTurn,
@@ -106,6 +107,10 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
     settings,
   })
 
+  const replyTo = args.replyToId
+    ? await quoteMessage(ctx, args.sessionId, args.replyToId)
+    : undefined
+
   const { messageId, segments } = await insertMessage(
     ctx,
     {
@@ -113,6 +118,7 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
       sender,
       role,
       ...identity,
+      ...(replyTo && { replyTo }),
       status: 'done',
     },
     parts,

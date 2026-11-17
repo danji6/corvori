@@ -9,7 +9,11 @@ import {
   groupKey,
   groupPartsCached,
 } from './parts'
-import { messageSenderKey, senderGroupDurations } from './sender-groups'
+import {
+  isTranscriptDivider,
+  messageSenderKey,
+  senderGroupDurations,
+} from './sender-groups'
 import { groupShellReportRows } from './shell-work-reports'
 import type { MessageRecord, PartMetadata } from './types'
 import {
@@ -28,6 +32,13 @@ export type MessageRow =
       key: string
       messageId: string
       reasoning?: ReasoningAddress
+      grouped?: boolean
+    }
+  | {
+      /** The quote card above a reply's content. */
+      kind: 'reply'
+      key: string
+      messageId: string
       grouped?: boolean
     }
   | {
@@ -64,7 +75,7 @@ export type MessageRow =
       grouped?: boolean
     }
   | {
-      kind: 'context-reset'
+      kind: 'context-reset' | 'presence'
       key: string
       messageId: string
       grouped?: boolean
@@ -153,6 +164,13 @@ function hasFooterContent(
   return duration !== undefined
 }
 
+/** The full-width row for a context reset or a join/leave notice. */
+function dividerRow(id: string, meta: MessageRecord | undefined): MessageRow {
+  return meta?.type === 'presence'
+    ? { kind: 'presence', key: `presence:${id}`, messageId: id }
+    : { kind: 'context-reset', key: `reset:${id}`, messageId: id }
+}
+
 export function buildRows(
   ids: string[],
   getMessage: (id: string) => UIMessage | null,
@@ -176,10 +194,10 @@ export function buildRows(
     if (!message) continue
 
     const meta = getMessageMetadata(id)
-    if (meta?.type === 'contextReset') {
+    if (isTranscriptDivider(meta)) {
       previousSenderKey = null
       senderHeader = undefined
-      rows.push({ kind: 'context-reset', key: `reset:${id}`, messageId: id })
+      rows.push(dividerRow(id, meta))
       continue
     }
 
@@ -228,6 +246,16 @@ export function buildRows(
         reasoning,
       }
       rows.push(senderHeader)
+      first = false
+    }
+
+    if (meta?.replyTo) {
+      rows.push({
+        kind: 'reply',
+        key: firstKey(`r:${id}`),
+        messageId: id,
+        ...(first && grouped && { grouped }),
+      })
       first = false
     }
 

@@ -16,6 +16,7 @@ import {
 import type { useChatStatus, useWorkspaceFileIndex } from '@/hooks/chat'
 import { useApprovalReview } from '@/hooks/chat/approval-review'
 import { useComposerReveal } from '@/hooks/chat/composer-reveal'
+import { useComposerReply } from '@/hooks/chat/reply-target'
 import { useRestoreShellFocus } from '@/hooks/chat/shell-focus'
 import { useHasElapsed } from '@/hooks/expiry'
 import { useAtBottomSticky } from '@/hooks/scroll'
@@ -46,6 +47,7 @@ import type { ChatToolbarProps } from './chat-toolbar'
 import { ActivityIndicator } from './composer/activity-indicator'
 import { ChatComposer } from './composer/chat-composer'
 import type { ComposerHandle } from './composer/chat-composer'
+import { ComposerReply } from './composer/composer-reply'
 import { ComposerToolbar } from './composer/composer-toolbar'
 import { useMessageEdit } from './messages/editor'
 import { MessageHighlightProvider } from './messages/message-highlight-context'
@@ -255,9 +257,16 @@ export function ChatSessionView({
     return () => cancelAnimationFrame(frame)
   }, [completedEditRevision, showDock, showInteractionPicker])
 
+  const reply = useComposerReply({
+    sessionId: session?._id,
+    composerRef,
+    onSubmit,
+  })
+  const submitMessage = reply.submit
+
   const handleSubmit = useCallback(
     async (msg: PendingMessage) => {
-      const messageId = await onSubmit(msg)
+      const messageId = await submitMessage(msg)
       clearTyping()
       const isUserMessage = !msg.role || msg.role === 'user'
       const isShellCommand =
@@ -266,7 +275,7 @@ export function ChatSessionView({
         intoView: isShellCommand,
       })
     },
-    [onSubmit, clearTyping],
+    [submitMessage, clearTyping],
   )
 
   const handleContentChange = useCallback(
@@ -479,13 +488,20 @@ export function ChatSessionView({
                       }}
                       onContentChange={handleContentChange}
                       notice={
-                        review.showReviewButton &&
-                        review.fullscreen && (
-                          <ReviewApprovalButton
-                            onClick={openReview}
-                            className="order-first w-full px-4 pt-1"
-                          />
-                        )
+                        <>
+                          {review.showReviewButton && review.fullscreen && (
+                            <ReviewApprovalButton
+                              onClick={openReview}
+                              className="order-first w-full px-4 pt-1"
+                            />
+                          )}
+                          {reply.target && (
+                            <ComposerReply
+                              target={reply.target}
+                              onCancel={reply.cancel}
+                            />
+                          )}
+                        </>
                       }
                       status={status}
                       inputRef={composerRef}

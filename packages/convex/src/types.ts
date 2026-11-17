@@ -91,6 +91,8 @@ export type MessageExtra = {
   workspace: Infer<typeof V.workspaceExtraValidator>
   /** The announced session mode change. */
   mode: Infer<typeof V.modeExtraValidator>
+  /** A participant who joined or left the session. */
+  presence: Infer<typeof V.presenceExtraValidator>
   /** The announced invoked command, and how far it got. */
   command: Infer<typeof V.commandExtraValidator>
 }
@@ -180,6 +182,7 @@ export type YieldRequest = Infer<typeof V.yieldRequestValidator>
 
 export type SaveSessionCacheArgs = Infer<typeof V.saveSessionCacheArgsValidator>
 export type SendMessageArgs = Infer<typeof V.sendMessageArgsValidator>
+export type ReplyQuote = Infer<typeof V.replyQuoteValidator>
 export type ConfirmAttachmentArgs = Infer<typeof V.confirmAttachmentArgsValidator> // prettier-ignore
 export type ConfirmAttachmentWithDimensionsArgs = Infer<typeof V.confirmAttachmentWithDimensionsArgsValidator> // prettier-ignore
 export type CreateGeneratedAttachmentArgs = Infer<typeof V.createGeneratedAttachmentArgsValidator> // prettier-ignore

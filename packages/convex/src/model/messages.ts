@@ -226,7 +226,11 @@ export const notACommandChip = (q: MessageFilter) =>
 
 /** Skips transcript markers when looking for user input or interjections. */
 export const notATranscriptMarker = (q: MessageFilter) =>
-  q.and(notACommandChip(q), q.neq(q.field('type'), 'contextReset'))
+  q.and(
+    notACommandChip(q),
+    q.neq(q.field('type'), 'contextReset'),
+    q.neq(q.field('type'), 'presence'),
+  )
 
 /** Excludes prepared provider context from messages that interrupt a turn. */
 export const notAContextNote = (q: MessageFilter) =>

@@ -2,6 +2,7 @@ import type { Id } from '../../_generated/dataModel'
 import { error } from '../../errors'
 import { type AuthMutationCtx } from '../../functions'
 import * as Attachments from '../attachments'
+import { remapReplyQuote } from '../chat/replies'
 import { insertMessage, withParts } from '../messageContents'
 import { finalizeMessageParts, notACommandChip } from '../messages'
 import { getBySession as getPlan, upsert as upsertPlan } from '../plans'
@@ -164,6 +165,7 @@ export async function duplicate(
         status: 'done',
         hidden: message.hidden,
         extra: portableContextExtra(message),
+        replyTo: await remapReplyQuote(ctx, message.replyTo, messageIdMap),
         metadata: message.metadata,
         senderName: message.senderName,
         senderAvatarId: message.senderAvatarId,

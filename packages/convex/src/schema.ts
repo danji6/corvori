@@ -165,6 +165,7 @@ export default defineSchema({
     .index('by_sessionId_status_contextEligible', ['sessionId', 'status', 'contextEligible'])
     .index('by_sessionId_type_status', ['sessionId', 'type', 'status'])
     .index('by_senderAvatarId', ['senderAvatarId'])
+    .index('by_replyTarget', ['replyTo.target.id'])
     .index('by_sender_status', ['sender.type', 'sender.id', 'status']),
 
   changeSets: defineTable(V.changeSetSchema)

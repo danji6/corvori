@@ -7,6 +7,7 @@ import type { AuthMutationCtx, AuthQueryCtx } from '../functions'
 import type { SessionMember } from '../types'
 import * as Notifications from './notifications'
 import { getMember, getMembership, requireOwner } from './session/memberships'
+import { announcePresence } from './session/presence'
 import { getByOwnerId as getSettings } from './settings'
 import { stopForUser } from './stream/lifecycle'
 
@@ -79,4 +80,9 @@ export async function remove(
   await stopForUser(ctx, userId)
   await Notifications.removeForMembership(ctx, userId, sessionId)
   await ctx.db.delete(membership._id)
+  await announcePresence(ctx, {
+    sessionId,
+    participant: { type: 'user', id: userId },
+    event: 'left',
+  })
 }

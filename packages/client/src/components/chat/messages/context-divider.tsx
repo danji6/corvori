@@ -1,10 +1,11 @@
 import { cn } from '@/lib/utils'
+import type { ReactNode } from 'react'
 
 export function ContextDivider({
   label,
   className,
 }: {
-  label: string
+  label: ReactNode
   className?: string
 }) {
   return (
@@ -15,7 +16,7 @@ export function ContextDivider({
       )}
     >
       <div className="h-px flex-1 bg-current opacity-30" />
-      <span>{label}</span>
+      <span className="flex min-w-0 items-center gap-1.5">{label}</span>
       <div className="h-px flex-1 bg-current opacity-30" />
     </div>
   )

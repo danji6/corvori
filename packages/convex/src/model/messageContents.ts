@@ -29,6 +29,7 @@ type InsertMessageFields = {
   metadata?: Doc<'messages'>['metadata']
   hidden?: boolean
   extra?: Doc<'messages'>['extra']
+  replyTo?: Doc<'messages'>['replyTo']
   summaryBoundaryCreationTime?: number
 } & SenderIdentity
 

@@ -3,6 +3,7 @@ import { error } from '../../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../../functions'
 import { generateId } from '../../lib/utils'
 import { getMember, getMembership, requireOwner } from './memberships'
+import { announcePresence } from './presence'
 
 export async function list(
   ctx: AuthQueryCtx,
@@ -83,6 +84,11 @@ export async function redeem(
       groupKey: 'ungrouped',
       lastMessageAt: session?.lastMessageAt,
       title: session?.title,
+    })
+    await announcePresence(ctx, {
+      sessionId: share.sessionId,
+      participant: { type: 'user', id: ctx.userId },
+      event: 'joined',
     })
   }
 

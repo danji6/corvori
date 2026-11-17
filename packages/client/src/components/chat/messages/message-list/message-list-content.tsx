@@ -289,14 +289,16 @@ function LoadWindowButton({
   )
 }
 
+/** Full-width rows that separate the transcript (resets, join/leave notices). */
+function isDividerRow(row?: MessageRow) {
+  return row?.kind === 'context-reset' || row?.kind === 'presence'
+}
+
 /** Chooses gaps whose values live in styles/messages.css. */
 function getRowSpacing(row?: MessageRow, previousRow?: MessageRow) {
   if (!row || row.kind === 'footer') return
 
-  if (
-    previousRow &&
-    (row.kind === 'context-reset' || previousRow.kind === 'context-reset')
-  ) {
+  if (previousRow && (isDividerRow(row) || isDividerRow(previousRow))) {
     return 'h-(--message-sender-gap)'
   }
 
@@ -346,7 +348,7 @@ function VirtualizedItem({
   const previousRow = rows[index - 1]
   const nextRow = rows[index + 1]
   const precedesNote = isNoteBoundaryRow(nextRow)
-  const footerBeforeReset = row?.kind === 'footer' && nextRow?.kind === 'context-reset' // prettier-ignore
+  const footerBeforeReset = row?.kind === 'footer' && isDividerRow(nextRow)
   const spacing = getRowSpacing(row, previousRow)
   const content = (
     <>

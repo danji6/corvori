@@ -15,6 +15,7 @@ import { revoke as revokeMcp } from './mcpRuntime'
 import * as Prompts from './prompts'
 import * as Reminders from './reminders'
 import { removeCacheRow } from './session/cache'
+import { announcePresence } from './session/presence'
 import { getByOwnerId } from './settings'
 import { assertAgentIdle } from './skills/access'
 import { start as startFileOperation } from './skills/operations'
@@ -188,6 +189,11 @@ export async function remove(
       })
     }
     await ctx.db.delete(link._id)
+    await announcePresence(ctx, {
+      sessionId: link.sessionId,
+      participant: { type: 'agent', id: agentId },
+      event: 'left',
+    })
   }
 
   await Prompts.removeForAgent(ctx, agentId)

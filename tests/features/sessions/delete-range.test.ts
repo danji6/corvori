@@ -74,6 +74,24 @@ describe('assertRangeDeletable', () => {
     ).not.toThrow()
   })
 
+  test('reserves join/leave notices for the owner and moderators', () => {
+    const ownJoin = userMessage('member-1', { type: 'presence' })
+    const agentJoin = message({ type: 'presence' })
+
+    for (const notice of [ownJoin, agentJoin]) {
+      expect(() =>
+        assertRangeDeletable(caller('member-1', 'user'), [notice], session),
+      ).toThrow()
+      expect(() =>
+        assertRangeDeletable(caller('owner-1', 'user'), [notice], session),
+      ).not.toThrow()
+      expect(
+        () =>
+        assertRangeDeletable(caller('member-3', 'moderator'), [notice], session), // prettier-ignore
+      ).not.toThrow()
+    }
+  })
+
   test('rejects a range containing a processing message', () => {
     const range = [message({}), message({ status: 'processing' })]
 

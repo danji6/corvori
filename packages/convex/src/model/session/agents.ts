@@ -10,6 +10,7 @@ import {
   requireMember,
   requireNonBlockingStream,
 } from './memberships'
+import { announcePresence } from './presence'
 
 type Args = {
   sessionId: Id<'sessions'>
@@ -57,9 +58,14 @@ export async function link(ctx: AuthMutationCtx, args: Args) {
   if (agent.ownerId !== ctx.userId) error('Forbidden', 403)
 
   const existing = await findLink(ctx, args)
-  if (!existing) {
-    await ctx.db.insert('sessionAgents', { ...args, addedBy: ctx.userId })
-  }
+  if (existing) return
+
+  await ctx.db.insert('sessionAgents', { ...args, addedBy: ctx.userId })
+  await announcePresence(ctx, {
+    sessionId: args.sessionId,
+    participant: { type: 'agent', id: args.agentId },
+    event: 'joined',
+  })
 }
 
 export async function unlink(ctx: AuthMutationCtx, args: Args) {
@@ -83,6 +89,11 @@ export async function unlink(ctx: AuthMutationCtx, args: Args) {
   }
 
   await ctx.db.delete(link._id)
+  await announcePresence(ctx, {
+    sessionId: args.sessionId,
+    participant: { type: 'agent', id: args.agentId },
+    event: 'left',
+  })
 }
 
 export async function activate(ctx: AuthMutationCtx, args: Args) {

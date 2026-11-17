@@ -1,5 +1,5 @@
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
-import type { SessionSummary, TokenUsage } from '@cv/convex/types'
+import type { ReplyQuote, SessionSummary, TokenUsage } from '@cv/convex/types'
 import type {
   ApproveToolArgs as CoreApproveToolArgs,
   CreateAgentArgs as CoreCreateAgentArgs,
@@ -73,6 +73,7 @@ export type MessageRecord = Pick<
   | 'type'
   | 'hidden'
   | 'extra'
+  | 'replyTo'
   | 'selectedVersion'
   | 'versionCount'
   | 'hasChanges'
@@ -119,6 +120,13 @@ export type PendingMessage = {
   /** Converted text pastes keyed by attachment occurrence ID. */
   pastedText?: Record<string, { text: string; position: number }>
   silent?: boolean
+  /** The message this one replies to, quoted above its content. */
+  replyTo?: ReplyTarget
+}
+
+/** A quote that still points at its message, as the composer holds it. */
+export type ReplyTarget = ReplyQuote & {
+  target: NonNullable<ReplyQuote['target']>
 }
 
 export type ToolMetadata = {

@@ -19,12 +19,14 @@ import * as Memberships from '../session/memberships'
 import { removeDeliveriesForParts } from '../shellOutputDeliveries'
 import { collectToolOutputStorageIds } from '../stream/toolOutput'
 import { clearAnnouncedMode } from './notes'
+import { forgetQuotedMessage } from './replies'
 
 export async function editMessage(
   ctx: AuthMutationCtx,
   args: { messageId: Id<'messages'>; content: string },
 ) {
   const { message } = await requireMessageMutation(ctx, args.messageId)
+  requireEditable(message)
   const parts = [{ type: 'text', text: args.content }]
 
   const segments = await listSelectedSegments(ctx, message)
@@ -47,6 +49,7 @@ export async function editMessagePart(
   args: EditMessagePartArgs,
 ) {
   const { message } = await requireMessageMutation(ctx, args.messageId)
+  requireEditable(message)
   const row = await getSegmentRow(
     ctx,
     message._id,
@@ -217,6 +220,7 @@ async function deleteMessageDoc(
   }
 
   await deleteVersions(ctx, message._id)
+  await forgetQuotedMessage(ctx, message._id)
   await ctx.db.delete(message._id)
 
   const avatarId = message.senderAvatarId
@@ -305,17 +309,28 @@ function isQueuedContextReset({ type, extra }: Doc<'messages'>) {
   )
 }
 
+type Caller = Pick<AuthMutationCtx, 'userId' | 'role'>
+
+/** Session owners and moderators may remove anyone's messages. */
+function canModerate(caller: Caller, session: Doc<'sessions'>) {
+  return session.ownerId === caller.userId || minRole(caller.role, 'moderator')
+}
+
 function requireDeletableSender(
-  ctx: Pick<AuthMutationCtx, 'userId' | 'role'>,
+  ctx: Caller,
   message: Doc<'messages'>,
   session: Doc<'sessions'>,
 ) {
-  if (
-    message.sender.type === 'user' &&
-    message.sender.id !== ctx.userId &&
-    session.ownerId !== ctx.userId &&
-    !minRole(ctx.role, 'moderator')
-  ) {
-    error('Forbidden', 403)
-  }
+  if (canModerate(ctx, session)) return
+
+  // Join/leave notices are a session record, not their participant's message
+  if (message.type === 'presence') error('Forbidden', 403)
+
+  const othersMessage =
+    message.sender.type === 'user' && message.sender.id !== ctx.userId
+  if (othersMessage) error('Forbidden', 403)
+}
+
+function requireEditable(message: Doc<'messages'>) {
+  if (message.type === 'presence') error('Message is not editable', 400)
 }

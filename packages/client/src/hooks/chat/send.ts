@@ -17,7 +17,7 @@ import {
 import { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
 import type { ResolvedSettings } from '@cv/convex/model/defaults'
-import type { ConfirmAttachmentArgs } from '@cv/convex/types'
+import type { ConfirmAttachmentArgs, ReplyQuote } from '@cv/convex/types'
 import { attachmentReferences } from '@cv/core/attachments'
 import { parseFileMentions } from '@cv/core/mentions/parse'
 import { parseShellCommand, unescapeShellPrefix } from '@cv/core/shell/command'
@@ -81,6 +81,7 @@ export function useSendMessage() {
         content,
         ...(messageRole !== 'user' ? { role: messageRole } : {}),
         ...(pending.silent ? { silent: true } : {}),
+        ...(pending.replyTo && { replyToId: pending.replyTo.target.id }),
       }
       const optimisticId = createOptimisticMessageId()
       const localFiles = pending.files.map((part) =>
@@ -121,6 +122,7 @@ export function useSendMessage() {
         settings,
         agent,
         optimisticId,
+        pending.replyTo,
       )
       const upload =
         previews && optimistic ? showMessageUpload(optimistic) : undefined
@@ -159,6 +161,7 @@ export function useSendMessage() {
               settings,
               agent,
               optimisticId,
+              pending.replyTo,
             )
           : optimistic
         previews?.confirm(attachments)
@@ -307,6 +310,7 @@ function buildOptimisticMessage(
   settings: ResolvedSettings | undefined,
   agent: ActiveAgent | null,
   id: Id<'messages'>,
+  replyTo?: ReplyQuote,
 ) {
   const content = unescapeShellPrefix(args.content).trim()
   if (!content && fileParts.length === 0) return
@@ -331,6 +335,8 @@ function buildOptimisticMessage(
     sessionId: args.sessionId,
     role,
     ...optimisticSender(role, profile, settings, agent, id),
+    // Shell commands run in place and never carry a quote
+    ...(replyTo && !command && { replyTo }),
     status: command ? 'processing' : 'done',
     selectedVersion: 1,
     versionCount: 1,

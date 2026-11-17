@@ -15,6 +15,11 @@ export function messageDisplayRole(
   return isAgentReport ? 'assistant' : message.role
 }
 
+/** Context resets and join/leave notices divide the transcript. */
+export function isTranscriptDivider(record: MessageRecord | undefined) {
+  return record?.type === 'contextReset' || record?.type === 'presence'
+}
+
 /** Identifies messages that can share a sender header. */
 export function messageSenderKey(
   message: UIMessage,
@@ -57,7 +62,7 @@ export function senderGroupDurations({
     const message = getMessage(id)
     if (!message) continue
     const record = getMetadata(id)
-    if (record?.type === 'contextReset') previousKey = null
+    if (isTranscriptDivider(record)) previousKey = null
     if (record?.hidden) continue
 
     const key = messageSenderKey(message, record)

@@ -30,11 +30,16 @@ import { HiddenChip } from './hidden-chip'
 import { MessageContext } from './message-context'
 import { MessageContextMenu } from './message-context-menu'
 import { MessageHeader } from './message-header'
-import { useMessageHighlight } from './message-highlight-context'
+import {
+  useMessageHighlight,
+  useMessageHighlightRef,
+} from './message-highlight-context'
 import { MessageVersionSwitcher } from './message-version-switcher'
 import { NoteGroupBlock } from './note-group-block'
+import { PresenceNotice } from './presence-notice'
 import { ReasoningHeader } from './reasoning-header'
 import { RenderGroup } from './render-group'
+import { ReplyQuoteCard } from './reply-quote'
 import { WorkBlock } from './work-block'
 
 export type MessageRowViewProps = {
@@ -64,12 +69,18 @@ export const MessageRowView = memo(function MessageRowView({
     )
   }
 
+  if (row.kind === 'presence') {
+    return <PresenceNotice message={message} record={messageMeta} />
+  }
+
   return (
     <RowShell message={message} messageMeta={messageMeta} row={row}>
       {row.kind === 'context-reset' ? (
         <ContextResetRow messageId={message.id} />
       ) : row.kind === 'header' ? (
         <HeaderRow row={row} message={message} messageMeta={messageMeta} />
+      ) : row.kind === 'reply' ? (
+        messageMeta?.replyTo && <ReplyQuoteCard quote={messageMeta.replyTo} />
       ) : row.kind === 'group' ? (
         <GroupRow
           row={row}
@@ -97,15 +108,7 @@ export const MessageRowView = memo(function MessageRowView({
 })
 
 function ContextResetRow({ messageId }: { messageId: string }) {
-  const registerElement = useMessageHighlight()?.registerElement
-  const target = useMemo(
-    () => ({ messageId, segmentIndex: null, groupIndex: null }),
-    [messageId],
-  )
-  const ref = useCallback(
-    (element: HTMLDivElement | null) => registerElement?.(target, element),
-    [registerElement, target],
-  )
+  const ref = useMessageHighlightRef(messageId)
 
   return (
     <div

@@ -22,6 +22,7 @@ import { activeAttachmentMessages } from './attachmentHistory'
 import { collectApprovalNotes } from './historyApprovals'
 import { insertApprovalNoteMessages } from './historyApprovals'
 import { resolveParts } from './historyContent'
+import { insertReplyQuote } from './historySenders'
 import { representMessage } from './historySenders'
 import { prefixSenderName } from './historySenders'
 import { removeOrphanToolCalls } from './historyTools'
@@ -32,6 +33,7 @@ export { insertApprovalNoteMessages } from './historyApprovals'
 export { removeOrphanToolCalls } from './historyTools'
 export { representMessage } from './historySenders'
 export { prefixSenderName } from './historySenders'
+export { insertReplyQuote } from './historySenders'
 
 export async function buildProviderHistory(
   ctx: ActionCtx,
@@ -101,10 +103,14 @@ export async function buildProviderHistory(
     })
   }
 
-  const attributed = messages.map((message, index) => ({
-    ...message,
-    parts: prefixSenderName(message, history[index], historyAgent),
-  }))
+  const attributed = messages.map((message, index) => {
+    const stored = history[index]
+    const parts = prefixSenderName(message, stored, historyAgent)
+    return {
+      ...message,
+      parts: insertReplyQuote({ ...message, parts }, stored, historyAgent),
+    }
+  })
   const approvalNotes = collectApprovalNotes(attributed)
 
   const [

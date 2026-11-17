@@ -26,7 +26,13 @@ import {
   isTextUIPart,
   isToolUIPart,
 } from 'ai'
-import { CopyIcon, PencilIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react'
+import {
+  CopyIcon,
+  PencilIcon,
+  ReplyIcon,
+  RotateCcwIcon,
+  Trash2Icon,
+} from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 
 import { prefetchRichTextEditor } from './editor/editable-text'
@@ -37,6 +43,7 @@ import {
   messageEditSelectionOptions,
 } from './message-edit-selection'
 import { useMessageHighlight } from './message-highlight-context'
+import { useReplyAction } from './reply-action'
 
 export type MessageContextMenuProps = {
   message: UIMessage
@@ -94,6 +101,7 @@ export function MessageContextMenu({
   const hasNewer = useHasNewerMessages(message.id)
   const retryMessage = useRetryMessage()
   const highlight = useMessageHighlight()
+  const reply = useReplyAction(message, record)
   const [confirm, setConfirm] = useState<Confirm>(null)
   const isEditing = editCtx?.editingMessageId === message.id
 
@@ -172,6 +180,12 @@ export function MessageContextMenu({
       <ContextMenu onOpen={handleOpen} onOpenChange={handleOpenChange}>
         <ContextMenu.Trigger>{children}</ContextMenu.Trigger>
         <ContextMenu.Content>
+          {reply && (
+            <ContextMenu.Item onSelect={reply}>
+              <ReplyIcon />
+              Reply
+            </ContextMenu.Item>
+          )}
           {menu.retry && (
             <>
               <ContextMenu.Item onSelect={() => retryMessage(message.id)}>

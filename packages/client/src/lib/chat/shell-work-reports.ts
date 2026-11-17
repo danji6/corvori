@@ -4,7 +4,11 @@ import type { UIMessage } from 'ai'
 import { isShellReportPart } from './parts'
 import type { ShellReportPart } from './parts'
 import type { MessageRow, SegmentGroups, segmentGroupsFor } from './rows'
-import { messageDisplayRole, messageSenderKey } from './sender-groups'
+import {
+  isTranscriptDivider,
+  messageDisplayRole,
+  messageSenderKey,
+} from './sender-groups'
 import { parseOutputValue } from './tool-output'
 import type { MessageRecord } from './types'
 import type { ResolveWorkId, WorkShellReport } from './work-layout'
@@ -40,7 +44,7 @@ export function groupShellReportRows(
   for (const row of rows) {
     const message = options.getMessage(row.messageId)
     const record = options.getMetadata(row.messageId)
-    if (row.kind === 'context-reset') {
+    if (isTranscriptDivider(record)) {
       state.jobs.clear()
       previousMessageId = undefined
       previousSenderKey = null

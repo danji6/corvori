@@ -1,4 +1,6 @@
+import type { Doc } from '@cv/convex/_generated/dataModel'
 import {
+  insertReplyQuote,
   prefixSenderName,
   representMessage,
 } from '@cv/convex/actions/stream/history'
@@ -155,5 +157,58 @@ describe('prefixSenderName', () => {
         ),
       ),
     ).toBe('hi')
+  })
+})
+
+describe('insertReplyQuote', () => {
+  const reply = (
+    quoted: Doc<'messages'>['sender'],
+    text = 'the answer',
+  ): Doc<'messages'> => ({
+    ...stored({ type: 'user', id: USER }, 'user', 'Alice'),
+    replyTo: { sender: quoted, senderName: 'Quoted', text },
+  })
+
+  const message = (): UIMessage => ({
+    id: 'm1',
+    role: 'user',
+    parts: [
+      { type: 'text', text: '<file path="a.ts">\ncode\n</file>' },
+      { type: 'text', text: 'Alice: why?' },
+    ],
+  })
+
+  const texts = (parts: UIMessage['parts']) =>
+    parts.map((part) => (part.type === 'text' ? part.text : ''))
+
+  test('puts the quote right before the reply text', () => {
+    const parts = insertReplyQuote(
+      message(),
+      reply({ type: 'agent', id: SELF }),
+      agent(),
+    )
+
+    expect(texts(parts)).toEqual([
+      '<file path="a.ts">\ncode\n</file>',
+      '<reply-to from="you">\nthe answer\n</reply-to>',
+      'Alice: why?',
+    ])
+  })
+
+  test('names another participant only when names are shared', () => {
+    const quoted = reply({ type: 'user', id: USER })
+    const blockOf = (options: Partial<Doc<'agents'>>) =>
+      texts(insertReplyQuote(message(), quoted, agent(options)))[1]
+
+    expect(blockOf({})).toBe('<reply-to>\nthe answer\n</reply-to>')
+    expect(blockOf({ shareUserDisplayNames: true })).toBe(
+      '<reply-to from="Quoted">\nthe answer\n</reply-to>',
+    )
+  })
+
+  test('adds nothing once the quoted message is gone', () => {
+    const detached = reply({ type: 'user', id: USER }, '')
+
+    expect(insertReplyQuote(message(), detached, agent())).toHaveLength(2)
   })
 })

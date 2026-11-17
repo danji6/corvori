@@ -41,6 +41,19 @@ export function highlightTargetForRow(
   }
 }
 
+/** Registers an element as the whole-message highlight target. */
+export function useMessageHighlightRef(messageId: string) {
+  const registerElement = useMessageHighlight()?.registerElement
+  const target = useMemo(
+    () => ({ messageId, segmentIndex: null, groupIndex: null }),
+    [messageId],
+  )
+  return useCallback(
+    (element: HTMLDivElement | null) => registerElement?.(target, element),
+    [registerElement, target],
+  )
+}
+
 type RegisteredElement = {
   target: HighlightTarget
   element: HTMLElement

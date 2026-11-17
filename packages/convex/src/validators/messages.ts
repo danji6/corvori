@@ -27,6 +27,7 @@ export const messageTypeValidator = v.union(
   v.literal('capabilities'),
   v.literal('command'),
   v.literal('mode'),
+  v.literal('presence'),
 )
 
 export const messageStatusValidator = v.union(
@@ -86,11 +87,36 @@ export const shellReportExtraValidator = v.object({
   userKilled: v.optional(v.boolean()),
 })
 
+export const presenceEventValidator = v.union(
+  v.literal('joined'),
+  v.literal('left'),
+)
+
+/** A participant joining or leaving, with their name at that moment. */
+export const presenceExtraValidator = v.object({
+  event: presenceEventValidator,
+  participant: senderValidator,
+  name: v.string(),
+})
+
+/** A snapshot of the message a reply quotes, taken at send time. */
+export const replyQuoteValidator = v.object({
+  /** Absent once the quoted message is deleted or was not copied along. */
+  target: v.optional(
+    v.object({ id: v.id('messages'), creationTime: v.number() }),
+  ),
+  sender: senderValidator,
+  senderName: v.optional(v.string()),
+  /** Markdown excerpt of the quoted message; empty when it has no text. */
+  text: v.string(),
+})
+
 export const messageExtraValidator = v.union(
   reminderExtraValidator,
   workspaceExtraValidator,
   skillsExtraValidator,
   modeExtraValidator,
+  presenceExtraValidator,
   commandExtraValidator,
   shellReportExtraValidator,
 )
@@ -135,6 +161,8 @@ export const sendMessageArgsValidator = v.object({
   content: v.string(),
   role: v.optional(roleValidator),
   silent: v.optional(v.boolean()), // skips agent invocation (and eventually, notifications)
+  /** The message this one replies to, quoted above its content. */
+  replyToId: v.optional(v.id('messages')),
   attachments: v.optional(
     v.array(
       v.object({
@@ -237,6 +265,7 @@ export const messageSchema = v.object({
   hidden: v.optional(v.boolean()),
   /** Extra payload keyed by `type` (see MessageExtra). */
   extra: v.optional(messageExtraValidator),
+  replyTo: v.optional(replyQuoteValidator),
   /** Last transcript row represented by a completed summary. */
   summaryBoundaryCreationTime: v.optional(v.number()),
   selectedVersion: v.number(),
