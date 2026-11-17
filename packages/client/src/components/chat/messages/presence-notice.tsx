@@ -12,7 +12,10 @@ import { LogInIcon, LogOutIcon, Trash2Icon } from 'lucide-react'
 import { useState } from 'react'
 
 import { ContextDivider } from './context-divider'
-import { useMessageHighlightRef } from './message-highlight-context'
+import {
+  useMessageHighlightMenu,
+  useMessageHighlightRef,
+} from './message-highlight-context'
 
 export type PresenceNoticeProps = {
   message: UIMessage
@@ -26,6 +29,7 @@ export function PresenceNotice({ message, record }: PresenceNoticeProps) {
   const deleteMessage = useDeleteMessage()
   const [confirm, setConfirm] = useState(false)
   const ref = useMessageHighlightRef(message.id)
+  const handleHighlightOpenChange = useMessageHighlightMenu(message.id)
   const canDelete = canMutateMessage(message, record, session, profile)
 
   const notice = (
@@ -43,7 +47,7 @@ export function PresenceNotice({ message, record }: PresenceNoticeProps) {
 
   return (
     <>
-      <ContextMenu>
+      <ContextMenu onOpenChange={handleHighlightOpenChange}>
         <ContextMenu.Trigger>{notice}</ContextMenu.Trigger>
         <ContextMenu.Content>
           <ContextMenu.Item

@@ -190,10 +190,18 @@ export function ChatSessionView({
     keepVisible: revealComposerForFocus,
   } = useComposerReveal(session?._id, isAtBottom)
 
+  const reply = useComposerReply({
+    sessionId: session?._id,
+    composerRef,
+    onSubmit,
+  })
+  const hasReply = reply.target !== undefined
+
   const unseenActivity = useUnseenTailActivity(isAtBottom)
   const hasActivity = isOngoingStream(status) || unseenActivity
   const agentWaiting = awaitingApproval || awaitingAnswer
-  const composerDocked = !isEditing && (isPinned || isAtBottom || hasContent)
+  const composerDocked =
+    !isEditing && (isPinned || isAtBottom || hasContent || hasReply)
 
   const review = useApprovalReview({
     awaitingApproval,
@@ -257,11 +265,6 @@ export function ChatSessionView({
     return () => cancelAnimationFrame(frame)
   }, [completedEditRevision, showDock, showInteractionPicker])
 
-  const reply = useComposerReply({
-    sessionId: session?._id,
-    composerRef,
-    onSubmit,
-  })
   const submitMessage = reply.submit
 
   const handleSubmit = useCallback(

@@ -4,11 +4,11 @@ import { useReasoningLabel } from '@/hooks/chat/reasoning-label'
 import type { MessageRole } from '@/lib/chat'
 import { cn } from '@/lib/utils'
 import type { ReasoningPart } from '@cv/convex/types'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 import { useGrowOnly } from './grow-only'
 import { MessageHeader, type MessageSender } from './message-header'
-import { useMessageHighlight } from './message-highlight-context'
+import { useMessageHighlightRef } from './message-highlight-context'
 import { useMessageList } from './message-list/message-list-context'
 import { SmoothText } from './smooth-text'
 
@@ -35,19 +35,12 @@ export function ReasoningHeader({
   const [open, setOpen] = useCollapsible(openKey)
   const messageList = useMessageList()
 
-  const registerElement = useMessageHighlight()?.registerElement
-
-  const target = useMemo(
-    () => ({ messageId, segmentIndex, groupIndex, surface: 'header' as const }),
-    [messageId, segmentIndex, groupIndex],
-  )
-
-  const highlightRef = useCallback(
-    (element: HTMLElement | null) => {
-      registerElement?.(target, element)
-    },
-    [target, registerElement],
-  )
+  const highlightRef = useMessageHighlightRef({
+    messageId,
+    segmentIndex,
+    groupIndex,
+    surface: 'header',
+  })
 
   const hasText = part.text.trim().length > 0
   const showBody = open && hasText

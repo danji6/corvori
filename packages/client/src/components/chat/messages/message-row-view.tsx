@@ -20,7 +20,7 @@ import { messageDisplayRole } from '@/lib/chat/sender-groups'
 import { cn, formatDuration, isTouchDevice } from '@/lib/utils'
 import { toDisplayName } from '@cv/core/utils/names'
 import { type UIMessage, isReasoningUIPart } from 'ai'
-import { memo, useCallback, useMemo, useRef } from 'react'
+import { memo, useMemo, useRef } from 'react'
 
 import { ChangesSummary } from './changes/changes-summary'
 import { ContextDivider } from './context-divider'
@@ -31,7 +31,7 @@ import { MessageContext } from './message-context'
 import { MessageContextMenu } from './message-context-menu'
 import { MessageHeader } from './message-header'
 import {
-  useMessageHighlight,
+  highlightTargetForRow,
   useMessageHighlightRef,
 } from './message-highlight-context'
 import { MessageVersionSwitcher } from './message-version-switcher'
@@ -80,7 +80,9 @@ export const MessageRowView = memo(function MessageRowView({
       ) : row.kind === 'header' ? (
         <HeaderRow row={row} message={message} messageMeta={messageMeta} />
       ) : row.kind === 'reply' ? (
-        messageMeta?.replyTo && <ReplyQuoteCard quote={messageMeta.replyTo} />
+        messageMeta?.replyTo && (
+          <ReplyQuoteCard messageId={message.id} quote={messageMeta.replyTo} />
+        )
       ) : row.kind === 'group' ? (
         <GroupRow
           row={row}
@@ -234,20 +236,8 @@ type HeaderRowProps = {
 }
 
 function HeaderRow({ row, message, messageMeta }: HeaderRowProps) {
-  const registerElement = useMessageHighlight()?.registerElement
+  const highlightRef = useMessageHighlightRef(message.id)
   const role = messageDisplayRole(message, messageMeta)
-
-  const highlightTarget = useMemo(
-    () => ({ messageId: message.id, segmentIndex: null, groupIndex: null }),
-    [message.id],
-  )
-
-  const highlightRef = useCallback(
-    (element: HTMLDivElement | null) => {
-      registerElement?.(highlightTarget, element)
-    },
-    [highlightTarget, registerElement],
-  )
 
   const reasoning = useReasoningHeader(message, messageMeta, row.reasoning)
 
@@ -319,20 +309,8 @@ function GroupRow({ row, message, messageMeta, partMeta }: GroupRowProps) {
     (candidate) => candidate.segmentIndex === row.segmentIndex,
   )
   const group = slice?.groups[row.groupIndex]
-  const registerElement = useMessageHighlight()?.registerElement
-  const highlightTarget = useMemo(
-    () => ({
-      messageId: message.id,
-      segmentIndex: row.segmentIndex,
-      groupIndex: row.groupIndex,
-    }),
-    [message.id, row.segmentIndex, row.groupIndex],
-  )
-  const highlightRef = useCallback(
-    (element: HTMLDivElement | null) => {
-      registerElement?.(highlightTarget, element)
-    },
-    [highlightTarget, registerElement],
+  const highlightRef = useMessageHighlightRef(
+    highlightTargetForRow(message.id, row),
   )
 
   if (!group) return null

@@ -35,11 +35,14 @@ import {
   Trash2Icon,
   TriangleAlertIcon,
 } from 'lucide-react'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useState } from 'react'
 
 import { CollapsibleBlock } from './collapsible-block'
 import { HiddenNoteContent } from './hidden-note-content'
-import { useMessageHighlight } from './message-highlight-context'
+import {
+  useMessageHighlightMenu,
+  useMessageHighlightRef,
+} from './message-highlight-context'
 
 type ChipPresentation = {
   icon: LucideIcon
@@ -157,34 +160,12 @@ export function HiddenChip({ message, record, placement }: HiddenChipProps) {
   const deleteMessage = useDeleteMessage()
   const deleteMessagesFrom = useDeleteMessagesFrom()
   const hasNewer = useHasNewerMessages(message.id)
-  const highlight = useMessageHighlight()
   const [confirm, setConfirm] = useState(false)
-  const ownsHighlightRef = useRef(false)
   const canMutate = canMutateMessage(message, record, session, profile)
   const presentation = chipPresentation(record)
   const { noun, copyText } = presentation
-
-  const highlightTarget = useMemo(
-    () => ({ messageId: message.id, segmentIndex: null, groupIndex: null }),
-    [message.id],
-  )
-  const highlightRef = useCallback(
-    (element: HTMLDivElement | null) => {
-      highlight?.registerElement(highlightTarget, element)
-    },
-    [highlight, highlightTarget],
-  )
-
-  function handleOpenChange(open: boolean) {
-    if (!highlight) return
-    if (open) {
-      ownsHighlightRef.current = true
-      highlight.setTarget(highlightTarget)
-    } else if (ownsHighlightRef.current) {
-      ownsHighlightRef.current = false
-      highlight.setTarget(null)
-    }
-  }
+  const highlightRef = useMessageHighlightRef(message.id)
+  const handleHighlightOpenChange = useMessageHighlightMenu(message.id)
 
   const chip = (
     <div
@@ -210,7 +191,7 @@ export function HiddenChip({ message, record, placement }: HiddenChipProps) {
 
   return (
     <>
-      <ContextMenu onOpenChange={handleOpenChange}>
+      <ContextMenu onOpenChange={handleHighlightOpenChange}>
         <ContextMenu.Trigger>{chip}</ContextMenu.Trigger>
         <ContextMenu.Content>
           <ContextMenu.Item

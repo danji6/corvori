@@ -2,7 +2,7 @@ import type { ReplyTarget } from '@/lib/chat'
 import { toDisplayName } from '@cv/core/utils/names'
 import { ReplyIcon, XIcon } from 'lucide-react'
 
-import { Button } from '../../ui'
+import { RippleButton } from '../../ui'
 import { ReplyQuoteExcerpt } from '../messages/reply-quote'
 
 type ComposerReplyProps = {
@@ -15,7 +15,7 @@ export function ComposerReply({ target, onCancel }: ComposerReplyProps) {
   return (
     <div data-slot="composer-reply" className="order-first w-full px-2 pt-1">
       <div className="bg-m3-surface-container flex min-w-0 items-stretch overflow-hidden rounded-2xl">
-        <span aria-hidden className="bg-m3-primary w-[3px] shrink-0" />
+        <span aria-hidden className="bg-m3-primary w-1 shrink-0" />
         <div className="flex min-w-0 flex-1 flex-col px-3 py-1.5">
           <span className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs">
             <ReplyIcon className="size-3.5 shrink-0" />
@@ -28,15 +28,15 @@ export function ComposerReply({ target, onCancel }: ComposerReplyProps) {
           </span>
           <ReplyQuoteExcerpt quote={target} lines={1} />
         </div>
-        <Button
+        <RippleButton
           size="icon-sm"
-          variant="ghost"
+          variant="surface"
           aria-label="Cancel reply"
           className="text-muted-foreground mr-1 shrink-0 self-center"
           onClick={onCancel}
         >
           <XIcon />
-        </Button>
+        </RippleButton>
       </div>
     </div>
   )

@@ -17,10 +17,7 @@ export type HighlightTarget = {
 export type MessageHighlightValue = {
   target: HighlightTarget | null
   setTarget: React.Dispatch<React.SetStateAction<HighlightTarget | null>>
-  registerElement: (
-    target: HighlightTarget,
-    element: HTMLElement | null,
-  ) => void
+  registerElement: (target: HighlightTarget, element: HTMLElement) => () => void
 }
 
 export const [MessageHighlightContext, useMessageHighlight] =
@@ -41,22 +38,52 @@ export function highlightTargetForRow(
   }
 }
 
-/** Registers an element as the whole-message highlight target. */
-export function useMessageHighlightRef(messageId: string) {
-  const registerElement = useMessageHighlight()?.registerElement
-  const target = useMemo(
-    () => ({ messageId, segmentIndex: null, groupIndex: null }),
-    [messageId],
+type HighlightTargetInput = HighlightTarget | string
+
+function resolveHighlightTarget(target: HighlightTargetInput): HighlightTarget {
+  if (typeof target !== 'string') return target
+  return { messageId: target, segmentIndex: null, groupIndex: null }
+}
+
+function useResolvedHighlightTarget(targetInput: HighlightTargetInput) {
+  const { messageId, segmentIndex, groupIndex, surface } =
+    resolveHighlightTarget(targetInput)
+  return useMemo(
+    () => ({ messageId, segmentIndex, groupIndex, surface }),
+    [messageId, segmentIndex, groupIndex, surface],
   )
+}
+
+/** Registers an element for a highlight target. */
+export function useMessageHighlightRef(targetInput: HighlightTargetInput) {
+  const registerElement = useMessageHighlight()?.registerElement
+  const target = useResolvedHighlightTarget(targetInput)
   return useCallback(
-    (element: HTMLDivElement | null) => registerElement?.(target, element),
+    (element: HTMLElement | null) => {
+      if (element) return registerElement?.(target, element)
+    },
     [registerElement, target],
   )
 }
 
-type RegisteredElement = {
-  target: HighlightTarget
-  element: HTMLElement
+export function useMessageHighlightMenu(targetInput: HighlightTargetInput) {
+  const setTarget = useMessageHighlight()?.setTarget
+  const target = useResolvedHighlightTarget(targetInput)
+  const ownsHighlightRef = useRef(false)
+
+  return useCallback(
+    (open: boolean) => {
+      if (!setTarget) return
+      if (open) {
+        ownsHighlightRef.current = true
+        setTarget(target)
+      } else if (ownsHighlightRef.current) {
+        ownsHighlightRef.current = false
+        setTarget(null)
+      }
+    },
+    [setTarget, target],
+  )
 }
 
 type HighlightRect = {
@@ -86,18 +113,19 @@ export function MessageHighlightProvider({
   const [target, setTarget] = useState<HighlightTarget | null>(null)
   const [rect, setRect] = useState<MeasuredHighlightRect | null>(null)
   const [registryVersion, setRegistryVersion] = useState(0)
-  const elementsRef = useRef(new Map<string, RegisteredElement>())
+  const elementsRef = useRef(new Map<HTMLElement, HighlightTarget>())
   const messageList = useMessageList()
 
   const registerElement = useCallback(
-    (target: HighlightTarget, element: HTMLElement | null) => {
-      const key = keyForTarget(target)
-      if (element) {
-        elementsRef.current.set(key, { target, element })
-      } else {
-        elementsRef.current.delete(key)
-      }
+    (target: HighlightTarget, element: HTMLElement) => {
+      elementsRef.current.set(element, target)
       setRegistryVersion((version) => version + 1)
+
+      return () => {
+        if (elementsRef.current.get(element) !== target) return
+        elementsRef.current.delete(element)
+        setRegistryVersion((version) => version + 1)
+      }
     },
     [],
   )
@@ -160,21 +188,22 @@ export function MessageHighlightProvider({
 
 function getTargetElements(
   target: HighlightTarget,
-  elements: Map<string, RegisteredElement>,
+  elements: Map<HTMLElement, HighlightTarget>,
 ): HTMLElement[] {
-  if (target.groupIndex !== null) {
-    const element = elements.get(keyForTarget(target))?.element
-    return element ? [element] : []
-  }
-
-  return Array.from(elements.values())
-    .filter((entry) => entry.target.messageId === target.messageId)
-    .map((entry) => entry.element)
+  const targetKey = keyForTarget(target)
+  return Array.from(elements.entries())
+    .filter(([, registeredTarget]) => {
+      if (target.groupIndex === null) {
+        return registeredTarget.messageId === target.messageId
+      }
+      return keyForTarget(registeredTarget) === targetKey
+    })
+    .map(([element]) => element)
 }
 
 function measureTarget(
   target: HighlightTarget,
-  elements: Map<string, RegisteredElement>,
+  elements: Map<HTMLElement, HighlightTarget>,
   scrollElement?: HTMLElement | null,
 ): HighlightRect | null {
   const rects = getTargetElements(target, elements)

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import {
   type HighlightTarget,
   useMessageHighlight,
+  useMessageHighlightRef,
 } from './message-highlight-context'
 import { useMessageSeek } from './message-seek-context'
 
@@ -26,11 +27,17 @@ const EXCERPT_MARKDOWN = [
 
 export type ReplyQuoteCardProps = {
   quote: ReplyQuote
+  messageId: string
   className?: string
 }
 
 /** The message a reply responds to, shown above the reply's content. */
-export function ReplyQuoteCard({ quote, className }: ReplyQuoteCardProps) {
+export function ReplyQuoteCard({
+  quote,
+  messageId,
+  className,
+}: ReplyQuoteCardProps) {
+  const highlightRef = useMessageHighlightRef(messageId)
   const jump = useJumpToMessage(quote.target)
   const unavailable = !quote.target && !quote.text
 
@@ -48,6 +55,7 @@ export function ReplyQuoteCard({ quote, className }: ReplyQuoteCardProps) {
 
   return (
     <div
+      ref={highlightRef}
       data-slot="reply-quote"
       role={jump ? 'button' : undefined}
       tabIndex={jump ? 0 : undefined}
@@ -64,7 +72,7 @@ export function ReplyQuoteCard({ quote, className }: ReplyQuoteCardProps) {
       <span
         aria-hidden
         className={cn(
-          'w-[3px] shrink-0',
+          'w-1 shrink-0',
           unavailable ? 'bg-border' : 'bg-m3-primary',
         )}
       />
