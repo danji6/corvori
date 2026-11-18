@@ -67,6 +67,7 @@ const PLACEHOLDER_NAME_MAX = 24
 export type ChatComposerProps = Omit<InputGroupProps, 'onSubmit'> & {
   onSubmit: (message: PendingMessage) => void | Promise<void>
   onStop?: () => void
+  stopDisabled?: boolean
   onRunCommand?: (name: string, argument: string, silent: boolean) => void
   onContinueAgent?: () => void
   canContinueAgent?: boolean
@@ -107,6 +108,7 @@ export type ChatComposerProps = Omit<InputGroupProps, 'onSubmit'> & {
 export function ChatComposer({
   onSubmit,
   onStop,
+  stopDisabled = false,
   onRunCommand,
   onContinueAgent,
   canContinueAgent = false,
@@ -493,7 +495,7 @@ export function ChatComposer({
                   isStop={isStop}
                   sending={sending}
                   disabled={
-                    (!isStop && !hasContent && !canContinue) ||
+                    (isStop ? stopDisabled : !hasContent && !canContinue) ||
                     (sendDisabled && hasContent) ||
                     shellBlocked
                   }

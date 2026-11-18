@@ -58,6 +58,7 @@ describe('_suspendStep', () => {
       'sessionAgents',
       'messages',
       'messageContents',
+      'sessionState',
       'streams',
     ])
     const prompt = inserts.find(({ table }) => table === 'messages')

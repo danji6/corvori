@@ -6,13 +6,14 @@ import {
 } from '@/components/markdown'
 import { T } from '@/components/ui/typography'
 import { useMathMode } from '@/hooks/chat/resolved-settings'
+import { useSmoothedText } from '@/hooks/chat/smoothed-text'
 import { useStreamingCursor } from '@/hooks/chat/streaming-cursor'
 import type { MathMode } from '@/lib/chat'
 import { autoCloseMarkdown, splitAtLastBlock } from '@/lib/markdown/helpers'
 import { remarkStreamingCursor } from '@/lib/markdown/remark'
 import { cn } from '@/lib/utils'
 import type { ReasoningUIPart, TextUIPart } from 'ai'
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useMemo } from 'react'
 import type { Components } from 'react-markdown'
 
 import { StreamingCodeBlock } from './streaming-code-block'
@@ -48,66 +49,7 @@ function SmoothTextComponent({ part }: SmoothTextProps) {
   const streamingCursor = useStreamingCursor(text, isStreaming)
   const mathMode = useMathMode()
 
-  const [smoothedText, setSmoothedText] = useState(text)
-  const currentIndexRef = useRef(smoothedText.length)
-
-  useEffect(() => {
-    if (!isStreaming) return
-
-    let rafId: number
-    let lastTime = performance.now()
-
-    // Resume from wherever we currently are painted
-    currentIndexRef.current = smoothedText.length
-
-    const loop = (time: number) => {
-      rafId = requestAnimationFrame(loop)
-
-      const dt = time - lastTime
-      lastTime = time
-
-      const BUFFER_CHARS = 8
-      const targetLen = Math.max(0, text.length - BUFFER_CHARS)
-
-      if (currentIndexRef.current >= targetLen) {
-        return // Caught up
-      }
-
-      // Catch up speed: ~150ms
-      const distance = targetLen - currentIndexRef.current
-      let speed = distance / 0.15
-
-      if (speed < 40) speed = 40
-
-      currentIndexRef.current += (speed * dt) / 1000
-
-      if (currentIndexRef.current >= targetLen) {
-        currentIndexRef.current = targetLen
-      }
-
-      const nextInt = Math.floor(currentIndexRef.current)
-
-      setSmoothedText((prev) => {
-        if (nextInt <= prev.length) return prev
-
-        // Back up past trailing markdown openers so we never leave the
-        // display mid-construct (e.g. a lone `*` before `**bold**` arrives)
-        let displayLen = nextInt
-        while (displayLen > prev.length && /[*`]/.test(text[displayLen - 1])) {
-          displayLen--
-        }
-
-        return displayLen > prev.length ? text.slice(0, displayLen) : prev
-      })
-    }
-
-    rafId = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(rafId)
-    // We intentionally only restart the loop when new text chunks arrive
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, isStreaming])
-
-  const displayedText = isStreaming ? smoothedText : text
+  const displayedText = useSmoothedText(text, isStreaming)
 
   const [committed, tail] = useMemo(
     () => (isStreaming ? splitAtLastBlock(displayedText) : [displayedText, '']),

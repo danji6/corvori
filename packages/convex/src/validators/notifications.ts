@@ -59,5 +59,5 @@ export const notificationSchema = v.object({
   approval: v.optional(notificationApprovalValidator),
   request: v.optional(notificationRequestValidator),
   requestState: v.optional(notificationRequestStateValidator),
-  attention: v.optional(v.boolean()),
+  attention: v.optional(v.literal(true)),
 })

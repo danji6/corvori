@@ -13,6 +13,7 @@ import { mkdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { z } from 'zod'
 
+import { workspaceRoots } from '../../checkpoints/group'
 import { checkpoints } from '../../checkpoints/manager'
 import { readOptionalEditSnapshot } from '../../files/read-snapshot'
 import { readTextPage } from '../../files/read-text'
@@ -92,48 +93,52 @@ async function writeWorkspaceFileImpl(input: {
     input.allowOutsideWorkspace,
   )
 
-  assertPersonalScope(input.workspace, target.absolutePath)
-  await assertCheckpointTarget(
-    workspace.root,
-    target.absolutePath,
-    target.external,
-  )
-  await checkpoints().trackFile(
+  return checkpoints().write(
     input.sessionId,
-    target.absolutePath,
-    input.workspace,
+    [target.absolutePath],
+    async (writer) => {
+      assertPersonalScope(input.workspace, target.absolutePath)
+      await assertCheckpointTarget(
+        workspace.root,
+        target.absolutePath,
+        target.external,
+      )
+      await writer.trackFile(target.absolutePath, input.workspace)
+      const previousContent = await readOptionalEditSnapshot(
+        target.absolutePath,
+      )
+
+      // Reject empty diffs
+      if (
+        previousContent !== undefined &&
+        isUnchangedWrite(previousContent, input.content)
+      ) {
+        throw new Error(
+          `No changes made to ${target.relativePath}. The file already contains this content.`,
+        )
+      }
+
+      await assertCheckpointTarget(
+        workspace.root,
+        target.absolutePath,
+        target.external,
+      )
+      await mkdir(path.dirname(target.absolutePath), { recursive: true })
+      await writeFile(target.absolutePath, input.content, 'utf-8')
+
+      return {
+        path: target.relativePath,
+        bytes: Buffer.byteLength(input.content),
+        diff: capDiff(
+          createUnifiedDiff(
+            target.relativePath,
+            normalizeToLf(stripBom(previousContent ?? '').text),
+            normalizeToLf(stripBom(input.content).text),
+          ),
+        ),
+      }
+    },
   )
-  const previousContent = await readOptionalEditSnapshot(target.absolutePath)
-
-  // Reject empty diffs
-  if (
-    previousContent !== undefined &&
-    isUnchangedWrite(previousContent, input.content)
-  ) {
-    throw new Error(
-      `No changes made to ${target.relativePath}. The file already contains this content.`,
-    )
-  }
-
-  await assertCheckpointTarget(
-    workspace.root,
-    target.absolutePath,
-    target.external,
-  )
-  await mkdir(path.dirname(target.absolutePath), { recursive: true })
-  await writeFile(target.absolutePath, input.content, 'utf-8')
-
-  return {
-    path: target.relativePath,
-    bytes: Buffer.byteLength(input.content),
-    diff: capDiff(
-      createUnifiedDiff(
-        target.relativePath,
-        normalizeToLf(stripBom(previousContent ?? '').text),
-        normalizeToLf(stripBom(input.content).text),
-      ),
-    ),
-  }
 }
 
 async function editWorkspaceFileImpl(input: {
@@ -159,41 +164,49 @@ async function editWorkspaceFileImpl(input: {
     input.allowOutsideWorkspace,
   )
 
-  assertPersonalScope(input.workspace, target.absolutePath)
-  await assertCheckpointTarget(
-    workspace.root,
-    target.absolutePath,
-    target.external,
-  )
-  await checkpoints().trackFile(
+  return checkpoints().write(
     input.sessionId,
-    target.absolutePath,
-    input.workspace,
-  )
-  const previousContent = await readOptionalEditSnapshot(target.absolutePath)
-  const { bom, text } = stripBom(previousContent ?? '')
-  const ending = detectLineEnding(text)
-  const baseContent = normalizeToLf(text)
-  const newContent = applyEdits(baseContent, input.edits, target.relativePath)
+    [target.absolutePath],
+    async (writer) => {
+      assertPersonalScope(input.workspace, target.absolutePath)
+      await assertCheckpointTarget(
+        workspace.root,
+        target.absolutePath,
+        target.external,
+      )
+      await writer.trackFile(target.absolutePath, input.workspace)
+      const previousContent = await readOptionalEditSnapshot(
+        target.absolutePath,
+      )
+      const { bom, text } = stripBom(previousContent ?? '')
+      const ending = detectLineEnding(text)
+      const baseContent = normalizeToLf(text)
+      const newContent = applyEdits(
+        baseContent,
+        input.edits,
+        target.relativePath,
+      )
 
-  await assertCheckpointTarget(
-    workspace.root,
-    target.absolutePath,
-    target.external,
-  )
-  await writeFile(
-    target.absolutePath,
-    bom + restoreLineEndings(newContent, ending),
-    'utf-8',
-  )
+      await assertCheckpointTarget(
+        workspace.root,
+        target.absolutePath,
+        target.external,
+      )
+      await writeFile(
+        target.absolutePath,
+        bom + restoreLineEndings(newContent, ending),
+        'utf-8',
+      )
 
-  return {
-    path: target.relativePath,
-    edits: input.edits.length,
-    diff: capDiff(
-      createUnifiedDiff(target.relativePath, baseContent, newContent),
-    ),
-  }
+      return {
+        path: target.relativePath,
+        edits: input.edits.length,
+        diff: capDiff(
+          createUnifiedDiff(target.relativePath, baseContent, newContent),
+        ),
+      }
+    },
+  )
 }
 
 /** Simulate a unified diff for the given input. */
@@ -274,13 +287,17 @@ async function runWorkspaceCommandImpl(input: {
   signal?: AbortSignal
 }) {
   const directory = await resolveShellDirectory(input)
-  await checkpoints().assertAvailable(input.sessionId, [directory.cwd])
-  return runCommand(
-    input.command,
-    directory.cwd,
-    input.timeout ?? 30,
-    input.signal,
-    directory.environment,
+  const roots = input.workspace
+    ? await workspaceRoots(input.sessionId, input.workspace)
+    : directory.roots
+  return checkpoints().write(input.sessionId, [...roots, directory.cwd], () =>
+    runCommand(
+      input.command,
+      directory.cwd,
+      input.timeout ?? 30,
+      input.signal,
+      directory.environment,
+    ),
   )
 }
 
@@ -357,9 +374,7 @@ export function writeWorkspaceFile(
   input: Parameters<typeof writeWorkspaceFileImpl>[0],
 ) {
   return withFilesystemOperation(input, () =>
-    checkpoints().write(input.sessionId, input.workspace, () =>
-      writeWorkspaceFileImpl(selectFileToolScope(input)),
-    ),
+    writeWorkspaceFileImpl(selectFileToolScope(input)),
   )
 }
 
@@ -367,9 +382,7 @@ export function editWorkspaceFile(
   input: Parameters<typeof editWorkspaceFileImpl>[0],
 ) {
   return withFilesystemOperation(input, () =>
-    checkpoints().write(input.sessionId, input.workspace, () =>
-      editWorkspaceFileImpl(selectFileToolScope(input)),
-    ),
+    editWorkspaceFileImpl(selectFileToolScope(input)),
   )
 }
 
@@ -384,11 +397,7 @@ export function previewWorkspaceDiff(
 export function runWorkspaceCommand(
   input: Parameters<typeof runWorkspaceCommandImpl>[0],
 ) {
-  return withFilesystemOperation(input, () =>
-    checkpoints().write(input.sessionId, input.workspace, () =>
-      runWorkspaceCommandImpl(input),
-    ),
-  )
+  return withFilesystemOperation(input, () => runWorkspaceCommandImpl(input))
 }
 
 export function checkFlaggedPaths(

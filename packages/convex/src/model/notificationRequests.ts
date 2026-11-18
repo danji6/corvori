@@ -6,6 +6,7 @@ import { error } from '../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../functions'
 import type { NotificationRequest, NotificationRequestState } from '../types'
 import { withApprovalActions } from './notificationApprovals'
+import { pruneReadNotifications } from './notificationRetention'
 
 type PendingPageArgs = {
   paginationOpts: PaginationOptions
@@ -35,18 +36,9 @@ export async function pendingPage(
   }
 }
 
-/** Counts the whole inbox independently of loaded pages and returns popup candidates. */
+/** Summarizes protected requests independently of the loaded inbox pages. */
 export async function summary(ctx: AuthQueryCtx) {
-  const [attention, unread] = await Promise.all([
-    attentionRows(ctx).collect(),
-    ctx.db
-      .query('notifications')
-      .withIndex('by_recipientId_status_readAt', (q) =>
-        q.eq('recipientId', ctx.userId).eq('status', 'unread'),
-      )
-      .collect(),
-  ])
-
+  const attention = await attentionRows(ctx).collect()
   const pending = attention.filter((row) => row.requestState === 'pending')
 
   const recent = [...pending]
@@ -56,12 +48,9 @@ export async function summary(ctx: AuthQueryCtx) {
     .slice(0, 100)
 
   return {
-    unreadCount:
-      attention.length + unread.filter((row) => !row.attention).length,
+    attentionCount: attention.length,
     pendingCount: pending.length,
-    activeIds: [...pending, ...unread.filter((row) => !row.attention)].map(
-      (row) => row._id,
-    ),
+    pendingIds: pending.map((row) => row._id),
     recent: await Promise.all(
       recent.map((row) => withApprovalActions(ctx, row)),
     ),
@@ -83,12 +72,13 @@ export async function acknowledge(
 ) {
   const row = await ctx.db.get(notificationId)
   if (!row || row.recipientId !== ctx.userId) error('Not found', 404)
-  if (row.requestState !== 'expired') return
+  if (!row.attention || row.requestState !== 'expired') return
   await ctx.db.patch(row._id, {
-    attention: false,
+    attention: undefined,
     status: 'read',
     readAt: Date.now(),
   })
+  await pruneReadNotifications(ctx, ctx.userId)
 }
 
 /** Matches the exact processing segment and invocation behind a request. */
@@ -124,11 +114,11 @@ export async function settleRequest(
   state: Exclude<NotificationRequestState, 'pending'> = 'handled',
 ) {
   const rows = await forStream(ctx, target.streamId)
-  for (const row of rows) {
-    if (row.requestState !== 'pending' || !sameInvocation(row.request, target))
-      continue
-    await settle(ctx, row, state)
-  }
+  await settle(
+    ctx,
+    rows.filter((row) => sameInvocation(row.request, target)),
+    state,
+  )
 }
 
 /** Settles protected requests before their stream is stopped or removed. */
@@ -137,9 +127,7 @@ export async function settleStream(
   streamId: Id<'streams'>,
   state: Exclude<NotificationRequestState, 'pending'>,
 ) {
-  for (const row of await forStream(ctx, streamId)) {
-    if (row.requestState === 'pending') await settle(ctx, row, state)
-  }
+  await settle(ctx, await forStream(ctx, streamId), state)
 }
 
 function forStream(ctx: MutationCtx, streamId: Id<'streams'>) {
@@ -151,14 +139,22 @@ function forStream(ctx: MutationCtx, streamId: Id<'streams'>) {
 
 async function settle(
   ctx: MutationCtx,
-  row: Doc<'notifications'>,
+  rows: Doc<'notifications'>[],
   state: Exclude<NotificationRequestState, 'pending'>,
 ) {
   const expired = state === 'expired'
-  await ctx.db.patch(row._id, {
-    requestState: state,
-    attention: expired,
-    status: expired ? 'unread' : 'read',
-    readAt: expired ? undefined : Date.now(),
-  })
+  const recipients = new Set<Id<'users'>>()
+  const readAt = expired ? undefined : Date.now()
+  for (const row of rows) {
+    if (row.requestState !== 'pending') continue
+    await ctx.db.patch(row._id, {
+      requestState: state,
+      attention: expired ? true : undefined,
+      status: expired ? 'unread' : 'read',
+      readAt,
+    })
+    if (!expired) recipients.add(row.recipientId)
+  }
+  for (const recipientId of recipients)
+    await pruneReadNotifications(ctx, recipientId)
 }

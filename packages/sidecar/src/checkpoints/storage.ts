@@ -44,7 +44,12 @@ export class CheckpointStorage {
       if (!/^[a-f0-9]{64}$/.test(name)) continue
       const filename = path.join(directory, name)
       await assertPlainPath(filename)
-      records.push(JSON.parse(await readFile(filename, 'utf8')))
+      try {
+        records.push(JSON.parse(await readFile(filename, 'utf8')))
+      } catch (error) {
+        // A disjoint restore can retire its journal after enumeration.
+        if (!isMissing(error)) throw error
+      }
     }
     return records
   }

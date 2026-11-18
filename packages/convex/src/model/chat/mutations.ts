@@ -9,6 +9,7 @@ import {
   allVersionParts,
   deleteVersions,
   getSegmentRow,
+  invalidateCompletedHistory,
   listSelectedSegments,
   replaceSelectedContent,
   setSegmentParts,
@@ -130,6 +131,7 @@ export async function deleteMessageParts(
       // Emptied segments are dropped without renumbering the remaining
       // ones (gaps keep later part addresses stable)
       await ctx.db.delete(row._id)
+      await invalidateCompletedHistory(ctx, message)
     } else {
       await setSegmentParts(ctx, message, row, kept)
     }
@@ -219,6 +221,7 @@ async function deleteMessageDoc(
     await Attachments.removeAttachment(ctx, attachment)
   }
 
+  await invalidateCompletedHistory(ctx, message)
   await deleteVersions(ctx, message._id)
   await forgetQuotedMessage(ctx, message._id)
   await ctx.db.delete(message._id)

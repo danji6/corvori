@@ -53,7 +53,11 @@ import { SessionTree } from './session-tree'
 // Keep sensor identity stable so folder toggles don't update every draggable.
 const MOUSE_SENSOR_OPTIONS = { activationConstraint: { distance: 8 } }
 
-export const SessionListView = memo(function SessionListView() {
+export const SessionListView = memo(function SessionListView({
+  streamingEnabled = true,
+}: {
+  streamingEnabled?: boolean
+}) {
   const {
     pages,
     folders: serverFolders,
@@ -308,6 +312,7 @@ export const SessionListView = memo(function SessionListView() {
         </header>
         <SessionListScrollArea ref={scrollArea}>
           <SessionTree
+            streamingEnabled={streamingEnabled}
             rows={rows}
             collapsed={collapsed}
             renderRow={renderRow}

@@ -274,7 +274,10 @@ function query(name: string, args: Record<string, unknown>) {
       continueCursor: String(start + numItems),
     }
   }
-  if (name === 'notifications:list' || name === 'streams:activeSessionIds')
+  if (
+    name === 'notifications:list' ||
+    name === 'streams:activeSessionIdsForSessions'
+  )
     return []
   if (name !== 'sessions:list') return null
   return sessionPage(args)

@@ -21,19 +21,19 @@ test('resumes a restarted capture without losing its baseline or external file r
   await writeFile(local, 'original local')
   await writeFile(external, 'original external')
   await f.manager.begin(f.begin)
-  await f.manager.write('session', f.begin.workspace, async () => {
-    await f.manager.trackFile('session', external, f.begin.workspace)
+  await f.manager.write('session', [external, local], async (writer) => {
+    await writer.trackFile(external, f.begin.workspace)
     await writeFile(external, 'before restart')
     await writeFile(local, 'before restart')
   })
 
   const restarted = new CheckpointManager(f.storage)
   await expect(
-    restarted.write('session', f.begin.workspace, async () => {}),
+    restarted.write('session', [f.root], async () => {}),
   ).rejects.toThrow('capture was interrupted')
   expect(await restarted.begin(f.begin)).toEqual({ queued: false })
-  await restarted.write('session', f.begin.workspace, async () => {
-    await restarted.trackFile('session', external, f.begin.workspace)
+  await restarted.write('session', [external, local], async (writer) => {
+    await writer.trackFile(external, f.begin.workspace)
     await writeFile(external, 'after restart')
     await writeFile(local, 'after restart')
   })
@@ -71,20 +71,20 @@ test('waits for inherited shell processes before resuming and retires their iden
   })
   await once(child, 'spawn')
   try {
-    await f.manager.write('session', f.begin.workspace, () =>
-      f.manager.trackJob('session', child.pid),
+    await f.manager.write('session', [f.root], (writer) =>
+      writer.trackJob(child.pid),
     )
     const restarted = new CheckpointManager(f.storage)
     expect(await restarted.begin(f.begin)).toEqual({ queued: true })
     await expect(
-      restarted.write('session', f.begin.workspace, async () => {}),
+      restarted.write('session', [f.root], async () => {}),
     ).rejects.toThrow('capture was interrupted')
     const exited = once(child, 'close')
     child.stdin.end('finished\n')
     await exited
 
     expect(await restarted.begin(f.begin)).toEqual({ queued: false })
-    await restarted.write('session', f.begin.workspace, () =>
+    await restarted.write('session', [f.root], () =>
       writeFile(path.join(f.root, 'resumed.txt'), 'resumed'),
     )
     expect((await restarted.finish(f.finish)).released).toBe(true)

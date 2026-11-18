@@ -32,6 +32,11 @@ export function fakeCtx(initial: Record<string, Row[]> = {}) {
       },
       collect: async () => selected(),
       first: async () => selected()[0] ?? null,
+      unique: async () => {
+        const rows = selected()
+        if (rows.length > 1) throw new Error('Expected at most one row')
+        return rows[0] ?? null
+      },
       paginate: async ({
         cursor,
         numItems,

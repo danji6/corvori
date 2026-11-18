@@ -1,16 +1,23 @@
 /// <reference types="bun-types" />
+import type { Id } from '@cv/convex/_generated/dataModel'
+import type { AuthQueryCtx } from '@cv/convex/functions'
+import { insertUnreadNotification } from '@cv/convex/model/notificationRetention'
 import {
   clearRead,
   discardSession,
   list,
   markAllRead,
+  markManyRead,
   markRead,
   markSessionRead,
   notificationPreview,
   notificationPreviewFromParts,
   notifyAgentEvent,
   notifyUserMessage,
+  removeForMembership,
+  removeForSession,
 } from '@cv/convex/model/notifications'
+import { MAX_UNREAD_NOTIFICATIONS } from '@cv/core/limits'
 import { describe, expect, test } from 'bun:test'
 import { fakeCtx } from '~/tests/setup/notifications'
 
@@ -123,38 +130,141 @@ describe('notification fan-out', () => {
   })
 
   test('unread fan-out prunes older rows to 100', async () => {
-    const notifications = Array.from({ length: 100 }, (_, index) => ({
-      _id: `notification_${index}`,
-      _creationTime: 100 + index,
-      recipientId: 'user_2',
-      sessionId: 'session_1',
-      kind: 'user_message',
-      status: 'unread',
-      sessionTitle: 'Notifications',
-      actorName: 'Ada',
-    }))
+    const notifications = Array.from(
+      { length: MAX_UNREAD_NOTIFICATIONS - 1 },
+      (_, index) => ({
+        _id: `notification_${index}`,
+        _creationTime: 100 + index,
+        recipientId: 'user_2',
+        sessionId: 'session_1',
+        kind: 'user_message',
+        status: 'unread',
+        sessionTitle: 'Notifications',
+        actorName: 'Ada',
+      }),
+    )
     const { ctx, rows } = fakeCtx({
       sessions: [session],
       userSessions: memberships,
       notifications,
     })
 
-    await notifyUserMessage(ctx, {
-      sessionId: 'session_1' as never,
-      senderId: 'user_1' as never,
-      actorName: 'Ada',
-      preview: 'newest',
-      sourceMessageId: 'message_1' as never,
-    })
+    const send = (preview: string) =>
+      notifyUserMessage(ctx, {
+        sessionId: 'session_1' as never,
+        senderId: 'user_1' as never,
+        actorName: 'Ada',
+        sourceMessageId: 'message_1' as never,
+        preview,
+      })
 
-    expect(rows('notifications')).toHaveLength(100)
-    expect(rows('notifications').some((row) => row.preview === 'newest')).toBe(
-      true,
+    await send('fills inbox')
+    const count = rows('notificationUnreadCounts')[0]
+    expect(count.count).toBe(MAX_UNREAD_NOTIFICATIONS)
+    expect(rows('notifications')).toHaveLength(MAX_UNREAD_NOTIFICATIONS)
+    expect(rows('notifications')[0]._id).toBe(notifications[0]._id)
+
+    await send('newest')
+    expect(count.count).toBe(MAX_UNREAD_NOTIFICATIONS)
+    expect(rows('notifications')).toHaveLength(MAX_UNREAD_NOTIFICATIONS)
+    const inbox = await list(
+      { ...(ctx as AuthQueryCtx), userId: 'user_2' as Id<'users'> },
+      { status: 'unread' },
     )
+    expect(inbox.slice(0, 2).map((row) => row.preview)).toEqual([
+      'newest',
+      'fills inbox',
+    ])
+    expect(inbox.at(-1)?._id as string).toBe(notifications[1]._id)
   })
 })
 
 describe('notification read lifecycle', () => {
+  test('ordinary unread counts follow reads, discard and membership removal', async () => {
+    const { ctx, rows } = fakeCtx()
+    const sessionId = 'session_1' as Id<'sessions'>
+    const recipientId = 'user_1' as Id<'users'>
+    const add = (
+      target = sessionId,
+      recipient = recipientId,
+      attention?: true,
+    ) =>
+      insertUnreadNotification(ctx, {
+        sessionId: target,
+        recipientId: recipient,
+        kind: attention ? 'input_required' : 'user_message',
+        sessionTitle: 'Test',
+        actorName: 'Ada',
+        attention,
+      })
+
+    const otherSession = 'session_2' as Id<'sessions'>
+    const otherRecipient = 'user_2' as Id<'users'>
+    await add()
+    await add()
+    await add(otherSession)
+    await add(otherSession, otherRecipient)
+    await add(sessionId, recipientId, true)
+    const [first, second] = rows('notifications').map(
+      (row) => row._id as Id<'notifications'>,
+    )
+    const counts = () =>
+      rows('notificationUnreadCounts').map((row) => row.count)
+    expect(counts()).toEqual([3, 1])
+
+    await markRead(ctx, { notificationId: first })
+    await markManyRead(ctx, { notificationIds: [first, second, second] })
+    expect(counts()).toEqual([1, 1])
+
+    await add()
+    await markSessionRead(ctx, { sessionId })
+    await markAllRead(ctx)
+    expect(counts()).toEqual([0, 1])
+
+    await add()
+    await discardSession(ctx, { sessionId })
+    expect(rows('notifications').filter((row) => row.attention)).toHaveLength(1)
+    expect(counts()).toEqual([0, 1])
+
+    await add()
+    await add(otherSession)
+    await removeForMembership(ctx, recipientId, sessionId)
+    expect(counts()).toEqual([1, 1])
+    await removeForSession(ctx, otherSession)
+    expect(counts()).toEqual([0, 0])
+  })
+
+  test('bulk marking keeps the newest read rows and leaves protected requests unread', async () => {
+    const notifications = Array.from({ length: 56 }, (_, index) => ({
+      _id: `notification_${index}`,
+      _creationTime: index + 1,
+      recipientId: 'user_1',
+      sessionId: 'session_1',
+      kind: 'user_message',
+      status: 'unread',
+      sessionTitle: 'Notifications',
+      actorName: 'Ada',
+      ...(index === 55 && { attention: true }),
+    }))
+    const { ctx, rows } = fakeCtx({ notifications })
+
+    await markManyRead(ctx, {
+      notificationIds: notifications.map(({ _id }) => _id as never),
+    })
+
+    const history = await list(ctx, { status: 'read' })
+    expect(history.map(({ _id }) => String(_id))).toEqual(
+      notifications
+        .slice(5, 55)
+        .reverse()
+        .map(({ _id }) => _id),
+    )
+    expect(rows('notifications').find((row) => row.attention)).toMatchObject({
+      status: 'unread',
+      attention: true,
+    })
+  })
+
   test('marking all read keeps only the 50 newest read rows', async () => {
     const notifications = Array.from({ length: 55 }, (_, index) => ({
       _id: `notification_${index}`,

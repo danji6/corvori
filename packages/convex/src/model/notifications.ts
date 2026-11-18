@@ -1,7 +1,6 @@
 import { approvalSummary } from '@cv/core/approval-presentation'
 import {
   MAX_NOTIFICATION_PREVIEW_CHARS,
-  MAX_READ_NOTIFICATIONS,
   MAX_UNREAD_NOTIFICATIONS,
 } from '@cv/core/limits'
 import type { AskToolInput } from '@cv/core/types'
@@ -22,6 +21,14 @@ import type {
 import { getProcessingSegmentRow } from './messageContents'
 import * as ApprovalNotifications from './notificationApprovals'
 import { hasRequest, settleRequest } from './notificationRequests'
+import {
+  insertUnreadNotification,
+  isOrdinaryUnread,
+  ordinaryNotifications,
+  pruneReadNotifications,
+  recordUnreadRemovals,
+  statusLimit,
+} from './notificationRetention'
 
 /** Denormalized activity snapshot persisted once per recipient. */
 type NotificationEvent = {
@@ -63,6 +70,7 @@ export async function notifyUserMessage(
   args: {
     sessionId: Id<'sessions'>
     senderId: Id<'users'>
+    members?: Doc<'userSessions'>[]
     actorName: string
     actorAvatarId?: Id<'avatars'>
     preview: string
@@ -79,7 +87,7 @@ export async function notifyUserMessage(
       preview: notificationPreview(args.preview, 'Sent a message'),
       sourceMessageId: args.sourceMessageId,
     },
-    args.senderId,
+    { excludedUserId: args.senderId, members: args.members },
   )
 }
 
@@ -203,29 +211,30 @@ function questionPreview(input: AskToolInput) {
 async function fanOut(
   ctx: MutationCtx,
   event: NotificationEvent,
-  excludedUserId?: Id<'users'>,
+  options?: { excludedUserId: Id<'users'>; members?: Doc<'userSessions'>[] },
 ) {
   const session = await ctx.db.get(event.sessionId)
   if (!session) return
 
-  const members = await ctx.db
-    .query('userSessions')
-    .withIndex('by_sessionId', (q) => q.eq('sessionId', event.sessionId))
-    .collect()
+  const members =
+    options?.members ??
+    (await ctx.db
+      .query('userSessions')
+      .withIndex('by_sessionId', (q) => q.eq('sessionId', event.sessionId))
+      .collect())
 
   const sessionTitle =
     session.title || session.firstMessagePreview || 'New chat'
 
   for (const member of members) {
-    if (member.userId === excludedUserId) continue
+    if (member.userId === options?.excludedUserId) continue
     const duplicate =
       event.request && (await hasRequest(ctx, member.userId, event.request))
     if (duplicate) continue
-    await ctx.db.insert('notifications', {
+    await insertUnreadNotification(ctx, {
       recipientId: member.userId,
       sessionId: event.sessionId,
       kind: event.kind,
-      status: 'unread',
       sessionTitle,
       actorName: event.actorName,
       actorAvatarId: event.actorAvatarId,
@@ -236,7 +245,6 @@ async function fanOut(
       requestState: event.request ? 'pending' : undefined,
       attention: event.request ? true : undefined,
     })
-    await pruneStatus(ctx, member.userId, 'unread')
   }
 }
 
@@ -245,15 +253,9 @@ export async function list(
   ctx: AuthQueryCtx,
   { status }: { status: NotificationStatus },
 ) {
-  const limit = statusLimit(status)
-  const rows = await ctx.db
-    .query('notifications')
-    .withIndex('by_recipientId_status_readAt', (q) =>
-      q.eq('recipientId', ctx.userId).eq('status', status),
-    )
-    .order('desc')
-    .collect()
-  const ordinary = rows.filter((row) => !row.attention).slice(0, limit)
+  const ordinary = await ordinaryNotifications(ctx, ctx.userId, status).take(
+    statusLimit(status),
+  )
   return Promise.all(
     ordinary.map((row) => ApprovalNotifications.withApprovalActions(ctx, row)),
   )
@@ -285,7 +287,8 @@ export async function respondApproval(
       expired ? 'expired' : 'unavailable',
     )
   }
-  await markRead(ctx, { notificationId })
+  // Settlement moves protected requests to history and may evict the row.
+  if (!notification.attention) await markRead(ctx, { notificationId })
   return status
 }
 
@@ -295,9 +298,8 @@ export async function markRead(
   { notificationId }: { notificationId: Id<'notifications'> },
 ) {
   const notification = await requireOwned(ctx, notificationId)
-  if (notification.status === 'read' || notification.attention) return
-  await ctx.db.patch(notificationId, { status: 'read', readAt: Date.now() })
-  await pruneStatus(ctx, ctx.userId, 'read')
+  if (!isOrdinaryUnread(notification)) return
+  await markNotificationsRead(ctx, [notification])
 }
 
 /** Marks a bounded set of owned notifications as read. */
@@ -305,33 +307,25 @@ export async function markManyRead(
   ctx: AuthMutationCtx,
   { notificationIds }: { notificationIds: Id<'notifications'>[] },
 ) {
-  const now = Date.now()
-  for (const notificationId of notificationIds.slice(
-    0,
-    MAX_UNREAD_NOTIFICATIONS,
+  const rows: Doc<'notifications'>[] = []
+  for (const notificationId of new Set(
+    notificationIds.slice(0, MAX_UNREAD_NOTIFICATIONS),
   )) {
     const notification = await ctx.db.get(notificationId)
     if (
-      notification?.recipientId !== ctx.userId ||
-      notification.status === 'read' ||
-      notification.attention
+      notification?.recipientId === ctx.userId &&
+      isOrdinaryUnread(notification)
     ) {
-      continue
+      rows.push(notification)
     }
-    await ctx.db.patch(notificationId, { status: 'read', readAt: now })
   }
-  await pruneStatus(ctx, ctx.userId, 'read')
+  await markNotificationsRead(ctx, rows)
 }
 
 /** Marks every unread notification for the current user as read. */
 export async function markAllRead(ctx: AuthMutationCtx) {
-  const rows = await unreadForRecipient(ctx, ctx.userId)
-  const now = Date.now()
-  for (const row of rows) {
-    if (row.attention) continue
-    await ctx.db.patch(row._id, { status: 'read', readAt: now })
-  }
-  await pruneStatus(ctx, ctx.userId, 'read')
+  const rows = await ordinaryNotifications(ctx, ctx.userId, 'unread').collect()
+  await markNotificationsRead(ctx, rows)
 }
 
 /** Marks the current user's unread notifications for one session as read. */
@@ -340,13 +334,7 @@ export async function markSessionRead(
   { sessionId }: { sessionId: Id<'sessions'> },
 ) {
   const rows = await forRecipientSession(ctx, ctx.userId, sessionId)
-  const now = Date.now()
-  for (const row of rows) {
-    if (row.status === 'unread' && !row.attention) {
-      await ctx.db.patch(row._id, { status: 'read', readAt: now })
-    }
-  }
-  await pruneStatus(ctx, ctx.userId, 'read')
+  await markNotificationsRead(ctx, rows.filter(isOrdinaryUnread))
 }
 
 /** Deletes notifications observed while their session was already focused. */
@@ -355,22 +343,25 @@ export async function discardSession(
   { sessionId }: { sessionId: Id<'sessions'> },
 ) {
   const rows = await forRecipientSession(ctx, ctx.userId, sessionId)
+  await deleteNotifications(ctx, rows.filter(isOrdinaryUnread))
+}
+
+async function markNotificationsRead(
+  ctx: AuthMutationCtx,
+  rows: Doc<'notifications'>[],
+) {
+  const readAt = Date.now()
+  await recordUnreadRemovals(ctx, rows)
   for (const row of rows) {
-    if (row.status === 'unread' && !row.attention) await ctx.db.delete(row._id)
+    await ctx.db.patch(row._id, { status: 'read', readAt })
   }
+  await pruneReadNotifications(ctx, ctx.userId)
 }
 
 /** Clears the current user's read notification history. */
 export async function clearRead(ctx: AuthMutationCtx) {
-  const rows = await ctx.db
-    .query('notifications')
-    .withIndex('by_recipientId_status_readAt', (q) =>
-      q.eq('recipientId', ctx.userId).eq('status', 'read'),
-    )
-    .collect()
-  for (const row of rows) {
-    if (!row.attention) await ctx.db.delete(row._id)
-  }
+  const rows = await ordinaryNotifications(ctx, ctx.userId, 'read').collect()
+  for (const row of rows) await ctx.db.delete(row._id)
 }
 
 /** Removes all notifications belonging to a deleted session. */
@@ -382,7 +373,7 @@ export async function removeForSession(
     .query('notifications')
     .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
     .collect()
-  for (const row of rows) await ctx.db.delete(row._id)
+  await deleteNotifications(ctx, rows)
 }
 
 /** Removes a former member's notifications for one session. */
@@ -392,7 +383,15 @@ export async function removeForMembership(
   sessionId: Id<'sessions'>,
 ) {
   const rows = await forRecipientSession(ctx, recipientId, sessionId)
+  await deleteNotifications(ctx, rows)
+}
+
+async function deleteNotifications(
+  ctx: MutationCtx,
+  rows: Doc<'notifications'>[],
+) {
   for (const row of rows) await ctx.db.delete(row._id)
+  await recordUnreadRemovals(ctx, rows)
 }
 
 /** Resolves a notification without revealing another user's rows. */
@@ -407,15 +406,6 @@ async function requireOwned(
   return notification
 }
 
-function unreadForRecipient(ctx: MutationCtx, recipientId: Id<'users'>) {
-  return ctx.db
-    .query('notifications')
-    .withIndex('by_recipientId_status_readAt', (q) =>
-      q.eq('recipientId', recipientId).eq('status', 'unread'),
-    )
-    .collect()
-}
-
 function forRecipientSession(
   ctx: MutationCtx,
   recipientId: Id<'users'>,
@@ -427,28 +417,4 @@ function forRecipientSession(
       q.eq('recipientId', recipientId).eq('sessionId', sessionId),
     )
     .collect()
-}
-
-/** Applies the retention limit for one notification status. */
-async function pruneStatus(
-  ctx: MutationCtx,
-  recipientId: Id<'users'>,
-  status: NotificationStatus,
-) {
-  const rows = await ctx.db
-    .query('notifications')
-    .withIndex('by_recipientId_status_readAt', (q) =>
-      q.eq('recipientId', recipientId).eq('status', status),
-    )
-    .order('desc')
-    .collect()
-  for (const row of rows
-    .filter((row) => !row.attention)
-    .slice(statusLimit(status))) {
-    await ctx.db.delete(row._id)
-  }
-}
-
-function statusLimit(status: NotificationStatus) {
-  return status === 'unread' ? MAX_UNREAD_NOTIFICATIONS : MAX_READ_NOTIFICATIONS
 }

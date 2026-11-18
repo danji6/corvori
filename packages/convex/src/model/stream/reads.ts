@@ -1,9 +1,10 @@
-import { orderContextNotes } from '@cv/core/context-notes'
 import { sha256 } from '@cv/core/sha256'
+import { SIDEBAR_STREAM_BATCH_SIZE } from '@cv/core/sidebar-streams'
 import { isKnownTextFile } from '@cv/core/workspace/files'
 
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { QueryCtx } from '../../_generated/server'
+import { error } from '../../errors'
 import type { AuthQueryCtx } from '../../functions'
 import { minRole } from '../../lib/roles'
 import { sharedSessionId } from '../../lib/subagent'
@@ -14,11 +15,7 @@ import {
   hasLoadedAttachmentMedia,
 } from '../attachmentMedia'
 import { resolve as resolveMcpServers } from '../mcp'
-import {
-  getProcessingSegmentRow,
-  withParts,
-  withPartsMany,
-} from '../messageContents'
+import { getProcessingSegmentRow, withParts } from '../messageContents'
 import { getBySession as getPlan } from '../plans'
 import { resolveSets as resolvePromptSets } from '../prompts'
 import { resolve as resolveProviders } from '../providers'
@@ -33,21 +30,38 @@ import { availableToolkits } from '../toolkits/access'
 import { toolkitSkillFingerprint } from '../toolkits/skillContext'
 import { ownsExecution } from './execution'
 import { resolveHistoryBoundary } from './historyBoundary'
+import { listDoneHistory } from './providerHistory'
 
-/** Returns a list of session ids that have ongoing streams. */
-export async function activeSessionIds(
+export { _getProviderHistory } from './providerHistory'
+
+export async function activeSessionIdsForSessions(
   ctx: AuthQueryCtx,
-): Promise<Id<'sessions'>[]> {
-  const streams = await ctx.db.query('streams').collect()
-  const sessionIds = [...new Set(streams.map((stream) => stream.sessionId))]
+  { sessionIds }: { sessionIds: Id<'sessions'>[] },
+) {
+  if (sessionIds.length > SIDEBAR_STREAM_BATCH_SIZE) {
+    error('Too many sessions in a streaming status request', 400)
+  }
 
-  const visible = await Promise.all(
-    sessionIds.map(async (sessionId) =>
-      (await getMembership(ctx, sessionId, ctx.userId)) ? sessionId : null,
-    ),
-  )
+  return findStreamingSessions([...new Set(sessionIds)], async (id) => {
+    const membership = await getMembership(ctx, id, ctx.userId)
+    return membership ? hasSessionStream(ctx, id) : false
+  })
+}
 
-  return visible.filter((id): id is Id<'sessions'> => id !== null)
+async function findStreamingSessions(
+  ids: Id<'sessions'>[],
+  hasStream: (id: Id<'sessions'>) => Promise<boolean>,
+) {
+  const streaming = await Promise.all(ids.map(hasStream))
+  return ids.filter((_, index) => streaming[index])
+}
+
+async function hasSessionStream(ctx: QueryCtx, sessionId: Id<'sessions'>) {
+  const stream = await ctx.db
+    .query('streams')
+    .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+    .first()
+  return stream !== null
 }
 
 export async function _getContext(
@@ -79,7 +93,6 @@ export async function _getContext(
     prompts,
     mcpServers,
     modelProviders,
-    hasActiveMedia,
   ] = await Promise.all([
     getSettings(ctx, agent.ownerId),
     getSettings(ctx, invoker._id),
@@ -93,7 +106,6 @@ export async function _getContext(
       sessionId: stream.sessionId,
     }),
     resolveProviders(ctx, agent.ownerId),
-    getActiveMediaState(ctx, stream),
   ])
 
   // Sub-agent sessions never spawn further sub-agents (flat only)
@@ -114,7 +126,6 @@ export async function _getContext(
 
   return {
     sessionCache,
-    hasActiveMedia,
     environment: state?.environment ?? {},
     toolApprovals: await getApprovals(ctx, stream.sessionId),
     spawnableAgents,
@@ -147,85 +158,6 @@ export async function _getContext(
     plan,
     ...participants,
   }
-}
-
-export async function _getProviderHistory(
-  ctx: QueryCtx,
-  { streamId, generation }: StreamExecutionArgs,
-) {
-  const stream = await ctx.db.get(streamId)
-  if (!ownsExecution(stream, { streamId, generation })) return []
-
-  const { upper, floor, summary } = await resolveHistoryBoundary(ctx, stream)
-  const messages = await listDoneHistory(ctx, stream.sessionId, floor, upper)
-
-  const ordered = summary
-    ? [summary, ...messages.filter((message) => message._id !== summary._id)]
-    : messages
-
-  const currentId = stream.state.processingMessageId
-  if (currentId) {
-    const notes = await ctx.db
-      .query('messages')
-      .withIndex('by_sessionId_contextAnchor', (q) =>
-        q
-          .eq('sessionId', stream.sessionId)
-          .eq('extra.anchorMessageId', currentId),
-      )
-      .collect()
-    for (const note of notes) {
-      if (
-        note.contextEligible &&
-        note._creationTime > floor &&
-        !ordered.some((message) => message._id === note._id)
-      ) {
-        ordered.push(note)
-      }
-    }
-  }
-
-  const visible = ordered.filter(
-    (message) => message.type !== 'mcp' || message.sender.id === stream.agentId,
-  )
-  const history = await withPartsMany(ctx, visible)
-
-  // The in-flight turn joins the history with all its segments concatenated
-  // (sealed split segments are only reachable through the processing doc)
-  const current = stream.state.processingMessageId
-    ? await ctx.db.get(stream.state.processingMessageId)
-    : null
-
-  const includesProcessingMessage =
-    stream.command.kind === 'invoke' || stream.command.kind === 'retry'
-  if (current && includesProcessingMessage) {
-    const joined = await withParts(ctx, current)
-    if (joined.parts.length > 0) {
-      history.push(joined)
-    }
-  }
-
-  return orderContextNotes(history)
-}
-
-function listDoneHistory(
-  ctx: QueryCtx,
-  sessionId: Id<'sessions'>,
-  floor: number,
-  upper: number,
-) {
-  if (floor >= upper) return []
-  return ctx.db
-    .query('messages')
-    .withIndex('by_sessionId_status_contextEligible', (q) =>
-      q
-        .eq('sessionId', sessionId)
-        .eq('status', 'done')
-        .eq('contextEligible', true)
-        .gt('_creationTime', floor)
-        .lte('_creationTime', upper),
-    )
-    .order('asc')
-    .collect()
 }
 
 export async function _isActive(

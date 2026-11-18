@@ -120,7 +120,7 @@ async function streamApproval(isSubagent: boolean, command: string) {
     streamSetup(isSubagent, command),
     Date.now() + 60_000,
   )
-  expect(result.awaitingApproval).toBe(true)
+  expect(result).toMatchObject({ awaitingApproval: true })
   expect(approvalSessions).toEqual([isSubagent ? 'child' : 'parent'])
   return patches.flat().filter((part) => part.state === 'approval-requested')
 }
@@ -147,7 +147,7 @@ describe('approval details are attached before requests are published', () => {
       streamSetup(false, 'git push origin main', '   '),
       Date.now() + 60_000,
     )
-    expect(result.awaitingApproval).toBe(false)
+    expect(result).toMatchObject({ awaitingApproval: false })
     expect(patches.flat()).toContainEqual(
       expect.objectContaining({
         type: 'tool-shell',

@@ -13,6 +13,7 @@ function mutationCtx({ message, segments }: { message: Row; segments: Row[] }) {
   const byId = new Map<string, Row>([
     [message._id, message],
     [session._id as string, session as never],
+    ['state_1', { _id: 'state_1', sessionId: session._id, stepCount: 0 }],
     ...rows.map((row) => [row._id, row] as const),
   ])
 
@@ -51,6 +52,7 @@ function mutationCtx({ message, segments }: { message: Row; segments: Row[] }) {
             if (table === 'userSessions') {
               return { _id: 'member_1', role: 'owner' }
             }
+            if (table === 'sessionState') return byId.get('state_1')
             if (table === 'messageContents') {
               return (
                 rows.find(

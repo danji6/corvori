@@ -10,6 +10,7 @@ import {
 } from './model/stream/contextNotes'
 import * as StreamLifecycle from './model/stream/lifecycle'
 import * as StreamMeta from './model/stream/lifecycleMeta'
+import * as ProviderHistory from './model/stream/providerHistory'
 import * as ProviderRequests from './model/stream/providerRequests'
 import * as StreamReads from './model/stream/reads'
 import * as StreamSubagents from './model/stream/subagents'
@@ -22,9 +23,9 @@ import {
   scheduleStreamRetryArgsValidator,
 } from './validators/streams'
 
-export const activeSessionIds = authQuery({
-  args: {},
-  handler: StreamReads.activeSessionIds,
+export const activeSessionIdsForSessions = authQuery({
+  args: { sessionIds: v.array(v.id('sessions')) },
+  handler: StreamReads.activeSessionIdsForSessions,
 })
 
 export const _getContext = internalQuery({
@@ -34,7 +35,12 @@ export const _getContext = internalQuery({
 
 export const _getProviderHistory = internalQuery({
   args: V.streamExecutionArgsValidator.fields,
-  handler: StreamReads._getProviderHistory,
+  handler: ProviderHistory._getProviderHistory,
+})
+
+export const _getProviderHistorySnapshot = internalQuery({
+  args: V.providerHistorySnapshotArgsValidator.fields,
+  handler: ProviderHistory._getProviderHistorySnapshot,
 })
 
 export const _hasActiveMedia = internalQuery({

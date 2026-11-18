@@ -1,3 +1,4 @@
+import type { FolderWorkspace } from '@cv/core/types/workspace'
 import { selectFileWorkspace } from '@cv/core/workspace/personal'
 import path from 'node:path'
 
@@ -13,32 +14,49 @@ import type {
   CaptureGroup,
   Checkpoint,
   RestoreJournal,
+  Snapshot,
 } from './types'
 
 export const overlaps = (left: string[], right: string[]) =>
   left.some((a) => right.some((b) => !isOutside(a, b) || !isOutside(b, a)))
 
-export async function captureRoots(input: BeginCapture) {
-  const selected = input.workspace.agentOnly
-    ? selectFileWorkspace(input.workspace, 'agent://')
-    : input.workspace
+export async function workspaceRoots(
+  sessionId: string,
+  context: FolderWorkspace,
+) {
+  const selected = context.agentOnly
+    ? selectFileWorkspace(context, 'agent://')
+    : context
   const workspace = await requireWorkspace(
-    input.sessionId,
+    sessionId,
     selected.workspaceId,
     selected,
   )
-  if (input.workspace.agentHome && !input.workspace.agentOnly) {
-    const personal = selectFileWorkspace(input.workspace, 'agent://')
+
+  if (context.agentHome && !context.agentOnly) {
+    const personal = selectFileWorkspace(context, 'agent://')
     const home = await requireWorkspace(
-      input.sessionId,
+      sessionId,
       personal.workspaceId,
       personal,
     )
     workspace.roots.push(...home.roots)
   }
-  if (input.workspace.sessionFiles)
-    workspace.roots.push(await ensureSessionDirectory(input.sessionId))
+  if (context.sessionFiles) {
+    workspace.roots.push(await ensureSessionDirectory(sessionId))
+  }
+
   return [...new Set(workspace.roots)]
+}
+
+/** Keeps the original before-state when an added source overlaps a prior root. */
+export function mergeBaseline(group: CaptureGroup, files: Snapshot) {
+  for (const [target, state] of Object.entries(files)) {
+    if (group.baseline[target] || group.explicit.includes(target)) continue
+    const covered = group.roots.some((root) => !isOutside(root, target))
+    const excluded = group.excluded.some((entry) => !isOutside(entry, target))
+    if (!covered || excluded) group.baseline[target] = state
+  }
 }
 
 export function createGroup(

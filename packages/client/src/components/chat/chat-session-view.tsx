@@ -10,6 +10,7 @@ import {
   useSessionMode,
   useStreamAwaitingAnswer,
   useStreamAwaitingApproval,
+  useStreamRawStatus,
   useTypingIndicator,
   useUnseenTailActivity,
 } from '@/hooks/chat'
@@ -110,6 +111,7 @@ export function ChatSessionView({
   // Composer
   const { typingUsers, notify, clearTyping, stopTyping } = useTypingIndicator(session?._id) // prettier-ignore
   const passiveSend = session?.settings?.passiveSend ?? false
+  const isStopping = useStreamRawStatus() === 'stopping'
   const cooldownUntil = useSendCooldownUntil()
   const cooldownElapsed = useHasElapsed(cooldownUntil)
   const sendDisabled = !!cooldownUntil && !cooldownElapsed
@@ -461,6 +463,7 @@ export function ChatSessionView({
                       onSubmit={handleSubmit}
                       onTyping={notify}
                       onStop={onStop}
+                      stopDisabled={isStopping}
                       onRunCommand={onRunCommand}
                       onContinueAgent={onContinueAgent}
                       canContinueAgent={hasActiveAgent && status === 'ready'}

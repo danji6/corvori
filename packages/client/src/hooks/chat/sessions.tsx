@@ -1,7 +1,4 @@
-import {
-  useActiveSessionId,
-  useActiveStreamSessionIds,
-} from '@/hooks/chat/session'
+import { useActiveSessionId } from '@/hooks/chat/session'
 import { createUsableContext } from '@/hooks/context'
 import type { SessionListItem } from '@/lib/chat'
 import type { PaginationMetadata } from '@/lib/chat/message-store'
@@ -96,7 +93,6 @@ export function SessionStoreProvider({ children }: { children: ReactNode }) {
   const folders = useLoadedFolders(serverPages)
   const { pages, pendingSessionIds, dropSession } = useSessionDrops(serverPages, folders) // prettier-ignore
   const activeId = useActiveSessionId()
-  const streamingIds = useActiveStreamSessionIds()
   const publish = useCallback((key: string, page: SessionGroupPage | null) => {
     setPages((current) => {
       const next = { ...current }
@@ -121,9 +117,8 @@ export function SessionStoreProvider({ children }: { children: ReactNode }) {
       loadMore: () => {},
       status: 'Exhausted',
       activeId,
-      streamingIds,
     })
-  }, [store, pages, activeId, streamingIds])
+  }, [store, pages, activeId])
 
   return (
     <SessionStoreContext.Provider value={store}>
@@ -316,6 +311,10 @@ export function useSessionIsActive(id: string): boolean {
 export function useSessionIsStreaming(id: string): boolean {
   const store = useSessionStore()
   return useSyncExternalStore(store.subscribe, () => store.getIsStreaming(id))
+}
+
+export function useSetSidebarStreamingIds() {
+  return useSessionStore().setStreamingIds
 }
 
 export function useSessionPagination(): PaginationMetadata & {

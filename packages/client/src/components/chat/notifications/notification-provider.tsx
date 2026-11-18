@@ -52,6 +52,14 @@ function useNotificationState() {
   const read = useQuery(api.notifications.list, { status: 'read' }) ?? []
   const summary = useQuery(api.notifications.summary, {})
 
+  const pendingIds = summary?.pendingIds
+  const activeIds = useMemo(() => {
+    if (!pendingIds || !unreadResult) return undefined
+    return [...pendingIds, ...unreadResult.map((row) => row._id)]
+  }, [pendingIds, unreadResult])
+  const unreadCount =
+    summary && unreadResult ? summary.attentionCount + unreadResult.length : 0
+
   const pending = usePaginatedQuery(
     api.notifications.pendingPage,
     { state: 'pending' },
@@ -150,7 +158,7 @@ function useNotificationState() {
   useNotificationDelivery({
     unread: unreadResult,
     recent: summary?.recent,
-    activeIds: summary?.activeIds,
+    activeIds,
     activeSessionId,
     desktopReady: preferences.desktopReady,
     desktopEnabled: preferences.desktopEnabled,
@@ -162,8 +170,8 @@ function useNotificationState() {
   })
 
   useEffect(() => {
-    updateNotificationFavicon(summary?.unreadCount ?? 0)
-  }, [summary?.unreadCount])
+    updateNotificationFavicon(unreadCount)
+  }, [unreadCount])
 
   useEffect(() => {
     if (!activeSessionId) return
@@ -187,7 +195,7 @@ function useNotificationState() {
   return {
     unread,
     read,
-    unreadCount: summary?.unreadCount ?? 0,
+    unreadCount,
     pendingCount: summary?.pendingCount ?? 0,
     inboxOpen,
     setInboxOpen,

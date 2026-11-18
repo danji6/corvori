@@ -6,6 +6,8 @@ const remoteBrowsers = browserServer()
 
 export default defineConfig({
   testDir: './specs',
+  // Playwright clears this directory before runs. Preserve local perf reports.
+  outputDir: '../../test-results/browser',
   fullyParallel: true,
   use: { baseURL: 'http://127.0.0.1:4178' },
   projects: [

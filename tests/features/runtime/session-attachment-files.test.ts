@@ -1,12 +1,14 @@
 import { resolveAttachmentHistoryParts } from '@cv/convex/actions/stream/attachmentHistory'
 import { canReplayToolContext } from '@cv/core/tool-context'
+import * as checkpointModule from '@cv/sidecar/checkpoints/manager'
+import { CheckpointManager } from '@cv/sidecar/checkpoints/manager'
 import { createApp } from '@cv/sidecar/main'
 import {
   readWorkspaceFile,
   writeWorkspaceFile,
 } from '@cv/sidecar/mcp/workspace/workspace'
 import { resolveShellDirectory } from '@cv/sidecar/shell/directory'
-import { afterAll, beforeAll, expect, test } from 'bun:test'
+import { afterAll, beforeAll, expect, spyOn, test } from 'bun:test'
 import {
   link,
   mkdir,
@@ -18,6 +20,10 @@ import {
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import {
+  CheckpointBarrierStorage,
+  checkpointDeadline,
+} from '~/tests/helpers/checkpoint-barrier'
 
 const original = new TextEncoder().encode('original attachment\n')
 const previousData = process.env.CHAT_SIDECAR_DATA_DIR
@@ -270,4 +276,69 @@ test('replays session notes only to agents with an effective file tool', () => {
   expect(
     canReplayToolContext(note, ['read_file'], 'other', 7, 'snapshot'),
   ).toBe(false)
+})
+
+test('a copy commit waits for an overlapping baseline and retries after release', async () => {
+  const target = {
+    sessionId: 'copy-fence',
+    operationId: 'copy-fence',
+    path: 'session://copy.txt',
+  }
+  const { workspace: copyWorkspace } = workspace(target.sessionId)
+  const directory = await resolveShellDirectory(workspace(target.sessionId))
+  await writeFile(path.join(directory.cwd, 'initial.txt'), 'held baseline')
+  const copy = { ...target, url: storage.url.href, byteLength: original.length }
+  expect((await call('stage-copy', copy)).ok).toBe(true)
+
+  const checkpointStorage = new CheckpointBarrierStorage(
+    path.join(root, 'copy-fence-checkpoints'),
+    (text) => text === 'held baseline',
+  )
+  const manager = new CheckpointManager(checkpointStorage)
+  const mock = spyOn(checkpointModule, 'checkpoints').mockReturnValue(manager)
+  const write = manager.write.bind(manager)
+  const reached = Promise.withResolvers<void>()
+  const writeSpy = spyOn(manager, 'write').mockImplementation((...args) => {
+    reached.resolve()
+    return write(...args)
+  })
+  const owner = {
+    sessionId: 'copy-fence-owner',
+    groupId: 'copy-fence-owner',
+    participantId: 'owner',
+  }
+  const paused = manager.begin({
+    ...owner,
+    workspace: {
+      ...copyWorkspace,
+      path: directory.cwd,
+      sessionOnly: false,
+      sessionFiles: false,
+      sources: [{ id: 'shared', path: directory.cwd, label: 'Shared' }],
+    },
+  })
+
+  let commit: ReturnType<typeof call> | undefined
+  try {
+    await checkpointDeadline(checkpointStorage.until(1))
+    commit = call('commit-copy', target)
+    await checkpointDeadline(reached.promise)
+  } finally {
+    checkpointStorage.release()
+    await Promise.allSettled([paused, commit])
+    writeSpy.mockRestore()
+    mock.mockRestore()
+  }
+
+  expect(await paused).toEqual({ queued: false })
+  expect((await commit)!.ok).toBe(false)
+  const destination = path.join(directory.cwd, 'copy.txt')
+  expect(await Bun.file(destination).exists()).toBe(false)
+  await manager.finish({ ...owner, root: true, checkpointId: 'copy-fence' })
+  expect((await call('commit-copy', target)).ok).toBe(true)
+  expect(await readFile(destination)).toEqual(Buffer.from(original))
+  await call('cleanup-transfer', {
+    operationId: target.operationId,
+    discardUpload: false,
+  })
 })

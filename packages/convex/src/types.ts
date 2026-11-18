@@ -59,7 +59,6 @@ export type StreamContext = {
   plan: Doc<'plans'> | null
   sessionCache: Doc<'sessionCache'> | null
   spawnableAgents: SpawnableAgent[]
-  hasActiveMedia: boolean
 }
 
 export type SessionMember = CoreSessionMember<
@@ -229,6 +228,8 @@ export type ReserveHomeArgs = Infer<typeof V.reserveHomeArgsValidator>
 export type OperationAttemptArgs = Infer<typeof V.operationAttemptArgsValidator>
 export type OperationResult = Infer<typeof V.operationResultValidator>
 export type StreamExecutionArgs = Infer<typeof V.streamExecutionArgsValidator>
+export type StopStreamArgs = Infer<typeof V.stopStreamArgsValidator>
+export type ProviderHistorySnapshotArgs = Infer<typeof V.providerHistorySnapshotArgsValidator> // prettier-ignore
 export type ThresholdCompactionArgs = Infer<typeof V.compactAtThresholdArgsValidator> // prettier-ignore
 export type PatchStreamMessageArgs = Infer<typeof V.patchStreamMessageArgsValidator> // prettier-ignore
 export type RecordStreamStepArgs = Infer<typeof V.recordStreamStepArgsValidator>

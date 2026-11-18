@@ -138,12 +138,13 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
       segmentIndex,
     })
   }
-  await syncActivity(ctx, args.sessionId, parts)
+  const members = await syncActivity(ctx, args.sessionId, parts)
 
   if (sender.type === 'user') {
     await notifyUserMessage(ctx, {
       sessionId: args.sessionId,
       senderId: sender.id,
+      members,
       actorName: identity.senderName ?? 'User',
       actorAvatarId: identity.senderAvatarId,
       preview: content.trim() || 'Sent an attachment',

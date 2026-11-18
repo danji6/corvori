@@ -33,7 +33,7 @@ const source = {
 
 const session = {
   _id: 'session_1',
-  ownerId: 'user_1'
+  ownerId: 'user_1',
 }
 
 const message = {
@@ -222,7 +222,11 @@ describe('shell output delivery provenance', () => {
 
   test('records only final saved results, preserving range metadata through offloading', async () => {
     const fixture = fakeCtx({
-      docs: [{ ...session }, { ...message }, { ...stream }],
+      docs: [
+        { ...session },
+        { ...message, status: 'processing' },
+        { ...stream },
+      ],
       contents: [
         {
           _id: 'content_1',
@@ -310,11 +314,12 @@ describe('shell output delivery provenance', () => {
     expect(fixture.inserts.map((row) => row.table)).toEqual([
       'messages',
       'messageContents',
+      'sessionState',
       'shellOutputDeliveries',
     ])
     expect((await readPosition(ctx, reader, 'job-1')).offset).toBe(10)
     await _report(ctx, { ...args, generation: 0 })
-    expect(fixture.inserts).toHaveLength(3)
+    expect(fixture.inserts).toHaveLength(4)
 
     const failed = fakeCtx({ docs: [{ ...session }, { ...watch }] })
     await _report(failed.ctx as MutationCtx, {
@@ -325,6 +330,7 @@ describe('shell output delivery provenance', () => {
     expect(failed.inserts.map((row) => row.table)).toEqual([
       'messages',
       'messageContents',
+      'sessionState',
     ])
   })
 })

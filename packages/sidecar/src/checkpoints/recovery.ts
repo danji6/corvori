@@ -38,7 +38,7 @@ export async function recoverCaptures(storage: CheckpointStorage) {
   return { groups, waiters }
 }
 
-async function recoverSealedBaseline(
+export async function recoverSealedBaseline(
   storage: CheckpointStorage,
   group: CaptureGroup,
 ) {

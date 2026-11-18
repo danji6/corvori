@@ -112,8 +112,8 @@ describe('turn checkpoints', () => {
     await writeFile(target, 'before')
     await writeFile(path.join(f.root, 'same'), 'same')
     await f.manager.begin(f.begin)
-    await f.manager.write('session', f.begin.workspace, async () => {
-      await f.manager.trackFile('session', target, f.begin.workspace)
+    await f.manager.write('session', [target], async (writer) => {
+      await writer.trackFile(target, f.begin.workspace)
       await writeFile(target, 'after')
     })
     await writeFile(path.join(f.root, 'ignored', 'generated'), 'skip')
@@ -238,8 +238,8 @@ describe('turn checkpoints', () => {
     await f.manager.begin(f.begin)
     const target = path.join(f.root, 'new.txt')
     await writeFile(target, 'shell content')
-    await f.manager.write('session', f.begin.workspace, async () => {
-      await f.manager.trackFile('session', target, f.begin.workspace)
+    await f.manager.write('session', [target], async (writer) => {
+      await writer.trackFile(target, f.begin.workspace)
       await writeFile(target, 'tool content')
     })
     const result = await f.manager.finish(f.finish)
@@ -366,8 +366,8 @@ describe('turn checkpoints', () => {
     )
     await once(child, 'spawn')
     try {
-      await f.manager.write('session', f.begin.workspace, () =>
-        f.manager.trackJob('session', child.pid),
+      await f.manager.write('session', [f.root], (writer) =>
+        writer.trackJob(child.pid),
       )
       const frozen = await f.manager.finish(f.finish)
       expect(frozen.released).toBe(false)
@@ -428,16 +428,19 @@ describe('turn checkpoints', () => {
     expect(result.publication?.files.map((file) => file.path)).toEqual([
       'file.txt',
     ])
+    const manifest = path.join(storage.root, 'manifest')
     await expect(
-      manager.trackFile('session', path.join(storage.root, 'manifest')),
+      manager.write('session', [manifest], (writer) =>
+        writer.trackFile(manifest),
+      ),
     ).rejects.toThrow('checkpoint store')
   })
 
   test('retires finished shell identities before their process IDs can be reused', async () => {
     const f = await fixture()
     await f.manager.begin(f.begin)
-    await f.manager.write('session', f.begin.workspace, () =>
-      f.manager.trackJob('session', process.pid),
+    await f.manager.write('session', [f.root], (writer) =>
+      writer.trackJob(process.pid),
     )
     expect((await f.manager.finish(f.finish)).released).toBe(false)
     await f.manager.finishJob('session', process.pid)

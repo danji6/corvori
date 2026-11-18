@@ -20,9 +20,11 @@ import {
 import { hasSavedTitle } from '../../model/messages'
 import type { PromptItem } from '../../model/prompt/prompts'
 import {
+  type CacheableRequest,
   appendOperationMessages,
   applyPromptCaching,
 } from '../../model/provider/cache'
+import type { ProviderOptions } from '../../model/provider/options'
 import { getProviderOptions } from '../../model/provider/options'
 import { findCredentialsForModel } from '../../model/provider/providers'
 import { postSidecar, sidecarDefaultShell } from '../../model/sidecar'
@@ -33,13 +35,20 @@ import { resolveToolManifest } from '../../model/tool/manifest'
 import { hasToolResultMedia } from '../../model/tool/mcpOutput'
 import { filesystemWorkspace } from '../../model/tool/sessionFilesystem'
 import {
+  type SessionTools,
+  type ToolReplay,
   prepareSessionTools,
   prepareToolReplay,
 } from '../../model/tool/sessionTools'
 import type { StreamContext, StreamExecutionArgs } from '../../types'
+import type { createCacheDiagnostics } from './cacheDiagnostics'
 import { buildSessionLogBody } from './engineLog'
 import { patchSessionLogBody } from './engineLog'
 import { buildEvalContext } from './evalContext'
+import {
+  type ProviderHistorySnapshot,
+  readHistorySnapshot,
+} from './historySnapshot'
 import {
   buildOperationMessages,
   buildProviderPrefix,
@@ -48,7 +57,33 @@ import {
 import type { PromptEvalResult } from './operations'
 import { prepareToolContext } from './toolContext'
 
-export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
+// Keep the action's input type independent of Convex's generated API.
+export type PreparedStreamStep = CacheableRequest &
+  Pick<StreamContext, 'stream' | 'agent' | 'output'> & {
+    modelId?: string
+    contextWindow?: number
+    trimContext: boolean
+    outputTokens?: number
+    workspace: StreamContext['session']['workspace']
+    workspaceSessionId: StreamContext['session']['_id']
+    isSubagent: boolean
+    needsTitle: boolean
+    evalResult: PromptEvalResult
+    resolved: ProviderOptions
+    requestLog: { body?: string }
+    cacheDiagnostics?: ReturnType<typeof createCacheDiagnostics>
+    tools: SessionTools['tools']
+    toolChoice?: 'none'
+    toolRuntime?: SessionTools
+    toolReplay: ToolReplay
+    hasActiveMedia: boolean
+  }
+
+export async function prepare(
+  ctx: ActionCtx,
+  execution: StreamExecutionArgs,
+  historySnapshot?: ProviderHistorySnapshot,
+): Promise<PreparedStreamStep | null> {
   let data = await ctx.runQuery(internal.streams._getContext, execution)
   if (!data) return null
 
@@ -195,6 +230,11 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
   const operationMessages = operationEval
     ? buildOperationMessages(operationEval.items, data.stream.command)
     : undefined
+  const historyRows = historySnapshot
+    ? await readHistorySnapshot(ctx, execution, historySnapshot)
+    : undefined
+  if (historyRows === null) return null
+
   const { remainingPrompts, ...prefix } = await buildProviderPrefix(
     ctx,
     data,
@@ -205,6 +245,7 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
       replay: toolReplay,
       trimWindow: trimContext ? contextWindow : undefined,
       operationMessages,
+      historyRows,
     },
   )
 
@@ -286,7 +327,7 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
         : ('none' as const),
     toolRuntime: runtime,
     toolReplay,
-    hasActiveMedia: data.hasActiveMedia || hasToolResultMedia(request.messages),
+    hasActiveMedia: hasToolResultMedia(request.messages),
   }
 }
 

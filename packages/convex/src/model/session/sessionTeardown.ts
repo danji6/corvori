@@ -7,6 +7,7 @@ import * as Avatars from '../avatars'
 import { removeChanges } from '../changes'
 import { revoke as revokeMcp } from '../mcpRuntime'
 import { deleteVersions } from '../messageContents'
+import { removeForSession as removeNotifications } from '../notifications'
 import { cancelForSession as cancelScheduledEvents } from '../scheduledEvents'
 import { remove as removeStream, stopForSession } from '../stream/lifecycle'
 import { requireOwner } from './memberships'
@@ -73,7 +74,6 @@ export async function remove(
     'shellOutputDeliveries',
     'attachmentCursors',
     'attachmentCursorReceipts',
-    'notifications',
   ] as const
 
   for (const table of sessionTables) {
@@ -86,6 +86,8 @@ export async function remove(
       await ctx.db.delete(row._id)
     }
   }
+
+  await removeNotifications(ctx, sessionId)
 
   const streams = await ctx.db
     .query('streams')

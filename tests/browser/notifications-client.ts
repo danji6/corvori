@@ -89,7 +89,7 @@ export const notificationControls = {
         ? {
             ...item,
             requestState: 'handled',
-            attention: false,
+            attention: undefined,
             status: 'read',
             approvalPending: false,
             approvalActions: [],
@@ -102,7 +102,7 @@ export const notificationControls = {
     items = items.map((item) => ({
       ...item,
       requestState: 'handled',
-      attention: false,
+      attention: undefined,
       status: 'read',
       approvalPending: false,
       approvalActions: [],
@@ -154,7 +154,7 @@ const client = {
               ...item,
               status: 'read',
               requestState: 'handled',
-              attention: false,
+              attention: undefined,
               readAt: Date.now(),
               approvalPending: false,
               approvalActions: [],
@@ -198,7 +198,7 @@ const client = {
     if (name === 'notifications:acknowledge') {
       items = items.map((item) =>
         item._id === args.notificationId && item.requestState === 'expired'
-          ? { ...item, attention: false, status: 'read' }
+          ? { ...item, attention: undefined, status: 'read' }
           : item,
       )
     }
@@ -216,22 +216,16 @@ function queryResult(name: string, args: Record<string, unknown>) {
     return items.filter(
       (item) => !item.attention && item.status === args.status,
     )
-  const pending = items.filter((item) => item.requestState === 'pending')
-  if (name === 'notifications:summary')
+  if (name === 'notifications:summary') {
+    const attention = items.filter((item) => item.attention)
+    const pending = attention.filter((item) => item.requestState === 'pending')
     return {
-      unreadCount: items.filter(
-        (item) => item.status === 'unread' || item.attention,
-      ).length,
+      attentionCount: attention.length,
       pendingCount: pending.length,
-      activeIds: items
-        .filter(
-          (item) =>
-            item.requestState === 'pending' ||
-            (!item.attention && item.status === 'unread'),
-        )
-        .map((item) => item._id),
-      recent: [...pending].reverse(),
+      pendingIds: pending.map((item) => item._id),
+      recent: pending.reverse().slice(0, 100),
     }
+  }
   if (name === 'notifications:pendingPage') {
     const { cursor, numItems } = args.paginationOpts as {
       cursor: string | null
@@ -307,7 +301,7 @@ export function addActivity() {
           approvalActions: [],
           request: undefined,
           requestState: undefined,
-          attention: false,
+          attention: undefined,
         }
       : item,
   )

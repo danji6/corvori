@@ -1,0 +1,1 @@
+export const SIDEBAR_STREAM_BATCH_SIZE = 32

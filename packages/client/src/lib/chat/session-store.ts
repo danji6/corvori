@@ -7,7 +7,6 @@ export type SessionStoreInput = {
   loadMore: (numItems: number) => void
   status: PaginationStatus
   activeId: string | null
-  streamingIds: Set<string>
 }
 
 export type SessionStore = ReturnType<typeof createSessionStore>
@@ -57,11 +56,6 @@ export function createSessionStore() {
       changed = true
     }
 
-    if (!setEqual(streamingIds, input.streamingIds)) {
-      streamingIds = input.streamingIds
-      changed = true
-    }
-
     const isLoadingFirstPage = input.status === 'LoadingFirstPage'
     if (
       paginationMeta.status !== input.status ||
@@ -79,6 +73,11 @@ export function createSessionStore() {
   return {
     subscribe,
     sync,
+    setStreamingIds: (next: Set<string>) => {
+      if (setEqual(streamingIds, next)) return
+      streamingIds = next
+      listeners.forEach((listener) => listener())
+    },
     loadMore: (numItems: number) => latestLoadMore(numItems),
     getIds: () => ids,
     getSession: (id: string): SessionListItem | null =>

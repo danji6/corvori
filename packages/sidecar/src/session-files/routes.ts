@@ -69,6 +69,19 @@ function activeSession<T>(id: string, action: () => Promise<T>) {
   })
 }
 
+type Transfer = z.infer<typeof transfer>
+
+function writeTransfer(
+  input: Transfer,
+  write: (input: Transfer) => Promise<void>,
+) {
+  const target = sessionFilePath(input.sessionId, input.path)
+  return checkpoints().write(input.sessionId, [target], async (writer) => {
+    await writer.trackFile(target)
+    await write(input)
+  })
+}
+
 export function sessionFileRoutes() {
   const app = new Hono()
 
@@ -83,15 +96,7 @@ export function sessionFileRoutes() {
   app.post('/commit-copy', async (c) => {
     const input = transfer.parse(await c.req.json())
     await exclusive(input.operationId, () =>
-      activeSession(input.sessionId, () =>
-        checkpoints().write(input.sessionId, undefined, async () => {
-          await checkpoints().trackFile(
-            input.sessionId,
-            sessionFilePath(input.sessionId, input.path),
-          )
-          await commitCopy(input)
-        }),
-      ),
+      activeSession(input.sessionId, () => writeTransfer(input, commitCopy)),
     )
     return c.json({ ok: true })
   })
@@ -116,7 +121,7 @@ export function sessionFileRoutes() {
       .parse(await c.req.json())
     return c.json(
       await exclusive(input.operationId, async () => {
-        if (input.rollback) await rollbackCopy(input.rollback)
+        if (input.rollback) await writeTransfer(input.rollback, rollbackCopy)
         const upload = input.discardUpload
           ? await uploadedSnapshot(input.operationId)
           : undefined

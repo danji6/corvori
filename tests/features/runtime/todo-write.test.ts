@@ -50,7 +50,7 @@ function makeCtx({
         withIndex: () => ({
           unique: async () => {
             if (table === 'settings') return settings
-            if (table === 'sessionState') return { stepCount }
+            if (table === 'sessionState') return { _id: 'state_1', stepCount }
             if (table === 'todos') return todo
             return null
           },
@@ -256,6 +256,7 @@ describe('injectDueReminders todo nudge', () => {
     expect(patches).toEqual([
       { id: 'todo_1', patch: { stepCount: staleStepCount } },
       { id: 'messages_1', patch: { position: expect.any(String) } },
+      { id: 'state_1', patch: { completedHistoryRevision: 1 } },
     ])
   })
 

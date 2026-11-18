@@ -7,6 +7,8 @@ The architectural overview below was originally audited at `0d6092b` on
 boundaries; it is not a fresh audit of every product feature or outstanding bug.
 See `REFACTOR_PLAN.md` for scope, verification, and remaining release checks.
 
+See the [performance analysis](tests/PERFORMANCE_ANALYSIS.md) for benchmark results.
+
 ## Turn changes and release cleanup (2026-10-30)
 
 The pre-release schema baseline is 33, with an empty public migration manifest.
@@ -1991,8 +1993,9 @@ generation (preferring `git ls-files` with a glob fallback), file and
 directory mention resolution, safe line-windowed file reads, write/edit
 operations with no-op rejection, BOM/line-ending preservation, capped unified
 diffs, simulated diffs for approval previews, path sensitivity checks, and
-workspace instructions discovery. The turn checkpoint manager serializes writes,
-captures before/after snapshots, and performs authorized transactional restores.
+workspace instructions discovery. The turn checkpoint manager coordinates
+writes and transactional restores against overlapping workspace roots, and
+captures before/after snapshots with bounded concurrency across disjoint roots.
 
 Convex never reads arbitrary local files directly. It calls the sidecar only
 after auth and role checks, using the dedicated internal Bearer credential.

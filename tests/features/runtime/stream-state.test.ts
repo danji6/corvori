@@ -1,4 +1,5 @@
 import type { Doc } from '@cv/convex/_generated/dataModel'
+import { stopStream } from '@cv/convex/model/chat/controls'
 import { reserveOrDebounceTurn } from '@cv/convex/model/chat/reserve'
 import { getActiveStream } from '@cv/convex/model/session/memberships'
 import {
@@ -182,6 +183,7 @@ test('chat projection exposes controls without command, lease, or scheduler data
     _id: 'stream',
     invokedBy: 'user',
     status: 'retrying',
+    generation: 1,
     attempt: 0,
     processingMessageId: 'message',
     fireAt: undefined,
@@ -189,6 +191,32 @@ test('chat projection exposes controls without command, lease, or scheduler data
     retryError: 'limit',
   })
   expect(activeStreamView({ ...row, state: { phase: 'reserved' } })).toBeNull()
+})
+
+test('a delayed Stop leaves replacement executions running', async () => {
+  const { ctx, rows, scheduled } = fixture()
+  const auth = Object.assign(ctx, { userId: 'user' })
+  const current = rows('streams')[0]
+  const sessionId = 'session' as never
+  current.leaseExpiresAt = Date.now() + 5000
+  current.generation = 2
+
+  await stopStream(auth, { sessionId, execution })
+  expect(current.state).toMatchObject({ phase: 'streaming' })
+  current._id = 'replacement'
+  await stopStream(auth, {
+    sessionId,
+    execution: { ...execution, generation: 2 },
+  })
+  expect(current.state).toMatchObject({ phase: 'streaming' })
+  expect(scheduled).toHaveLength(0)
+
+  await stopStream(auth, {
+    sessionId,
+    execution: { streamId: 'replacement' as never, generation: 2 },
+  })
+  expect(current.state).toMatchObject({ phase: 'stopping' })
+  expect(scheduled).toHaveLength(1)
 })
 
 for (const phase of ['streaming', 'stopping'] as const) {

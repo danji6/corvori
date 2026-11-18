@@ -116,6 +116,7 @@ export const sessionStateSchema = v.object({
   toolApprovals: v.optional(toolApprovalsValidator),
   /** Successful provider steps completed by invoke streams. */
   stepCount: v.number(),
+  completedHistoryRevision: v.optional(v.number()),
   /** (reminderId, stepCount) at last injection, or baseline when first seen. */
   reminderState: v.optional(v.record(v.string(), v.number())),
   /** Deferred (slash) commands. */

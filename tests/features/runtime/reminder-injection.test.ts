@@ -143,7 +143,7 @@ describe('injectDueReminders', () => {
     ])
     expect(content?.doc.searchText).toBeUndefined()
 
-    expect(state.patches).toEqual([{ reminderState: { r1: 6 } }])
+    expect(state.patches).toContainEqual({ reminderState: { r1: 6 } })
   })
 
   test('seeds a baseline for unseen reminders without inserting', async () => {

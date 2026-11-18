@@ -14,6 +14,7 @@ import type { SenderIdentity } from './chat/identities'
 import { senderIdentity } from './chat/identities'
 import { removeForMessage as removeMcpOperations } from './mcpOperations'
 import { isContextEligible, searchTextFromParts } from './messages'
+import { advanceCompletedHistoryRevision } from './session/state'
 import { removeDeliveriesForMessage } from './shellOutputDeliveries'
 import { collectToolOutputStorageIds } from './stream/toolOutput'
 
@@ -32,6 +33,16 @@ type InsertMessageFields = {
   replyTo?: Doc<'messages'>['replyTo']
   summaryBoundaryCreationTime?: number
 } & SenderIdentity
+
+/** Invalidates history if this document could be present in a completed snapshot. */
+export async function invalidateCompletedHistory(
+  ctx: MutationCtx,
+  message: Pick<Doc<'messages'>, 'sessionId' | 'status' | 'contextEligible'>,
+) {
+  if (message.status === 'done' && message.contextEligible) {
+    await advanceCompletedHistoryRevision(ctx, message.sessionId)
+  }
+}
 
 /** Point read of a single segment row. */
 export function getSegmentRow(
@@ -211,6 +222,8 @@ export async function insertMessage(
     )
   }
 
+  await invalidateCompletedHistory(ctx, message)
+
   return { messageId, contentId, segments }
 }
 
@@ -258,13 +271,16 @@ export async function addVersion(
     searchText: searchTextFromParts(parts),
   })
 
+  const contextEligible = isContextEligible(parts)
   await ctx.db.patch(message._id, {
     selectedVersion: version,
     versionCount: version,
     ...senderIdentity(identity ?? message),
-    contextEligible: isContextEligible(parts),
+    contextEligible,
     metadata: undefined,
   })
+
+  await invalidatePartsChange(ctx, message, contextEligible)
 
   return { contentId, version }
 }
@@ -296,12 +312,31 @@ export async function patchSegmentParts(
   await ctx.db.patch(row._id, { parts })
   const contextEligible = row.segmentIndex > 0 || isContextEligible(parts)
   const message = await ctx.db.get(messageId)
-  if (message && message.contextEligible !== contextEligible) {
+  if (!message) return
+  if (message.contextEligible !== contextEligible) {
     await ctx.db.patch(messageId, { contextEligible })
+  }
+  if (message.status !== 'done') return
+  if (
+    row.version === message.selectedVersion ||
+    message.contextEligible !== contextEligible
+  ) {
+    await invalidatePartsChange(ctx, message, contextEligible)
   }
 }
 
-/** Writes a segment's final parts, search text and metadata slice. */
+async function invalidatePartsChange(
+  ctx: MutationCtx,
+  message: Doc<'messages'>,
+  contextEligible: boolean,
+) {
+  await invalidateCompletedHistory(ctx, {
+    ...message,
+    contextEligible: message.contextEligible || contextEligible,
+  })
+}
+
+/** Writes a processing segment's final parts, search text and metadata slice. */
 export async function sealSegment(
   ctx: MutationCtx,
   row: Doc<'messageContents'>,
@@ -330,10 +365,16 @@ export async function finalizeTurn(
   await sealSegment(ctx, row, parts, metadata)
 
   const segments = await listSelectedSegments(ctx, message)
+  const contextEligible = segments.some((segment) => segment.parts.length > 0)
   await ctx.db.patch(message._id, {
     status: 'done',
-    contextEligible: segments.some((segment) => segment.parts.length > 0),
+    contextEligible,
     metadata: mergeSegmentMetadata(segments),
+  })
+  await invalidateCompletedHistory(ctx, {
+    ...message,
+    status: 'done',
+    contextEligible,
   })
 }
 
@@ -380,9 +421,9 @@ export async function replaceSelectedContent(
     await ctx.db.delete(row._id)
   }
 
-  await ctx.db.patch(message._id, {
-    contextEligible: isContextEligible(parts),
-  })
+  const contextEligible = isContextEligible(parts)
+  await ctx.db.patch(message._id, { contextEligible })
+  await invalidatePartsChange(ctx, message, contextEligible)
 }
 
 /** Replaces one segment's parts, re-deriving the doc's eligibility. */
@@ -400,9 +441,9 @@ export async function setSegmentParts(
 
   if (row.version !== message.selectedVersion) return
   const segments = await listSelectedSegments(ctx, message)
-  await ctx.db.patch(message._id, {
-    contextEligible: segments.some((segment) => segment.parts.length > 0),
-  })
+  const contextEligible = segments.some((segment) => segment.parts.length > 0)
+  await ctx.db.patch(message._id, { contextEligible })
+  await invalidatePartsChange(ctx, message, contextEligible)
 }
 
 /** Points the message at another version and updates the denormalized fields. */
@@ -415,12 +456,14 @@ export async function setSelectedVersion(
   const head = segments[0]
   if (!head) error('Version not found', 404)
 
+  const contextEligible = segments.some((segment) => segment.parts.length > 0)
   await ctx.db.patch(message._id, {
     selectedVersion: version,
-    contextEligible: segments.some((segment) => segment.parts.length > 0),
+    contextEligible,
     metadata: mergeSegmentMetadata(segments),
     ...senderIdentity(head.senderName ? head : message),
   })
+  await invalidatePartsChange(ctx, message, contextEligible)
 }
 
 /** Deletes every content row of a message, releasing its tool-output blobs. */

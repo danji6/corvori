@@ -6,7 +6,11 @@ import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import type { Session } from '../../types'
 import type { MessageExtra, SessionMode } from '../../types'
-import { deleteVersions, insertMessage } from '../messageContents'
+import {
+  deleteVersions,
+  insertMessage,
+  invalidateCompletedHistory,
+} from '../messageContents'
 import { scheduleMessageEval } from '../messages'
 import { removeForSession as removeSessionCache } from '../session/cache'
 import { sessionToolNames } from '../tool/selection'
@@ -197,6 +201,7 @@ export async function injectModeNote(
   if (insert && !sender) return
 
   if (trailing && remove) {
+    await invalidateCompletedHistory(ctx, trailing)
     await deleteVersions(ctx, trailing._id)
     await ctx.db.delete(trailing._id)
   }

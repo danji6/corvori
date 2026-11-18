@@ -13,6 +13,7 @@ import type { UIMessage } from 'ai'
 
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
+import type { MessageWithParts } from '../../model/messageContents'
 import { buildPrompts } from '../../model/prompt/prompts'
 import { rememberWireCalls } from '../../model/tool/dispatchTransport'
 import type { ToolReplay } from '../../model/tool/sessionTools'
@@ -40,6 +41,7 @@ type ProviderHistoryOptions = {
   manifestVersion?: number
   contextId?: string
   replay?: ToolReplay
+  historyRows?: MessageWithParts[]
   trim?: TrimHistoryOptions
 }
 
@@ -52,6 +54,7 @@ export async function buildProviderHistory(
     manifestVersion,
     contextId = data.sessionCache?.tools?.contextId,
     replay,
+    historyRows,
     trim,
   }: ProviderHistoryOptions = {},
 ) {
@@ -59,10 +62,12 @@ export async function buildProviderHistory(
     ...data.agent,
     ...data.sessionCache?.historyPresentation,
   }
-  const rows = await ctx.runQuery(internal.streams._getProviderHistory, {
-    streamId: data.stream._id,
-    generation: data.stream.generation,
-  })
+  const rows =
+    historyRows ??
+    (await ctx.runQuery(internal.streams._getProviderHistory, {
+      streamId: data.stream._id,
+      generation: data.stream.generation,
+    }))
 
   if (replay) {
     for (const row of rows) rememberWireCalls(row.parts, replay)

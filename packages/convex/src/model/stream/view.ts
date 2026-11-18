@@ -12,6 +12,7 @@ export function activeStreamView(
     _id: stream._id,
     invokedBy: stream.invokedBy,
     status: state.phase,
+    generation: stream.generation,
     attempt: stream.attempt,
     processingMessageId: state.processingMessageId,
     fireAt: state.phase === 'pending' ? state.fireAt : undefined,

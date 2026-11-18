@@ -194,9 +194,14 @@ export default defineSchema({
   notifications: defineTable(V.notificationSchema)
     .index('by_recipientId_attention', ['recipientId', 'attention', 'requestState'])
     .index('by_requestStreamId', ['request.streamId'])
-    .index('by_recipientId_status_readAt', ['recipientId', 'status', 'readAt'])
+    .index('by_recipient_status_attention_readAt', ['recipientId', 'status', 'attention', 'readAt'])
     .index('by_recipientId_sessionId', ['recipientId', 'sessionId'])
     .index('by_sessionId', ['sessionId']),
+
+  notificationUnreadCounts: defineTable({
+    recipientId: v.id('users'),
+    count: v.number(),
+  }).index('by_recipientId', ['recipientId']),
 
   typing: defineTable(V.typingSchema)
     .index('by_sessionId', ['sessionId'])

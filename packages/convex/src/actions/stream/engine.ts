@@ -14,6 +14,7 @@ import { compactBeforeDispatch } from './engineCompaction'
 import { prepare } from './engineSetup'
 import { consumeProviderStep } from './engineStep'
 import { ProviderStreamFailure } from './engineStep'
+import type { ProviderHistorySnapshot } from './historySnapshot'
 
 // Max steps before the turn is handed off to a new action
 const MAX_STEPS = 50
@@ -29,6 +30,7 @@ export async function _stream(ctx: ActionCtx, execution: StreamExecutionArgs) {
   const claimed = await ctx.runMutation(internal.streams._claim, { ...execution }) // prettier-ignore
   if (!claimed) return
 
+  const historySnapshot: ProviderHistorySnapshot = {}
   let attempt = claimed.attempt
   let hasGeneratedOutput = false
   let lastSetup: Awaited<ReturnType<typeof prepare>> = null
@@ -50,10 +52,18 @@ export async function _stream(ctx: ActionCtx, execution: StreamExecutionArgs) {
         return
       }
 
-      const setup = await prepare(ctx, execution)
+      const setup = await prepare(ctx, execution, historySnapshot)
       if (!setup) return
       lastSetup = setup
       if (await compactBeforeDispatch(ctx, execution, setup)) return
+
+      const result = await consumeProviderStep(
+        ctx,
+        execution,
+        setup,
+        windowDeadline,
+      )
+      if (result.shouldContinue === null) return
 
       const {
         shouldContinue,
@@ -64,8 +74,7 @@ export async function _stream(ctx: ActionCtx, execution: StreamExecutionArgs) {
         awaitingQuestions,
         awaitingTasks,
         awaitingYield,
-      } = await consumeProviderStep(ctx, execution, setup, windowDeadline)
-      if (shouldContinue === null) return
+      } = result
 
       hasGeneratedOutput = hasGeneratedOutput || hasOutput.value
 

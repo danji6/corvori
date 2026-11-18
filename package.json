@@ -27,7 +27,8 @@
     "server": "bun scripts/sidecar.ts",
     "tests": "bun --no-env-file scripts/test.ts",
     "test:all": "bun --no-env-file scripts/test.ts all",
-    "test:browser": "bun --no-env-file scripts/test.ts browser"
+    "test:browser": "bun --no-env-file scripts/test.ts browser",
+    "test:perf": "bun --no-env-file tests/perf/run.ts"
   },
   "dependencies": {
     "@ai-sdk/alibaba": "^2.0.88",

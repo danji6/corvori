@@ -27,7 +27,8 @@ import { attachApprovalPreviews } from './engineApproval'
 import { buildSessionLogBody } from './engineLog'
 import { patchSessionLogBody } from './engineLog'
 import { offloadLargeParts } from './engineOutput'
-import { type prepare } from './engineSetup'
+import { createStreamPatcher } from './enginePatches'
+import type { PreparedStreamStep } from './engineSetup'
 import { STEP_DEADLINE_GRACE_MS } from './engineWatchdog'
 import { STEP_DEADLINE_REASON } from './engineWatchdog'
 import { watchForStop } from './engineWatchdog'
@@ -35,8 +36,6 @@ import {
   collectRespondedApprovalNotes,
   insertApprovalNoteMessages,
 } from './history'
-
-export const PATCH_INTERVAL_MS = 100
 
 export class ProviderStreamFailure {
   constructor(
@@ -51,7 +50,7 @@ export class ProviderStreamFailure {
 export async function consumeProviderStep(
   ctx: ActionCtx,
   execution: StreamExecutionArgs,
-  setup: NonNullable<Awaited<ReturnType<typeof prepare>>>,
+  setup: PreparedStreamStep,
   windowDeadline: number,
 ) {
   const [
@@ -128,11 +127,24 @@ export async function consumeProviderStep(
     )
 
   let streamError: unknown
-  let lastPatch = 0
   let latestParts = initialMessage.parts
   let lastToolStates = toolStateSignature(latestParts)
+  let hasPatchedText = false
+  const patches = createStreamPatcher(
+    async (parts) => patchMessage(ctx, execution, await prepareParts(parts)),
+    abortController,
+  )
+  const startedAt = Date.now()
+  const stopped = () => ({
+    shouldContinue: null,
+    hasOutput: {
+      value: outputTracker.hasOutput,
+      duration: Date.now() - startedAt,
+      toolErrors: [...toolErrorTracker.toolErrors],
+      warnings: [],
+    },
+  })
   try {
-    const startedAt = Date.now()
     const model = toolsDisabled
       ? await replayLanguageModel(
           setup.resolved.languageModel,
@@ -207,25 +219,28 @@ export async function consumeProviderStep(
       if (hasAwaitingApproval(latestParts)) continue
       // Tool state transitions bypass the throttle to avoid staleness
       const toolStates = toolStateSignature(latestParts)
-      const throttled = Date.now() - lastPatch < PATCH_INTERVAL_MS
-      if (throttled && toolStates === lastToolStates) continue
-      lastPatch = Date.now()
+      const firstText: boolean =
+        !hasPatchedText &&
+        latestParts.some(
+          (part, index) =>
+            index >= initialPartCount &&
+            part.type === 'text' &&
+            part.text.length > 0,
+        )
+      const write = patches.update(
+        latestParts,
+        firstText || toolStates !== lastToolStates,
+      )
+      hasPatchedText ||= firstText
       lastToolStates = toolStates
-      latestParts = await prepareParts(latestParts)
-      if (!(await patchMessage(ctx, execution, latestParts))) {
-        return {
-          shouldContinue: null,
-          hasOutput: {
-            value: outputTracker.hasOutput,
-            duration: Date.now() - startedAt,
-            toolErrors: [...toolErrorTracker.toolErrors],
-            warnings: [],
-          },
-        }
-      }
+      if (write) await write
+      if (patches.rejected || patches.failure) break
     }
 
     const duration = Date.now() - startedAt
+    await patches.close()
+    if (patches.rejected) return stopped()
+    if (patches.failure) throw patches.failure.error
 
     if (abortController.signal.reason === STEP_DEADLINE_REASON) {
       throw new Error('Backend execution window elapsed')
@@ -301,13 +316,15 @@ export async function consumeProviderStep(
       usage,
     }
   } catch (error) {
+    await patches.close()
+    if (patches.rejected) return stopped()
     await setup.cacheDiagnostics?.fail(abortController.signal.aborted)
     latestParts = await prepareParts(latestParts).catch(() => latestParts)
 
     await tryPatchMessage(ctx, execution, latestParts)
 
     throw new ProviderStreamFailure(
-      streamError ?? error,
+      patches.failure ? patches.failure.error : (streamError ?? error),
       outputTracker.hasOutput,
       hasReplayableToolOutputSince(latestParts, initialPartCount),
       abortController.signal.aborted,
@@ -322,7 +339,7 @@ export async function patchMessage(
   ctx: ActionCtx,
   execution: StreamExecutionArgs,
   parts: UIMessage['parts'],
-) {
+): Promise<boolean> {
   return ctx.runMutation(internal.streams._patchMessage, {
     ...execution,
     parts,

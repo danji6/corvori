@@ -8,6 +8,7 @@ import { streamSSE } from 'hono/streaming'
 import { ZodError, z } from 'zod'
 
 import { withAgentFiles } from '../agent-files/access'
+import { workspaceRoots } from '../checkpoints/group'
 import { checkpoints } from '../checkpoints/manager'
 import {
   withWorkspaceOperation,
@@ -112,42 +113,30 @@ export const startShell: Handler = async (c) => {
       () =>
         withWorkspaceOperation(input.sessionId, async () => {
           const directory = await resolveShellDirectory(input)
-          return checkpoints().write(
-            input.sessionId,
-            input.workspace,
-            async () => {
-              await checkpoints().assertAvailable(input.sessionId, [
-                directory.cwd,
-              ])
-              const started = await startShellJob(
-                {
-                  ...input,
-                  agentId: input.workspace.agentHome?.agentId,
-                  homeId: input.workspace.agentHome?.homeId,
-                  cwd: directory.cwd,
-                  environment: directory.environment,
-                },
-                [
-                  ...directory.roots,
-                  ...(input.workspace.sources?.map((source) => source.path) ??
-                    []),
-                  ...(input.workspace.agentHome
-                    ? [input.workspace.agentHome.path]
-                    : []),
-                ],
-              )
-              try {
-                await checkpoints().trackJob(
-                  input.sessionId,
-                  shellJobPid(started.jobId, input.sessionId),
-                )
-              } catch (error) {
-                killShellJob(started.jobId, input.sessionId)
-                throw error
-              }
-              return started
-            },
-          )
+          const roots = [
+            ...(await workspaceRoots(input.sessionId, input.workspace)),
+            ...directory.roots,
+            directory.cwd,
+          ]
+          return checkpoints().write(input.sessionId, roots, async (writer) => {
+            const started = await startShellJob(
+              {
+                ...input,
+                agentId: input.workspace.agentHome?.agentId,
+                homeId: input.workspace.agentHome?.homeId,
+                cwd: directory.cwd,
+                environment: directory.environment,
+              },
+              roots,
+            )
+            try {
+              await writer.trackJob(shellJobPid(started.jobId, input.sessionId))
+            } catch (error) {
+              killShellJob(started.jobId, input.sessionId)
+              throw error
+            }
+            return started
+          })
         }),
     )
     return c.json(result)

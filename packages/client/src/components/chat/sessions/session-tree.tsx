@@ -5,6 +5,7 @@ import {
   SessionGroupPreload,
   SessionGroupQuery,
 } from '@/hooks/chat/sessions'
+import { useSidebarStreaming } from '@/hooks/chat/sidebar-streaming'
 import { isFolderCollapsed } from '@/lib/chat/session-folder-state'
 import {
   type GroupRow,
@@ -24,6 +25,7 @@ type SessionTreeProps = {
   search: string
   pages: Record<string, SessionGroupPage>
   dragging: boolean
+  streamingEnabled?: boolean
   organizationPending?: boolean
 }
 
@@ -35,10 +37,12 @@ export function SessionTree({
   search,
   pages,
   dragging,
+  streamingEnabled = true,
   organizationPending = false,
 }: SessionTreeProps) {
   const [recentsOpen, setRecentsOpen] = useState(true)
   const nodes = useMemo(() => nestSessionRows(rows), [rows])
+  useSidebarStreaming(nodes, collapsed, recentsOpen, streamingEnabled)
 
   function renderBranch(
     node: SessionTreeNode,

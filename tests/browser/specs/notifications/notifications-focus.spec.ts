@@ -179,6 +179,40 @@ test('returning to the session closes its existing desktop banner and suppresses
   await expect(page.locator('[data-sonner-toast]')).toHaveCount(0)
 })
 
+test('marking ordinary activity read updates the badges and closes just its desktop banner', async ({
+  page,
+}) => {
+  await mockDesktop(page, false)
+  await page.goto(otherSession)
+  await page.getByRole('button', { name: 'Notify activity' }).click()
+  await expect.poll(() => desktopCaptures(page)).toHaveLength(1)
+  await page.getByRole('button', { name: 'Notify shell', exact: true }).click()
+  await expect.poll(() => desktopCaptures(page)).toHaveLength(2)
+  await expect(page).toHaveTitle(/^\(2\)/)
+  await page
+    .getByRole('button', { name: 'Notifications, 2 unread', exact: true })
+    .click()
+  await page
+    .getByRole('button', { name: 'Mark all as read', exact: true })
+    .click()
+  await expect(
+    page.getByRole('button', { name: 'Notifications, 1 unread', exact: true }),
+  ).toBeVisible()
+  await expect(page).toHaveTitle(/^\(1\)/)
+  await expect
+    .poll(async () => {
+      const captures: Array<{ body: string; closed?: boolean }> =
+        await desktopCaptures(page)
+      return captures.filter(({ closed }) => closed).map(({ body }) => body)
+    })
+    .toEqual(['Finished the regression tests'])
+  await expect(
+    page
+      .getByRole('tabpanel', { name: 'Unread', exact: true })
+      .getByRole('button', { name: 'Allow', exact: true }),
+  ).toBeEnabled()
+})
+
 test('desktop delivery rechecks focus after waiting for worker registration', async ({
   page,
 }) => {

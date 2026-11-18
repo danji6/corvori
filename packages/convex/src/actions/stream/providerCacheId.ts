@@ -1,3 +1,5 @@
+'use node'
+
 import { sha256 } from '@cv/core/sha256'
 
 import { internal } from '../../_generated/api'

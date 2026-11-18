@@ -1,27 +1,29 @@
 import type { ChangePublication } from '@cv/core/types/changes'
 import type { FolderWorkspace } from '@cv/core/types/workspace'
-import {
-  assertPersonalScope,
-  selectFileWorkspace,
-} from '@cv/core/workspace/personal'
 
-import { isOutside } from '../mcp/workspace/access'
-import { requireWorkspace } from '../mcp/workspace/resolve-workspace'
-import { sessionDirectory } from '../session-files/storage'
-import { changedFiles, publication } from './diff'
+import { removeSessionCheckpoints } from './cleanup'
 import {
-  captureRoots,
-  collectBlobs,
+  CheckpointOperations,
+  CheckpointScans,
+  type SnapshotOptions,
+  checkpointKey,
+  groupKey,
+  sessionKey,
+} from './coordination'
+import {
   createGroup,
-  displayFile,
   enrollParticipant,
+  mergeBaseline,
   overlaps,
+  workspaceRoots,
 } from './group'
 import { hasCaptureJobs } from './jobs'
-import { recoverCaptures } from './recovery'
+import { recoverCaptures, recoverSealedBaseline } from './recovery'
 import { recoverJournal, restore } from './restore'
-import { captureFile, snapshot } from './snapshot'
+import { sealCheckpoint } from './seal'
+import { snapshot } from './snapshot'
 import { CheckpointStorage } from './storage'
+import { trackFile } from './track-file'
 import type {
   BeginCapture,
   CaptureGroup,
@@ -32,198 +34,211 @@ import type {
   RestoreJournal,
 } from './types'
 
+type CheckpointWriter = {
+  trackFile: (target: string, workspace?: FolderWorkspace) => Promise<void>
+  trackJob: (pid?: number) => Promise<void>
+}
+
 /** Coordinates capture groups and restoration across canonical workspace roots. */
 export class CheckpointManager {
   private groups = new Map<string, CaptureGroup>()
   private waiters: CaptureWaiter[] = []
+  private lastWaiterTime = 0
+  private pendingCaptures = new Map<symbol, BeginCapture>()
   private initialized?: Promise<void>
-  private queue = Promise.resolve()
+  private operations = new CheckpointOperations()
+  private scans: CheckpointScans
 
-  constructor(readonly storage = new CheckpointStorage()) {}
-
-  serial<T>(operation: () => Promise<T>): Promise<T> {
-    const result = this.queue.then(async () => {
-      this.initialized ??= this.initialize()
-      await this.initialized
-      return operation()
-    })
-    this.queue = result.then(
-      () => undefined,
-      () => undefined,
-    )
-    return result
+  constructor(
+    readonly storage = new CheckpointStorage(),
+    options: SnapshotOptions = {},
+  ) {
+    this.scans = new CheckpointScans(options)
   }
 
-  begin(input: BeginCapture) {
-    return this.serial(async () => {
-      const requestedRoots = await captureRoots(input)
-      const existing = this.groups.get(input.groupId)
-      const inheritedJobsRunning =
-        existing?.interrupted && (await hasCaptureJobs(existing))
-      if (inheritedJobsRunning) return { queued: true }
-      const roots = [...new Set([...(existing?.roots ?? []), ...requestedRoots])] // prettier-ignore
-      const turn = this.waiters.findIndex((waiter) => waiter.id === input.groupId) // prettier-ignore
-      const earlier = this.waiters
-        .slice(0, turn < 0 ? undefined : turn)
-        .some((waiter) => overlaps(waiter.roots, roots))
-      const busy = await this.blocked(roots, input.groupId)
+  async begin(input: BeginCapture) {
+    const attempt = Symbol()
+    this.pendingCaptures.set(attempt, input)
+    try {
+      await this.ready()
+      let requested: string[] = []
+      const roots = () => [
+        ...new Set([
+          ...(this.groups.get(input.groupId)?.roots ?? []),
+          ...requested,
+        ]),
+      ]
+      return await this.operations.run(
+        () => ({
+          roots: roots(),
+          keys: [groupKey(input.groupId), sessionKey(input.sessionId)],
+        }),
+        () => this.beginCapture(input, roots()),
+        async () => {
+          requested = await workspaceRoots(input.sessionId, input.workspace)
+        },
+      )
+    } finally {
+      this.pendingCaptures.delete(attempt)
+    }
+  }
 
-      if (busy || (!existing && earlier)) {
-        if (existing)
-          throw new Error(
-            'Cannot extend a capture reservation into another active workspace',
-          )
-        if (turn < 0) {
-          const waiter = {
-            id: input.groupId,
-            roots,
-            createdAt: Date.now(),
-            sessionId: input.sessionId,
-          }
-          this.waiters.push(waiter)
-          await this.storage.save('waiters', waiter.id, waiter)
-        }
-        return { queued: true }
-      }
+  private async beginCapture(input: BeginCapture, roots: string[]) {
+    const existing = this.groups.get(input.groupId)
+    if (existing?.released) throw new Error('Capture group has already ended')
+    if (existing?.interrupted && (await hasCaptureJobs(existing)))
+      return { queued: true }
 
-      this.waiters = this.waiters.filter((waiter) => waiter.id !== input.groupId) // prettier-ignore
-      await this.storage.remove('waiters', input.groupId)
+    const turn = this.waiters.findIndex((waiter) => waiter.id === input.groupId)
+    const earlier = this.waiters
+      .slice(0, turn < 0 ? undefined : turn)
+      .some((waiter) => overlaps(waiter.roots, roots))
+    const busy = await this.blocked(roots, existing?.id)
+    if (busy && existing) {
+      throw new Error(
+        'Cannot extend a capture reservation into another active workspace',
+      )
+    }
+    if (busy || (!existing && earlier)) {
+      await this.saveWaiter(input, roots, this.waiters[turn])
+      return { queued: true }
+    }
 
-      const group = existing ?? createGroup(input, roots)
-      if (group.released) throw new Error('Capture group has already ended')
+    await this.removeWaiter(input.groupId)
 
-      const addedRoots = roots.filter((root) => !group.roots.includes(root))
+    const group = existing
+      ? structuredClone(existing)
+      : createGroup(input, roots)
 
-      if (!existing || addedRoots.length) {
-        const captured = await snapshot(
-          this.storage,
-          existing ? addedRoots : roots,
-        )
-        Object.assign(group.baseline, captured.files)
-        group.issues.push(...captured.issues)
-        group.excluded.push(...captured.excluded)
-        group.unavailable = [
-          ...(group.unavailable ?? []),
-          ...captured.unavailable,
-        ]
-      }
-      group.roots = roots
-      enrollParticipant(group, input)
-      if (group.interrupted) {
-        group.interrupted = false
-        group.shellPids = []
-      }
-      this.groups.set(group.id, group)
+    await recoverSealedBaseline(this.storage, group)
+    await this.captureBaseline(group, roots, !!existing)
+    enrollParticipant(group, input)
+
+    if (group.interrupted) {
+      group.interrupted = false
+      group.shellPids = []
+    }
+
+    try {
       await this.saveGroup(group)
-      return { queued: false }
-    })
+    } catch (error) {
+      await this.fenceFailedCapture(group)
+      throw error
+    }
+    this.groups.set(group.id, group)
+    return { queued: false }
   }
 
-  /** Holds capture transitions against native writes and shell dispatch. */
-  write<T>(
-    sessionId: string,
-    workspace: FolderWorkspace | undefined,
-    fn: () => Promise<T>,
-  ) {
-    return this.serial(async () => {
-      const group = this.forSession(sessionId)
-      if (workspace) {
-        const selected = workspace.agentOnly
-          ? selectFileWorkspace(workspace, 'agent://')
-          : workspace
-        const resolved = await requireWorkspace(
-          sessionId,
-          selected.workspaceId,
-          selected,
-        )
-        if (await this.blocked(resolved.roots, group?.id))
-          throw new Error('Workspace is reserved by another agent turn')
-      }
-      if (group?.interrupted)
-        throw new Error(
-          'Workspace capture was interrupted; wait for reconciliation',
-        )
-      return fn()
-    })
+  private async fenceFailedCapture(group: CaptureGroup) {
+    // Rename can succeed before a directory sync fails. Keep any such
+    // reservation fenced and reconcile it on the next begin.
+    const stored = await this.storage
+      .read<CaptureGroup>('groups', group.id)
+      .catch(() => group)
+    if (stored) this.groups.set(group.id, { ...stored, interrupted: true })
   }
 
-  /** Captures an explicit target before its first write, including ignored files. */
-  async trackFile(
-    sessionId: string,
-    target: string,
-    workspace?: FolderWorkspace,
+  private async saveWaiter(
+    input: BeginCapture,
+    roots: string[],
+    previous?: CaptureWaiter,
   ) {
-    if (!isOutside(this.storage.root, target)) {
-      throw new Error('Cannot edit the checkpoint store')
-    }
-
-    const group = this.forSession(sessionId)
-    if (await this.blocked([target], group?.id)) {
-      throw new Error('File is reserved by another agent turn')
-    }
-    if (!group || group.explicit.includes(target)) {
-      return
-    }
-
-    assertPersonalScope(workspace, target)
-
-    if (!group.roots.some((root) => !isOutside(root, target)))
-      group.roots.push(target)
-    const previouslyExcluded = group.excluded.some(
-      (entry) => !isOutside(entry, target),
+    if (
+      previous &&
+      roots.length === previous.roots.length &&
+      roots.every((root) => previous.roots.includes(root))
     )
-
-    const previouslyCovered = group.participants.some((participant) => {
-      const roots =
-        participant.workspace.sources?.map((source) => source.path) ?? []
-      if (participant.workspace.sessionFiles)
-        roots.push(sessionDirectory(participant.sessionId))
-      if (participant.workspace.agentHome)
-        roots.push(participant.workspace.agentHome.path)
-      return roots.some((root) => !isOutside(root, target))
-    })
-
-    if (!previouslyCovered || previouslyExcluded) {
-      try {
-        const state = await captureFile(this.storage, target)
-        if (!group.baseline[target] && state) group.baseline[target] = state
-      } catch (error) {
-        group.issues.push(`${target}: ${String(error)}`)
-        group.unavailable = [...(group.unavailable ?? []), target]
-      }
+      return
+    const waiter = {
+      id: input.groupId,
+      roots,
+      createdAt: previous?.createdAt ?? this.nextWaiterTime(),
+      sessionId: input.sessionId,
     }
+    await this.storage.save('waiters', waiter.id, waiter)
+    if (previous) Object.assign(previous, waiter)
+    else this.waiters.push(waiter)
+  }
 
-    group.explicit.push(target)
-    await this.saveGroup(group)
+  private nextWaiterTime() {
+    this.lastWaiterTime = Math.max(Date.now(), this.lastWaiterTime + 1)
+    return this.lastWaiterTime
+  }
+
+  private async removeWaiter(id: string) {
+    if (!this.waiters.some((waiter) => waiter.id === id)) return
+    await this.storage.remove('waiters', id)
+    this.waiters = this.waiters.filter((waiter) => waiter.id !== id)
+  }
+
+  private async captureBaseline(
+    group: CaptureGroup,
+    roots: string[],
+    existing: boolean,
+  ) {
+    const added = existing
+      ? roots.filter((root) => !group.roots.includes(root))
+      : roots
+    if (added.length) {
+      const captured = await this.scans.run('begin', () =>
+        snapshot(this.storage, added),
+      )
+      if (existing) mergeBaseline(group, captured.files)
+      else group.baseline = captured.files
+      group.issues.push(...captured.issues)
+      group.excluded.push(...captured.excluded)
+      group.unavailable = [
+        ...(group.unavailable ?? []),
+        ...captured.unavailable,
+      ]
+    }
+    group.roots = roots
+  }
+
+  /** Holds the actual write scope through file tracking or shell registration. */
+  async write<T>(
+    sessionId: string,
+    roots: string[],
+    fn: (writer: CheckpointWriter) => Promise<T>,
+  ) {
+    await this.ready()
+    return this.operations.run(
+      () => ({
+        roots,
+        keys: [sessionKey(sessionId), ...this.sessionGroupKeys(sessionId)],
+      }),
+      async () => {
+        const group = this.forSession(sessionId)
+        if (await this.blocked(roots, group?.id))
+          throw new Error('Workspace is reserved by another agent turn')
+        if (group?.interrupted)
+          throw new Error(
+            'Workspace capture was interrupted; wait for reconciliation',
+          )
+        return fn({
+          trackFile: (target, workspace) =>
+            trackFile(this.storage, roots, group, target, workspace),
+          trackJob: (pid) => this.trackJob(group, pid),
+        })
+      },
+    )
   }
 
   finish(input: FinishCapture) {
-    return this.serial(async () => {
+    return this.finalize(input.groupId, input.checkpointId, async () => {
       const saved = await this.storage.read<Checkpoint>(
         'checkpoints',
         input.checkpointId,
       )
-      if (saved) {
-        const group = this.groups.get(input.groupId)
-        if (group) {
-          await this.tryRelease(group)
-          await this.saveGroup(group)
-        }
-        return {
-          publication: saved.publication,
-          released: group?.released ?? true,
-        }
-      }
+      if (saved) return this.finishSaved(input.groupId, saved)
 
       const group = this.groups.get(input.groupId)
       if (!group) {
-        this.waiters = this.waiters.filter(
-          (waiter) => waiter.id !== input.groupId,
-        )
-        await this.storage.remove('waiters', input.groupId)
+        await this.removeWaiter(input.groupId)
         return { released: true }
       }
       if (group.released) return { released: true }
+      await recoverSealedBaseline(this.storage, group)
 
       for (const id of input.pendingParticipants ?? []) {
         if (!group.participants.some((item) => item.id === id)) {
@@ -236,7 +251,7 @@ export class CheckpointManager {
         (item) => item.id === input.participantId,
       )
       if (participant?.completedCheckpoint === input.checkpointId)
-        return { released: group.released }
+        return { released: await this.releaseIfFinished(group) }
       if (participant) participant.finished = true
 
       let result: ChangePublication | undefined
@@ -245,159 +260,166 @@ export class CheckpointManager {
       if (shouldSeal) result = await this.seal(group, input.checkpointId)
       if (participant) participant.completedCheckpoint = input.checkpointId
 
-      const released = await this.tryRelease(group)
-      await this.saveGroup(group)
+      const released = await this.releaseIfFinished(group)
 
       return { publication: result, released }
     })
   }
 
-  async read(checkpointId: string) {
-    return this.serial(() =>
-      this.storage.read<Checkpoint>('checkpoints', checkpointId),
+  private async finalize<T>(
+    groupId: string,
+    checkpointId: string,
+    operation: () => Promise<T>,
+  ) {
+    await this.ready()
+    return this.operations.run(
+      () => ({
+        roots: this.groups.get(groupId)?.roots,
+        keys: [groupKey(groupId), checkpointKey(checkpointId)],
+      }),
+      operation,
     )
   }
 
-  restore(input: RestoreInput) {
-    return this.serial(async () => {
-      const checkpoint = await this.storage.read<Checkpoint>(
-        'checkpoints',
-        input.checkpointId,
-      )
-      if (!checkpoint || checkpoint.sessionId !== input.sessionId)
-        throw new Error('Checkpoint not found')
+  async read(checkpointId: string) {
+    await this.ready()
+    return this.operations.run(
+      () => ({ keys: [checkpointKey(checkpointId)] }),
+      () => this.storage.read<Checkpoint>('checkpoints', checkpointId),
+    )
+  }
 
-      const journal = await this.storage.read<RestoreJournal>(
-        'journals',
-        checkpoint.id,
+  async restore(input: RestoreInput) {
+    const initial = await this.read(input.checkpointId)
+    if (!initial || initial.sessionId !== input.sessionId)
+      throw new Error('Checkpoint not found')
+
+    return this.operations.run(
+      () => ({ roots: initial.roots, keys: [checkpointKey(initial.id)] }),
+      () => this.restoreCheckpoint(input),
+    )
+  }
+
+  private async restoreCheckpoint(input: RestoreInput) {
+    const checkpoint = await this.storage.read<Checkpoint>(
+      'checkpoints',
+      input.checkpointId,
+    )
+    if (!checkpoint || checkpoint.sessionId !== input.sessionId)
+      throw new Error('Checkpoint not found')
+
+    if (await this.blocked(checkpoint.roots, undefined, checkpoint.id))
+      throw new Error(
+        'Wait for workspace writers to finish before restoring changes',
       )
-      if (journal) await recoverJournal(this.storage, journal)
-      if (await this.blocked(checkpoint.roots)) {
-        throw new Error(
-          'Wait for workspace writers to finish before restoring changes',
-        )
-      }
-      return restore(this.storage, checkpoint, input)
-    })
+
+    const journal = await this.storage.read<RestoreJournal>(
+      'journals',
+      checkpoint.id,
+    )
+    if (journal) await recoverJournal(this.storage, journal)
+    return restore(this.storage, checkpoint, input)
   }
 
   /** Checks lingering jobs after their turn has ended and seals only their new delta. */
   settle(groupId: string, checkpointId: string) {
-    return this.serial(async () => {
+    return this.finalize(groupId, checkpointId, async () => {
       const saved = await this.storage.read<Checkpoint>(
         'checkpoints',
         checkpointId,
       )
-      if (saved) {
-        const group = this.groups.get(groupId)
-        if (group) {
-          await this.tryRelease(group)
-          await this.saveGroup(group)
-        }
-        return {
-          publication: saved.publication,
-          released: group?.released ?? true,
-        }
-      }
+      if (saved) return this.finishSaved(groupId, saved)
 
       const group = this.groups.get(groupId)
       if (!group || group.released) return { released: true }
       const pending = group.participants.some((participant) => !participant.finished) // prettier-ignore
       if (pending || (await hasCaptureJobs(group))) return { released: false }
+      await recoverSealedBaseline(this.storage, group)
 
       const result = group.sealed
         ? await this.seal(group, checkpointId)
         : undefined
 
-      const released = await this.tryRelease(group)
-      await this.saveGroup(group)
+      const released = await this.releaseIfFinished(group)
 
       return { publication: result, released }
     })
   }
 
   async removeSession(sessionId: string) {
-    return this.serial(async () => {
-      const cancelled = this.waiters.filter(
-        (waiter) => waiter.sessionId === sessionId,
-      )
-      for (const waiter of cancelled) {
-        await this.storage.remove('waiters', waiter.id)
-      }
-      this.waiters = this.waiters.filter(
-        (waiter) => waiter.sessionId !== sessionId,
-      )
-
-      for (const group of this.groups.values()) {
-        if (group.sessionId !== sessionId) continue
-        if (await hasCaptureJobs(group))
-          throw new Error('Waiting for background jobs to stop')
-        group.released = true
-        await this.storage.remove('groups', group.id)
-        this.groups.delete(group.id)
-      }
-
-      for (const group of await this.storage.records<CaptureGroup>('groups')) {
-        if (group.sessionId === sessionId)
-          await this.storage.remove('groups', group.id)
-      }
-
-      const checkpoints = this.storage.records<Checkpoint>('checkpoints')
-      for (const item of await checkpoints) {
-        if (item.sessionId === sessionId)
-          await this.storage.remove('checkpoints', item.id)
-      }
-
-      await collectBlobs(this.storage, this.groups.values())
-    })
+    await this.ready()
+    return this.operations.run(
+      () => ({ exclusive: true }),
+      async () => {
+        for (const waiter of this.waiters) {
+          if (waiter.sessionId === sessionId) await this.removeWaiter(waiter.id)
+        }
+        await removeSessionCheckpoints(this.storage, this.groups, sessionId)
+      },
+    )
   }
 
-  async assertAvailable(sessionId: string, roots: string[]) {
-    if (await this.blocked(roots, this.forSession(sessionId)?.id))
-      throw new Error('Workspace is reserved by another agent turn')
-  }
-
-  async trackJob(sessionId: string, pid: number | undefined) {
-    const group = this.forSession(sessionId)
+  private async trackJob(group: CaptureGroup | undefined, pid?: number) {
     if (!group || !pid) return
     group.shellPids = [...new Set([...(group.shellPids ?? []), pid])]
     await this.saveGroup(group)
   }
 
-  finishJob(sessionId: string, pid: number | undefined) {
-    return this.serial(async () => {
-      for (const group of this.groups.values()) {
-        const ownsJob = group.participants.some(
-          (item) => item.sessionId === sessionId,
-        )
-        if (!ownsJob || !pid || !group.shellPids?.includes(pid)) continue
-        group.shellPids = group.shellPids.filter((item) => item !== pid)
-        await this.saveGroup(group)
-      }
-    })
+  async finishJob(sessionId: string, pid?: number) {
+    if (!pid) return
+    await this.ready()
+    return this.operations.run(
+      () => ({
+        keys: [sessionKey(sessionId), ...this.sessionGroupKeys(sessionId)],
+      }),
+      async () => {
+        for (const group of this.sessionGroups(sessionId)) {
+          if (!group.shellPids?.includes(pid)) continue
+          const shellPids = group.shellPids.filter((item) => item !== pid)
+          await this.saveGroup({ ...group, shellPids })
+          group.shellPids = shellPids
+        }
+      },
+    )
   }
 
-  homeReserved(homeId: string) {
-    return this.serial(async () =>
+  async homeReserved(homeId: string) {
+    await this.ready()
+    const usesHome = (workspace: FolderWorkspace) =>
+      (workspace.agentHome?.homeId ?? workspace.agentHome?.agentId) === homeId
+    return (
+      [...this.pendingCaptures.values()].some((input) =>
+        usesHome(input.workspace),
+      ) ||
       [...this.groups.values()].some(
         (group) =>
           !group.released &&
-          group.participants.some((item) => {
-            const home = item.workspace.agentHome
-            return (home?.homeId ?? home?.agentId) === homeId
-          }),
+          group.participants.some((participant) =>
+            usesHome(participant.workspace),
+          ),
+      )
+    )
+  }
+
+  async reserved(sessionId: string) {
+    await this.ready()
+    return (
+      [...this.pendingCaptures.values()].some(
+        (input) => input.sessionId === sessionId,
+      ) || this.sessionGroups(sessionId).some((group) => !group.released)
+    )
+  }
+
+  private sessionGroups(sessionId: string) {
+    return [...this.groups.values()].filter((group) =>
+      group.participants.some(
+        (participant) => participant.sessionId === sessionId,
       ),
     )
   }
 
-  reserved(sessionId: string) {
-    return this.serial(async () =>
-      [...this.groups.values()].some(
-        (group) =>
-          !group.released &&
-          group.participants.some((item) => item.sessionId === sessionId),
-      ),
-    )
+  private sessionGroupKeys(sessionId: string) {
+    return this.sessionGroups(sessionId).map((group) => groupKey(group.id))
   }
 
   private forSession(sessionId: string) {
@@ -410,13 +432,18 @@ export class CheckpointManager {
     )
   }
 
+  private ready() {
+    return (this.initialized ??= this.initialize())
+  }
+
   private async initialize() {
     const recovered = await recoverCaptures(this.storage)
     this.waiters = recovered.waiters
+    this.lastWaiterTime = this.waiters.at(-1)?.createdAt ?? 0
     this.groups = recovered.groups
   }
 
-  private async blocked(roots: string[], except?: string) {
+  private async blocked(roots: string[], except?: string, journalId?: string) {
     const { hasRunningWorkspaceJobs } = await import('../shell/registry')
 
     const ownerSessions = except
@@ -431,60 +458,36 @@ export class CheckpointManager {
     if (busy) return true
 
     return (await this.storage.records<RestoreJournal>('journals')).some(
-      (journal) => overlaps(journal.roots, roots),
+      (journal) =>
+        journal.checkpointId !== journalId && overlaps(journal.roots, roots),
     )
   }
 
-  private async seal(group: CaptureGroup, id: string) {
-    group.pendingCheckpoint = id
-    await this.saveGroup(group)
-    const directoryRoots = group.roots.filter(
-      (root) => !group.explicit.includes(root),
-    )
-    const captured = await snapshot(this.storage, directoryRoots, [
-      ...group.explicit,
-      ...Object.keys(group.baseline),
-    ])
-    for (const target of captured.unavailable) {
-      if (group.baseline[target])
-        captured.files[target] = group.baseline[target]
-    }
-
-    const unavailable = [...(group.unavailable ?? []), ...captured.unavailable]
-    const files = changedFiles(group.baseline, captured.files).filter(
-      (file) => !unavailable.some((target) => !isOutside(target, file.target)),
-    )
-    for (const file of files) file.path = displayFile(group, file.target)
-
-    const issues = [...new Set([...group.issues, ...captured.issues])]
-    const display = await publication(this.storage, id, files, issues)
-
-    const checkpoint: Checkpoint = {
-      version: 1,
-      id,
-      sessionId: group.sessionId,
-      groupId: group.id,
-      roots: group.roots,
-      files,
-      publication: display,
-    }
-
-    await this.storage.save('checkpoints', id, checkpoint)
-    group.baseline = captured.files
-    group.unavailable = captured.unavailable
-    group.pendingCheckpoint = undefined
-    group.issues = issues
-    await this.saveGroup(group)
-
-    return display
+  private seal(group: CaptureGroup, id: string) {
+    return sealCheckpoint(this.storage, this.scans, group, id)
   }
 
-  private async tryRelease(group: CaptureGroup) {
+  private async finishSaved(groupId: string, checkpoint: Checkpoint) {
+    if (checkpoint.groupId !== groupId)
+      throw new Error('Checkpoint belongs to another capture group')
+    const group = this.groups.get(groupId)
+    if (group?.pendingCheckpoint === checkpoint.id)
+      await recoverSealedBaseline(this.storage, group)
+    return {
+      publication: checkpoint.publication,
+      released: group ? await this.releaseIfFinished(group) : true,
+    }
+  }
+
+  private async releaseIfFinished(group: CaptureGroup) {
+    if (group.released) return true
     const finished = group.participants.every(
       (participant) => participant.finished,
     )
-    if (finished && !(await hasCaptureJobs(group))) group.released = true
-    return group.released
+    const released = finished && !(await hasCaptureJobs(group))
+    await this.saveGroup({ ...group, released })
+    group.released = released
+    return released
   }
 
   private saveGroup(group: CaptureGroup) {

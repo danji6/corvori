@@ -4,6 +4,7 @@ import type { ModelMessage } from '@ai-sdk/provider-utils'
 
 import type { Doc } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
+import type { MessageWithParts } from '../../model/messageContents'
 import {
   buildExtraInstructions,
   buildPromptMessages,
@@ -89,6 +90,7 @@ type PrefixOptions = {
   replay: ToolReplay
   trimWindow?: number
   operationMessages?: ModelMessage[]
+  historyRows?: MessageWithParts[]
 }
 
 /** Builds the chat prefix before adding any operation-specific instructions. */
@@ -96,7 +98,14 @@ export async function buildProviderPrefix(
   ctx: ActionCtx,
   data: StreamContext,
   prompts: PromptItem[],
-  { manifest, toolNames, replay, trimWindow, operationMessages }: PrefixOptions,
+  {
+    manifest,
+    toolNames,
+    replay,
+    trimWindow,
+    operationMessages,
+    historyRows,
+  }: PrefixOptions,
 ) {
   const { systemPrompt, remainingPrompts } = buildSystemPrompt(
     prompts,
@@ -107,6 +116,7 @@ export async function buildProviderPrefix(
     manifestVersion: manifest.version ?? 1,
     contextId: manifest.contextId,
     replay,
+    historyRows,
     trim: trimWindow
       ? {
           contextWindow: trimWindow,

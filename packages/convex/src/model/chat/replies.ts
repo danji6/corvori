@@ -6,6 +6,7 @@ import { error } from '../../errors'
 import type { PartAddress, ReplyQuote } from '../../types'
 import {
   getSegmentRow,
+  invalidateCompletedHistory,
   listSelectedSegments,
   queryMessageSegments,
 } from '../messageContents'
@@ -82,6 +83,7 @@ export async function forgetQuotedMessage(
     await ctx.db.patch(reply._id, {
       replyTo: { sender, ...(senderName && { senderName }), text: '' },
     })
+    await invalidateCompletedHistory(ctx, reply)
   }
 }
 

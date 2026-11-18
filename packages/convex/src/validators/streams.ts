@@ -54,6 +54,7 @@ export const activeStreamValidator = v.object({
   _id: v.id('streams'),
   invokedBy: v.id('users'),
   status: streamStatusValidator,
+  generation: v.number(),
   attempt: v.number(),
   processingMessageId: v.optional(v.id('messages')),
   fireAt: v.optional(v.number()),
@@ -135,6 +136,16 @@ export const streamStateValidator = v.union(
 export const streamExecutionArgsValidator = v.object({
   streamId: v.id('streams'),
   generation: v.number(),
+})
+
+export const stopStreamArgsValidator = v.object({
+  sessionId: v.id('sessions'),
+  execution: v.optional(streamExecutionArgsValidator),
+})
+
+export const providerHistorySnapshotArgsValidator = v.object({
+  ...streamExecutionArgsValidator.fields,
+  knownHistory: v.optional(v.string()),
 })
 
 export const patchStreamMessageArgsValidator = v.object({

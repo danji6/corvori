@@ -9,7 +9,7 @@ import type { Doc, Id } from '@cv/convex/_generated/dataModel'
 import type { ApprovalMode } from '@cv/convex/types'
 import type { OptimisticLocalStore } from 'convex/browser'
 import { useMutation, useQuery } from 'convex/react'
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { useLocationProperty } from 'wouter/use-browser-location'
 
@@ -137,12 +137,6 @@ export function useSessionMode() {
   )
 
   return { mode, setMode, cycleMode, toggleMode }
-}
-
-/** Session ids that currently have an in-flight stream. */
-export function useActiveStreamSessionIds(): Set<string> {
-  const ids = useQuery(api.streams.activeSessionIds, {})
-  return useMemo(() => new Set(ids ?? []), [ids])
 }
 
 export function useValidatedSessionId(): string | null {

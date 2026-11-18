@@ -18,6 +18,9 @@ export const MESSAGE_PAGE_MAX_ROWS = 40
 /** Row count safety cap for the full retained message window. */
 export const MESSAGE_WINDOW_MAX_ROWS = 160
 
+/** Target spacing for ordinary streaming patches and the reveal animation. */
+export const STREAM_PATCH_INTERVAL_MS = 200
+
 /** Steps without a todo write/edit before unresolved todos trigger a nudge. */
 export const TODO_NUDGE_INTERVAL_STEPS = 10
 

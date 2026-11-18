@@ -8,6 +8,7 @@ import {
 import {
   clearRead,
   discardSession,
+  list,
   markAllRead,
   markRead,
   markSessionRead,
@@ -63,7 +64,12 @@ describe('durable notification queue', () => {
         preview: 'Activity',
         sourceMessageId: 'message' as never,
       })
-    expect((await summary(ctx)).unreadCount).toBe(225)
+    const protectedRequests = await summary(ctx)
+    expect(protectedRequests.attentionCount).toBe(125)
+    expect(protectedRequests.pendingIds.map(String)).toEqual(
+      notifications.map((row) => row._id),
+    )
+    expect(await list(ctx, { status: 'unread' })).toHaveLength(100)
     await markRead(ctx, { notificationId: notifications[0]._id as never })
     await markAllRead(ctx)
     await markSessionRead(ctx, { sessionId: 'session' as never })
@@ -99,7 +105,7 @@ describe('durable notification queue', () => {
     )
     const result = await summary(ctx)
     expect(result.pendingCount).toBe(80)
-    expect(result.unreadCount).toBe(80)
+    expect(result.attentionCount).toBe(80)
     expect(String(result.recent[0]._id)).toBe('notification_user_1_79')
   })
 
@@ -123,6 +129,30 @@ describe('durable notification queue', () => {
     expect(rows('notifications')[2].attention).toBe(true)
   })
 
+  test('bulk settlement retains the newest read entries for each recipient', async () => {
+    const first = Array.from({ length: 55 }, (_, index) => notification(index))
+    const second = notification(1, 'user_2')
+    const expired = { ...notification(99), requestState: 'expired' }
+    const { ctx, rows } = fakeCtx({
+      notifications: [...first, second, expired],
+    })
+
+    await settleStream(ctx, 'stream' as never, 'handled')
+
+    const read = await list(ctx, { status: 'read' })
+    expect(read.map((row) => String(row._id))).toEqual(
+      first
+        .slice(5)
+        .reverse()
+        .map(({ _id }) => _id),
+    )
+    expect(rows('notifications')).toHaveLength(52)
+    expect(rows('notifications')).toContainEqual(expired)
+    expect(
+      rows('notifications').find((row) => row._id === second._id),
+    ).toMatchObject({ status: 'read', requestState: 'handled' })
+  })
+
   test('expired requests remain protected until explicit acknowledgement', async () => {
     const { ctx, rows } = fakeCtx({ notifications: [notification(1)] })
     await settleStream(ctx, 'stream' as never, 'expired')
@@ -135,10 +165,13 @@ describe('durable notification queue', () => {
       attention: true,
       status: 'unread',
     })
-    expect((await summary(ctx)).pendingCount).toBe(0)
-    expect((await summary(ctx)).unreadCount).toBe(1)
+    expect(await summary(ctx)).toMatchObject({
+      attentionCount: 1,
+      pendingCount: 0,
+      pendingIds: [],
+    })
     await acknowledge(ctx, { notificationId: 'notification_user_1_1' as never })
-    expect((await summary(ctx)).unreadCount).toBe(0)
+    expect((await summary(ctx)).attentionCount).toBe(0)
     await clearRead(ctx)
     expect(rows('notifications')).toHaveLength(0)
   })
@@ -152,5 +185,31 @@ describe('durable notification queue', () => {
     await expect(
       acknowledge(ctx, { notificationId: 'notification_user_2_2' as never }),
     ).rejects.toThrow('Not found')
+  })
+
+  test('acknowledging an expired request enforces read retention once', async () => {
+    const expired = { ...notification(50), requestState: 'expired' }
+    const history = Array.from({ length: 50 }, (_, index) => ({
+      ...notification(index),
+      attention: undefined,
+      status: 'read',
+      readAt: index,
+      requestState: 'handled',
+    }))
+    const { ctx, rows } = fakeCtx({ notifications: [...history, expired] })
+
+    await acknowledge(ctx, { notificationId: expired._id as never })
+    const acknowledged = rows('notifications').find(
+      (row) => row._id === expired._id,
+    )
+    expect(acknowledged).toMatchObject({ status: 'read', attention: undefined })
+    const readAt = acknowledged!.readAt
+    await acknowledge(ctx, { notificationId: expired._id as never })
+
+    expect(acknowledged!.readAt).toBe(readAt)
+    expect(rows('notifications')).toHaveLength(50)
+    expect(
+      rows('notifications').some((row) => row._id === history[0]._id),
+    ).toBe(false)
   })
 })

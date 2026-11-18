@@ -1,5 +1,6 @@
 import { useMessageStore } from '@/hooks/chat/messages'
 import { useActiveSession } from '@/hooks/chat/session'
+import { useStreamStore } from '@/hooks/chat/stream'
 import type { PartAddress } from '@/lib/chat/parts'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
@@ -15,12 +16,34 @@ type WindowMessage = FunctionReturnType<
 
 export function useAbortStream() {
   const session = useActiveSession()
-  const stopMutation = useMutation(api.chat.stopStream)
+  const streamStore = useStreamStore()
+
+  const stopMutation = useMutation(api.chat.stopStream).withOptimisticUpdate(
+    (store, { sessionId, execution }) => {
+      if (!execution) return
+      const args = { sessionId }
+      const stream = store.getQuery(api.chat.getActiveStream, args)
+      if (
+        stream?._id !== execution.streamId ||
+        stream.generation !== execution.generation
+      ) {
+        return
+      }
+      store.setQuery(api.chat.getActiveStream, args, {
+        ...stream,
+        status: 'stopping',
+      })
+    },
+  )
 
   return useCallback(() => {
-    if (!session) return
-    stopMutation({ sessionId: session._id }).catch(console.error)
-  }, [session, stopMutation])
+    const stream = streamStore.getStream()
+    if (!session || !stream || stream.status === 'stopping') return
+    stopMutation({
+      sessionId: session._id,
+      execution: { streamId: stream._id, generation: stream.generation },
+    }).catch(console.error)
+  }, [session, stopMutation, streamStore])
 }
 
 export function useDeleteMessage() {

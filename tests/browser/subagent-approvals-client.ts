@@ -235,7 +235,8 @@ function query(name: string, args: Record<string, unknown>) {
         parts: pendingParts(request.sessionId),
       }))
       .filter((request) => request.parts.length)
-  if (name.endsWith(':list') || name === 'streams:activeSessionIds') return []
+  if (name.endsWith(':list') || name === 'streams:activeSessionIdsForSessions')
+    return []
   return null
 }
 

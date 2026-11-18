@@ -107,9 +107,7 @@ const LeftSidebar = memo(function LeftSidebar() {
             </div>
           </Sidebar.Header>
           <Sidebar.Content>
-            <SessionStoreProvider>
-              <SessionListView />
-            </SessionStoreProvider>
+            <LeftSidebarSessions />
           </Sidebar.Content>
           <Sidebar.Footer>
             <UpdateButton />
@@ -121,6 +119,15 @@ const LeftSidebar = memo(function LeftSidebar() {
     </ChatSidebar>
   )
 })
+
+function LeftSidebarSessions() {
+  const { isOpen } = useSidebar()
+  return (
+    <SessionStoreProvider>
+      <SessionListView streamingEnabled={isOpen} />
+    </SessionStoreProvider>
+  )
+}
 
 const RightSidebar = memo(function RightSidebar() {
   const { available: canSearch } = useChatSearch()

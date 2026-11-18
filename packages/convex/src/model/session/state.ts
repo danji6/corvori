@@ -24,6 +24,26 @@ export async function getState(
     .unique()
 }
 
+/** Invalidates completed provider history in the same transaction as its write. */
+export async function advanceCompletedHistoryRevision(
+  ctx: MutationCtx,
+  sessionId: Id<'sessions'>,
+) {
+  const state = await getState(ctx, sessionId)
+  if (state) {
+    await ctx.db.patch(state._id, {
+      completedHistoryRevision: (state.completedHistoryRevision ?? 0) + 1,
+    })
+  } else {
+    await ctx.db.insert('sessionState', {
+      sessionId,
+      stepCount: 0,
+      completedHistoryRevision: 1,
+      updatedAt: Date.now(),
+    })
+  }
+}
+
 /** Reads the successful provider-step count. */
 export async function getStepCount(
   ctx: QueryCtx,

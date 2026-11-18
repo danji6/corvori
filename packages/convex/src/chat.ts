@@ -15,6 +15,7 @@ import {
 import {
   activeStreamValidator,
   resolveYieldArgsValidator,
+  stopStreamArgsValidator,
   yieldRequestArgsValidator,
 } from './validators/streams'
 
@@ -69,7 +70,7 @@ export const getToolOutputUrl = authQuery({
 })
 
 export const stopStream = authMutation({
-  args: { sessionId: v.id('sessions') },
+  args: stopStreamArgsValidator.fields,
   handler: Chat.stopStream,
 })
 

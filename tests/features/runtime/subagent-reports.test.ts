@@ -81,6 +81,7 @@ describe('deliverChildReport', () => {
     expect(inserts.map(({ table }) => table)).toEqual([
       'messages',
       'messageContents',
+      'sessionState',
     ])
     expect(scheduled).toHaveLength(0)
   })

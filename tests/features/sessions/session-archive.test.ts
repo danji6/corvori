@@ -13,6 +13,7 @@ function makeCtx() {
   const tables: Record<string, Row[]> = {
     users: [{ _id: 'users_1', subject: 'sub_1' }],
     sessions: [],
+    sessionState: [],
     userSessions: [],
     messages: [],
     messageContents: [],

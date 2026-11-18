@@ -49,7 +49,7 @@ export function hasSavedTitle(session: Pick<Doc<'sessions'>, 'title'>) {
   return session.title !== undefined
 }
 
-/** Denormalizes the latest activity onto the session and its membership rows. */
+/** Updates session activity and returns the members for notification delivery. */
 export async function syncActivity(
   ctx: MutationCtx,
   sessionId: Id<'sessions'>,
@@ -79,6 +79,7 @@ export async function syncActivity(
   for (const member of members) {
     await ctx.db.patch(member._id, { lastMessageAt: now })
   }
+  return members
 }
 
 /** Builds a session preview from the visible text parts of a message. */

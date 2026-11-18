@@ -266,6 +266,7 @@ describe('insertMessage', () => {
     const tables: Record<string, Record<string, unknown>[]> = {
       messages: [],
       messageContents: [],
+      sessionState: [],
     }
     let nextId = 1
 
@@ -276,6 +277,7 @@ describe('insertMessage', () => {
     const ctx = {
       db: {
         get: async (id: string) => get(id),
+        query: () => ({ withIndex: () => ({ unique: async () => null }) }),
         patch: async (id: string, patch: Record<string, unknown>) => {
           Object.assign(get(id)!, patch)
         },

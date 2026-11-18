@@ -17,6 +17,7 @@ import type { Session } from '../../types'
 import {
   getSegmentRow,
   insertMessage,
+  invalidateCompletedHistory,
   patchSegmentParts,
   setSegmentParts,
 } from '../messageContents'
@@ -102,11 +103,12 @@ export async function runShellCommand(
   )
 
   // The preview reads from text parts, which a command message has none of
-  await syncActivity(ctx, session._id, `$ ${command}`)
+  const members = await syncActivity(ctx, session._id, `$ ${command}`)
   if (sender.type === 'user') {
     await notifyUserMessage(ctx, {
       sessionId: session._id,
       senderId: sender.id,
+      members,
       actorName: identity.senderName ?? 'User',
       actorAvatarId: identity.senderAvatarId,
       preview: `$ ${command}`,
@@ -255,6 +257,7 @@ export async function _finishUserShell(
     status: 'done',
     metadata: { ...message.metadata, duration },
   })
+  await invalidateFinishedShell(ctx, messageId)
 
   const session = await getSessionWithWorkspace(ctx, message.sessionId)
   if (!session) return
@@ -305,6 +308,15 @@ export async function _reapUserShell(
   }
 
   await ctx.db.patch(messageId, { status: 'done' })
+  await invalidateFinishedShell(ctx, messageId)
+}
+
+async function invalidateFinishedShell(
+  ctx: MutationCtx,
+  messageId: Id<'messages'>,
+) {
+  const message = await ctx.db.get(messageId)
+  if (message) await invalidateCompletedHistory(ctx, message)
 }
 
 function mapShellPart(

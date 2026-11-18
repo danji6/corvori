@@ -105,6 +105,7 @@ describe('workspace context when a sub-agent reports', () => {
     expect(inserts.map((row) => row.table)).toEqual([
       'messages',
       'messageContents',
+      'sessionState',
     ])
     expect(scheduled).toHaveLength(0)
   })
