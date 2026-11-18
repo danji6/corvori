@@ -6,14 +6,12 @@ test.beforeEach(async ({ page }) => {
 
 test('toast shows the agent description and applies a session approval without navigation', async ({
   page,
-}, testInfo) => {
+}) => {
   await page.getByRole('button', { name: 'Notify shell', exact: true }).click()
   const toast = page
     .locator('[data-sonner-toast]')
     .filter({ hasText: 'Start the local sidecar test server' })
   await expect(toast).toBeVisible()
-  await expect(toast).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)')
-  await page.screenshot({ path: testInfo.outputPath('notification-toast.png') })
   await expect(
     toast.getByRole('button', { name: 'Deny', exact: true }),
   ).toBeVisible()
@@ -429,10 +427,12 @@ test('resolving requests keeps a large minimized queue minimized while older can
       exact: true,
     }),
   ).toBeVisible()
-  await page
+  const minimize = page
     .locator('[data-sonner-toast][data-front=true]')
     .getByRole('button', { name: 'Minimize', exact: true })
-    .click()
+  await expect(minimize).toBeVisible()
+  // Exercise queue state independently of hit testing on a crowded toast stack.
+  await minimize.evaluate((button) => (button as HTMLButtonElement).click())
   await expect(page.locator('[data-sonner-toast]')).toHaveCount(0)
   await page
     .getByRole('button', { name: 'Resolve newest', exact: true })

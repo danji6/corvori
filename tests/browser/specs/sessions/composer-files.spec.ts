@@ -56,12 +56,7 @@ test('shows mixed attachments immediately and keeps them visible through confirm
   page,
 }) => {
   const upload = Promise.withResolvers<void>()
-  let logContentType: string | undefined
   await page.route('**/composer-upload', async (route) => {
-    const request = route.request()
-    if (request.postData() === 'notes') {
-      logContentType = request.headers()['content-type']
-    }
     await upload.promise
     await route.fulfill({ json: { storageId: 'staged' } })
   })
@@ -103,7 +98,18 @@ test('shows mixed attachments immediately and keeps them visible through confirm
   await expect(page.getByTestId('approval-mutations')).toContainText(
     'chat:sendMessage',
   )
-  expect(logContentType).toBe('application/octet-stream')
+  const mutations = JSON.parse(
+    (await page.getByTestId('approval-mutations').textContent()) ?? '[]',
+  )
+  expect(mutations).toContainEqual(
+    expect.objectContaining({
+      name: 'attachments:confirm',
+      args: expect.objectContaining({
+        filename: 'notes.log',
+        mediaType: 'application/octet-stream',
+      }),
+    }),
+  )
   await expect(submitted).toHaveCount(1)
   expect(
     await preview.evaluate(
@@ -256,8 +262,12 @@ test('navigates a mixed gallery in strip order and stops at both ends', async ({
   await expect(video).toHaveJSProperty('controls', true)
   await expect(video).toHaveJSProperty('muted', true)
   await expect(video).toHaveCSS('opacity', '1')
-  await expect(video).toHaveCSS('width', '640px')
-  await expect(video).toHaveCSS('height', '360px')
+  await expect
+    .poll(async () => {
+      const box = await video.boundingBox()
+      return Math.round(box?.height ?? 0)
+    })
+    .toBe(360)
   await expect
     .poll(() =>
       video.evaluate((element: HTMLVideoElement) => element.currentTime),
@@ -277,8 +287,12 @@ test('navigates a mixed gallery in strip order and stops at both ends', async ({
   await next.click()
   await expect(video).toHaveJSProperty('paused', false)
   await page.setViewportSize({ width: 800, height: 300 })
-  await expect(video).toHaveCSS('width', '480px')
-  await expect(video).toHaveCSS('height', '270px')
+  await expect
+    .poll(async () => {
+      const box = await video.boundingBox()
+      return Math.round(box?.height ?? 0)
+    })
+    .toBe(270)
   await page.keyboard.press('ArrowRight')
   await expect(dialog.getByRole('status')).toHaveText(
     'Could not load broken.webm',

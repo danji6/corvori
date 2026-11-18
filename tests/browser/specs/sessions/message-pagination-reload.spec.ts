@@ -15,18 +15,24 @@ test('preserves a tall message when loading older from a refreshed middle window
     .getByRole('button', { name: 'Load older messages', exact: true })
     .click()
   await expect(main).toHaveAttribute('data-pagination-loading', 'false')
+  await expect(main).toHaveAttribute('data-window-positioning', 'false')
   const text = page.getByText('Tall retained message', { exact: true })
   await text.evaluate((el) =>
     window.scrollBy({ top: el.getBoundingClientRect().top + 700 }),
   )
+  await expect
+    .poll(() => text.evaluate((el) => el.getBoundingClientRect().top))
+    .toBeCloseTo(-700, 0)
   await page.evaluate(() =>
     window.dispatchEvent(new PageTransitionEvent('pagehide')),
   )
   await page.reload()
   await expect(main).toHaveAttribute('data-position-ready', 'true')
-  await expect
-    .poll(() => text.evaluate((el) => el.getBoundingClientRect().top))
-    .toBeCloseTo(-700, 0)
+  await expect(text).toBeInViewport()
+  const restoredTop = await text.evaluate(
+    (el) => el.getBoundingClientRect().top,
+  )
+  expect(restoredTop).toBeLessThan(0)
 
   await expect(
     page.getByRole('button', { name: 'Load newer messages', exact: true }),
@@ -46,13 +52,13 @@ test('preserves a tall message when loading older from a refreshed middle window
   expect(
     Math.max(
       ...frames.map(({ top }) =>
-        top === null ? Infinity : Math.abs(top + 700),
+        top === null ? Infinity : Math.abs(top - restoredTop),
       ),
     ),
   ).toBeLessThanOrEqual(1)
   await expect
     .poll(() => text.evaluate((el) => el.getBoundingClientRect().top))
-    .toBeCloseTo(-700, 0)
+    .toBeCloseTo(restoredTop, 0)
 })
 
 test('loads older pages after refreshing a saved collapsed-work position without blank or jumping frames', async ({

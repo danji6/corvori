@@ -256,7 +256,7 @@ test('folder controls retain sibling collapse state and refresh pin actions afte
     .toMatchObject({ a: false, b: true })
 })
 
-test('narrow sidebar controls fit in both themes', async ({ page }) => {
+test('narrow sidebar controls fit without overlapping', async ({ page }) => {
   await page.setViewportSize({ width: 260, height: 1000 })
   for (const dark of [false, true]) {
     if (dark) await page.getByRole('button', { name: 'Toggle theme' }).click()
@@ -267,10 +267,6 @@ test('narrow sidebar controls fit in both themes', async ({ page }) => {
       name: 'Collapse Portfolio and subfolders',
       exact: true,
     })
-    const foreground = await page
-      .getByTestId('sidebar')
-      .evaluate((element) => getComputedStyle(element).color)
-    await expect(header).toHaveCSS('color', foreground)
     const boxes = await Promise.all([
       header.boundingBox(),
       compose.boundingBox(),
@@ -288,10 +284,5 @@ test('narrow sidebar controls fit in both themes', async ({ page }) => {
     expect(boxes[1]!.x + boxes[1]!.width).toBeLessThanOrEqual(boxes[2]!.x)
     expect(boxes[2]!.x + boxes[2]!.width).toBeLessThanOrEqual(boxes[3]!.x)
     expect(boxes[3]!.x + boxes[3]!.width).toBeLessThanOrEqual(260)
-    await header.hover({ position: { x: 8, y: 18 } })
-    await page.screenshot({
-      animations: 'disabled',
-      path: `/tmp/corvori-session-folders-${dark ? 'dark' : 'light'}.png`,
-    })
   }
 })

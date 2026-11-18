@@ -300,11 +300,15 @@ test('picker preloads before opening without loading indicators and resets addit
   await expect(page.getByRole('listbox').getByRole('status')).toHaveCount(0)
 })
 
-test('empty chat waits for the selected folder instead of flashing the welcome heading', async ({
+test('empty chat keeps the previous welcome inactive until the selected folder loads', async ({
   page,
 }) => {
   await page.goto('/?fixture=session-folders&emptyChat&slowFolders')
   const chat = page.getByTestId('empty-chat')
+  const welcome = chat.getByRole('region', { name: 'Welcome' })
+  const pendingWelcome = chat.locator('[inert][aria-busy="true"]').filter({
+    has: page.getByRole('region', { name: 'Welcome' }),
+  })
   const genericLabel = 'What’s on your mind?'
   await expect(chat.getByText(genericLabel, { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Resolve session queries' }).click()
@@ -317,20 +321,17 @@ test('empty chat waits for the selected folder instead of flashing the welcome h
     exact: true,
   })
   await expect(picker).toBeDisabled()
-  await expect(chat).not.toContainText(genericLabel)
+  await expect(pendingWelcome).toBeVisible()
   await page.getByRole('button', { name: 'Resolve session queries' }).click()
-  await expect(
-    chat.getByText('Portfolio', { exact: true }).first(),
-  ).toBeVisible()
+  await expect(welcome.getByText('Portfolio', { exact: true })).toBeVisible()
 
   await page
     .getByRole('button', { name: 'Compose in Corvori', exact: true })
     .click()
   await expect(picker).toBeDisabled()
-  await expect(chat).not.toContainText(genericLabel)
-  await expect(chat.getByText('Portfolio', { exact: true })).toHaveCount(0)
+  await expect(pendingWelcome).toBeVisible()
   await page.getByRole('button', { name: 'Resolve session queries' }).click()
-  await expect(chat.getByText('Corvori', { exact: true }).first()).toBeVisible()
+  await expect(welcome.getByText('Corvori', { exact: true })).toBeVisible()
 
   await chat.getByRole('button', { name: 'Clear session folder' }).click()
   await expect(chat.getByText(genericLabel, { exact: true })).toBeVisible()

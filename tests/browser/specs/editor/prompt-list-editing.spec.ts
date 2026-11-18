@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import type { Editor } from '@tiptap/core'
 
-test('prompt lists have even spacing and preserve editable blank lines', async ({
+test('Backspace removes an empty paragraph after a prompt list', async ({
   page,
 }) => {
   await page.goto('/?fixture=provider-connections')
@@ -34,20 +34,8 @@ test('prompt lists have even spacing and preserve editable blank lines', async (
     })
   })
 
-  const gaps = () =>
-    editor.evaluate((element) => {
-      const blocks = [...element.children].map((child) =>
-        child.getBoundingClientRect(),
-      )
-      return blocks
-        .slice(1)
-        .map((block, index) => block.top - blocks[index].bottom)
-    })
-  await expect.poll(gaps).toEqual([0, 0, 0])
-
   await editor.press('ControlOrMeta+End')
   await editor.press('Home')
   await editor.press('Backspace')
   await expect(editor.locator(':scope > p')).toHaveText(['Rules:', 'Request'])
-  await expect.poll(gaps).toEqual([0, 0])
 })

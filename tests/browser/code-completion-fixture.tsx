@@ -2,11 +2,7 @@ import { SCRIPT_COMPLETIONS } from '@/components/chat/messages/editor/script-com
 import { PromptContentEditor } from '@/components/chat/prompts/prompt-content-editor'
 import { CodeEditor } from '@/components/ui/code-editor'
 import '@/globals.css'
-import { completionWord } from '@cv/core/code-completion/engine'
-import type {
-  Completion,
-  CompletionProvider,
-} from '@cv/core/code-completion/types'
+import type { Completion } from '@cv/core/code-completion/types'
 import { useState } from 'react'
 
 const symbols: Completion[] = [
@@ -42,22 +38,10 @@ const symbols: Completion[] = [
   },
 ]
 
-const slowProvider: CompletionProvider = async (request) => {
-  const word = completionWord(request)
-  if (!word.query) return { items: [] }
-  await new Promise((resolve) =>
-    setTimeout(resolve, word.query === 'old' ? 500 : 10),
-  )
-  return {
-    items: [{ label: `${word.query}Result`, from: word.from, to: word.to }],
-  }
-}
-
 export function CodeCompletionFixture() {
   const [source, setSource] = useState('')
   const [other, setOther] = useState('')
   const [language, setLanguage] = useState('javascript')
-  const [slow, setSlow] = useState(false)
   const [prompt, setPrompt] = useState(false)
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
@@ -84,14 +68,6 @@ export function CodeCompletionFixture() {
       <label>
         <input
           type="checkbox"
-          checked={slow}
-          onChange={(event) => setSlow(event.target.checked)}
-        />
-        Delayed provider
-      </label>
-      <label>
-        <input
-          type="checkbox"
           checked={prompt}
           onChange={(event) => setPrompt(event.target.checked)}
         />
@@ -110,13 +86,7 @@ export function CodeCompletionFixture() {
             value={source}
             onChange={setSource}
             language={language}
-            completions={
-              slow
-                ? slowProvider
-                : language === 'javascript'
-                  ? symbols
-                  : undefined
-            }
+            completions={language === 'javascript' ? symbols : undefined}
             fullscreenId="completion-primary"
             className="h-40"
           />

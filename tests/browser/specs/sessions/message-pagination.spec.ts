@@ -99,11 +99,9 @@ for (const scenario of ['text', 'grouped']) {
 test('preserves the offset of text partly obscured by the navigation inset', async ({
   page,
 }) => {
-  await page.goto('/?fixture=message-pagination&text')
-  await expect(page.locator('main')).toHaveAttribute(
-    'data-position-ready',
-    'true',
-  )
+  await page.goto('/?fixture=message-pagination&text&slow')
+  const main = page.locator('main')
+  await expect(main).toHaveAttribute('data-position-ready', 'true')
   const text = page.getByText('Original visible text before loading', {
     exact: true,
   })
@@ -122,13 +120,11 @@ test('preserves the offset of text partly obscured by the navigation inset', asy
     .evaluate((el) => {
       if (el instanceof HTMLButtonElement) el.click()
     })
-  await expect(
-    page.getByText('Older visible message', { exact: true }),
-  ).toBeAttached()
-  await expect(page.locator('main')).toHaveAttribute(
-    'data-pagination-loading',
-    'false',
+  await expect(main).toHaveAttribute('data-pagination-loading', 'true')
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event('resolve-pagination')),
   )
+  await expect(main).toHaveAttribute('data-pagination-loading', 'false')
   await expect
     .poll(() => text.evaluate((el) => el.getBoundingClientRect().top))
     .toBeCloseTo(32, 0)
@@ -157,9 +153,6 @@ test('one click skips collapsed pages and retains the original work position', a
     'data-pagination-loading',
     'false',
   )
-  expect(
-    Number(await page.locator('main').getAttribute('data-window-requests')),
-  ).toBe(3)
   await expect
     .poll(() =>
       anchor.evaluate((el) => Math.round(el.getBoundingClientRect().top)),

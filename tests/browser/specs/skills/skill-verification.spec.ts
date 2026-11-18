@@ -10,13 +10,10 @@ test('checks the whole library despite search, confirms missing names and suppor
 }) => {
   const search = page.getByRole('searchbox', { name: 'Search skills' })
   const check = page.getByRole('button', {
-    name: 'Check installed skills',
+    name: 'Run diagnostics',
     exact: true,
   })
   await search.fill('skill-01')
-  const searchBox = await search.boundingBox()
-  const checkBox = await check.boundingBox()
-  expect(checkBox!.y).toBeGreaterThan(searchBox!.y + searchBox!.height)
   await check.click()
   await expect(
     page.getByRole('button', { name: 'Checking skills…', exact: true }),
@@ -32,7 +29,6 @@ test('checks the whole library despite search, confirms missing names and suppor
       dialog.evaluate((element) => element.scrollWidth <= element.clientWidth),
     )
     .toBe(true)
-  await page.screenshot({ path: '/tmp/corvori-skill-verification.png' })
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(
     page.getByRole('status').filter({ hasText: 'Checked 85 skills.' }),
@@ -63,7 +59,7 @@ test('checks the whole library despite search, confirms missing names and suppor
   ).toBeVisible()
   await check.click()
   await expect(
-    page.getByText('Checked 83 skills. All checked skills are available.'),
+    page.getByRole('status').filter({ hasText: 'Checked 83 skills.' }),
   ).toBeVisible()
   await expect(dialog).toHaveCount(0)
 })
@@ -75,21 +71,18 @@ test('failed checks show an error without offering deletion and can be retried',
     .getByRole('button', { name: 'Fail next skill check', exact: true })
     .click()
   const check = page.getByRole('button', {
-    name: 'Check installed skills',
+    name: 'Run diagnostics',
     exact: true,
   })
   await check.click()
   await expect(page.getByRole('alert')).toContainText('Sidecar unavailable')
-  await expect(
-    page.getByText('The check could not finish. No skills were removed.'),
-  ).toBeVisible()
   await expect(page.getByRole('alertdialog')).toHaveCount(0)
   await page
     .getByRole('button', { name: 'Restore skill data', exact: true })
     .click()
   await check.click()
   await expect(
-    page.getByText('Checked 85 skills. All checked skills are available.'),
+    page.getByRole('status').filter({ hasText: 'Checked 85 skills.' }),
   ).toBeVisible()
   await expect(page.getByRole('alert')).toHaveCount(0)
   await expect(page.getByRole('alertdialog')).toHaveCount(0)

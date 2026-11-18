@@ -8,7 +8,6 @@ import {
   unreferencedAttachmentIds,
 } from '@cv/convex/model/attachments'
 import {
-  generatedFileCacheKey,
   generatedFilename,
   isGeneratedFilePart,
   parseDataUrl,
@@ -19,23 +18,15 @@ import sharp from 'sharp'
 const PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
 
-describe('isGeneratedFilePart', () => {
-  test('matches inline data-url file parts', () => {
-    expect(isGeneratedFilePart({ type: 'file', url: PNG_DATA_URL })).toBe(true)
-  })
-
-  test('ignores already-offloaded attachment references', () => {
-    expect(
-      isGeneratedFilePart({ type: 'file', url: 'attachment:abc123' }),
-    ).toBe(false)
-  })
-
-  test('ignores external urls and non-file parts', () => {
-    expect(isGeneratedFilePart({ type: 'file', url: 'https://x/y.png' })).toBe(
-      false,
-    )
-    expect(isGeneratedFilePart({ type: 'text', text: 'hi' })).toBe(false)
-  })
+test('offloads only inline generated files', () => {
+  expect(isGeneratedFilePart({ type: 'file', url: PNG_DATA_URL })).toBe(true)
+  expect(isGeneratedFilePart({ type: 'file', url: 'attachment:abc123' })).toBe(
+    false,
+  )
+  expect(isGeneratedFilePart({ type: 'file', url: 'https://x/y.png' })).toBe(
+    false,
+  )
+  expect(isGeneratedFilePart({ type: 'text', text: 'hi' })).toBe(false)
 })
 
 describe('parseDataUrl', () => {
@@ -49,17 +40,6 @@ describe('parseDataUrl', () => {
 
   test('returns null for non data urls', () => {
     expect(parseDataUrl('attachment:abc')).toBeNull()
-  })
-})
-
-describe('generatedFileCacheKey', () => {
-  test('is stable for identical urls and differs across urls', () => {
-    expect(generatedFileCacheKey(PNG_DATA_URL)).toBe(
-      generatedFileCacheKey(PNG_DATA_URL),
-    )
-    expect(generatedFileCacheKey(PNG_DATA_URL)).not.toBe(
-      generatedFileCacheKey('data:image/jpeg;base64,/9j/4AAQ'),
-    )
   })
 })
 

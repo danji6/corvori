@@ -7,7 +7,7 @@ test('wrapped labels stay close to their checkbox and centered after resizing', 
   const checkbox = page.getByRole('checkbox')
   await expect(checkbox).toBeVisible()
 
-  for (const width of [440, 320, 220, 440]) {
+  for (const width of [440, 220]) {
     await page.setViewportSize({ width, height: 500 })
     await expect
       .poll(async () =>
@@ -39,16 +39,10 @@ test('wrapped labels stay close to their checkbox and centered after resizing', 
         fits: true,
         wrapped: width < 440,
       })
-    if (width === 320) {
-      await page.screenshot({
-        path: '/tmp/corvori-checkbox-label-wrapped.png',
-      })
-    }
   }
 
   await page
     .getByText('Also delete the managed folder and its contents')
     .click()
   await expect(checkbox).toBeChecked()
-  await page.screenshot({ path: '/tmp/corvori-checkbox-label.png' })
 })

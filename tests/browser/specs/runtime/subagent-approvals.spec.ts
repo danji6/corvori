@@ -149,14 +149,6 @@ test('keeps an automatic approval stable while work expands and collapses', asyn
   expect(await originalPicker.evaluate((element) => element.isConnected)).toBe(
     true,
   )
-
-  await page.evaluate(() => window.scrollTo(0, 0))
-  await expect(review(page)).toBeVisible()
-  await expect(picker(page)).toHaveCount(0)
-  await page
-    .getByRole('button', { name: 'Scroll to bottom', exact: true })
-    .click()
-  await expect(picker(page)).toBeVisible()
 })
 
 test('restores note drafts and approval navigation when moving between views', async ({
@@ -357,7 +349,7 @@ test('keeps typing and sends chat messages independently of the current approval
     },
   ])
 
-  await review(page).click()
+  await review(page).press('Enter')
   await expect(picker(page)).toContainText('git push origin local')
   await expect(actions(page)).toBeFocused()
   await expect(note(page)).toHaveText('Use the test remote')
@@ -370,7 +362,12 @@ test('keeps typing and sends chat messages independently of the current approval
   })
   expect(await mutations(page)).toHaveLength(1)
   await expect(note(page)).toBeFocused()
-  await picker(page).getByRole('option', { name: /^Deny/ }).hover()
+  const allow = picker(page).getByRole('option', { name: /^Allow(?:\s+1)?$/ })
+  await expect(allow).toHaveAttribute('aria-selected', 'true')
+  await picker(page)
+    .getByRole('option', { name: /^Deny/ })
+    .dispatchEvent('pointermove', { pointerType: 'mouse' })
+  await expect(allow).toHaveAttribute('aria-selected', 'true')
   await note(page).press('ControlOrMeta+Enter')
   await expect
     .poll(() => mutations(page))

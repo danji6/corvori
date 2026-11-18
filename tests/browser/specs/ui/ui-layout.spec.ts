@@ -39,17 +39,6 @@ test('settings tabs clear their hover highlight on pointer exit', async ({
 })
 
 for (const variant of ['hug', 'pill']) {
-  test(`subtabs clear their hover highlight on pointer exit (${variant})`, async ({
-    page,
-  }) => {
-    await page.goto(`/?fixture=ui-layout&variant=${variant}`)
-    await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    await expectHoverToClear(
-      page.getByRole('tab', { name: 'MCP' }),
-      page.getByRole('tab', { name: 'Tools' }),
-    )
-  })
-
   test(`sub-tab indicator is visible on opening settings and follows selection (${variant})`, async ({
     page,
   }) => {

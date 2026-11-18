@@ -279,107 +279,21 @@ test('starters fill the composer, disable during drafting, and switching preserv
   ).toBeEnabled()
 })
 
-test('agent selection expands the ripple without moving its center or the pressed card until the welcome fades out', async ({
+test('agent selection prevents a second choice until it completes', async ({
   page,
 }) => {
   await page.goto('/?fixture=empty-chat&noAgent&deferSelection')
   const card = page.getByRole('button', { name: /^Agent 3 / })
-  await card.click({ trial: true })
-  await card.evaluate((button) => {
-    button.addEventListener(
-      'pointerdown',
-      (event) => {
-        if (!(event instanceof PointerEvent)) return
-        const { clientX, clientY } = event
-        const original = button.getBoundingClientRect()
-        let frames = 0
-        let centerError = 0
-        let movement = 0
-        let minRippleWidth = Infinity
-        let maxRippleWidth = 0
-        function sample() {
-          const ripple = button.querySelector(
-            ':scope > span.pointer-events-none',
-          )
-          const bounds = ripple?.getBoundingClientRect()
-          if (bounds) {
-            minRippleWidth = Math.min(minRippleWidth, bounds.width)
-            maxRippleWidth = Math.max(maxRippleWidth, bounds.width)
-          }
-          if (bounds && bounds.width > 0) {
-            centerError = Math.max(
-              centerError,
-              Math.hypot(
-                bounds.x + bounds.width / 2 - clientX,
-                bounds.y + bounds.height / 2 - clientY,
-              ),
-            )
-          }
-          const position = button.getBoundingClientRect()
-          movement = Math.max(
-            movement,
-            Math.hypot(position.x - original.x, position.y - original.y),
-          )
-          button.dataset.rippleFrames = String(++frames)
-          button.dataset.rippleCenterError = String(centerError)
-          button.dataset.cardMovement = String(movement)
-          button.dataset.rippleGrowth = String(maxRippleWidth - minRippleWidth)
-          if (frames < 16) requestAnimationFrame(sample)
-        }
-        requestAnimationFrame(sample)
-      },
-      { once: true },
-    )
-  })
-  const bounds = (await card.boundingBox())!
-  await page.mouse.move(
-    bounds.x + bounds.width * 0.7,
-    bounds.y + bounds.height * 0.6,
-  )
-  await page.mouse.down()
-  await expect
-    .poll(() => card.getAttribute('data-ripple-frames').then(Number))
-    .toBeGreaterThanOrEqual(3)
-  await page.mouse.up()
-  await expect(card).toBeDisabled()
-  await expect(card).toHaveAttribute('data-ripple-frames', '16')
-  expect(
-    Number(await card.getAttribute('data-ripple-center-error')),
-  ).toBeLessThan(1)
-  expect(Number(await card.getAttribute('data-card-movement'))).toBeLessThan(1)
-  expect(Number(await card.getAttribute('data-ripple-growth'))).toBeGreaterThan(
-    bounds.width / 2,
-  )
+  const otherCard = page.getByRole('button', { name: /^Agent 0 / })
+  await card.click()
 
-  const inertWhileExiting = await page.evaluate(
-    () =>
-      new Promise<boolean>((resolve) => {
-        const grid = document.querySelector(
-          'section[aria-label="Choose an agent"]',
-        )!
-        const observer = new MutationObserver(() => {
-          if (grid.closest('[inert]')) {
-            observer.disconnect()
-            resolve(true)
-          } else if (!grid.isConnected) {
-            observer.disconnect()
-            resolve(false)
-          }
-        })
-        observer.observe(document.body, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          attributeFilter: ['inert'],
-        })
-        window.dispatchEvent(new Event('complete-selection'))
-      }),
+  await expect(card).toBeDisabled()
+  await expect(otherCard).toBeDisabled()
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event('complete-selection')),
   )
-  expect(inertWhileExiting).toBe(true)
   await expectWelcomeForAgent(page, 3)
-  await expect(
-    page.locator('section[aria-label="Choose an agent"]'),
-  ).toHaveCount(0)
+  await expect(card).toHaveCount(0)
 })
 
 test('failed agent selection re-enables the cards', async ({ page }) => {

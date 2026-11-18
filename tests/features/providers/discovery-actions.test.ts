@@ -89,7 +89,7 @@ test('publishes the catalog before optional details and ignores stale scheduled 
     expect(requests).toHaveLength(2)
     expect((await resolve(ctx, ctx.userId))[0].models[0]).toMatchObject({
       label: 'My label',
-      contextWindow: 128000,
+      discovered: { contextWindow: 128000 },
     })
     await ctx.db.patch(providerId, { configRevision: 1 })
     await refreshDetails(actionCtx, job.args as never)

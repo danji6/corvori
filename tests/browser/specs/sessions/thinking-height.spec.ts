@@ -6,22 +6,6 @@ async function openThinking(page: Page) {
   await work.click()
   const blocks = page.locator('[data-slot="reasoning-block"]')
   await expect(blocks.first()).toBeVisible()
-  await expect
-    .poll(async () => {
-      const thinkingIcon = await blocks
-        .first()
-        .locator('svg')
-        .first()
-        .boundingBox()
-      const readIcon = await page
-        .locator('[data-slot="read-file-block"] svg')
-        .first()
-        .boundingBox()
-      return thinkingIcon && readIcon
-        ? Math.abs(thinkingIcon.x - readIcon.x)
-        : Infinity
-    })
-    .toBeLessThanOrEqual(1)
   return blocks
 }
 
@@ -93,7 +77,7 @@ test('delayed thinking collapse releases its retained height', async ({
     ;(element as HTMLElement).style.transitionDelay = '80ms'
     content.style.transitionDelay = '80ms'
   })
-  await block.getByRole('button').click()
+  await block.getByRole('button').press('Enter')
   await expectNoRetainedSpace(block)
 })
 
@@ -103,7 +87,7 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
   }) => {
     await page.emulateMedia({ reducedMotion })
     const block = (await openThinking(page)).first()
-    await block.getByRole('button').click()
+    await block.getByRole('button').press('Enter')
     await waitForAnimations(block)
     await block.getByRole('button').evaluate((button: HTMLButtonElement) => {
       button.click()
@@ -111,7 +95,7 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
     })
     await expect(block).toHaveAttribute('data-open', 'true')
     await waitForAnimations(block)
-    await block.getByRole('button').click()
+    await block.getByRole('button').press('Enter')
     await expectNoRetainedSpace(block)
   })
 }

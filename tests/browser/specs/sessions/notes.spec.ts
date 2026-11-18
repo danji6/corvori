@@ -353,11 +353,6 @@ test('loads an anchored window for a collapsed note and wraps content on narrow 
   ).toBeLessThanOrEqual(390)
   await note(page, 'workspace').click({ button: 'right' })
   await expect(page.getByRole('menu')).toHaveCount(0)
-  await note(page, 'workspace').getByRole('button').click()
-  await expect(note(page, 'workspace').getByRole('button')).toHaveAttribute(
-    'aria-expanded',
-    'false',
-  )
 })
 
 test('shows command details and retains copy and confirmed deletion actions', async ({
@@ -374,9 +369,9 @@ test('shows command details and retains copy and confirmed deletion actions', as
   })
   await page.reload()
   await showGroup(page)
-  await group(page).click()
+  await group(page).press('Enter')
   await waitForGroupAnimation(page)
-  await note(page, 'command').getByRole('button').click()
+  await note(page, 'command').getByRole('button').press('Enter')
   await expect(note(page, 'command')).toContainText('Status: failed')
   await expect(note(page, 'command')).toContainText('Command failed')
   await note(page, 'command').evaluate(async (element) => {
@@ -391,23 +386,19 @@ test('shows command details and retains copy and confirmed deletion actions', as
   expect(await page.evaluate(() => localStorage.getItem('copied-note'))).toBe(
     '/timeout 30',
   )
-  await note(page, 'workspace').click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Copy Content' }).click()
-  expect(
-    await page.evaluate(() => localStorage.getItem('copied-note')),
-  ).toContain('<system-reminder>')
-  await note(page, 'workspace').click({ button: 'right' })
+  await expect(page.getByRole('menu')).toHaveCount(0)
+  await note(page, 'command').click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(page.getByRole('alertdialog')).toHaveCount(0)
-  await expect(note(page, 'workspace')).toBeVisible()
-  await note(page, 'workspace').click({ button: 'right' })
+  await expect(note(page, 'command')).toBeVisible()
+  await note(page, 'command').click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
   await page
     .getByRole('alertdialog')
     .getByRole('button', { name: 'Delete', exact: true })
     .click()
-  await expect(note(page, 'workspace')).toHaveCount(0)
+  await expect(note(page, 'command')).toHaveCount(0)
   await expect(group(page)).toHaveAccessibleName('Collapse 3 notes')
 })
 

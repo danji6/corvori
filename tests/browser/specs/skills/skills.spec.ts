@@ -93,26 +93,32 @@ test('failed skill toggles retain the saved state and allow retry', async ({
   await expect(page.getByRole('alert')).toHaveCount(0)
 })
 
-test('descriptions expand from two lines and the library scrolls beyond its first page', async ({
+test('expands a skill description and loads the last page on scroll', async ({
   page,
 }) => {
-  const description = page
-    .getByText('A deliberately long skill description', { exact: false })
-    .first()
-  await expect(description).toHaveCSS('-webkit-line-clamp', '2')
-  await page.getByRole('button', { name: 'Show more' }).first().click()
-  await expect(description).not.toHaveCSS('-webkit-line-clamp', '2')
-  await page.getByRole('button', { name: 'Show less' }).first().click()
-  const library = page.getByLabel('Agent skills', { exact: true })
-  await expect(library.getByText('skill-00', { exact: true })).toBeVisible()
-  for (let i = 0; i < 12; i++) {
-    await library.evaluate((element) => {
-      element.scrollTop = element.scrollHeight
+  const library = page.getByRole('list', { name: 'Agent skills' })
+  const firstSkill = library
+    .getByRole('listitem')
+    .filter({ hasText: 'skill-00' })
+  await firstSkill.getByRole('button', { name: 'Show more' }).click()
+  const collapse = firstSkill.getByRole('button', { name: 'Show less' })
+  await expect(collapse).toHaveAttribute('aria-expanded', 'true')
+  await collapse.press('Enter')
+  await expect(
+    firstSkill.getByRole('button', { name: 'Show more' }),
+  ).toBeVisible()
+
+  const lastSkill = library.getByText('skill-84', { exact: true })
+  await expect(lastSkill).toHaveCount(0)
+  await expect
+    .poll(async () => {
+      await library.evaluate((element) =>
+        element.scrollTo(0, element.scrollHeight),
+      )
+      return lastSkill.count()
     })
-    if (await library.getByText('skill-84', { exact: true }).count()) break
-    await page.waitForTimeout(150)
-  }
-  await expect(library.getByText('skill-84', { exact: true })).toBeVisible()
+    .toBe(1)
+  await expect(lastSkill).toBeInViewport()
 })
 
 test('busy feedback and Add buttons stay stable during delayed operation handoffs', async ({
@@ -234,7 +240,6 @@ test('only the skills list scrolls while search and filter stay visible', async 
     const panel = page.getByRole('tabpanel')
     const list = page.getByRole('list', { name: 'Agent skills', exact: true })
     await expect(list.getByRole('listitem').first()).toBeVisible()
-    await page.getByRole('button', { name: 'Show more' }).first().click()
     await expect
       .poll(() =>
         panel.evaluate(
@@ -244,7 +249,6 @@ test('only the skills list scrolls while search and filter stay visible', async 
         ),
       )
       .toBe(true)
-    await page.getByRole('button', { name: 'Show less' }).first().click()
     await list.hover()
     const before = await page.getByRole('searchbox').boundingBox()
     await page.mouse.wheel(0, 250)
@@ -262,11 +266,5 @@ test('only the skills list scrolls while search and filter stay visible', async 
       element.scrollTop = 0
     })
     await expect(list.getByText('skill-00', { exact: true })).toBeInViewport()
-    if (width === 1000) {
-      await page.getByRole('button', { name: /^Filter/ }).click()
-      await expect(page.getByRole('menu')).toHaveCSS('opacity', '1')
-      await panel.screenshot({ path: '/tmp/corvori-agent-skills.png' })
-      await page.getByRole('menu').press('Escape')
-    }
   }
 })

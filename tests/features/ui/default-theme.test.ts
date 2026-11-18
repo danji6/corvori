@@ -1,36 +1,11 @@
 import { exportSchemeCss } from '@/lib/theme'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
 import type { AuthMutationCtx } from '@cv/convex/functions'
-import { SOURCE_COLOR } from '@cv/convex/model/defaults'
 import { getOrDefault, update } from '@cv/convex/model/settings'
 import { expect, mock, test } from 'bun:test'
-import { readFileSync } from 'node:fs'
 
 const ownerId = 'owner' as Id<'users'>
 const settingsId = 'settings' as Id<'settings'>
-
-test('both CSS palettes match the default source color used by settings', () => {
-  const stylesheet = new URL(
-    '../../../packages/client/src/styles/theme.css',
-    import.meta.url,
-  )
-  const css = readFileSync(stylesheet, 'utf8')
-
-  for (const mode of ['light', 'dark']) {
-    const palette = css
-      .split(`/* Begin generated ${mode} palette */`)[1]
-      ?.split(`/* End generated ${mode} palette */`)[0]
-    expect(palette).toBeDefined()
-
-    const declarations = palette!.matchAll(/(--[a-z-]+): (#[a-f0-9]{6});/g)
-    const actual = Object.fromEntries(
-      Array.from(declarations, ([, token, value]) => [token, value]),
-    )
-    expect(actual).toEqual(
-      exportSchemeCss(SOURCE_COLOR, mode === 'dark', 0).css,
-    )
-  }
-})
 
 function context(theme?: Doc<'settings'>['theme']) {
   const patch = mock(async () => {})

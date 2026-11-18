@@ -122,7 +122,7 @@ export function SessionFoldersFixture() {
             <main
               className={`bg-background text-foreground max-w-full py-3 ${emptyChat ? 'flex' : 'w-72'}`}
             >
-              <div className="w-72 shrink-0">
+              <div className="w-72 max-w-full shrink-0">
                 <div className="h-[600px]" data-testid="sidebar">
                   <SessionListView />
                 </div>

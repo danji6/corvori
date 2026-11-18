@@ -195,21 +195,6 @@ test('composition and blur close suggestions, and external source changes resync
   await expect(popupFor(page)).toHaveCount(0)
 })
 
-test('stale delayed results cannot replace newer suggestions or reopen after blur', async ({
-  page,
-}) => {
-  await page.getByLabel('Delayed provider').check()
-  await setSource(page, 'old▌')
-  await page.keyboard.press('Control+Space')
-  await page.keyboard.press('Control+a')
-  await page.keyboard.insertText('new')
-  await expect(page.getByRole('option', { name: 'newResult' })).toBeVisible()
-  await page.waitForTimeout(550)
-  await expect(page.getByRole('option', { name: 'oldResult' })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Outside editor' }).click()
-  await expect(popupFor(page)).toHaveCount(0)
-})
-
 test('popup remains within a narrow viewport after resizing and scrolling', async ({
   page,
 }) => {

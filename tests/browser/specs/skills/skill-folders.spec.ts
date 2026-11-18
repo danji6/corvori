@@ -30,7 +30,6 @@ test('folder picker remembers confirmed selections across reloads, with no paren
 
   await choose.click()
   await path.fill('/missing')
-  await path.press('Escape')
   await picker
     .getByRole('button', { name: 'Use this folder', exact: true })
     .click()
@@ -43,7 +42,6 @@ test('folder picker remembers confirmed selections across reloads, with no paren
   ).toBeEnabled()
   expect(await recent()).toBeNull()
   await path.fill('/fixture/custom-home/project')
-  await path.press('Escape')
   await expect(picker.getByRole('alert')).toHaveCount(0)
   await picker
     .getByRole('button', { name: 'Use this folder', exact: true })

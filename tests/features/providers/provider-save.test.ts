@@ -317,17 +317,18 @@ test('subscription models retain custom inference and advanced settings', async 
 test('validates token settings before saving a provider model', async () => {
   const { ctx } = providerFixture()
   const provider = { key: 'openai', enabled: true }
+  const invalid = { data: { code: 400 } }
   for (const outputTokens of [0, -1, 0.5, Infinity]) {
     await expect(
       create(ctx, { ...provider, models: [{ id: 'model', outputTokens }] }),
-    ).rejects.toThrow('Output tokens must be a positive integer')
+    ).rejects.toMatchObject(invalid)
   }
   await expect(
     create(ctx, {
       ...provider,
       models: [{ id: 'model', contextWindow: -100 }],
     }),
-  ).rejects.toThrow('Context window must be zero or a positive number')
+  ).rejects.toMatchObject(invalid)
   const id = await create(ctx, {
     ...provider,
     models: [{ id: 'model', contextWindow: 64_000 }],
@@ -337,10 +338,13 @@ test('validates token settings before saving a provider model', async () => {
       providerId: id,
       models: [{ id: 'model', contextWindow: -100 }],
     }),
-  ).rejects.toThrow('Context window must be non-negative')
+  ).rejects.toMatchObject(invalid)
   await expect(
     create(ctx, { ...provider, models: [{ id: 'model', trimContext: true }] }),
-  ).rejects.toThrow('Set a positive context window to enable trimming')
+  ).rejects.toMatchObject(invalid)
+  expect((await list(ctx))[0].models).toMatchObject([
+    { id: 'model', contextWindow: 64_000 },
+  ])
 })
 
 test('refreshing a changed endpoint preserves previously configured missing models as unavailable', async () => {

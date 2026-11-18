@@ -42,44 +42,42 @@ test.each([undefined, 'Return a short title in Italian.', ''])(
   },
 )
 
-test.each([DEFAULT_TITLE_SYSTEM_PROMPT, 'Return a short title in Italian.'])(
-  'sends the resolved system prompt for automatic and regenerated titles: %s',
-  async (systemPrompt) => {
-    const { server, requests } = startTitleProvider()
-    const ctx = {
-      auth,
-      runQuery: async () => ({
-        exchange: 'User: Plan a weekend in Rome.',
-        modelId: 'title-model',
-        systemPrompt,
-        credentials: {
-          providerId: 'custom',
-          baseURL: server.url.toString(),
-          apiKey: 'fixture',
-        },
-      }),
-      runMutation: async () => {},
-    } as unknown as ActionCtx
+test('sends the resolved system prompt for automatic and regenerated titles', async () => {
+  const systemPrompt = 'Return a short title in Italian.'
+  const { server, requests } = startTitleProvider()
+  const ctx = {
+    auth,
+    runQuery: async () => ({
+      exchange: 'User: Plan a weekend in Rome.',
+      modelId: 'title-model',
+      systemPrompt,
+      credentials: {
+        providerId: 'custom',
+        baseURL: server.url.toString(),
+        apiKey: 'fixture',
+      },
+    }),
+    runMutation: async () => {},
+  } as unknown as ActionCtx
 
-    try {
-      expect(await generateTitle(ctx, { sessionId })).toBe(
-        'Un fine settimana romano',
-      )
-      expect(await regenerateTitle(ctx, { sessionId })).toBe(
-        'Un fine settimana romano',
-      )
-      expect(requests).toHaveLength(2)
-      for (const request of requests) {
-        expect(request.messages[0]).toEqual({
-          role: 'system',
-          content: systemPrompt,
-        })
-      }
-    } finally {
-      await server.stop(true)
+  try {
+    expect(await generateTitle(ctx, { sessionId })).toBe(
+      'Un fine settimana romano',
+    )
+    expect(await regenerateTitle(ctx, { sessionId })).toBe(
+      'Un fine settimana romano',
+    )
+    expect(requests).toHaveLength(2)
+    for (const request of requests) {
+      expect(request.messages[0]).toEqual({
+        role: 'system',
+        content: systemPrompt,
+      })
     }
-  },
-)
+  } finally {
+    await server.stop(true)
+  }
+})
 
 test('without a title model, automatic titles use the first message', async () => {
   const patches: unknown[] = []

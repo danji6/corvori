@@ -387,6 +387,11 @@ export const approvalFixtureClient = {
   ) {
     const name = getFunctionName(reference)
     mutations.push({ name, args })
+    if (name.startsWith('typing:')) {
+      // Typing signals do not invalidate the optimistic message window.
+      notify()
+      return
+    }
     if (name === 'chat:approveTool')
       await respond(args, options?.optimisticUpdate)
     else if (name === 'chat:sendMessage') {
@@ -403,8 +408,7 @@ export const approvalFixtureClient = {
       stopped = [...stopped, String(args.childSessionId ?? args.sessionId)]
     } else if (name === 'sessions:setApprovalMode') {
       unrestrictedAccess = args.mode === 'unrestricted'
-    } else if (!name.startsWith('typing:'))
-      throw new Error(`Unexpected mutation: ${name}`)
+    } else throw new Error(`Unexpected mutation: ${name}`)
     cache.clear()
     notify()
   },

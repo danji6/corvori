@@ -128,7 +128,11 @@ test('handoff recovers one invocation after response loss and consumes user mess
   )
   const setup = {
     output: { _id: f.messageId, role: 'assistant', parts: [] },
-    stream: { sessionId: f.sessionId, invokedBy: 'owner' },
+    stream: {
+      sessionId: f.sessionId,
+      invokedBy: 'owner',
+      command: { kind: 'invoke' },
+    },
     agent: {},
     evalResult: {},
     resolved: { languageModel: model(input) },
