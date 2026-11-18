@@ -83,6 +83,14 @@ export function ModelPicker({
                 ? `${label} (unavailable)`
                 : label
             }
+            if (
+              selectedModel?.id === val &&
+              selectedModel.available === false
+            ) {
+              const label =
+                selectedModel.label ?? parseModelReference(val).modelId
+              return `${label} (unavailable)`
+            }
             if (disabled && selectedModel?.id === val && selectedModel.label) {
               return selectedModel.label
             }

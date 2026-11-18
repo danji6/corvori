@@ -14,6 +14,7 @@ import { promptHelp } from '../prompt-help'
 import type { AgentFormValues } from './agent-form'
 import { AgentPromptList } from './agent-prompt-list'
 import { AgentReminderList } from './agent-reminder-list'
+import { ModelOverrideSettings } from './model-override-settings'
 import { OverrideLabel, OverrideSection } from './override-section'
 
 export function BehaviorGeneralSettings({
@@ -140,6 +141,7 @@ export function BehaviorGeneralSettings({
           </SettingsList.Select>
         )}
       />
+      <ModelOverrideSettings control={control} />
     </SettingsList>
   )
 }

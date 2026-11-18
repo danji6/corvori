@@ -12,6 +12,10 @@ import type {
   ReasoningEffort,
 } from '../../types'
 import {
+  effectiveAgentSelection,
+  unavailableModelOverride,
+} from '../agent/modelOverride'
+import {
   findCredentialsForModel,
   findModelSelection,
 } from '../provider/providers'
@@ -40,34 +44,85 @@ export async function resolveSubagentModel(
   const override = parent?.subAgents?.overrides?.find(
     (entry) => entry.agentId === agent._id,
   )
-  let model = session.model
-  if (override?.modelId) {
-    const providers = await resolveProviders(ctx, agent.ownerId)
-    const selected = findModelSelection(
-      providers.filter((provider) => provider.enabled),
-      override.modelId,
-    )
-    const credentials = findCredentialsForModel(providers, selected?.id)
-    if (!selected || credentials?.model?.available === false) {
-      return {
-        error: `Cannot spawn sub-agent "${agent.name}": model "${override.modelId}" is unavailable. Select an enabled model in the parent agent's sub-agent settings.`,
-      }
+  const ownOverride = agent.modelOverride
+  const parentOverride = parent?.modelOverride
+  if (!override && !ownOverride && !parentOverride) {
+    return {
+      settings: {
+        model: session.model,
+        reasoningEffort: session.reasoningEffort,
+      },
     }
-    model = selected
   }
-  return { settings: resolveReasoning(session, model, override) }
+
+  const pinnedModelId = ownOverride?.modelId ?? override?.modelId
+  const providers =
+    pinnedModelId || parentOverride
+      ? await resolveProviders(ctx, agent.ownerId)
+      : []
+  if (pinnedModelId && !availableModel(providers, pinnedModelId)) {
+    const details = ownOverride
+      ? unavailableModelOverride(pinnedModelId)
+      : `Model "${pinnedModelId}" is unavailable. Select an enabled model in the parent agent's sub-agent settings.`
+    return { error: `Cannot spawn sub-agent "${agent.name}": ${details}` }
+  }
+
+  const inherited = inheritedParentSettings(session, providers, parentOverride)
+  const model = override?.modelId
+    ? (findModelSelection(providers, override.modelId) ?? {
+        id: override.modelId,
+      })
+    : inherited.model
+
+  // Keep the spawn-time selections as fallbacks if the child override is cleared.
+  const settings = ownOverride
+    ? {
+        model,
+        reasoningEffort: override?.reasoningEffort ?? inherited.reasoningEffort,
+      }
+    : resolveReasoning(inherited, model, override)
+  return { settings }
+}
+
+type Providers = Awaited<ReturnType<typeof resolveProviders>>
+
+function availableModel(providers: Providers, modelId: string) {
+  const model = findCredentialsForModel(providers, modelId)?.model
+  return model && model.available !== false
+}
+
+function inheritedParentSettings(
+  session: Session,
+  providers: Providers,
+  override: Doc<'agents'>['modelOverride'],
+): SubagentModelSettings {
+  if (!override) return session
+  const { modelId, reasoningEffort } = effectiveAgentSelection(
+    session,
+    override,
+  )
+  const model = findModelSelection(providers, modelId) ?? {
+    id: override.modelId,
+  }
+  return {
+    model,
+    reasoningEffort: normalizeReasoningEffort(
+      reasoningEffort,
+      model.reasoning ?? defaultModelReasoning(),
+    ),
+  }
 }
 
 function resolveReasoning(
-  session: Session,
+  inherited: SubagentModelSettings,
   model: ModelSelection | undefined,
   override?: AgentSubagentOverride,
 ): SubagentModelSettings {
   // Preserve legacy inheritance exactly when neither setting is overridden.
-  if (!override) return { model, reasoningEffort: session.reasoningEffort }
+  if (!override) return { model, reasoningEffort: inherited.reasoningEffort }
   const reasoningEffort = normalizeReasoningEffort(
     override.reasoningEffort ??
-      (session.reasoningEffort as ReasoningEffort | undefined),
+      (inherited.reasoningEffort as ReasoningEffort | undefined),
     model?.reasoning ?? defaultModelReasoning(),
   )
   return { model, reasoningEffort }

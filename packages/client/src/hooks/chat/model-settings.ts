@@ -8,7 +8,7 @@ import { useMutation } from 'convex/react'
 import { useCallback, useMemo } from 'react'
 
 import { useActiveAgent } from './agent'
-import { useModels } from './models'
+import { findOverrideModel, useModels } from './models'
 import { useActiveSession } from './session'
 import { useSettings, useSettingsUpdate } from './settings'
 
@@ -20,6 +20,8 @@ export type ActiveModelSettingsState = {
   inference: InferenceParameters
   setInference: (inference: InferenceParameters) => void
   editable: boolean
+  modelOverridden: boolean
+  reasoningOverridden: boolean
 }
 
 export type ActiveModelInferenceState = {
@@ -51,13 +53,18 @@ export function useActiveModelSettings(): ActiveModelSettingsState {
   const { models, isLoading } = useModels()
 
   const editable = Boolean(agent && 'ownerId' in agent)
+  const override = agent?.modelOverride
+  const projectedModel =
+    agent && 'overrideModel' in agent ? agent.overrideModel : undefined
   const modelId = session ? session.model?.id : settings?.recentModel
-  const reasoningEffort = (
+  const defaultReasoningEffort = (
     session ? session.reasoningEffort : settings?.recentReasoning
   ) as ReasoningEffort | undefined
   const sessionModel = session?.model
 
   const model = useMemo(() => {
+    if (override)
+      return findOverrideModel(models, override.modelId, projectedModel)
     if (isLoading || !modelId) return null
     const configured = models.find((candidate) => candidate.id === modelId)
     if (sessionModel?.id !== modelId) return configured ?? { id: modelId }
@@ -67,15 +74,23 @@ export function useActiveModelSettings(): ActiveModelSettingsState {
       subscription: configured?.subscription,
       inference: configured?.inference,
     }
-  }, [isLoading, modelId, models, sessionModel])
+  }, [isLoading, modelId, models, override, projectedModel, sessionModel])
+  const modelOverridden = Boolean(override)
+  const reasoningOverridden = override?.reasoningEffort !== undefined
+  const reasoningEffort = override
+    ? normalizeReasoningEffort(
+        override.reasoningEffort ?? defaultReasoningEffort,
+        model?.reasoning,
+      )
+    : defaultReasoningEffort
 
   const setModel = useCallback(
     (value: UIModel | string) => {
-      if (!editable) return
+      if (!editable || modelOverridden) return
       const id = typeof value === 'string' ? value : value.id
       const selected = models.find((candidate) => candidate.id === id)
       const normalized = normalizeReasoningEffort(
-        reasoningEffort,
+        defaultReasoningEffort,
         selected?.reasoning,
       )
 
@@ -95,7 +110,8 @@ export function useActiveModelSettings(): ActiveModelSettingsState {
     [
       editable,
       models,
-      reasoningEffort,
+      defaultReasoningEffort,
+      modelOverridden,
       session,
       setSessionModel,
       updateSettings,
@@ -104,7 +120,7 @@ export function useActiveModelSettings(): ActiveModelSettingsState {
 
   const setReasoningEffort = useCallback(
     (value: ReasoningEffort) => {
-      if (!editable) return
+      if (!editable || reasoningOverridden) return
       if (session) {
         void setSessionReasoning({
           sessionId: session._id,
@@ -114,7 +130,13 @@ export function useActiveModelSettings(): ActiveModelSettingsState {
       }
       void updateSettings({ patch: { recentReasoning: value } })
     },
-    [editable, session, setSessionReasoning, updateSettings],
+    [
+      editable,
+      reasoningOverridden,
+      session,
+      setSessionReasoning,
+      updateSettings,
+    ],
   )
 
   const setInference = useCallback(
@@ -133,6 +155,8 @@ export function useActiveModelSettings(): ActiveModelSettingsState {
     inference: model?.inference ?? {},
     setInference,
     editable,
+    modelOverridden,
+    reasoningOverridden,
   }
 }
 

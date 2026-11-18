@@ -1,5 +1,6 @@
 import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
+import { error } from '../../errors'
 import { type AuthMutationCtx, requireRole } from '../../functions'
 import type { ApprovalMode, SessionMode, UpdateSessionArgs } from '../../types'
 import { injectModeNote } from '../chat/notes'
@@ -63,6 +64,7 @@ export async function setModel(
   },
 ) {
   const agent = await requireActiveAgentOwner(ctx, sessionId)
+  if (agent.modelOverride) error('Model is overridden by this agent', 409)
   const model = await resolveSessionModel(ctx, agent.ownerId, modelId)
 
   await ctx.db.patch(sessionId, { model, reasoningEffort })
@@ -80,7 +82,10 @@ export async function setReasoningEffort(
     reasoningEffort,
   }: { sessionId: Id<'sessions'>; reasoningEffort: string },
 ) {
-  await requireActiveAgentOwner(ctx, sessionId)
+  const agent = await requireActiveAgentOwner(ctx, sessionId)
+  if (agent.modelOverride?.reasoningEffort !== undefined) {
+    error('Reasoning is overridden by this agent', 409)
+  }
   await ctx.db.patch(sessionId, { reasoningEffort })
   await ensureSettingsForUser(ctx, ctx.userId, {
     recentReasoning: reasoningEffort,

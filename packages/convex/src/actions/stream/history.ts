@@ -13,7 +13,6 @@ import type { UIMessage } from 'ai'
 
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
-import { trimContextToThreshold } from '../../model/context'
 import { buildPrompts } from '../../model/prompt/prompts'
 import { rememberWireCalls } from '../../model/tool/dispatchTransport'
 import type { SessionTools } from '../../model/tool/sessionTools'
@@ -26,6 +25,7 @@ import { insertReplyQuote } from './historySenders'
 import { representMessage } from './historySenders'
 import { prefixSenderName } from './historySenders'
 import { removeOrphanToolCalls } from './historyTools'
+import { type TrimHistoryOptions, trimProviderHistory } from './trimHistory'
 
 export { collectApprovalNotes } from './historyApprovals'
 export { collectRespondedApprovalNotes } from './historyApprovals'
@@ -35,14 +35,25 @@ export { representMessage } from './historySenders'
 export { prefixSenderName } from './historySenders'
 export { insertReplyQuote } from './historySenders'
 
+type ProviderHistoryOptions = {
+  toolNames?: string[]
+  manifestVersion?: number
+  contextId?: string
+  runtime?: SessionTools
+  trim?: TrimHistoryOptions
+}
+
 export async function buildProviderHistory(
   ctx: ActionCtx,
   data: StreamContext,
   remainingPrompts: Parameters<typeof buildPrompts>[0],
-  toolNames?: string[],
-  manifestVersion?: number,
-  contextId = data.sessionCache?.tools?.contextId,
-  runtime?: SessionTools,
+  {
+    toolNames,
+    manifestVersion,
+    contextId = data.sessionCache?.tools?.contextId,
+    runtime,
+    trim,
+  }: ProviderHistoryOptions = {},
 ) {
   const historyAgent = {
     ...data.agent,
@@ -140,30 +151,36 @@ export async function buildProviderHistory(
     },
   })
   modelMessages = removeOrphanToolCalls(modelMessages)
-  modelMessages = insertApprovalNoteMessages(modelMessages, approvalNotes)
 
-  if (data.stream.omitActiveMedia) {
-    modelMessages.push({
-      role: 'system',
-      content: block(
-        'attachment-error',
-        'The provider rejected the media payload as too large. Continue without media; stored attachment links and MCP results remain available.' +
-          (names.includes('read_mcp_output')
-            ? ' Use read_mcp_output to retrieve full MCP output.'
-            : ''),
-      ),
-    })
+  const mediaNote = data.stream.omitActiveMedia
+    ? ({
+        role: 'system',
+        content: block(
+          'attachment-error',
+          'The provider rejected the media payload as too large. Continue without media; stored attachment links and MCP results remain available.' +
+            (names.includes('read_mcp_output')
+              ? ' Use read_mcp_output to retrieve full MCP output.'
+              : ''),
+        ),
+      } as const)
+    : undefined
+  if (trim) {
+    modelMessages = await trimProviderHistory(
+      modelMessages,
+      {
+        ...trim,
+        messages: [
+          ...buildPrompts(remainingPrompts, [], (value) => value),
+          ...trim.messages,
+          ...(mediaNote ? [mediaNote] : []),
+        ],
+      },
+      approvalNotes,
+    )
+  } else {
+    modelMessages = insertApprovalNoteMessages(modelMessages, approvalNotes)
   }
 
-  modelMessages = buildPrompts(
-    remainingPrompts,
-    modelMessages,
-    (value) => value,
-  )
-
-  const { trimContext, contextWindow } = data.agent
-
-  return trimContext && (contextWindow ?? 0) > 0
-    ? await trimContextToThreshold(modelMessages, undefined, contextWindow!)
-    : modelMessages
+  if (mediaNote) modelMessages.push(mediaNote)
+  return buildPrompts(remainingPrompts, modelMessages, (value) => value)
 }

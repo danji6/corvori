@@ -15,6 +15,7 @@ type EvalContextInput = {
   owner: Doc<'users'>
   ownerSettings: Doc<'settings'> | null
   session: Session
+  model?: Pick<NonNullable<Session['model']>, 'id' | 'label'>
   userCount: number
   agentCount: number
   toolNames: string[]
@@ -30,6 +31,7 @@ export function buildEvalContext({
   invokerSettings,
   ownerSettings,
   session,
+  model = session.model,
   userCount,
   agentCount,
   toolNames,
@@ -44,14 +46,10 @@ export function buildEvalContext({
     assistant: agent.name,
     user: toOptionalName(invokerSettings?.displayName),
     owner: toDisplayName(ownerSettings?.displayName),
-    modelId: session.model
-      ? parseModelReference(session.model.id).modelId
-      : undefined,
+    modelId: model ? parseModelReference(model.id).modelId : undefined,
     modelName:
-      session.model?.label ??
-      (session.model
-        ? parseModelReference(session.model.id).modelId
-        : undefined),
+      model?.label ??
+      (model ? parseModelReference(model.id).modelId : undefined),
     tools: toolNames,
     isAdmin: minRole(invoker.role, 'admin'),
     userCount,

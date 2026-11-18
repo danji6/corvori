@@ -1,3 +1,4 @@
+import { usableContextWindow } from '@cv/core/discovered-model'
 import { messagePosition } from '@cv/core/message-position'
 import { hasPendingQuestions } from '@cv/core/utils/ask'
 import { hasPendingToolApprovals } from '@cv/core/utils/tool-parts'
@@ -13,6 +14,7 @@ import type {
   StreamExecutionArgs,
   ThresholdCompactionArgs,
 } from '../../types'
+import { effectiveAgentSelection } from '../agent/modelOverride'
 import { insertCommandChip } from '../chat/commandChips'
 import { senderIdentity } from '../chat/identities'
 import { scheduledCompactForStream } from '../chat/scheduling'
@@ -23,7 +25,7 @@ import {
   insertMessage,
 } from '../messageContents'
 import { finalizeMessageParts, scheduleMessageEval } from '../messages'
-import { getSavedContextWindow } from '../provider/providers'
+import { getSavedModel } from '../provider/providers'
 import { consume as consumeEvent } from '../scheduledEvents'
 import { patchState } from '../session/state'
 import { ownsExecution, scheduleStream } from './execution'
@@ -71,9 +73,15 @@ async function matchesPreparedModel(
     ctx.db.get(stream.sessionId),
     ctx.db.get(stream.agentId),
   ])
-  if (!agent || session?.model?.id !== modelId) return false
+  if (!agent || !session) return false
+  if (effectiveAgentSelection(session, agent.modelOverride).modelId !== modelId)
+    return false
+
+  const saved = await getSavedModel(ctx, agent.ownerId, modelId)
   return (
-    (await getSavedContextWindow(ctx, agent.ownerId, modelId)) === contextWindow
+    saved?.model.available !== false &&
+    !saved?.model.trimContext &&
+    usableContextWindow(saved?.model.contextWindow) === contextWindow
   )
 }
 

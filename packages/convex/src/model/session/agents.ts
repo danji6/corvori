@@ -1,6 +1,7 @@
 import type { Id } from '../../_generated/dataModel'
 import { error } from '../../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../../functions'
+import { modelOverrideView } from '../agent/modelOverride'
 import { rememberSelection } from '../agent/selection'
 import { getByOwnerId } from '../settings'
 import { stopForSession } from '../stream/lifecycle'
@@ -36,6 +37,10 @@ export async function list(
           _id: agent._id,
           name: agent.name,
           avatarId: agent.avatarId,
+          modelOverride: agent.modelOverride,
+          overrideModel: agent.modelOverride
+            ? await modelOverrideView(ctx, agent.ownerId, agent.modelOverride)
+            : undefined,
           customCss: agent.customCss,
           scrollMode: agent.scrollMode,
           mathMode: agent.mathMode,

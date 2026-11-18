@@ -1,8 +1,15 @@
+import {
+  type AgentFormValues,
+  newAgentFormValues,
+} from '@/components/chat/entities/agent/agent-form'
+import { ModelOverrideSettings } from '@/components/chat/entities/agent/model-override-settings'
+import { SubagentSettings } from '@/components/chat/entities/agent/subagent-settings'
 import { ModelSettings } from '@/components/chat/entities/user/model-settings'
 import type { SettingsFormValues } from '@/components/chat/entities/user/settings-schema'
 import { defaultSettingsValues } from '@/components/chat/entities/user/user-settings-values'
 import { ModelPicker } from '@/components/chat/models/model-picker'
-import { Input, RippleButton } from '@/components/ui'
+import { ChatAgentPicker } from '@/components/chat/sessions/chat-agent-picker'
+import { Input, RippleButton, SettingsList } from '@/components/ui'
 import '@/globals.css'
 import { useUserSettingsPersistence } from '@/hooks/chat/user-settings-persistence'
 import { providerForm } from '@/lib/provider-settings'
@@ -21,11 +28,29 @@ export function ProviderConnectionsFixture() {
   return (
     <ConvexProvider client={providerConnectionsClient}>
       <ConvexQueryCacheProvider>
-        <Settings />
+        {new URLSearchParams(location.search).has('agentOverrides') ? (
+          <AgentOverrides />
+        ) : (
+          <Settings />
+        )}
       </ConvexQueryCacheProvider>
     </ConvexProvider>
   )
 }
+
+function AgentOverrides() {
+  const form = useForm<AgentFormValues>({ defaultValues: newAgentFormValues() })
+  return (
+    <main className="bg-background text-foreground min-h-screen p-8">
+      <ChatAgentPicker />
+      <SettingsList>
+        <ModelOverrideSettings control={form.control} />
+      </SettingsList>
+      <SubagentSettings control={form.control} taskEnabled />
+    </main>
+  )
+}
+
 function Settings() {
   const [saved, setSaved] = useState('')
   const [model, setModel] = useState('')

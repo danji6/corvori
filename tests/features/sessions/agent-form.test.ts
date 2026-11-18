@@ -282,6 +282,25 @@ describe('agent path grants', () => {
   })
 })
 
+test('persists a model override and clears it with its reasoning', async () => {
+  const modelOverride = {
+    modelId: 'cv-model:provider:fast',
+    reasoningEffort: 'low' as const,
+  }
+  const agent = { ...bareAgent(), modelOverride }
+  const values = agentToFormValues(agent, EMPTY_AGENT_PROMPT_SETS)
+  expect(values.modelOverride).toEqual(modelOverride)
+  expect((await formValuesToCreate(values)).modelOverride).toEqual(
+    modelOverride,
+  )
+  const patch = await formValuesToPatch(agent._id, {
+    ...values,
+    modelOverride: null,
+  })
+  expect(patch.modelOverride).toBeUndefined()
+  expect(patch.unset).toContain('modelOverride')
+})
+
 describe('subagent model form settings', () => {
   const override = {
     agentId: 'child' as Id<'agents'>,

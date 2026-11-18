@@ -50,6 +50,8 @@ export function useUserSettingsPersistence({
   const savePromptSets = useUserPromptSetsSave()
 
   return async function persist(values: SettingsFormValues) {
+    const connections = values.providers.map(providerSaveInput)
+
     if (pendingAvatar) {
       await uploadAvatar(pendingAvatar)
       setPendingAvatar(null)
@@ -136,7 +138,7 @@ export function useUserSettingsPersistence({
     }
 
     const savedProviders = await saveProviders({
-      connections: values.providers.map(providerSaveInput),
+      connections,
       removed: (values.removedProviders ?? []).map((row) => ({
         ...row,
         providerId: row.providerId as Id<'modelProviders'>,

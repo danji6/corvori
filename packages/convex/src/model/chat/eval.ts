@@ -1,5 +1,6 @@
 import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
+import { modelOverrideView } from '../agent/modelOverride'
 import { resolve as resolveMcpServers } from '../mcp'
 import { getSegmentRow, setSegmentParts } from '../messageContents'
 import { getSessionWithWorkspace } from '../session/folderContext'
@@ -54,6 +55,9 @@ export async function _getMessageEvalContext(
   return {
     message: { ...message, parts: row.parts },
     session,
+    model: agent.modelOverride
+      ? await modelOverrideView(ctx, agent.ownerId, agent.modelOverride)
+      : undefined,
     environment: (await getState(ctx, message.sessionId))?.environment ?? {},
     agent,
     invoker,

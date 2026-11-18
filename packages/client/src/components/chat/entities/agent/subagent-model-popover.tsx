@@ -1,6 +1,7 @@
 import { Popover, RippleButton } from '@/components/ui'
 import { useModels } from '@/hooks/chat'
-import type { Doc, Id } from '@cv/convex/_generated/dataModel'
+import { findOverrideModel } from '@/hooks/chat/models'
+import type { Doc } from '@cv/convex/_generated/dataModel'
 import {
   defaultModelReasoning,
   normalizeReasoningEffort,
@@ -16,7 +17,7 @@ import type { AgentFormValues } from './agent-form'
 
 type SubagentModelPopoverProps = {
   control: Control<AgentFormValues>
-  agent: Pick<Doc<'agents'>, '_id' | 'name'>
+  agent: Pick<Doc<'agents'>, '_id' | 'name' | 'modelOverride'>
   open: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -37,26 +38,7 @@ export function SubagentModelPopover({
         <Settings2Icon className="size-4" />
       </Popover.Trigger>
       <Popover.Content align="end" className="w-60 p-4">
-        {open && (
-          <>
-            <div className="flex items-center justify-between gap-2">
-              <Popover.Title>{agent.name}</Popover.Title>
-              <Popover.Close
-                render={
-                  <RippleButton
-                    type="button"
-                    variant="stealth"
-                    size="icon-sm"
-                  />
-                }
-                aria-label="Close model settings"
-              >
-                <XIcon className="size-4" />
-              </Popover.Close>
-            </div>
-            <SubagentModelFields control={control} agentId={agent._id} />
-          </>
-        )}
+        {open && <SubagentModelFields control={control} agent={agent} />}
       </Popover.Content>
     </Popover>
   )
@@ -64,17 +46,21 @@ export function SubagentModelPopover({
 
 function SubagentModelFields({
   control,
-  agentId,
+  agent,
 }: {
   control: Control<AgentFormValues>
-  agentId: Id<'agents'>
+  agent: SubagentModelPopoverProps['agent']
 }) {
+  const agentId = agent._id
   const { field } = useController({ control, name: 'subAgentOverrides' })
   const overrides = field.value ?? []
   const value = overrides.find((entry) => entry.agentId === agentId)
   const { models, isLoading } = useModels()
-  const model = models.find((entry) => entry.id === value?.modelId) ?? null
-  const unavailable = !isLoading && !!value?.modelId && !model
+  const ownOverride = agent.modelOverride
+  const modelId = ownOverride?.modelId ?? value?.modelId
+  const model = findOverrideModel(models, modelId)
+  const unavailable = !isLoading && model?.available === false
+  const reasoningOverridden = ownOverride?.reasoningEffort !== undefined
 
   function update(patch: Partial<AgentSubagentOverride>) {
     field.onChange(
@@ -101,40 +87,46 @@ function SubagentModelFields({
 
   return (
     <>
+      <Popover.Description className="text-xs">
+        {ownOverride
+          ? 'This subagent will use its own model override.'
+          : 'Settings used when this parent agent spawns this subagent.'}
+      </Popover.Description>
       <div className="flex flex-col gap-1.5">
-        <span>Model</span>
+        <span>{ownOverride ? 'Model (Overridden)' : 'Model'}</span>
         <ModelPicker
           className="w-full"
           aria-label="Subagent model"
           inheritLabel="Inherit"
-          value={value?.modelId ?? ''}
-          selectedModel={
-            model ?? (value?.modelId ? { id: value.modelId } : null)
-          }
+          value={modelId ?? ''}
+          selectedModel={model}
+          disabled={Boolean(ownOverride)}
           onValueChange={setModel}
         />
         {unavailable && (
           <p className="text-destructive text-sm" role="status">
-            This model is unavailable. Choose another model or inherit from the
-            main session before spawning this agent.
+            {ownOverride
+              ? 'This model is unavailable. Edit the subagent’s model override in its Behavior settings.'
+              : 'This model is unavailable. Choose another model before spawning this agent.'}
           </p>
         )}
       </div>
-      <div className="flex flex-col gap-1.5">
-        <span>Reasoning</span>
-        <ReasoningPicker
-          className="w-full"
-          aria-label="Subagent reasoning"
-          value={value?.reasoningEffort}
-          model={model}
-          onInherit={() => update({ reasoningEffort: undefined })}
-          onValueChange={(reasoningEffort) => update({ reasoningEffort })}
-        />
-      </div>
-      <Popover.Description className="text-xs">
-        Used when this parent agent spawns this subagent. Changes apply to new
-        tasks.
-      </Popover.Description>
+      {(!ownOverride || model?.reasoning?.type !== 'none') && (
+        <div className="flex flex-col gap-1.5">
+          <span>
+            {reasoningOverridden ? 'Reasoning (Overridden)' : 'Reasoning'}
+          </span>
+          <ReasoningPicker
+            className="w-full"
+            aria-label="Subagent reasoning"
+            value={ownOverride?.reasoningEffort ?? value?.reasoningEffort}
+            model={model?.available === false ? null : model}
+            disabled={reasoningOverridden}
+            onInherit={() => update({ reasoningEffort: undefined })}
+            onValueChange={(reasoningEffort) => update({ reasoningEffort })}
+          />
+        </div>
+      )}
     </>
   )
 }

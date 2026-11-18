@@ -1,4 +1,5 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
+import { update as updateAgent } from '@cv/convex/model/agents'
 import { activate } from '@cv/convex/model/session/agents'
 import { refreshForOwner } from '@cv/convex/model/session/models'
 import {
@@ -11,6 +12,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   MEMBER,
   OWNER,
+  type Row,
   makeCtx,
   seedMembership,
   seedSession,
@@ -144,6 +146,98 @@ describe('session model binding', () => {
     expect(
       tables.agents.find((agent) => agent._id === 'agents_2')?.lastSelectedAt,
     ).toBeNumber()
+  })
+
+  test('locks only the configured fields and preserves the composer defaults', async () => {
+    const { ctx, tables } = makeCtx()
+    const session = seedSession(tables, {
+      activeAgentId: 'agents_1',
+      model: { id: 'model-a' },
+      reasoningEffort: 'high',
+    })
+    const override = { modelId: modelReference('provider_1', 'model-b') }
+    const agent = {
+      _id: 'agents_1',
+      ownerId: OWNER,
+      name: 'Agent',
+      modelOverride: override as Record<string, unknown>,
+    }
+    tables.agents.push(agent)
+    const sessionId = session._id as Id<'sessions'>
+
+    await expect(
+      setModel(ctx as never, {
+        sessionId,
+        modelId: 'model-c',
+        reasoningEffort: 'none',
+      }),
+    ).rejects.toThrow('Model is overridden')
+    await setReasoningEffort(ctx as never, {
+      sessionId,
+      reasoningEffort: 'low',
+    })
+    agent.modelOverride = { ...override, reasoningEffort: 'none' }
+    await expect(
+      setReasoningEffort(ctx as never, { sessionId, reasoningEffort: 'high' }),
+    ).rejects.toThrow('Reasoning is overridden')
+    expect(session).toMatchObject({
+      model: { id: 'model-a' },
+      reasoningEffort: 'low',
+    })
+    expect(tables.settings[0]).toMatchObject({ recentReasoning: 'low' })
+    expect(tables.settings[0].recentModel).toBeUndefined()
+  })
+
+  test('validates and renames an override using only the agent owner’s connections', async () => {
+    const { ctx, tables } = makeCtx()
+    ctx.db.normalizeId = (_table: string, id: string) => id
+    const agentId = 'agents_1' as Id<'agents'>
+    const agent: Row = { _id: agentId, ownerId: OWNER, name: 'Agent' }
+    tables.agents.push(agent)
+    tables.modelProviders.push(
+      {
+        _id: 'own',
+        ownerId: OWNER,
+        key: 'openai',
+        enabled: true,
+        models: [{ id: 'before' }],
+      },
+      {
+        _id: 'foreign',
+        ownerId: MEMBER,
+        key: 'openai',
+        enabled: true,
+        models: [{ id: 'before' }],
+      },
+    )
+    await expect(
+      updateAgent(ctx as never, {
+        agentId,
+        modelOverride: { modelId: modelReference('foreign', 'before') },
+      }),
+    ).rejects.toMatchObject({
+      data: {
+        message: expect.stringContaining(
+          'model override "before" is unavailable',
+        ),
+      },
+    })
+    const from = modelReference('own', 'before')
+    const to = modelReference('own', 'after')
+    await updateAgent(ctx as never, {
+      agentId,
+      modelOverride: { modelId: from, reasoningEffort: 'high' },
+    })
+    tables.modelProviders[0].models = [{ id: 'after' }]
+    await refreshForOwner(
+      ctx as never,
+      OWNER as Id<'users'>,
+      new Map([[from, to]]),
+    )
+    expect(agent.modelOverride).toEqual({
+      modelId: to,
+      reasoningEffort: 'high',
+    })
   })
 
   test('provider edits refresh metadata without changing the selected id', async () => {

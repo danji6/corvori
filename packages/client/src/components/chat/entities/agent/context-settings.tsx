@@ -1,7 +1,7 @@
 import { md } from '@/components/markdown'
 import { SettingsList } from '@/components/ui'
 import type { Control } from 'react-hook-form'
-import { Controller, useWatch } from 'react-hook-form'
+import { Controller } from 'react-hook-form'
 
 import type { AgentFormValues } from './agent-form'
 
@@ -10,8 +10,6 @@ export function ContextSettings({
 }: {
   control: Control<AgentFormValues>
 }) {
-  const trimContext = useWatch({ control, name: 'trimContext' })
-
   return (
     <SettingsList>
       <Controller
@@ -64,69 +62,6 @@ export function ContextSettings({
           />
         )}
       />
-
-      <Controller
-        control={control}
-        name="outputTokens"
-        render={({ field }) => (
-          <SettingsList.NumberInput
-            label="Output tokens"
-            description="Maximum number of tokens to output in a single response."
-            help={md`
-              How many tokens the model is allowed to generate in a single
-              response.
-            `}
-            value={field.value}
-            defaultValue={-1}
-            minValue={0}
-            maxValue={1000000}
-            step={1024}
-            onChange={field.onChange}
-          />
-        )}
-      />
-
-      <Controller
-        control={control}
-        name="trimContext"
-        render={({ field }) => (
-          <SettingsList.Switch
-            label="Trim context"
-            description="Ensure the configured context window isn't exceeded."
-            help={md`
-              When enabled, older messages are automatically discarded when the
-              total context exceeds the configured window size.
-
-              Enabling this is not recommended when the provider uses prompt
-              caching.
-            `}
-            checked={field.value}
-            onCheckedChange={field.onChange}
-          />
-        )}
-      />
-
-      {trimContext && (
-        <Controller
-          control={control}
-          name="contextWindow"
-          render={({ field }) => (
-            <SettingsList.NumberInput
-              label="Context Window"
-              help={md`
-                The maximum number of tokens to keep in context when 'Trim Context'
-                is enabled.
-              `}
-              value={field.value}
-              defaultValue={-1}
-              minValue={0}
-              maxValue={1000000}
-              step={1024}
-              onChange={field.onChange}
-            />
-          )}
-        />
-      )}
     </SettingsList>
   )
 }

@@ -32,11 +32,18 @@ export async function refreshForOwner(
     .collect()
 
   for (const agent of agents) {
+    const override = agent.modelOverride
+    const overrideRename = override && renames?.get(override.modelId)
+    if (override && overrideRename) {
+      await ctx.db.patch(agent._id, {
+        modelOverride: { ...override, modelId: overrideRename },
+      })
+    }
+
     const links = await ctx.db
       .query('sessionAgents')
       .withIndex('by_agentId', (q) => q.eq('agentId', agent._id))
       .collect()
-
     for (const link of links) {
       const session = await ctx.db.get(link.sessionId)
       if (session?.activeAgentId !== agent._id || !session.model) continue

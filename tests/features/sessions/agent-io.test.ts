@@ -24,9 +24,6 @@ const pngBytes = new Uint8Array([
 const agentData = {
   name: 'Assistant',
   prompts: [],
-  trimContext: false,
-  contextWindow: -1,
-  outputTokens: -1,
 }
 
 function importContext() {

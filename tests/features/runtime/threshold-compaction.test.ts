@@ -184,6 +184,47 @@ async function completeSummary(f: Fixture, execution: StreamExecutionArgs) {
   return messageId
 }
 
+test('uses the override in the threshold guard and defers to explicitly queued compaction when trimming', async () => {
+  const f = await fixture()
+  const overrideId = modelReference('provider', 'override')
+  await f.ctx.db.patch(agentId, { modelOverride: { modelId: overrideId } })
+  await f.ctx.db.patch('provider' as never, {
+    models: [{ id: 'override', contextWindow, trimContext: true }],
+  })
+  const claimed = (await _claim(f.ctx, f.execution))!
+  const transition = mock()
+  const action = { runMutation: transition } as unknown as ActionCtx
+  expect(
+    await compactBeforeDispatch(action, f.execution, {
+      stream: claimed,
+      modelId: overrideId,
+      contextWindow,
+      trimContext: true,
+      systemPrompt: atThreshold,
+      messages: [],
+      tools: {},
+    }),
+  ).toBe(false)
+  expect(transition).not.toHaveBeenCalled()
+
+  // A threshold check prepared before trimming was enabled hands off for a fresh request.
+  expect(
+    await _compactAtThreshold(f.ctx, { ...f.threshold, modelId: overrideId }),
+  ).toBe(true)
+  const running = await current(f)
+  expect(running.stream.command.kind).toBe('invoke')
+  const reloaded = (await _claim(f.ctx, running.execution))!
+  await autoCompact(f.ctx, { sessionId })
+  await f.ctx.db.patch(reloaded.state.processingContentId!, {
+    parts: [{ type: 'text', text: 'Finished reply' }],
+  })
+  await _complete(f.ctx, running.execution)
+  expect(f.rows('streams')[0]?.command).toMatchObject({
+    kind: 'compact',
+    autoCompact: true,
+  })
+})
+
 test('preempts normal dispatch, consumes the one-shot, and resumes with unread media and queued inputs', async () => {
   const f = await fixture({ withMedia: true })
   await autoCompact(f.ctx, { sessionId })

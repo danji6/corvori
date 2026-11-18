@@ -2,6 +2,7 @@ import { Popover } from '@/components/ui/popover'
 import { ProgressCircle } from '@/components/ui/progress-circle'
 import { QuickTooltip } from '@/components/ui/quick-tooltip'
 import {
+  useActiveAgent,
   useActiveModel,
   useActiveSessionState,
   useChatMetadata,
@@ -131,7 +132,7 @@ function Row({
 function useTokenData() {
   const metadata = useChatMetadata()
   const state = useActiveSessionState()
-  const model = useActiveModel()
+  const model = useActiveModel(useActiveAgent())
 
   return useMemo(() => {
     const lastRequest = metadata?.usage

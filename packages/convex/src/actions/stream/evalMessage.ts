@@ -42,6 +42,7 @@ export async function _evalMessage(
   const {
     message,
     session,
+    model,
     agent,
     invoker,
     invokerSettings,
@@ -64,6 +65,7 @@ export async function _evalMessage(
     owner,
     ownerSettings,
     session,
+    model,
     userCount,
     agentCount,
     // No cached manifest outside a stream; resolve from live state

@@ -111,9 +111,6 @@ export type ResolvedSettings = Omit<
 }
 
 export const DEFAULT_CONTEXT_OPTIONS: ContextOptions = {
-  trimContext: false,
-  contextWindow: -1,
-  outputTokens: -1,
   shareUserDisplayNames: false,
   shareAgentDisplayNames: false,
   maskOtherAgents: false,

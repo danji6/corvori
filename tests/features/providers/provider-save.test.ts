@@ -234,6 +234,8 @@ test('subscription models retain custom inference and advanced settings', async 
     id: 'one',
     source: 'discovered' as const,
     contextWindow: 128_000,
+    outputTokens: 4_096,
+    trimContext: true,
     inference: { temperature: 0.7 },
     extraParameters: '{"max_output_tokens":400}',
   }
@@ -259,12 +261,13 @@ test('subscription models retain custom inference and advanced settings', async 
   })
   expect((await resolve(ctx, ctx.userId))[0].models[0]).toMatchObject({
     contextWindow: 128_000,
+    outputTokens: 4_096,
+    trimContext: true,
     inference: { temperature: 0.2 },
     extraParameters: '{"max_output_tokens":400}',
   })
 
   const draft = providerForm((await list(ctx))[0])
-  draft.models[0].contextWindow = undefined
   await saveProviders(ctx, {
     connections: [providerSaveInput(draft)],
     removed: [],
@@ -286,9 +289,58 @@ test('subscription models retain custom inference and advanced settings', async 
     models: [{ id: 'one', contextWindow: 256_000 }],
   })
   await finish(ctx, refreshed)
+  const refreshedModel = (await resolve(ctx, ctx.userId))[0].models[0]
+  expect(refreshedModel).toMatchObject({
+    contextWindow: 128_000,
+    outputTokens: 4_096,
+    trimContext: true,
+  })
+  expect(refreshedModel.discovered?.contextWindow).toBe(256_000)
+
+  const reset = providerForm((await list(ctx))[0])
+  Object.assign(reset.models[0], {
+    contextWindow: undefined,
+    outputTokens: undefined,
+    trimContext: undefined,
+  })
+  await saveProviders(ctx, {
+    connections: [providerSaveInput(reset)],
+    removed: [],
+  })
   const cleared = (await resolve(ctx, ctx.userId))[0].models[0]
   expect(cleared.contextWindow).toBeUndefined()
+  expect(cleared.outputTokens).toBeUndefined()
+  expect(cleared.trimContext).toBeUndefined()
   expect(cleared.discovered?.contextWindow).toBe(256_000)
+})
+
+test('validates token settings before saving a provider model', async () => {
+  const { ctx } = providerFixture()
+  const provider = { key: 'openai', enabled: true }
+  for (const outputTokens of [0, -1, 0.5, Infinity]) {
+    await expect(
+      create(ctx, { ...provider, models: [{ id: 'model', outputTokens }] }),
+    ).rejects.toThrow('Output tokens must be a positive integer')
+  }
+  await expect(
+    create(ctx, {
+      ...provider,
+      models: [{ id: 'model', contextWindow: -100 }],
+    }),
+  ).rejects.toThrow('Context window must be zero or a positive number')
+  const id = await create(ctx, {
+    ...provider,
+    models: [{ id: 'model', contextWindow: 64_000 }],
+  })
+  await expect(
+    update(ctx, {
+      providerId: id,
+      models: [{ id: 'model', contextWindow: -100 }],
+    }),
+  ).rejects.toThrow('Context window must be non-negative')
+  await expect(
+    create(ctx, { ...provider, models: [{ id: 'model', trimContext: true }] }),
+  ).rejects.toThrow('Set a positive context window to enable trimming')
 })
 
 test('refreshing a changed endpoint preserves previously configured missing models as unavailable', async () => {

@@ -241,6 +241,8 @@ function optimisticallyLinkAgent(
       _id: owned._id,
       name: owned.name,
       avatarId: owned.avatarId,
+      modelOverride: owned.modelOverride,
+      overrideModel: undefined,
       // The agent's appearance arrives with the server's next result
       customCss: undefined,
       scrollMode: undefined,

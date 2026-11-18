@@ -62,24 +62,39 @@ export function ChatAgentPicker({
       }
       footer={
         <div className="flex flex-col items-start gap-2">
-          <PickerField label="Model">
+          <PickerField
+            label={
+              modelSettings.modelOverridden ? 'Model (Overridden)' : 'Model'
+            }
+          >
             <ModelPicker
               className="w-full"
               side="top"
               value={modelSettings.model?.id ?? ''}
               selectedModel={modelSettings.model}
               onValueChange={modelSettings.setModel}
-              disabled={!modelSettings.editable}
+              aria-label="Select model"
+              disabled={
+                !modelSettings.editable || modelSettings.modelOverridden
+              }
             />
           </PickerField>
           {modelSettings.model?.reasoning?.type !== 'none' && (
-            <PickerField label="Reasoning">
+            <PickerField
+              label={
+                modelSettings.reasoningOverridden
+                  ? 'Reasoning (Overridden)'
+                  : 'Reasoning'
+              }
+            >
               <ReasoningPicker
                 className="w-full"
                 value={modelSettings.reasoningEffort ?? 'auto'}
                 onValueChange={modelSettings.setReasoningEffort}
                 model={modelSettings.model}
-                disabled={!modelSettings.editable}
+                disabled={
+                  !modelSettings.editable || modelSettings.reasoningOverridden
+                }
               />
             </PickerField>
           )}

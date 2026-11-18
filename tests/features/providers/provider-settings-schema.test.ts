@@ -1,8 +1,22 @@
 /// <reference types="bun-types" />
-import { providerSchema } from '@/components/chat/entities/user/settings-schema'
+import {
+  modelEntrySchema,
+  providerSchema,
+} from '@/components/chat/entities/user/settings-schema'
 import { describe, expect, test } from 'bun:test'
 
 describe('provider settings schema', () => {
+  test('rejects negative context windows while allowing a blank window or zero', () => {
+    const model = { id: 'model' }
+    expect(modelEntrySchema.safeParse(model).success).toBe(true)
+    expect(
+      modelEntrySchema.safeParse({ ...model, contextWindow: 0 }).success,
+    ).toBe(true)
+    expect(
+      modelEntrySchema.safeParse({ ...model, contextWindow: -100 }).success,
+    ).toBe(false)
+  })
+
   test('accepts optional per-model inference parameters', () => {
     expect(
       providerSchema.safeParse({

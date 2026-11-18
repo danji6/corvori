@@ -1,3 +1,6 @@
+import type { agentModelOverrideValidator } from '@cv/convex/validators'
+import type { Infer } from 'convex/values'
+
 import type {
   Prompt,
   PromptItem,
@@ -31,6 +34,8 @@ export type AgentAutoApprove = {
 
 export type AgentSubAgentsMode = 'allow' | 'deny'
 
+export type AgentModelOverride = Infer<typeof agentModelOverrideValidator>
+
 /** Model settings used by one parent when spawning an owned agent. */
 export type AgentSubagentOverride<AgentId extends string = string> = {
   agentId: AgentId
@@ -58,6 +63,7 @@ export type AgentMutableFields<AgentId extends string = string> =
       description?: string
       libraryReminderIds?: string[]
       autoApprove?: AgentAutoApprove
+      modelOverride?: AgentModelOverride
       subAgents?: AgentSubAgents<AgentId>
     }
 

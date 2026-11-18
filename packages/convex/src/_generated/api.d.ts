@@ -48,7 +48,9 @@ import type * as actions_stream_historyContent from "../actions/stream/historyCo
 import type * as actions_stream_historySenders from "../actions/stream/historySenders.js";
 import type * as actions_stream_historyTools from "../actions/stream/historyTools.js";
 import type * as actions_stream_operations from "../actions/stream/operations.js";
+import type * as actions_stream_requestTokens from "../actions/stream/requestTokens.js";
 import type * as actions_stream_toolContext from "../actions/stream/toolContext.js";
+import type * as actions_stream_trimHistory from "../actions/stream/trimHistory.js";
 import type * as actions_streams from "../actions/streams.js";
 import type * as actions_terminals from "../actions/terminals.js";
 import type * as actions_tool_shellJobs from "../actions/tool/shellJobs.js";
@@ -101,6 +103,7 @@ import type * as mcpProtocol from "../mcpProtocol.js";
 import type * as migrations from "../migrations.js";
 import type * as model_agent_archive from "../model/agent/archive.js";
 import type * as model_agent_discovery from "../model/agent/discovery.js";
+import type * as model_agent_modelOverride from "../model/agent/modelOverride.js";
 import type * as model_agent_selection from "../model/agent/selection.js";
 import type * as model_agent_subagents from "../model/agent/subagents.js";
 import type * as model_agents from "../model/agents.js";
@@ -504,7 +507,9 @@ declare const fullApi: ApiFromModules<{
   "actions/stream/historySenders": typeof actions_stream_historySenders;
   "actions/stream/historyTools": typeof actions_stream_historyTools;
   "actions/stream/operations": typeof actions_stream_operations;
+  "actions/stream/requestTokens": typeof actions_stream_requestTokens;
   "actions/stream/toolContext": typeof actions_stream_toolContext;
+  "actions/stream/trimHistory": typeof actions_stream_trimHistory;
   "actions/streams": typeof actions_streams;
   "actions/terminals": typeof actions_terminals;
   "actions/tool/shellJobs": typeof actions_tool_shellJobs;
@@ -557,6 +562,7 @@ declare const fullApi: ApiFromModules<{
   migrations: typeof migrations;
   "model/agent/archive": typeof model_agent_archive;
   "model/agent/discovery": typeof model_agent_discovery;
+  "model/agent/modelOverride": typeof model_agent_modelOverride;
   "model/agent/selection": typeof model_agent_selection;
   "model/agent/subagents": typeof model_agent_subagents;
   "model/agents": typeof model_agents;

@@ -19,14 +19,11 @@ export type AgentArchive = {
 const PROMPT_ROLES = ['system', 'user', 'assistant'] as const
 const SCROLL_MODES = ['follow', 'into-view'] as const
 
-// subAgents is deliberately excluded here as ids don't survive import/export
+// Subagents and model overrides reference installation-specific IDs.
 const PASSTHROUGH_KEYS = [
   'name',
   'description',
   'tools',
-  'trimContext',
-  'contextWindow',
-  'outputTokens',
   'shareUserDisplayNames',
   'shareAgentDisplayNames',
   'maskOtherAgents',

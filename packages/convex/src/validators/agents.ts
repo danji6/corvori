@@ -23,6 +23,11 @@ export const agentSubagentOverrideValidator = v.object({
   reasoningEffort: v.optional(reasoningEffortValidator),
 })
 
+export const agentModelOverrideValidator = v.object({
+  modelId: v.string(),
+  reasoningEffort: v.optional(reasoningEffortValidator),
+})
+
 /** Which owned agents an agent may spawn as sub-agents. */
 export const agentSubAgentsValidator = v.object({
   mode: v.union(v.literal('allow'), v.literal('deny')),
@@ -35,9 +40,7 @@ export const agentMutableFieldsValidator = {
   tools: v.optional(v.array(v.string())),
   libraryReminderIds: v.optional(v.array(v.string())),
   promptOrder: v.optional(v.array(promptOrderRefValidator)),
-  trimContext: v.optional(v.boolean()),
-  contextWindow: v.optional(v.number()),
-  outputTokens: v.optional(v.number()),
+  modelOverride: v.optional(agentModelOverrideValidator),
   shareUserDisplayNames: v.optional(v.boolean()),
   shareAgentDisplayNames: v.optional(v.boolean()),
   maskOtherAgents: v.optional(v.boolean()),
@@ -100,12 +103,10 @@ export const agentSchema = v.object({
   libraryReminderIds: v.optional(v.array(v.string())),
   /** Names of the selected tools. */
   tools: v.optional(v.array(v.string())),
-  trimContext: v.optional(v.boolean()),
+  modelOverride: v.optional(agentModelOverrideValidator),
   /** Library skills omitted from this agent's catalog. */
   toolkitIds: v.optional(v.array(v.id('toolkits'))),
   disabledSkillIds: v.optional(v.array(v.id('skills'))),
-  contextWindow: v.optional(v.number()),
-  outputTokens: v.optional(v.number()),
   shareUserDisplayNames: v.optional(v.boolean()),
   shareAgentDisplayNames: v.optional(v.boolean()),
   maskOtherAgents: v.optional(v.boolean()),

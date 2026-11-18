@@ -1,4 +1,4 @@
-import { modelMetadata } from '@cv/core/discovered-model'
+import { modelMetadata, usableContextWindow } from '@cv/core/discovered-model'
 import { limitError } from '@cv/core/limit-errors'
 import { MAX_PROVIDER_MODELS } from '@cv/core/limits'
 import { parseModelExtraParameters } from '@cv/core/model-parameters'
@@ -49,6 +49,22 @@ function assertModelsWithinCap(models: ModelEntry[]) {
 }
 
 function assertModelConfig(model: ModelEntry) {
+  const { outputTokens, trimContext, contextWindow } = model
+  if (outputTokens !== undefined) {
+    if (!Number.isSafeInteger(outputTokens) || outputTokens <= 0) {
+      error('Output tokens must be a positive integer', 400)
+    }
+  }
+  const invalidWindow =
+    contextWindow !== undefined &&
+    (!Number.isFinite(contextWindow) || contextWindow < 0)
+  if (invalidWindow) {
+    error('Context window must be non-negative', 400)
+  }
+  if (trimContext && !usableContextWindow(contextWindow)) {
+    error('Set a positive context window to enable trimming', 400)
+  }
+
   try {
     parseModelExtraParameters(model.extraParameters)
   } catch (err) {

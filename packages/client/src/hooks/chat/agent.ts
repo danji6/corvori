@@ -14,6 +14,7 @@ import { mergePrompts } from '@/lib/chat/prompts'
 import { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
 import type { EvalContext } from '@cv/core/interpreter/types'
+import type { AgentModelOverride, UIModel } from '@cv/core/types'
 import { toDisplayName, toOptionalName } from '@cv/core/utils/names'
 import { useQuery as useCachedQuery } from 'convex-helpers/react/cache/hooks'
 import { useMutation, useQuery } from 'convex/react'
@@ -37,6 +38,8 @@ export type LinkedAgent = {
   codeBlockHighlighting?: boolean
   codeBlockLineNumbers?: boolean
   theme?: ThemeSnapshot
+  modelOverride?: AgentModelOverride
+  overrideModel?: UIModel
 }
 
 export type ActiveAgent = Doc<'agents'> | LinkedAgent
@@ -47,6 +50,7 @@ export type AgentSummary = {
   name: string
   description?: string
   avatarId?: Id<'avatars'>
+  modelOverride?: AgentModelOverride
 }
 
 export function useOwnedAgents(): AgentSummary[] | undefined {
@@ -104,7 +108,7 @@ export function useActiveAgent(): ActiveAgent | null {
  */
 export function useAgentPrompts(workDir?: string) {
   const activeAgent = useActiveAgent()
-  const model = useActiveModel()
+  const model = useActiveModel(activeAgent)
   const modelId = model?.id
   const modelName = model?.label ?? modelId
   const sessionId = useActiveSessionId()

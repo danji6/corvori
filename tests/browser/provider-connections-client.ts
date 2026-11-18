@@ -6,7 +6,32 @@ import { type Value, convexToJson, jsonToConvex } from 'convex/values'
 
 const listeners = new Set<() => void>()
 const cache = new Map<string, unknown>()
-const settings: Record<string, unknown> = {}
+const agentOverrides = new URLSearchParams(location.search).has(
+  'agentOverrides',
+)
+const modelId = (id: string) => modelReference('personal', id)
+const agents = [
+  {
+    _id: 'locked',
+    ownerId: 'owner',
+    name: 'Pinned agent',
+    modelOverride: { modelId: modelId('binary'), reasoningEffort: 'none' },
+  },
+  {
+    _id: 'model-only',
+    ownerId: 'owner',
+    name: 'Model only agent',
+    modelOverride: { modelId: modelId('tiered') },
+  },
+  { _id: 'inherited', ownerId: 'owner', name: 'Inherited agent' },
+]
+const settings: Record<string, unknown> = agentOverrides
+  ? {
+      recentAgentId: 'locked',
+      recentModel: modelId('same'),
+      recentReasoning: 'low',
+    }
+  : {}
 type Row = ProviderFormValues & {
   _id: string
   ownerId: string
@@ -23,7 +48,23 @@ let rows: Row[] = [
     hasKey: true,
     enabled: true,
     configRevision: 0,
-    models: [{ id: 'same', label: 'Same model' }],
+    models: [
+      { id: 'same', label: 'Same model' },
+      ...(agentOverrides
+        ? [
+            {
+              id: 'binary',
+              label: 'Binary model',
+              reasoning: { type: 'binary' as const, parameter: 'thinking' },
+            },
+            {
+              id: 'tiered',
+              label: 'Tiered model',
+              reasoning: { type: 'effort' as const, efforts: ['low' as const] },
+            },
+          ]
+        : []),
+    ],
   },
 ]
 let failure = false
@@ -38,6 +79,9 @@ function update() {
 }
 function query(name: string, args: Record<string, unknown>) {
   if (name === 'settings:get') return { ...settings }
+  if (name === 'agents:list') return agentOverrides ? agents : []
+  if (name === 'agents:get')
+    return agents.find((agent) => agent._id === args.agentId) ?? null
   if (name === 'providers:list') return rows
   if (name === 'providers:get')
     return rows.find((row) => row._id === args.providerId)
@@ -109,6 +153,11 @@ export const providerConnectionsClient = {
   ) {
     const args = jsonToConvex(convexToJson(input)) as typeof input
     const name = getFunctionName(reference)
+    if (name === 'agents:select') {
+      settings.recentAgentId = args.agentId
+      update()
+      return
+    }
     if (name === 'settings:update') {
       Object.assign(settings, args.patch)
       update()

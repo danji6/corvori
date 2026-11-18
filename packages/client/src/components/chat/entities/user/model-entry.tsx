@@ -12,7 +12,7 @@ import {
   TrashButton,
 } from '@/components/ui'
 import { expandNumber } from '@/lib/utils'
-import { effectiveModel } from '@cv/core/discovered-model'
+import { effectiveModel, usableContextWindow } from '@cv/core/discovered-model'
 import { parseModelExtraParameters } from '@cv/core/model-parameters'
 import {
   DEFAULT_BINARY_REASONING_PARAMETER,
@@ -24,7 +24,7 @@ import {
   REASONING_TIERS,
   type ReasoningTier,
 } from '@cv/core/types'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 
 import { InferenceSettings } from '../../models'
 import type { ModelEntryFormValues } from './settings-schema'
@@ -99,7 +99,14 @@ export function ModelRow({
         />
         <ContextWindowField
           value={model.contextWindow}
-          onChange={(contextWindow) => onChange({ contextWindow })}
+          onChange={(contextWindow) =>
+            onChange({
+              contextWindow,
+              ...((contextWindow === undefined || contextWindow === 0) && {
+                trimContext: undefined,
+              }),
+            })
+          }
         />
       </div>
 
@@ -128,6 +135,7 @@ export function ModelRow({
                   Use discovered reasoning
                 </RippleButton>
               )}
+              <ModelTokenSettings model={model} onChange={onChange} />
               <ExtraParametersField
                 editorId={editorId}
                 value={model.extraParameters ?? ''}
@@ -147,6 +155,80 @@ export function ModelRow({
         </Tabs.Panels>
       </Tabs>
     </SettingsCollapsible>
+  )
+}
+
+function ModelTokenSettings({
+  model,
+  onChange,
+}: Pick<ModelRowProps, 'model' | 'onChange'>) {
+  const { contextWindow, outputTokens, trimContext } = model
+  const trimDescriptionId = useId()
+  const invalidOutput =
+    outputTokens !== undefined &&
+    (!Number.isSafeInteger(outputTokens) || outputTokens <= 0)
+  return (
+    <>
+      <div className="flex flex-col gap-1.5">
+        <HelpPopoverLabel
+          className="text-muted-foreground text-sm"
+          help="Maximum tokens to generate in one response. Leave blank to use the provider default."
+        >
+          Output tokens
+        </HelpPopoverLabel>
+        <Input
+          type="number"
+          min={1}
+          step={1}
+          aria-label="Output tokens"
+          aria-invalid={invalidOutput}
+          size="sm"
+          className="max-w-32 font-mono"
+          placeholder="Default"
+          value={outputTokens ?? ''}
+          onChange={({ target }) =>
+            onChange({
+              outputTokens: target.value ? target.valueAsNumber : undefined,
+            })
+          }
+        />
+        {invalidOutput && (
+          <p className="text-destructive text-xs">
+            Enter a positive number.
+          </p>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <HelpPopoverLabel
+            className="text-muted-foreground text-sm"
+            help={md`
+              When enabled, older messages are automatically discarded when the
+              total context exceeds 90% of the configured window size. This
+              setting disables automatic compaction.
+
+              Enabling this is not recommended when the provider uses prompt
+              caching.
+            `}
+          >
+            Trim context
+          </HelpPopoverLabel>
+          <p id={trimDescriptionId} className="text-muted-foreground text-xs">
+            Drop older messages when near the context limit.
+          </p>
+        </div>
+        <Switch
+          size="sm"
+          aria-label="Trim context"
+          aria-describedby={trimDescriptionId}
+          checked={trimContext ?? false}
+          disabled={!usableContextWindow(contextWindow)}
+          onCheckedChange={(checked) =>
+            onChange({ trimContext: checked || undefined })
+          }
+        />
+      </div>
+    </>
   )
 }
 
@@ -203,8 +285,11 @@ function ContextWindowField({
   value?: number
   onChange: (value: number | undefined) => void
 }) {
+  const errorId = useId()
   const [text, setText] = useState(value?.toString() ?? '')
   const [prevValue, setPrevValue] = useState(value)
+  const invalidWindow =
+    value !== undefined && (!Number.isFinite(value) || value < 0)
   if (prevValue !== value) {
     setPrevValue(value)
     setText(value?.toString() ?? '')
@@ -215,7 +300,8 @@ function ContextWindowField({
     const trimmed = raw.trim()
     if (!trimmed) return onChange(undefined)
     try {
-      onChange(Math.round(expandNumber(trimmed)))
+      const tokens = expandNumber(trimmed)
+      onChange(tokens < 0 ? tokens : Math.round(tokens))
     } catch {
       // Keep typing
     }
@@ -226,20 +312,31 @@ function ContextWindowField({
       <HelpPopoverLabel
         className="text-muted-foreground text-sm"
         help={md`
-          Maximum context tokens for this model. The agent compacts at 90% of
-          this limit. Leave blank to disable automatic compaction. Accepts
-          shorthand like \`128k\` or \`1m\`.
+          Maximum context tokens for this model. At 90% of this limit, the sesssion
+          is automatically compacted, or if context trimming is enabled, older
+          messages will be dropped to keep tokens below this threshold.
+          Leave blank to disable this behavior.
+
+          Accepts shorthand like \`128k\` or \`1m\`.
         `}
       >
         Context window <span className="opacity-60">(optional)</span>
       </HelpPopoverLabel>
       <Input
         size="sm"
+        aria-label="Context window"
+        aria-invalid={invalidWindow}
+        aria-describedby={invalidWindow ? errorId : undefined}
         className="max-w-32 font-mono"
         placeholder="e.g. 128k"
         value={text}
         onChange={(event) => commit(event.target.value)}
       />
+      {invalidWindow && (
+        <p id={errorId} className="text-destructive text-xs">
+          Enter a non-negative number.
+        </p>
+      )}
     </div>
   )
 }

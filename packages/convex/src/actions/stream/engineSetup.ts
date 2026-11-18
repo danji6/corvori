@@ -1,5 +1,6 @@
 'use node'
 
+import { usableContextWindow } from '@cv/core/discovered-model'
 import { stableStringify } from '@cv/core/stable-json'
 import {
   hasFilesystemTools,
@@ -9,8 +10,13 @@ import { contextEnabled } from '@cv/core/tool-context'
 
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
+import { error } from '../../errors'
 import { minRole } from '../../lib/roles'
 import { sharedSessionId } from '../../lib/subagent'
+import {
+  effectiveAgentSelection,
+  unavailableModelOverride,
+} from '../../model/agent/modelOverride'
 import { hasSavedTitle } from '../../model/messages'
 import { applyPromptCaching } from '../../model/provider/cache'
 import { getProviderOptions } from '../../model/provider/options'
@@ -24,7 +30,6 @@ import { hasToolResultMedia } from '../../model/tool/mcpOutput'
 import { filesystemWorkspace } from '../../model/tool/sessionFilesystem'
 import { prepareSessionTools } from '../../model/tool/sessionTools'
 import type { StreamExecutionArgs } from '../../types'
-import type { ReasoningEffort } from '../../types'
 import { buildSessionLogBody } from './engineLog'
 import { patchSessionLogBody } from './engineLog'
 import { buildEvalContext } from './evalContext'
@@ -40,6 +45,7 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
     data.stream.command.kind === 'invoke' ||
     data.stream.command.kind === 'retry'
   const chosen = selectedBuiltinTools(data.agent.tools)
+
   const observesToolkits =
     invokesTools &&
     !!data.toolkitCount &&
@@ -53,6 +59,19 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
       if (!data) return null
     }
   }
+
+  const { modelId, reasoningEffort } = effectiveAgentSelection(
+    data.session,
+    data.agent.modelOverride,
+  )
+  const credentials = findCredentialsForModel(data.modelProviders, modelId)
+  const model = credentials?.model
+  if (data.agent.modelOverride && (!model || model.available === false))
+    error(unavailableModelOverride(data.agent.modelOverride.modelId), 409)
+
+  const contextWindow = usableContextWindow(model?.contextWindow)
+  const trimContext = model?.trimContext === true
+
   const needsPersonalWorkspace =
     hasFilesystemTools(chosen) || chosen.includes('list_skills')
   if (needsPersonalWorkspace && minRole(data.invoker.role, 'admin')) {
@@ -115,6 +134,9 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
       owner: data.owner,
       ownerSettings: data.ownerSettings,
       session: data.session,
+      model: data.agent.modelOverride
+        ? { id: data.agent.modelOverride.modelId, label: model?.label }
+        : undefined,
       userCount: data.userCount,
       agentCount: data.agentCount,
       toolNames: operationPlan.toolNames,
@@ -193,12 +215,12 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
   if (!contextPrepared) return null
 
   const { systemPrompt, messages, tools, toolRuntime } =
-    await operationPlan.buildRequest(ctx, data, evalResult)
-
-  const credentials = findCredentialsForModel(
-    data.modelProviders,
-    data.session.model?.id,
-  )
+    await operationPlan.buildRequest(
+      ctx,
+      data,
+      evalResult,
+      trimContext ? contextWindow : undefined,
+    )
 
   const { createCacheDiagnostics } = await import('./cacheDiagnostics')
   const isChatGPT =
@@ -218,8 +240,8 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
   // Apply logging after replay filtering for more accuracy
   const requestLog: { body?: string } = {}
   const resolved = await getProviderOptions(
-    data.session.model?.id,
-    data.session.reasoningEffort as ReasoningEffort | undefined,
+    modelId,
+    reasoningEffort,
     credentials,
     {
       cacheKey: data.stream.sessionId,
@@ -244,8 +266,10 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
 
   return {
     stream: data.stream,
-    modelId: data.session.model?.id,
-    contextWindow: credentials?.model?.contextWindow,
+    modelId,
+    contextWindow,
+    trimContext,
+    outputTokens: model?.outputTokens,
     agent: data.agent,
     output: data.output,
     workspace: hasFilesystemTools(operationPlan.toolNames)

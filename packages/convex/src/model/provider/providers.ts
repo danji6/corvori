@@ -1,4 +1,4 @@
-import { usableContextWindow } from '@cv/core/discovered-model'
+import { effectiveModel, usableContextWindow } from '@cv/core/discovered-model'
 import { modelReference, parseModelReference } from '@cv/core/model-reference'
 import type { UIModel, UIModelConfig } from '@cv/core/types/providers'
 
@@ -112,8 +112,8 @@ export function findModelSelection(
   }
 }
 
-/** Looks up the current saved limit without resolving provider credentials. */
-export async function getSavedContextWindow(
+/** Looks up the current model without resolving provider credentials. */
+export async function getSavedModel(
   ctx: QueryCtx | MutationCtx,
   ownerId: Id<'users'>,
   modelId: string,
@@ -122,8 +122,16 @@ export async function getSavedContextWindow(
   const provider = reference.connectionId
     ? await readOwnedConnection(ctx, ownerId, reference.connectionId)
     : findConnection(await listProviders(ctx, ownerId), reference)
-  const model = provider?.models.find((m) => m.id.trim() === reference.modelId)
-  return usableContextWindow(model?.contextWindow)
+  if (!provider) return
+
+  const model = provider.models.find((m) => m.id.trim() === reference.modelId)
+  if (model) {
+    return {
+      id: modelReference(provider._id, model.id.trim()),
+      providerId: provider.key,
+      model: effectiveModel(model),
+    }
+  }
 }
 
 async function readOwnedConnection(

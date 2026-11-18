@@ -91,7 +91,12 @@ export const modelEntrySchema = z
     _clientId: z.string().optional(),
     _savedId: z.string().optional(),
     label: z.string().optional(),
-    contextWindow: z.number().optional(),
+    contextWindow: z
+      .number()
+      .nonnegative('Enter a non-negative number.')
+      .optional(),
+    outputTokens: z.number().int().positive().optional(),
+    trimContext: z.boolean().optional(),
     reasoning: z
       .discriminatedUnion('type', [
         z.object({
@@ -126,6 +131,13 @@ export const modelEntrySchema = z
     extraParameters: z.string().optional(),
   })
   .superRefine((model, ctx) => {
+    if (model.trimContext && !model.contextWindow) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contextWindow'],
+        message: 'Set a positive context window to enable trimming',
+      })
+    }
     try {
       parseModelExtraParameters(model.extraParameters)
     } catch (error) {

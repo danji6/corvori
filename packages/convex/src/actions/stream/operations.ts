@@ -51,6 +51,7 @@ type OperationPlan = {
     ctx: ActionCtx,
     data: StreamContext,
     evalResult: PromptEvalResult,
+    trimWindow?: number,
   ) => Promise<ProviderRequest>
 }
 
@@ -136,13 +137,14 @@ function createInvokePlan(
         ...(frozenPresentation ? {} : { historyPresentation }),
       }
     },
-    buildRequest: (ctx, data, evalResult) =>
+    buildRequest: (ctx, data, evalResult, trimWindow) =>
       buildInvokeRequest(
         ctx,
         data,
         plan.requestItems(evalResult.items),
         manifest,
         runtime,
+        trimWindow,
       ),
   }
 }
@@ -157,13 +159,14 @@ function createAppendPlan(
     evalItems: [...prompts, ...operationPrompts],
     toolNames: [],
     snapshotPatch: () => null,
-    buildRequest: (ctx, data, evalResult) =>
+    buildRequest: (ctx, data, evalResult, trimWindow) =>
       buildAppendRequest(
         ctx,
         data,
         evalResult.items.slice(0, prompts.length),
         evalResult.items.slice(prompts.length),
         instructions,
+        trimWindow,
       ),
   }
 }
@@ -174,49 +177,55 @@ async function buildInvokeRequest(
   prompts: PromptItem[],
   manifest: ToolManifest,
   runtime?: SessionTools,
+  trimWindow?: number,
 ): Promise<ProviderRequest> {
   const { systemPrompt, remainingPrompts } = buildSystemPrompt(
     prompts,
     (value) => value,
   )
-  const [{ getEnabledTools }, messages] = await Promise.all([
-    import('../../model/tool/build'),
-    buildProviderHistory(
-      ctx,
-      data,
-      remainingPrompts,
-      runtime?.current.names ?? manifest.names,
-      manifest.version ?? 1,
-      manifest.contextId,
-      runtime,
-    ),
-  ])
+  const tools = runtime?.tools ?? (await buildRequestTools(ctx, data, manifest))
+  const messages = await buildProviderHistory(ctx, data, remainingPrompts, {
+    toolNames: runtime?.current.names ?? manifest.names,
+    manifestVersion: manifest.version ?? 1,
+    contextId: manifest.contextId,
+    runtime,
+    trim: trimWindow
+      ? {
+          contextWindow: trimWindow,
+          systemPrompt,
+          messages: [],
+          tools,
+          toolRuntime: runtime,
+        }
+      : undefined,
+  })
+  return { systemPrompt, messages, toolRuntime: runtime, tools }
+}
 
-  return {
-    systemPrompt,
-    messages,
-    toolRuntime: runtime,
-    tools:
-      runtime?.tools ??
-      (await getEnabledTools(
-        manifest,
-        { ...data.session, toolApprovals: data.toolApprovals },
-        toolResources(data),
-        {
-          ctx,
-          autoApprove: data.agent.autoApprove,
-          omitMcpMedia: data.stream.omitActiveMedia,
-          messageId: data.output._id,
-          messageCreatedAt: data.output._creationTime,
-          agentId: data.agent._id,
-          invokedBy: data.stream.invokedBy,
-          execution: {
-            streamId: data.stream._id,
-            generation: data.stream.generation,
-          },
-        },
-      )),
-  }
+async function buildRequestTools(
+  ctx: ActionCtx,
+  data: StreamContext,
+  manifest: ToolManifest,
+) {
+  const { getEnabledTools } = await import('../../model/tool/build')
+  return getEnabledTools(
+    manifest,
+    { ...data.session, toolApprovals: data.toolApprovals },
+    toolResources(data),
+    {
+      ctx,
+      autoApprove: data.agent.autoApprove,
+      omitMcpMedia: data.stream.omitActiveMedia,
+      messageId: data.output._id,
+      messageCreatedAt: data.output._creationTime,
+      agentId: data.agent._id,
+      invokedBy: data.stream.invokedBy,
+      execution: {
+        streamId: data.stream._id,
+        generation: data.stream.generation,
+      },
+    },
+  )
 }
 
 /** Appends operation instructions after the complete agent/history layout. */
@@ -226,23 +235,31 @@ async function buildAppendRequest(
   prompts: PromptItem[],
   operationPrompts: PromptItem[],
   instructions?: string,
+  trimWindow?: number,
 ): Promise<ProviderRequest> {
   const { systemPrompt, remainingPrompts } = buildSystemPrompt(
     prompts,
     (value) => value,
   )
-  const messages = await buildProviderHistory(ctx, data, remainingPrompts)
-
-  messages.push(...buildPromptMessages(operationPrompts, (value) => value))
-
+  const trailing = buildPromptMessages(operationPrompts, (value) => value)
   const extraInstructions = buildExtraInstructions(instructions)
   if (extraInstructions) {
-    messages.push({ role: 'user', content: extraInstructions })
+    trailing.push({ role: 'user', content: extraInstructions })
   }
 
+  const messages = await buildProviderHistory(ctx, data, remainingPrompts, {
+    trim: trimWindow
+      ? {
+          contextWindow: trimWindow,
+          systemPrompt,
+          messages: trailing,
+          tools: {},
+        }
+      : undefined,
+  })
   return {
     systemPrompt,
-    messages,
+    messages: [...messages, ...trailing],
     tools: {},
   }
 }

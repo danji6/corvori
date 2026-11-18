@@ -3,6 +3,7 @@ import { error } from '../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../functions'
 import { minRole } from '../lib/roles'
 import type { CreateAgentArgs, Prompt, UpdateAgentArgs } from '../types'
+import { validateModelOverride } from './agent/modelOverride'
 import { sanitizeSubAgents } from './agent/subagents'
 import * as Avatars from './avatars'
 import {
@@ -25,7 +26,7 @@ import { stopForSession } from './stream/lifecycle'
 /** What the agent pickers and lists render. */
 export type AgentSummary = Pick<
   Doc<'agents'>,
-  '_id' | 'name' | 'description' | 'avatarId'
+  '_id' | 'name' | 'description' | 'avatarId' | 'modelOverride'
 >
 
 /** All agents the user owns, as subsets of the docs for cheap read. */
@@ -36,11 +37,12 @@ export async function list(ctx: AuthQueryCtx): Promise<AgentSummary[]> {
     .order('asc')
     .collect()
 
-  return agents.map(({ _id, name, description, avatarId }) => ({
+  return agents.map(({ _id, name, description, avatarId, modelOverride }) => ({
     _id,
     name,
     description,
     avatarId,
+    modelOverride,
   }))
 }
 
@@ -106,6 +108,9 @@ export async function create(ctx: AuthMutationCtx, args: CreateAgentArgs) {
     ownerId: ctx.userId,
     ...DEFAULT_CONTEXT_OPTIONS,
     ...rest,
+    modelOverride: rest.modelOverride
+      ? await validateModelOverride(ctx, ctx.userId, rest.modelOverride)
+      : undefined,
     subAgents: await sanitizeSubAgents(ctx, ctx.userId, args.subAgents),
   })
 
@@ -140,9 +145,22 @@ export async function update(
   ctx: AuthMutationCtx,
   { agentId, unset, ...patch }: UpdateAgentArgs,
 ) {
-  await requireOwned(ctx, agentId)
+  const agent = await requireOwned(ctx, agentId)
+
+  if (
+    patch.modelOverride &&
+    patch.modelOverride.modelId !== agent.modelOverride?.modelId
+  ) {
+    patch.modelOverride = await validateModelOverride(
+      ctx,
+      ctx.userId,
+      patch.modelOverride,
+    )
+  }
+
   assertCustomCssCap(patch.customCss)
   assertShellPathCap(patch.shell)
+
   if (patch.autoApprove?.paths)
     patch.autoApprove = {
       ...patch.autoApprove,

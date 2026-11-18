@@ -70,6 +70,8 @@ export const providerDiscoveryValidator = v.object({
 
 export const modelEntryValidator = v.object({
   ...modelSelectionFields,
+  outputTokens: v.optional(v.number()),
+  trimContext: v.optional(v.boolean()),
   discovered: v.optional(modelMetadataValidator),
   source: v.optional(v.union(v.literal('manual'), v.literal('discovered'))),
   available: v.optional(v.boolean()),

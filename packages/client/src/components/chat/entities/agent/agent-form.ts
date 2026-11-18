@@ -15,7 +15,11 @@ import { createDefaultAgent } from '@cv/convex/model/defaults'
 import { ensurePromptMarkers } from '@cv/convex/model/prompt/markers'
 import { normalizeSubagentOverrides } from '@cv/core/subagent-settings'
 import { normalizeToolSelection } from '@cv/core/tool-capabilities'
-import type { AgentSubAgentsMode, AgentSubagentOverride } from '@cv/core/types'
+import type {
+  AgentModelOverride,
+  AgentSubAgentsMode,
+  AgentSubagentOverride,
+} from '@cv/core/types'
 
 /** The agent's prompt rows, grouped by scope. */
 export type AgentPromptSets = {
@@ -57,9 +61,7 @@ export type AgentDocValues = {
   subAgentIds: Id<'agents'>[]
   subAgentOverrides: AgentSubagentOverride<Id<'agents'>>[]
   // Context
-  trimContext: boolean
-  contextWindow: number
-  outputTokens: number
+  modelOverride: AgentModelOverride | null
   shareUserDisplayNames: boolean
   shareAgentDisplayNames: boolean
   maskOtherAgents: boolean
@@ -91,9 +93,7 @@ export const EMPTY_AGENT_FORM: AgentFormValues = {
   subAgentsMode: 'allow',
   subAgentIds: [],
   subAgentOverrides: [],
-  trimContext: false,
-  contextWindow: -1,
-  outputTokens: -1,
+  modelOverride: null,
   shareUserDisplayNames: false,
   shareAgentDisplayNames: false,
   maskOtherAgents: false,
@@ -140,9 +140,7 @@ export function agentToFormValues(
     subAgentsMode: agent.subAgents?.mode ?? 'allow',
     subAgentIds: agent.subAgents?.agentIds ?? [],
     subAgentOverrides: agent.subAgents?.overrides ?? [],
-    trimContext: agent.trimContext ?? false,
-    contextWindow: agent.contextWindow ?? -1,
-    outputTokens: agent.outputTokens ?? -1,
+    modelOverride: agent.modelOverride ?? null,
     shareUserDisplayNames: agent.shareUserDisplayNames ?? false,
     shareAgentDisplayNames: agent.shareAgentDisplayNames ?? false,
     maskOtherAgents: agent.maskOtherAgents ?? false,

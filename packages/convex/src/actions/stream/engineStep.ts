@@ -147,10 +147,7 @@ export async function consumeProviderStep(
         messages: insertApprovalNoteMessages(messages, respondedApprovalNotes),
       }),
       maxRetries: 0,
-      maxOutputTokens:
-        (setup.agent.outputTokens ?? 0) > 0
-          ? setup.agent.outputTokens
-          : undefined,
+      maxOutputTokens: setup.outputTokens,
       providerOptions: setup.resolved.providerOptions,
       reasoning: setup.resolved.reasoning,
       temperature: setup.resolved.temperature,

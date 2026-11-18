@@ -1,5 +1,6 @@
 /// <reference types="bun-types" />
 import type { Doc } from '@cv/convex/_generated/dataModel'
+import { effectiveAgentSelection } from '@cv/convex/model/agent/modelOverride'
 import { _suspendStep } from '@cv/convex/model/stream/subagents'
 import { resolveSubagentModel } from '@cv/convex/model/subagent/models'
 import { modelReference } from '@cv/core/model-reference'
@@ -43,6 +44,7 @@ function setup(
       { id: 'fast', label: 'Fast', contextWindow: 32768, reasoning },
       {
         id: 'capable',
+        available: true,
         reasoning: { type: 'effort', efforts: ['low', 'high'] },
       },
     ],
@@ -81,12 +83,13 @@ function setup(
 
 async function resolve(
   fixture: ReturnType<typeof setup>,
-  parent = fixture.parent,
+  parent: unknown = fixture.parent,
+  agent: unknown = explorer,
 ) {
   return resolveSubagentModel(fixture.ctx, {
     parent: parent as unknown as Doc<'agents'>,
     session: session as Doc<'sessions'>,
-    agent: explorer as Doc<'agents'>,
+    agent: agent as Doc<'agents'>,
   })
 }
 
@@ -164,6 +167,49 @@ describe('subagent model resolution', () => {
       { type: 'binary', parameter: 'enable_thinking' },
     )
     expect((await resolve(fixture)).settings?.reasoningEffort).toBe('none')
+  })
+
+  test('uses the child’s own model and reasoning ahead of the parent’s choices', async () => {
+    const fixture = setup([
+      { agentId: 'explore', modelId: 'removed', reasoningEffort: 'low' },
+    ])
+    const modelId = modelReference('provider', 'capable')
+    const child = {
+      ...explorer,
+      modelOverride: { modelId, reasoningEffort: 'none' as const },
+    }
+    const result = await resolve(fixture, fixture.parent, child)
+    expect(result.settings).toEqual({
+      model: { id: 'removed' },
+      reasoningEffort: 'low',
+    })
+    expect(
+      effectiveAgentSelection(result.settings!, child.modelOverride),
+    ).toEqual({
+      modelId,
+      reasoningEffort: 'none',
+    })
+    expect(
+      effectiveAgentSelection(result.settings!, { modelId }).reasoningEffort,
+    ).toBe('low')
+
+    fixture.provider.models[1].available = false
+    expect((await resolve(fixture, fixture.parent, child)).error).toContain(
+      'Choose an available model in the agent',
+    )
+  })
+
+  test('inherits the effective parent model and reasoning at spawn', async () => {
+    const fixture = setup()
+    const modelId = modelReference('provider', 'capable')
+    const parent = {
+      ...fixture.parent,
+      modelOverride: { modelId, reasoningEffort: 'low' },
+    }
+    expect((await resolve(fixture, parent)).settings).toMatchObject({
+      model: { id: modelId },
+      reasoningEffort: 'low',
+    })
   })
 })
 

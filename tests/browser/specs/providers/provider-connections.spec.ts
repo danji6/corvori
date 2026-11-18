@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test'
 import { DEFAULT_TITLE_SYSTEM_PROMPT } from '@cv/core/title-generation'
+import { expect, test } from '@playwright/test'
 
 for (const titleModel of [false, true]) {
   test(`model search matches display names and ignores opaque references (title=${titleModel})`, async ({
@@ -321,14 +321,15 @@ test('new ChatGPT connections expose sign-in before saving and stay expanded', a
   await page
     .getByRole('option', { name: 'ChatGPT subscription', exact: true })
     .click()
-  await expect(
-    page.getByRole('button', { name: 'Continue with ChatGPT' }),
-  ).toBeVisible()
+  const signIn = page.getByRole('button', { name: 'Sign in', exact: true })
+  await expect(signIn).toBeVisible()
   await expect(page.getByRole('alert')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Continue with ChatGPT' }).click()
+  await signIn.click()
   await expect(page.getByLabel('Saved connection count')).toHaveText('2')
   await expect(
-    page.getByRole('button', { name: 'Continue with ChatGPT' }),
+    page
+      .getByRole('button', { name: 'Cancel sign-in', exact: true })
+      .or(page.getByRole('button', { name: 'Disconnect', exact: true })),
   ).toBeVisible()
   await expect(page.getByPlaceholder('e.g. OpenAI')).toBeVisible()
   await page.getByRole('button', { name: 'Cancel settings' }).click()
@@ -355,4 +356,47 @@ test('discovered display names are editable and use the full field width', async
     parent: input.parentElement!.getBoundingClientRect().width,
   }))
   expect(dimensions.parent - dimensions.input).toBeLessThan(2)
+})
+
+test('model token settings require a window and save with the model', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=provider-connections')
+  await page.getByText('Personal API', { exact: true }).click()
+  await page
+    .getByRole('button', { name: 'Enable New discovered model' })
+    .click()
+  await page.getByText('New discovered model', { exact: true }).click()
+  const window = page.getByRole('textbox', { name: 'Context window' })
+  const trim = page.getByRole('switch', { name: 'Trim context' })
+  const output = page.getByRole('spinbutton', { name: 'Output tokens' })
+  await window.fill('')
+  await expect(trim).toBeDisabled()
+  await window.fill('64k')
+  await output.fill('1024')
+  await trim.click()
+  await expect(trim).toBeChecked()
+  await window.fill('-100')
+  await expect(window).toHaveAttribute('aria-invalid', 'true')
+  await expect(window).toHaveAccessibleDescription(
+    'Enter a non-negative number.',
+  )
+  await expect(trim).toBeDisabled()
+  await window.fill('-0.1')
+  await expect(window).toHaveAttribute('aria-invalid', 'true')
+  await window.fill('64k')
+  await expect(window).toHaveAttribute('aria-invalid', 'false')
+  await expect(trim).toBeEnabled()
+  await expect(trim).toBeChecked()
+  await page.getByRole('button', { name: 'Save global settings' }).click()
+  await expect(page.getByLabel('Global saved value')).toHaveText(
+    'Unrelated settings',
+  )
+  await page.getByRole('button', { name: 'Cancel settings' }).click()
+  await page
+    .getByRole('button', { name: 'Expand New discovered model' })
+    .click()
+  await expect(output).toHaveValue('1024')
+  await expect(window).toHaveValue('64000')
+  await expect(trim).toBeChecked()
 })

@@ -47,9 +47,6 @@ describe('agent import data normalization', () => {
         prompts: [{ type: 'message-history' }],
         tools: undefined,
         promptOrder: undefined,
-        trimContext: undefined,
-        contextWindow: undefined,
-        outputTokens: undefined,
         shareUserDisplayNames: undefined,
         shareAgentDisplayNames: undefined,
         maskOtherAgents: undefined,
@@ -58,6 +55,16 @@ describe('agent import data normalization', () => {
         theme: undefined,
       },
     })
+  })
+
+  test('ignores obsolete token settings in legacy agent exports', () => {
+    const agent = agentArchiveToCreateArgs({
+      name: 'Agent',
+      trimContext: true,
+      contextWindow: 32000,
+      outputTokens: 1024,
+    })
+    expect(agent).toEqual({ name: 'Agent', prompts: [] })
   })
 
   test('strips display fields from prompt markers', () => {
