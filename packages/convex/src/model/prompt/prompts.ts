@@ -82,20 +82,19 @@ export function buildPrompts(
   allMessages: ModelMessage[],
   render: RenderFn,
 ): ModelMessage[] {
-  const markerIndex = findPromptMarker(remainingPrompts, 'message-history')
-
-  if (markerIndex === -1) {
-    return [...toModelMessages(remainingPrompts, render), ...allMessages]
-  }
-
-  const before = remainingPrompts.slice(0, markerIndex)
-  const after = remainingPrompts.slice(markerIndex + 1)
-
+  const { before, after } = splitHistoryPrompts(remainingPrompts)
   return [
     ...toModelMessages(before, render),
     ...allMessages,
     ...toModelMessages(after, render),
   ]
+}
+
+export function splitHistoryPrompts(prompts: PromptItem[]) {
+  const marker = findPromptMarker(prompts, 'message-history')
+  return marker === -1
+    ? { before: prompts, after: [] }
+    : { before: prompts.slice(0, marker), after: prompts.slice(marker + 1) }
 }
 
 export function buildPromptMessages(

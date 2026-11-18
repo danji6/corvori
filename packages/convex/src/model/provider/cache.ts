@@ -32,6 +32,44 @@ export function applyPromptCaching(
   return { systemPrompt: undefined, messages }
 }
 
+/** Appends instructions after placing the same cache breakpoints as chat. */
+export function appendOperationMessages(
+  prefix: CacheableRequest,
+  trailing: ModelMessage[],
+  providerId: string | undefined,
+): CacheableRequest {
+  if (trailing.length === 0) return prefix
+
+  const suffix =
+    providerId === 'anthropic'
+      ? anthropicOperationMessages(prefix.messages, trailing)
+      : trailing
+  return { ...prefix, messages: [...prefix.messages, ...suffix] }
+}
+
+function anthropicOperationMessages(
+  prefix: ModelMessage[],
+  trailing: ModelMessage[],
+) {
+  // Anthropic hoists the first system block, even if it follows history.
+  if (!prefix.some((message) => message.role === 'system'))
+    return trailing.map(asUserInstruction)
+
+  if (prefix.some((message) => message.role !== 'system')) return trailing
+
+  // Leading operation system messages would extend the prefix's system block.
+  const endOfSystem = trailing.findIndex((message) => message.role !== 'system')
+  if (endOfSystem === -1) return trailing.map(asUserInstruction)
+  return [
+    ...trailing.slice(0, endOfSystem).map(asUserInstruction),
+    ...trailing.slice(endOfSystem),
+  ]
+}
+
+function asUserInstruction(message: ModelMessage): ModelMessage {
+  return message.role === 'system' ? { ...message, role: 'user' } : message
+}
+
 function withCacheControl(message: ModelMessage): ModelMessage {
   return {
     ...message,

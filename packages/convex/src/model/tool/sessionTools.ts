@@ -8,7 +8,7 @@ import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
 import { ToolError } from '../../errors'
 import { generateId } from '../../lib/utils'
-import type { StreamContext } from '../../types'
+import type { StreamContext, StreamExecutionArgs } from '../../types'
 import {
   compactDefinitions,
   frozenDefinitions,
@@ -19,13 +19,28 @@ import { guardMcpApproval } from './mcpApproval'
 
 export const DISPATCH_ERROR_TOOL = '__cv_tool_error'
 
-export type SessionTools = {
+export type ToolReplay = {
   wireDefinitions: ToolDefinition[]
+  wireCalls: Map<string, WireToolCall>
+}
+
+export type SessionTools = ToolReplay & {
   frozen: ToolManifest
   current: ToolManifest
   tools: ToolSet
-  wireCalls: Map<string, WireToolCall>
   assertAccess: (name: string) => Promise<void>
+}
+
+/** Loads provider definitions without constructing executable tools. */
+export async function prepareToolReplay(
+  ctx: ActionCtx,
+  frozen: ToolManifest,
+  execution: StreamExecutionArgs,
+): Promise<ToolReplay> {
+  return {
+    wireDefinitions: await frozenDefinitions(ctx, frozen, execution),
+    wireCalls: new Map(),
+  }
 }
 
 type ToolPreparation = {

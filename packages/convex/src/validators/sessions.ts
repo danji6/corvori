@@ -123,6 +123,13 @@ export const sessionStateSchema = v.object({
   usage: v.optional(tokenUsageValidator),
   /** Last provider request/response body. */
   log: v.optional(v.id('_storage')),
+  cacheId: v.optional(
+    v.object({
+      agentId: v.id('agents'),
+      prefixDigest: v.string(),
+      switchedAgents: v.boolean(),
+    }),
+  ),
   cacheDiagnostics: v.optional(v.array(cacheDiagnosticValidator)),
   updatedAt: v.number(),
 })

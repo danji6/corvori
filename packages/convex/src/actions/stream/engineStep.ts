@@ -19,6 +19,7 @@ import { resolveUsage } from '../../model/stream/usage'
 import {
   attachWireCalls,
   dispatchLanguageModel,
+  replayLanguageModel,
 } from '../../model/tool/dispatchTransport'
 import type { StreamExecutionArgs } from '../../types'
 import { hasAwaitingApproval } from './engineApproval'
@@ -102,13 +103,17 @@ export async function consumeProviderStep(
   const respondedApprovalNotes = collectRespondedApprovalNotes(
     initialMessage.parts,
   )
+  const command = setup.stream.command
+  const toolsDisabled = command.kind === 'compact' || command.kind === 'impersonate' // prettier-ignore
+  const runtime = toolsDisabled ? undefined : setup.toolRuntime
+  const tools = toolsDisabled ? undefined : setup.tools
 
   /** Everything a parts array needs before it can be persisted. */
   const prepareParts = async (parts: UIMessage['parts']) =>
     applyReasoningDurations(
       await offloadLargeParts(
         ctx,
-        setup.toolRuntime ? attachWireCalls(parts, setup.toolRuntime) : parts,
+        runtime ? attachWireCalls(parts, runtime) : parts,
         {
           toolCache: offloadCache,
           fileCache,
@@ -128,24 +133,33 @@ export async function consumeProviderStep(
   let lastToolStates = toolStateSignature(latestParts)
   try {
     const startedAt = Date.now()
+    const model = toolsDisabled
+      ? await replayLanguageModel(
+          setup.resolved.languageModel,
+          setup.toolReplay,
+        )
+      : runtime
+        ? await dispatchLanguageModel(setup.resolved.languageModel, runtime)
+        : setup.resolved.languageModel
     const result = streamText({
-      model: setup.toolRuntime
-        ? await dispatchLanguageModel(
-            setup.resolved.languageModel,
-            setup.toolRuntime,
-          )
-        : setup.resolved.languageModel,
+      model,
       system: setup.systemPrompt,
       allowSystemInMessages: true,
       messages: setup.messages,
-      tools: Object.keys(setup.tools).length ? setup.tools : undefined,
-      toolApproval: shellApprovalPolicy(setup.tools),
+      tools: tools && Object.keys(tools).length ? tools : undefined,
+      toolChoice: setup.toolChoice,
+      toolApproval: tools ? shellApprovalPolicy(tools) : undefined,
       stopWhen: stepCountIs(1),
       // Approved tools execute before the first provider call. Add their notes
       // once the SDK tool results exist, without disrupting the resume.
-      prepareStep: ({ messages }) => ({
-        messages: insertApprovalNoteMessages(messages, respondedApprovalNotes),
-      }),
+      prepareStep: toolsDisabled
+        ? undefined
+        : ({ messages }) => ({
+            messages: insertApprovalNoteMessages(
+              messages,
+              respondedApprovalNotes,
+            ),
+          }),
       maxRetries: 0,
       maxOutputTokens: setup.outputTokens,
       providerOptions: setup.resolved.providerOptions,
@@ -158,10 +172,12 @@ export async function consumeProviderStep(
       onError: ({ error }) => {
         streamError ??= error
       },
-      experimental_repairToolCall: async ({ toolCall, error }) =>
-        InvalidToolInputError.isInstance(error)
-          ? repairToolCall(toolCall)
-          : null,
+      experimental_repairToolCall: tools
+        ? async ({ toolCall, error }) =>
+            InvalidToolInputError.isInstance(error)
+              ? repairToolCall(toolCall)
+              : null
+        : undefined,
       experimental_transform: [
         normalizeUnsupportedWarnings,
         stripProviderMetadata,
@@ -177,7 +193,7 @@ export async function consumeProviderStep(
       message: initialMessage,
       stream: toUIMessageStream({
         stream: result.stream,
-        tools: setup.tools,
+        tools,
         // Recoverable errors
         onError: (error) => sanitizeChatError(error),
       }),
@@ -253,7 +269,6 @@ export async function consumeProviderStep(
       execution,
     })
 
-    const command = setup.stream.command
     const needsSummaryText =
       command.kind === 'compact' && command.thresholdResume
     const hasExpectedOutput = needsSummaryText
@@ -271,7 +286,7 @@ export async function consumeProviderStep(
       needsTitle && lastStep ? truncateTitleExcerpt(lastStep.text.trim()) : ''
 
     return {
-      shouldContinue: finishReason === 'tool-calls',
+      shouldContinue: !toolsDisabled && finishReason === 'tool-calls',
       titleText: titleText || undefined,
       awaitingApproval,
       awaitingQuestions,

@@ -10,34 +10,73 @@ import type { LanguageModel, LanguageModelMiddleware, UIMessage } from 'ai'
 
 import { extractErrorMessage } from '../../errors'
 import { sameDefinition } from './manifest'
-import { DISPATCH_ERROR_TOOL, type SessionTools } from './sessionTools'
+import {
+  DISPATCH_ERROR_TOOL,
+  type SessionTools,
+  type ToolReplay,
+} from './sessionTools'
 
 /** Freezes wire definitions and translates dispatch before SDK validation and lifecycle handling. */
 export async function dispatchLanguageModel(
   model: LanguageModel,
   runtime: SessionTools,
 ) {
-  if (typeof model === 'string')
-    throw new Error('Dispatcher requires a resolved language model')
-  const { wrapLanguageModel } = await import('ai')
-  return wrapLanguageModel({ model, middleware: dispatchMiddleware(runtime) })
+  return wrapToolTransport(model, dispatchMiddleware(runtime))
 }
 
-export function dispatchMiddleware(
-  runtime: SessionTools,
-): LanguageModelMiddleware {
+/** Replays the chat wire format and discards any new tool output. */
+export async function replayLanguageModel(
+  model: LanguageModel,
+  replay: ToolReplay,
+) {
+  return wrapToolTransport(model, {
+    ...replayMiddleware(replay),
+    wrapStream: async ({ doStream }) => {
+      const response = await doStream()
+      const stream = response.stream.pipeThrough(
+        new TransformStream<
+          LanguageModelV4StreamPart,
+          LanguageModelV4StreamPart
+        >({
+          transform(chunk, controller) {
+            if (!chunk.type.startsWith('tool-')) controller.enqueue(chunk)
+          },
+        }),
+      )
+      return { ...response, stream }
+    },
+  })
+}
+
+async function wrapToolTransport(
+  model: LanguageModel,
+  middleware: LanguageModelMiddleware,
+) {
+  if (typeof model === 'string')
+    throw new Error('Tool transport requires a resolved language model')
+  const { wrapLanguageModel } = await import('ai')
+  return wrapLanguageModel({ model, middleware })
+}
+
+function replayMiddleware(replay: ToolReplay): LanguageModelMiddleware {
   return {
     specificationVersion: 'v4',
     transformParams: async ({ params }) => ({
       ...params,
-      tools: runtime.wireDefinitions.map((definition) => ({
+      tools: replay.wireDefinitions.map((definition) => ({
         type: 'function' as const,
         name: definition.name,
         description: definition.description,
         inputSchema: JSON.parse(definition.inputSchema),
       })),
-      prompt: restoreWirePrompt(params.prompt, runtime),
+      prompt: restoreWirePrompt(params.prompt, replay),
     }),
+  }
+}
+
+function dispatchMiddleware(runtime: SessionTools): LanguageModelMiddleware {
+  return {
+    ...replayMiddleware(runtime),
     wrapGenerate: async ({ doGenerate }) => {
       const response = await doGenerate()
       const content = await Promise.all(
@@ -176,25 +215,25 @@ export function attachWireCalls(
 /** Remembers envelopes before replay conversion or approval resumption. */
 export function rememberWireCalls(
   parts: readonly unknown[],
-  runtime: SessionTools,
+  replay: ToolReplay,
 ) {
   for (const part of parts) {
     const id = (part as { toolCallId?: string })?.toolCallId
     const wire = wireToolCall(part)
-    if (id && wire) runtime.wireCalls.set(id, wire)
+    if (id && wire) replay.wireCalls.set(id, wire)
   }
 }
 
 /** Restores provider names after the SDK has executed approved logical tool calls. */
 export function restoreWirePrompt(
   prompt: LanguageModelV4Prompt,
-  runtime: SessionTools,
+  replay: ToolReplay,
 ): LanguageModelV4Prompt {
   return prompt.map((message) => {
     if (message.role !== 'assistant' && message.role !== 'tool') return message
     const content = message.content.map((part) => {
       if (part.type !== 'tool-call' && part.type !== 'tool-result') return part
-      const wire = runtime.wireCalls.get(part.toolCallId)
+      const wire = replay.wireCalls.get(part.toolCallId)
       if (!wire) return part
       return part.type === 'tool-call'
         ? { ...part, toolName: wire.name, input: wire.input }

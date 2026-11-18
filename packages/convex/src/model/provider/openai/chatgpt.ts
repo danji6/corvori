@@ -8,6 +8,7 @@ import type { LanguageModel } from 'ai'
 
 import { sidecarUrl } from '../../sidecar'
 import { sidecarRequest } from '../../sidecarTransport'
+import type { ProviderRequestOptions } from '../options'
 import type { ProviderCredentials } from '../providers'
 import { filterPromptReasoning } from '../reasoningReplay'
 import { fetchChatGPTResponse } from './transport'
@@ -113,7 +114,7 @@ export async function withChatGPTPolicy(
 /** Preserves explicit user parameters even when the SDK omits unsupported settings. */
 export function chatGPTRequest(
   credentials: ProviderCredentials,
-  cacheKey: string = crypto.randomUUID(),
+  resolveCacheId?: ProviderRequestOptions['resolveCacheId'],
 ) {
   const inference = credentials.model?.inference
   const explicit: Record<string, unknown> = {}
@@ -132,12 +133,15 @@ export function chatGPTRequest(
   }
 
   const extras = parseModelExtraParameters(credentials.model?.extraParameters)
+  let fallbackCacheId: string | undefined
 
-  return (body: Record<string, unknown>) =>
-    prepareChatGPTRequest({
-      prompt_cache_key: cacheKey,
-      ...body,
-      ...explicit,
-      ...extras,
-    })
+  return async (body: Record<string, unknown>) => {
+    const request = { ...body, ...explicit, ...extras }
+    if (request.prompt_cache_key === undefined) {
+      request.prompt_cache_key = resolveCacheId
+        ? await resolveCacheId()
+        : (fallbackCacheId ??= crypto.randomUUID())
+    }
+    return prepareChatGPTRequest(request)
+  }
 }

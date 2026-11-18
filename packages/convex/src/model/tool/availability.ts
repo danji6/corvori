@@ -26,9 +26,7 @@ export async function prepareToolAvailability(
   }
 
   const readsSkills =
-    data.agent.tools?.includes('skills') &&
-    minRole(data.invoker.role, 'admin') &&
-    ['invoke', 'retry'].includes(data.stream.command.kind)
+    data.agent.tools?.includes('skills') && minRole(data.invoker.role, 'admin')
   if (!readsSkills) return availability
 
   if (

@@ -15,7 +15,7 @@ import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
 import { buildPrompts } from '../../model/prompt/prompts'
 import { rememberWireCalls } from '../../model/tool/dispatchTransport'
-import type { SessionTools } from '../../model/tool/sessionTools'
+import type { ToolReplay } from '../../model/tool/sessionTools'
 import type { MessageRole, StreamContext } from '../../types'
 import { activeAttachmentMessages } from './attachmentHistory'
 import { collectApprovalNotes } from './historyApprovals'
@@ -39,7 +39,7 @@ type ProviderHistoryOptions = {
   toolNames?: string[]
   manifestVersion?: number
   contextId?: string
-  runtime?: SessionTools
+  replay?: ToolReplay
   trim?: TrimHistoryOptions
 }
 
@@ -51,7 +51,7 @@ export async function buildProviderHistory(
     toolNames,
     manifestVersion,
     contextId = data.sessionCache?.tools?.contextId,
-    runtime,
+    replay,
     trim,
   }: ProviderHistoryOptions = {},
 ) {
@@ -64,9 +64,9 @@ export async function buildProviderHistory(
     generation: data.stream.generation,
   })
 
-  if (runtime) {
-    for (const row of rows) rememberWireCalls(row.parts, runtime)
-    rememberWireCalls(data.output.parts, runtime)
+  if (replay) {
+    for (const row of rows) rememberWireCalls(row.parts, replay)
+    rememberWireCalls(data.output.parts, replay)
   }
 
   const names =

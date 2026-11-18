@@ -2,6 +2,7 @@
 
 import type { ModelMessage } from '@ai-sdk/provider-utils'
 
+import { error } from '../../errors'
 import { estimateTokens } from '../../model/context'
 import { insertApprovalNoteMessages } from './historyApprovals'
 import {
@@ -12,7 +13,10 @@ import {
   requestToolDefinitions,
 } from './requestTokens'
 
-export type TrimHistoryOptions = RequestToEstimate & { contextWindow: number }
+export type TrimHistoryOptions = RequestToEstimate & {
+  contextWindow: number
+  enforceContextWindow?: boolean
+}
 
 /** Removes whole history turns while keeping the latest input and its replies. */
 export async function trimProviderHistory(
@@ -23,13 +27,11 @@ export async function trimProviderHistory(
   const turns = groupTurns(history).map((turn) =>
     insertApprovalNoteMessages(turn, approvalNotes),
   )
-  if (turns.length <= 1) return turns.flat()
+  if (turns.length <= 1 && !fixed.enforceContextWindow) return turns.flat()
   const costs = await Promise.all(
     turns.map(async (turn) => {
       const costs = await Promise.all(
-        turn.map((message) =>
-          estimateMessageTokens(message, fixed.toolRuntime),
-        ),
+        turn.map((message) => estimateMessageTokens(message, fixed.toolReplay)),
       )
       return costs.reduce((total, cost) => total + cost, 0)
     }),
@@ -41,6 +43,10 @@ export async function trimProviderHistory(
 
   while (total > threshold && start < turns.length - 1) {
     total -= costs[start++]
+  }
+
+  if (fixed.enforceContextWindow && total > fixed.contextWindow) {
+    error('Operation instructions and required context exceed the model context window', 413) // prettier-ignore
   }
 
   return turns.slice(start).flat()
@@ -69,7 +75,7 @@ async function fixedTokens(request: RequestToEstimate) {
   const costs = await Promise.all([
     estimateTokens(request.systemPrompt ?? ''),
     ...request.messages.map((message) =>
-      estimateMessageTokens(message, request.toolRuntime),
+      estimateMessageTokens(message, request.toolReplay),
     ),
     ...definitions.map(estimateToolTokens),
   ])

@@ -94,7 +94,11 @@ test.each(['lost', 'disconnected'])(
     })
     const setup = {
       output: { _id: f.messageId, role: 'assistant', parts: [] },
-      stream: { sessionId: f.sessionId, invokedBy: 'owner' },
+      stream: {
+        sessionId: f.sessionId,
+        invokedBy: 'owner',
+        command: { kind: 'invoke' },
+      },
       agent: {},
       evalResult: {},
       requestLog: {},

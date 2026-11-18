@@ -254,6 +254,11 @@ export const prepareContextNoteArgsValidator = v.object({
   toolkitFingerprint: v.optional(v.string()),
 })
 
+export const resolveProviderCacheIdArgsValidator = v.object({
+  ...streamExecutionArgsValidator.fields,
+  prefixDigest: v.string(),
+})
+
 export const prepareProviderRequestArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   scope: providerContinuityScopeValidator,

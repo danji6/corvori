@@ -4,13 +4,13 @@ import type { ModelMessage, ToolResultOutput } from '@ai-sdk/provider-utils'
 import type { ToolSet } from 'ai'
 
 import { estimateTokens } from '../../model/context'
-import type { SessionTools } from '../../model/tool/sessionTools'
+import type { ToolReplay } from '../../model/tool/sessionTools'
 
 export type RequestToEstimate = {
   systemPrompt?: string
   messages: ModelMessage[]
   tools: ToolSet
-  toolRuntime?: SessionTools
+  toolReplay?: ToolReplay
 }
 
 export function contextThreshold(contextWindow: number) {
@@ -19,17 +19,17 @@ export function contextThreshold(contextWindow: number) {
 
 export async function estimateMessageTokens(
   message: ModelMessage,
-  runtime?: SessionTools,
+  replay?: ToolReplay,
 ) {
-  return 5 + (await estimateTokens(messageText(message, runtime)))
+  return 5 + (await estimateTokens(messageText(message, replay)))
 }
 
 export async function requestToolDefinitions(
-  request: Pick<RequestToEstimate, 'toolRuntime' | 'tools'>,
+  request: Pick<RequestToEstimate, 'toolReplay' | 'tools'>,
 ) {
   const { toolDefinitions } = await import('../../model/tool/definitions')
   return (
-    request.toolRuntime?.wireDefinitions ??
+    request.toolReplay?.wireDefinitions ??
     (await toolDefinitions(request.tools))
   )
 }
@@ -53,7 +53,7 @@ export async function reachesCompactionThreshold(
   let tokens = await estimateTokens(request.systemPrompt ?? '')
   for (const message of request.messages) {
     if (tokens >= threshold) return true
-    tokens += await estimateMessageTokens(message, request.toolRuntime)
+    tokens += await estimateMessageTokens(message, request.toolReplay)
   }
   if (tokens >= threshold) return true
 
@@ -64,7 +64,7 @@ export async function reachesCompactionThreshold(
   return false
 }
 
-function messageText(message: ModelMessage, runtime?: SessionTools) {
+function messageText(message: ModelMessage, replay?: ToolReplay) {
   if (typeof message.content === 'string') return message.content
   return message.content
     .map((part) => {
@@ -75,7 +75,7 @@ function messageText(message: ModelMessage, runtime?: SessionTools) {
         case 'file':
           return inlineFileText(part.data)
         case 'tool-call': {
-          const wire = runtime?.wireCalls.get(part.toolCallId)
+          const wire = replay?.wireCalls.get(part.toolCallId)
           return JSON.stringify({
             name: wire?.name ?? part.toolName,
             input: wire ? wire.input : part.input,
@@ -83,7 +83,7 @@ function messageText(message: ModelMessage, runtime?: SessionTools) {
         }
         case 'tool-result': {
           const name =
-            runtime?.wireCalls.get(part.toolCallId)?.name ?? part.toolName
+            replay?.wireCalls.get(part.toolCallId)?.name ?? part.toolName
           return `${name}\n${toolOutputText(part.output)}`
         }
         default:

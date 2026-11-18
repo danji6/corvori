@@ -141,18 +141,20 @@ function legacyRequest(body: Record<string, unknown>) {
 describe('ChatGPT cache routing', () => {
   test('preserves session identity through the SDK, logging, sidecar and reconstructed models', async () => {
     const logs: string[] = []
-    for (const cacheKey of [
-      'session-a',
-      'session-a',
-      'child-session',
-      'title:session-a',
+    const derivedKey = 'a'.repeat(64)
+    for (const resolveCacheId of [
+      () => 'session-a',
+      async () => derivedKey,
+      () => 'session-a',
+      () => 'child-session',
+      () => 'title:session-a',
     ]) {
       const options = await getProviderOptions(
         'fixture-model',
         'auto',
         credentials,
         {
-          cacheKey,
+          resolveCacheId,
           onRequest: (body) => {
             logs.push(body)
           },
@@ -163,6 +165,7 @@ describe('ChatGPT cache routing', () => {
     }
     expect(requests.map((request) => request.body.prompt_cache_key)).toEqual([
       'session-a',
+      derivedKey,
       'session-a',
       'child-session',
       'title:session-a',
@@ -191,7 +194,11 @@ describe('ChatGPT cache routing', () => {
           extraParameters: JSON.stringify({ prompt_cache_key: 'custom-cache' }),
         },
       },
-      { cacheKey: 'session-default' },
+      {
+        resolveCacheId: async () => {
+          throw new Error('Explicit key should bypass automatic routing')
+        },
+      },
     )
     await runRequest(options)
     expect(requests[0].body.prompt_cache_key).toBe('custom-cache')
@@ -253,7 +260,11 @@ describe('ChatGPT cache routing', () => {
         providerId: 'openai',
         apiKey: 'fixture-api-key',
       },
-      { cacheKey: 'session-default' },
+      {
+        resolveCacheId: () => {
+          throw new Error('API-key transport should ignore the cache ID')
+        },
+      },
     )
     await runRequest(options)
     expect(requests[0].headers.has('session-id')).toBe(false)
@@ -291,7 +302,10 @@ describe('ChatGPT turn routing and diagnostics', () => {
         'fixture-model',
         'auto',
         credentials,
-        { cacheKey: 'session', observeTransport: diagnostics.observeTransport },
+        {
+          resolveCacheId: () => 'session',
+          observeTransport: diagnostics.observeTransport,
+        },
       )
       const result = streamText({
         model: options.languageModel,
@@ -399,7 +413,7 @@ describe('ChatGPT turn routing and diagnostics', () => {
       })
       await runRequest(
         await getProviderOptions('fixture-model', 'auto', credentials, {
-          cacheKey: 'session',
+          resolveCacheId: () => 'session',
           observeTransport: diagnostics.observeTransport,
         }),
       )
@@ -457,7 +471,7 @@ describe('ChatGPT turn routing and diagnostics', () => {
     })
     await runRequest(
       await getProviderOptions('fixture-model', 'auto', credentials, {
-        cacheKey: 'session',
+        resolveCacheId: () => 'session',
         observeTransport: diagnostics.observeTransport,
       }),
     )
@@ -482,7 +496,7 @@ describe('ChatGPT turn routing and diagnostics', () => {
     await expect(
       runRequest(
         await getProviderOptions('fixture-model', 'auto', credentials, {
-          cacheKey: 'session',
+          resolveCacheId: () => 'session',
           observeTransport: failed.observeTransport,
         }),
       ),

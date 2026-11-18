@@ -97,10 +97,8 @@ export async function _getContext(
   ])
 
   // Sub-agent sessions never spawn further sub-agents (flat only)
-  const invocation =
-    stream.command.kind === 'invoke' || stream.command.kind === 'retry'
   const spawnableAgents =
-    invocation && !session.parent
+    agent.tools?.includes('task') && !session.parent
       ? await resolveSpawnableAgents(ctx, agent)
       : []
 
@@ -141,10 +139,9 @@ export async function _getContext(
     ),
     toolkitSkillRevision: await toolkitSkillFingerprint(toolkits),
     toolkitCount: toolkits.length,
-    hasStoredMcpOutput:
-      invocation && agent.tools?.includes('mcp_access')
-        ? await hasStoredMcpOutput(ctx, session._id, agent)
-        : false,
+    hasStoredMcpOutput: agent.tools?.includes('mcp_access')
+      ? await hasStoredMcpOutput(ctx, session._id, agent)
+      : false,
     mcpServers,
     modelProviders,
     plan,

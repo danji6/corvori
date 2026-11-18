@@ -10,7 +10,9 @@ import { adaptReasoningResponse } from './response'
 
 type RequestAdapterOptions = {
   providerId: string
-  transformRequest?: (body: Record<string, unknown>) => Record<string, unknown>
+  transformRequest?: (
+    body: Record<string, unknown>,
+  ) => Promise<Record<string, unknown>>
   reasoning?: ModelReasoning
   reasoningEffort?: ReasoningEffort
   extraParameters?: string
@@ -57,7 +59,9 @@ export function createProviderFetch({
       body as Record<string, unknown>,
     )
     const combined = { ...body, ...reasoningPatch, ...extras }
-    const merged = transformRequest ? transformRequest(combined) : combined
+    const merged = transformRequest
+      ? await transformRequest(combined)
+      : combined
     if (onRequest) {
       await onRequest(JSON.stringify(omitLargeStrings(merged), null, 2))
     }

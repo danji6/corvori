@@ -187,6 +187,11 @@ export const _getFilesystemContext = internalQuery({
   handler: filesystemToolContext,
 })
 
+export const _resolveProviderCacheId = internalMutation({
+  args: V.resolveProviderCacheIdArgsValidator.fields,
+  handler: ProviderRequests.resolveProviderCacheId,
+})
+
 export const _prepareProviderRequest = internalMutation({
   args: V.prepareProviderRequestArgsValidator.fields,
   handler: ProviderRequests.prepareProviderRequest,

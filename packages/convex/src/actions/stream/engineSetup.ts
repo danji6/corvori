@@ -18,7 +18,11 @@ import {
   unavailableModelOverride,
 } from '../../model/agent/modelOverride'
 import { hasSavedTitle } from '../../model/messages'
-import { applyPromptCaching } from '../../model/provider/cache'
+import type { PromptItem } from '../../model/prompt/prompts'
+import {
+  appendOperationMessages,
+  applyPromptCaching,
+} from '../../model/provider/cache'
 import { getProviderOptions } from '../../model/provider/options'
 import { findCredentialsForModel } from '../../model/provider/providers'
 import { postSidecar, sidecarDefaultShell } from '../../model/sidecar'
@@ -28,12 +32,19 @@ import { capabilitySource } from '../../model/tool/capabilitySource'
 import { resolveToolManifest } from '../../model/tool/manifest'
 import { hasToolResultMedia } from '../../model/tool/mcpOutput'
 import { filesystemWorkspace } from '../../model/tool/sessionFilesystem'
-import { prepareSessionTools } from '../../model/tool/sessionTools'
-import type { StreamExecutionArgs } from '../../types'
+import {
+  prepareSessionTools,
+  prepareToolReplay,
+} from '../../model/tool/sessionTools'
+import type { StreamContext, StreamExecutionArgs } from '../../types'
 import { buildSessionLogBody } from './engineLog'
 import { patchSessionLogBody } from './engineLog'
 import { buildEvalContext } from './evalContext'
-import { createOperationPlan, toolResources } from './operations'
+import {
+  buildOperationMessages,
+  buildProviderPrefix,
+  createOperationPlan,
+} from './operations'
 import type { PromptEvalResult } from './operations'
 import { prepareToolContext } from './toolContext'
 
@@ -47,7 +58,7 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
   const chosen = selectedBuiltinTools(data.agent.tools)
 
   const observesToolkits =
-    invokesTools &&
+    (invokesTools || !data.sessionCache) &&
     !!data.toolkitCount &&
     (contextEnabled('mcp', chosen) || chosen.includes('list_skills')) &&
     minRole(data.invoker.role, 'admin')
@@ -83,7 +94,7 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
 
   // Only needed while resolving a manifest
   const needsShell =
-    invokesTools &&
+    (invokesTools || !data.sessionCache) &&
     data.agent.tools?.includes('shell') &&
     minRole(data.invoker.role, 'admin')
   const defaultShell = needsShell ? await sidecarDefaultShell() : undefined
@@ -100,73 +111,31 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
   }
 
   const availability = await prepareToolAvailability(ctx, data)
-  const runtime = invokesTools
-    ? await prepareSessionTools(
-        ctx,
-        data,
-        resolveToolManifest({
-          ...data,
-          resources: toolResources(data),
-          defaultShell,
-          availability,
-        }),
-      )
-    : undefined
-  const operationPlan = createOperationPlan(
-    data,
+  const current = resolveToolManifest({
+    ...data,
+    resources: { settings: data.settings, mcpServers: data.mcpServers },
     defaultShell,
     availability,
-    runtime,
-  )
+  })
+  const frozen = data.sessionCache?.tools
+  const preparedTools =
+    invokesTools || !frozen
+      ? await prepareSessionTools(ctx, data, current)
+      : undefined
+  const manifest = preparedTools?.frozen ?? frozen!
+  const runtime = invokesTools ? preparedTools : undefined
+  const { wireDefinitions, wireCalls } =
+    preparedTools ?? (await prepareToolReplay(ctx, manifest, execution))
+  const toolReplay = { wireDefinitions, wireCalls }
+  const operationPlan = createOperationPlan(data, manifest)
 
-  // Frozen prompts skip evaluation (see snapshots.ts)
-  let evalResult: PromptEvalResult = {
-    items: [],
-    environment: data.environment,
-    dirty: false,
-  }
-
-  if (operationPlan.evalItems.length > 0) {
-    const evalContext = buildEvalContext({
-      agent: data.agent,
-      invoker: data.invoker,
-      invokerSettings: data.invokerSettings,
-      owner: data.owner,
-      ownerSettings: data.ownerSettings,
-      session: data.session,
-      model: data.agent.modelOverride
-        ? { id: data.agent.modelOverride.modelId, label: model?.label }
-        : undefined,
-      userCount: data.userCount,
-      agentCount: data.agentCount,
-      toolNames: operationPlan.toolNames,
-    })
-
-    evalResult = await postSidecar<PromptEvalResult>('/eval/prompts', {
-      items: operationPlan.evalItems,
-      context: evalContext,
-      authorizedAgentId:
-        evalContext.isAdmin && evalContext.tools?.includes('read_file')
-          ? (data.session.workspace?.agentHome?.homeId ?? data.agent._id)
-          : undefined,
-      authorizedWorkDirs:
-        evalContext.isAdmin && evalContext.tools?.includes('read_file')
-          ? evalContext.workDirs
-          : undefined,
-      authorizedAgentDir:
-        evalContext.isAdmin && evalContext.tools?.includes('read_file')
-          ? evalContext.agentDir
-          : undefined,
-      authorizedWorkDir:
-        evalContext.isAdmin && evalContext.tools?.includes('read_file')
-          ? evalContext.workDir
-          : undefined,
-      environment: evalResult.environment,
-    })
-  }
-
-  // The tool manifest needs freezing on the first invoke
-  const patch = operationPlan.snapshotPatch(evalResult)
+  const promptEval = await evaluatePromptItems({
+    data,
+    items: operationPlan.evalItems,
+    toolNames: current.names,
+    modelLabel: model?.label,
+  })
+  const patch = preparedTools && operationPlan.snapshotPatch(promptEval.items)
   if (patch) {
     await ctx.runMutation(internal.streams._saveSessionCache, {
       ...execution,
@@ -208,24 +177,41 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
     ctx,
     execution,
     data,
-    operationPlan.toolNames,
+    current.names,
     runtime?.frozen.contextId,
     availability,
   )
   if (!contextPrepared) return null
 
-  const { systemPrompt, messages, tools, toolRuntime } =
-    await operationPlan.buildRequest(
-      ctx,
-      data,
-      evalResult,
-      trimContext ? contextWindow : undefined,
-    )
+  const operationEval = invokesTools
+    ? undefined
+    : await evaluatePromptItems({
+        data,
+        items: operationPlan.operationPrompts,
+        toolNames: [],
+        modelLabel: model?.label,
+        previous: promptEval,
+      })
+  const operationMessages = operationEval
+    ? buildOperationMessages(operationEval.items, data.stream.command)
+    : undefined
+  const { remainingPrompts, ...prefix } = await buildProviderPrefix(
+    ctx,
+    data,
+    operationPlan.requestItems(promptEval.items),
+    {
+      manifest,
+      toolNames: current.names,
+      replay: toolReplay,
+      trimWindow: trimContext ? contextWindow : undefined,
+      operationMessages,
+    },
+  )
 
   const { createCacheDiagnostics } = await import('./cacheDiagnostics')
-  const isChatGPT =
+  const usesChatGPTContinuity =
     credentials?.providerId === 'openai' && credentials.auth === 'chatgpt'
-  const cacheDiagnostics = isChatGPT
+  const cacheDiagnostics = usesChatGPTContinuity
     ? createCacheDiagnostics(ctx, {
         execution,
         messageId: data.stream.state.processingMessageId,
@@ -233,7 +219,7 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
         credentials,
       })
     : undefined
-  if (!isChatGPT && data.stream.providerContinuity) {
+  if (!usesChatGPTContinuity && data.stream.providerContinuity) {
     await ctx.runMutation(internal.streams._clearProviderContinuity, execution)
   }
 
@@ -244,7 +230,15 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
     reasoningEffort,
     credentials,
     {
-      cacheKey: data.stream.sessionId,
+      resolveCacheId: async () => {
+        const { resolveStreamCacheId } = await import('./providerCacheId')
+        return resolveStreamCacheId(ctx, execution, {
+          sessionId: data.stream.sessionId,
+          systemPrompt: prefix.systemPrompt,
+          remainingPrompts,
+          wireDefinitions,
+        })
+      },
       observeTransport: cacheDiagnostics?.observeTransport,
       onRequest: async (body) => {
         requestLog.body = body
@@ -256,11 +250,9 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
     },
   )
 
-  const request = applyPromptCaching(
-    {
-      systemPrompt,
-      messages,
-    },
+  const request = appendOperationMessages(
+    applyPromptCaching(prefix, credentials?.providerId),
+    operationMessages ?? [],
     credentials?.providerId,
   )
 
@@ -272,21 +264,68 @@ export async function prepare(ctx: ActionCtx, execution: StreamExecutionArgs) {
     outputTokens: model?.outputTokens,
     agent: data.agent,
     output: data.output,
-    workspace: hasFilesystemTools(operationPlan.toolNames)
-      ? filesystemWorkspace(data.session)
-      : data.session.workspace,
+    workspace:
+      invokesTools && hasFilesystemTools(current.names)
+        ? filesystemWorkspace(data.session)
+        : data.session.workspace,
     workspaceSessionId: sharedSessionId(data.session),
     isSubagent: !!data.session.parent,
     needsTitle:
       data.stream.command.kind === 'invoke' && !hasSavedTitle(data.session),
-    evalResult,
+    evalResult: operationEval ?? promptEval,
     systemPrompt: request.systemPrompt,
     messages: request.messages,
     resolved,
     requestLog,
     cacheDiagnostics,
-    tools,
-    toolRuntime,
-    hasActiveMedia: data.hasActiveMedia || hasToolResultMedia(messages),
+    tools: runtime?.tools ?? {},
+    // Anthropic keys its message cache on tool choice even for read-only replay.
+    toolChoice:
+      invokesTools || credentials?.providerId === 'anthropic'
+        ? undefined
+        : ('none' as const),
+    toolRuntime: runtime,
+    toolReplay,
+    hasActiveMedia: data.hasActiveMedia || hasToolResultMedia(request.messages),
   }
+}
+
+type PromptEvalBatch = {
+  data: StreamContext & { userCount: number; agentCount: number }
+  items: PromptItem[]
+  toolNames: string[]
+  modelLabel?: string
+  previous?: PromptEvalResult
+}
+
+async function evaluatePromptItems({
+  data,
+  items,
+  toolNames,
+  modelLabel,
+  previous,
+}: PromptEvalBatch): Promise<PromptEvalResult> {
+  const environment = previous?.environment ?? data.environment
+  if (!items.length) return { items, environment, dirty: !!previous?.dirty }
+
+  const evalContext = buildEvalContext({
+    ...data,
+    model: data.agent.modelOverride
+      ? { id: data.agent.modelOverride.modelId, label: modelLabel }
+      : undefined,
+    toolNames,
+  })
+  const canReadFiles = evalContext.isAdmin && toolNames.includes('read_file')
+  const result = await postSidecar<PromptEvalResult>('/eval/prompts', {
+    items,
+    context: evalContext,
+    authorizedAgentId: canReadFiles
+      ? (data.session.workspace?.agentHome?.homeId ?? data.agent._id)
+      : undefined,
+    authorizedWorkDirs: canReadFiles ? evalContext.workDirs : undefined,
+    authorizedAgentDir: canReadFiles ? evalContext.agentDir : undefined,
+    authorizedWorkDir: canReadFiles ? evalContext.workDir : undefined,
+    environment,
+  })
+  return { ...result, dirty: !!previous?.dirty || result.dirty }
 }

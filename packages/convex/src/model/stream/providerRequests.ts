@@ -7,11 +7,43 @@ import type {
   PrepareProviderRequestArgs,
   ProviderContinuityScope,
   RecordCacheDiagnosticArgs,
+  ResolveProviderCacheIdArgs,
   SaveProviderContinuityArgs,
   StreamExecutionArgs,
 } from '../../types'
 import { getState, patchState } from '../session/state'
 import { ownsExecution } from './execution'
+
+/** Keeps the original route assigned to the prefix warmed before an agent switch. */
+export async function resolveProviderCacheId(
+  ctx: MutationCtx,
+  args: ResolveProviderCacheIdArgs,
+) {
+  const stream = await ctx.db.get(args.streamId)
+  if (!ownsExecution(stream, args))
+    error('Stream execution is no longer active', 409)
+
+  const { sessionId, agentId } = stream
+  const { prefixDigest } = args
+  const baseline = (await getState(ctx, sessionId))?.cacheId
+  if (baseline?.switchedAgents) {
+    return baseline.prefixDigest === prefixDigest ? sessionId : prefixDigest
+  }
+
+  if (baseline && baseline.agentId !== agentId) {
+    await patchState(ctx, sessionId, {
+      cacheId: { ...baseline, switchedAgents: true },
+    })
+    return baseline.prefixDigest === prefixDigest ? sessionId : prefixDigest
+  }
+
+  if (baseline?.prefixDigest !== prefixDigest) {
+    await patchState(ctx, sessionId, {
+      cacheId: { agentId, prefixDigest, switchedAgents: false },
+    })
+  }
+  return sessionId
+}
 
 /** Describes the identity change without retaining raw cache keys. */
 export function continuityResetReason(

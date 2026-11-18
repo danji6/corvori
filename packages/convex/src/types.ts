@@ -303,6 +303,7 @@ export type RestoreChangesResultArgs = Infer<typeof ChangesV.restoreChangesResul
 export type AppendChangesArgs = Infer<typeof ChangesV.appendChangesArgsValidator> // prettier-ignore
 export type ReservePublicationArgs = Infer<typeof ChangesV.reservePublicationArgsValidator> // prettier-ignore
 export type AgentPageArgs = Infer<typeof V.agentPageArgsValidator>
+export type ResolveProviderCacheIdArgs = Infer<typeof StreamsV.resolveProviderCacheIdArgsValidator> // prettier-ignore
 export type PrepareProviderRequestArgs = Infer<typeof StreamsV.prepareProviderRequestArgsValidator> // prettier-ignore
 export type SaveProviderContinuityArgs = Infer<typeof StreamsV.saveProviderContinuityArgsValidator> // prettier-ignore
 export type RecordCacheDiagnosticArgs = Infer<typeof StreamsV.recordCacheDiagnosticArgsValidator> // prettier-ignore

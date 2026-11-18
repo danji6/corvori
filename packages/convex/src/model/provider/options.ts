@@ -32,7 +32,8 @@ export type ProviderOptions = {
 
 export type ProviderRequestOptions = {
   observeTransport?: ProviderTransportObserver
-  cacheKey?: string
+  /** Resolves the default cache ID on demand for transports that use one. */
+  resolveCacheId?: () => string | Promise<string>
   onRequest?: (body: string) => void | Promise<void>
   fetch?: typeof globalThis.fetch
 }
@@ -59,11 +60,7 @@ export async function getProviderOptions(
     )
   }
 
-  const transport = inferenceTransport(
-    credentials,
-    request.cacheKey,
-    request.observeTransport,
-  )
+  const transport = inferenceTransport(credentials, request)
   const providerId = credentials.providerId
   const reasoning = resolveModelReasoning(providerId, credentials.model?.reasoning) // prettier-ignore
   const normalizedEffort = normalizeReasoningEffort(reasoningEffort, reasoning)

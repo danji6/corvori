@@ -193,7 +193,7 @@ test('subagent and filesystem requirements narrow selected groups', () => {
     expect(user.names).not.toContain(name)
 })
 
-test('a cached manifest never acquires helpers or changes selections until reset', () => {
+test('snapshot capture reuses the frozen manifest until reset', () => {
   const frozen = { version: 1, names: ['read_file'] }
   const data = {
     ...input(['shell', 'mcp_access', 'skills']),
@@ -204,14 +204,14 @@ test('a cached manifest never acquires helpers or changes selections until reset
     sessionCache: { tools: frozen, items: [], historyPresentation: {} },
     agent: { tools: ['shell', 'mcp_access', 'skills'] },
   }
-  const plan = createOperationPlan(data as never)
-  expect(plan.toolNames).toBe(frozen.names)
-  expect(
-    plan.snapshotPatch({ items: [], environment: {}, dirty: false }),
-  ).toBeNull()
-  expect(
-    createOperationPlan({ ...data, sessionCache: null } as never).toolNames,
-  ).not.toContain('read_file')
+  const plan = createOperationPlan(data as never, frozen)
+  expect(plan.snapshotPatch([])).toBeNull()
+  const current = resolveToolManifest(input(['shell', 'mcp_access', 'skills']))
+  const uncached = createOperationPlan(
+    { ...data, sessionCache: null } as never,
+    current,
+  )
+  expect(uncached.snapshotPatch([])?.tools).toBe(current)
 })
 
 test('context policy hides disabled, incompatible, foreign, and unstamped notes without suppressing evidence', () => {

@@ -1,6 +1,9 @@
 /// <reference types="bun-types" />
 import type { ModelMessage } from '@ai-sdk/provider-utils'
-import { applyPromptCaching } from '@cv/convex/model/provider/cache'
+import {
+  appendOperationMessages,
+  applyPromptCaching,
+} from '@cv/convex/model/provider/cache'
 import { describe, expect, test } from 'bun:test'
 
 const EPHEMERAL = { type: 'ephemeral' }
@@ -83,4 +86,22 @@ describe('applyPromptCaching', () => {
       ).toBe(true)
     }
   })
+})
+
+test('Anthropic preserves operation system roles after the initial system block is closed', () => {
+  const prefix = applyPromptCaching(
+    { systemPrompt: 'Chat instructions', messages: [] },
+    'anthropic',
+  )
+  const trailing: ModelMessage[] = [
+    { role: 'system', content: 'First operation instruction' },
+    { role: 'user', content: 'User instruction' },
+    { role: 'system', content: 'Later operation instruction' },
+  ]
+  const request = appendOperationMessages(prefix, trailing, 'anthropic')
+  expect(request.messages).toEqual([
+    ...prefix.messages,
+    { role: 'user', content: 'First operation instruction' },
+    ...trailing.slice(1),
+  ])
 })

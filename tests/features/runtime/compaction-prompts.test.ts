@@ -1,6 +1,8 @@
 /// <reference types="bun-types" />
 import {
   type PromptEvalResult,
+  buildOperationMessages,
+  buildProviderPrefix,
   createOperationPlan,
 } from '@cv/convex/actions/stream/operations'
 import {
@@ -16,6 +18,7 @@ import {
 import type { Prompt, PromptItem, StreamContext } from '@cv/convex/types'
 import { evaluate } from '@cv/core/interpreter/evaluate'
 import { createVariableStore } from '@cv/core/interpreter/store'
+import type { JsonValue } from '@cv/core/interpreter/types'
 import { describe, expect, test } from 'bun:test'
 
 function prompt(overrides: Partial<Prompt> & { id: string }): Prompt {
@@ -51,12 +54,16 @@ function data(
       compaction: trailing,
       impersonation: trailing,
     },
-    sessionCache: { items: [prompt({ id: 'stale-snapshot' })] },
+    output: { parts: [] },
+    sessionCache: null,
   } as unknown as StreamContext
 }
 
-function render(items: PromptItem[]): PromptEvalResult {
-  const store = createVariableStore()
+function render(
+  items: PromptItem[],
+  environment?: Record<string, JsonValue>,
+): PromptEvalResult {
+  const store = createVariableStore(environment)
   return {
     items: items.map((item) =>
       'type' in item || !item.enabled
@@ -80,6 +87,34 @@ const history = [
   },
 ]
 const ctx = { runQuery: async () => history } as never
+const manifest = { names: [] }
+
+async function renderRequest(input: StreamContext) {
+  const plan = createOperationPlan(input, manifest)
+  const base = render(plan.evalItems)
+  const operation = render(
+    plan.operationPrompts,
+    base.environment as Record<string, JsonValue>,
+  )
+  const prefix = await buildProviderPrefix(
+    ctx,
+    input,
+    plan.requestItems(base.items),
+    {
+      manifest,
+      toolNames: manifest.names,
+      replay: { wireDefinitions: [], wireCalls: new Map() },
+    },
+  )
+  return {
+    ...prefix,
+    messages: [
+      ...prefix.messages,
+      ...buildOperationMessages(operation.items, input.stream.command),
+    ],
+    environment: operation.environment,
+  }
+}
 
 for (const operation of ['compact', 'impersonate'] as const) {
   describe(`${operation} appended prompts`, () => {
@@ -97,16 +132,14 @@ for (const operation of ['compact', 'impersonate'] as const) {
         prompt({ id: 'last', content: 'Last' }),
       ]
       const input = data(operation, own, trailing, '  Extra instructions  ')
-      const plan = createOperationPlan(input)
-      expect(plan.evalItems).toEqual([...own.slice(0, -1), ...trailing])
-      expect(plan.toolNames).toEqual([])
-      expect(plan.snapshotPatch(render(plan.evalItems))).toBeNull()
-      const request = await plan.buildRequest(
-        ctx,
-        input,
-        render(plan.evalItems),
-      )
-      expect(request.tools).toEqual({})
+      const plan = createOperationPlan(input, manifest)
+      expect(plan.evalItems).toEqual(own.slice(0, -1))
+      expect(plan.operationPrompts).toEqual(trailing)
+      expect(plan.snapshotPatch(render(plan.evalItems).items)).toMatchObject({
+        items: own.slice(0, -1),
+        tools: manifest,
+      })
+      const request = await renderRequest(input)
       expect(request.systemPrompt).toBe('system content.')
       expect(request.messages).toEqual([
         { role: 'user', content: [{ type: 'text', text: 'Hello' }] },
@@ -123,12 +156,7 @@ for (const operation of ['compact', 'impersonate'] as const) {
         [prompt({ id: 'base' }), prompt({ id: 'before', role: 'user' })],
         [prompt({ id: 'task' })],
       )
-      const plan = createOperationPlan(input)
-      const request = await plan.buildRequest(
-        ctx,
-        input,
-        render(plan.evalItems),
-      )
+      const request = await renderRequest(input)
       expect(request.systemPrompt).toBe('base content.')
       expect(request.messages.map((message) => message.content)).toEqual([
         'before content.',
@@ -154,12 +182,10 @@ for (const operation of ['compact', 'impersonate'] as const) {
           prompt({ id: 'second', content: '{{getVar("value")}}' }),
         ],
       )
-      const plan = createOperationPlan(input)
-      const evaluated = render(plan.evalItems)
-      const request = await plan.buildRequest(ctx, input, evaluated)
+      const request = await renderRequest(input)
       expect(String(request.messages.at(-2)?.content)).toContain('agent')
       expect(request.messages.at(-1)?.content).toBe('operation')
-      expect(evaluated.environment.value).toBe('operation')
+      expect(request.environment.value).toBe('operation')
     })
 
     test('an all-disabled override adds no operation prompts or defaults', async () => {
@@ -169,12 +195,7 @@ for (const operation of ['compact', 'impersonate'] as const) {
         [prompt({ id: 'off', enabled: false })],
         ' ',
       )
-      const plan = createOperationPlan(input)
-      const request = await plan.buildRequest(
-        ctx,
-        input,
-        render(plan.evalItems),
-      )
+      const request = await renderRequest(input)
       expect(request.messages).toHaveLength(1)
       expect(request.systemPrompt).toBeUndefined()
     })
@@ -192,12 +213,7 @@ for (const operation of ['compact', 'impersonate'] as const) {
       expect(defaults.map((p) => p.role)).toEqual(['system', 'user'])
       expect(defaults.every((p) => !('type' in p))).toBe(true)
       const input = data(operation, [], [])
-      const plan = createOperationPlan(input)
-      const request = await plan.buildRequest(
-        ctx,
-        input,
-        render(plan.evalItems),
-      )
+      const request = await renderRequest(input)
       expect(request.messages.map((m) => m.role)).toEqual([
         'user',
         'system',
