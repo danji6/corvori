@@ -120,6 +120,27 @@ describe('prefixSenderName', () => {
     ).toBe('Bot: hi')
   })
 
+  test('attributes literal reply markup to its sender', () => {
+    const msg = stored({ type: 'agent', id: OTHER }, 'assistant', 'Bot')
+    const literal = '<reply to="Alice">example</reply>'
+    const content = message()
+    content.parts = [
+      { type: 'text', text: literal },
+      { type: 'text', text: 'More text.' },
+    ]
+
+    const parts = prefixSenderName(
+      content,
+      msg,
+      agent({ shareAgentDisplayNames: true }),
+    )
+
+    expect(parts).toEqual([
+      { type: 'text', text: `Bot: ${literal}` },
+      { type: 'text', text: 'More text.' },
+    ])
+  })
+
   test('never prefixes the agent itself', () => {
     const msg = stored({ type: 'agent', id: SELF }, 'assistant', 'Self')
     expect(
@@ -185,30 +206,51 @@ describe('insertReplyQuote', () => {
     const parts = insertReplyQuote(
       message(),
       reply({ type: 'agent', id: SELF }),
-      agent(),
     )
 
     expect(texts(parts)).toEqual([
       '<file path="a.ts">\ncode\n</file>',
-      '<reply-to from="you">\nthe answer\n</reply-to>',
+      '<reply to="Quoted">\nthe answer\n</reply>',
       'Alice: why?',
     ])
   })
 
-  test('names another participant only when names are shared', () => {
-    const quoted = reply({ type: 'user', id: USER })
-    const blockOf = (options: Partial<Doc<'agents'>>) =>
-      texts(insertReplyQuote(message(), quoted, agent(options)))[1]
+  test('inserts the quote before literal reply markup with names off', () => {
+    const content = message()
+    const literal = '<reply to="Alice">example</reply>'
+    content.parts[1] = { type: 'text', text: literal }
 
-    expect(blockOf({})).toBe('<reply-to>\nthe answer\n</reply-to>')
-    expect(blockOf({ shareUserDisplayNames: true })).toBe(
-      '<reply-to from="Quoted">\nthe answer\n</reply-to>',
+    const parts = insertReplyQuote(content, reply({ type: 'agent', id: OTHER }))
+
+    expect(texts(parts)).toEqual([
+      '<file path="a.ts">\ncode\n</file>',
+      '<reply to="Quoted">\nthe answer\n</reply>',
+      literal,
+    ])
+  })
+
+  test.each([
+    { type: 'user' as const, id: USER },
+    { type: 'agent' as const, id: OTHER },
+    { type: 'agent' as const, id: SELF },
+  ])('always names the quoted sender (%j)', (sender) => {
+    const parts = insertReplyQuote(message(), reply(sender))
+
+    expect(texts(parts)[1]).toBe('<reply to="Quoted">\nthe answer\n</reply>')
+  })
+
+  test('uses the display name fallback when the original has no name', () => {
+    const quoted = reply({ type: 'user', id: USER })
+    quoted.replyTo!.senderName = undefined
+
+    expect(texts(insertReplyQuote(message(), quoted))[1]).toBe(
+      '<reply to="Anonymous">\nthe answer\n</reply>',
     )
   })
 
   test('adds nothing once the quoted message is gone', () => {
     const detached = reply({ type: 'user', id: USER }, '')
 
-    expect(insertReplyQuote(message(), detached, agent())).toHaveLength(2)
+    expect(insertReplyQuote(message(), detached)).toHaveLength(2)
   })
 })

@@ -99,11 +99,22 @@ export const presenceExtraValidator = v.object({
   name: v.string(),
 })
 
+/** Addresses one part within a message's selected version. */
+export const partAddressValidator = v.object({
+  segmentIndex: v.number(),
+  partIndex: v.number(),
+})
+
 /** A snapshot of the message a reply quotes, taken at send time. */
 export const replyQuoteValidator = v.object({
   /** Absent once the quoted message is deleted or was not copied along. */
   target: v.optional(
-    v.object({ id: v.id('messages'), creationTime: v.number() }),
+    v.object({
+      id: v.id('messages'),
+      creationTime: v.number(),
+      /** The quoted text block; absent for message-wide or older replies. */
+      part: v.optional(partAddressValidator),
+    }),
   ),
   sender: senderValidator,
   senderName: v.optional(v.string()),
@@ -163,6 +174,8 @@ export const sendMessageArgsValidator = v.object({
   silent: v.optional(v.boolean()), // skips agent invocation (and eventually, notifications)
   /** The message this one replies to, quoted above its content. */
   replyToId: v.optional(v.id('messages')),
+  /** A selected text block; absent for message-wide replies. */
+  replyToPart: v.optional(partAddressValidator),
   attachments: v.optional(
     v.array(
       v.object({
@@ -204,12 +217,6 @@ export const messagesWindowArgsValidator = v.object({
    * it, newer pages from it. Absent means the whole message.
    */
   anchorSegment: v.optional(v.number()),
-})
-
-/** Addresses one part within a message's selected version. */
-export const partAddressValidator = v.object({
-  segmentIndex: v.number(),
-  partIndex: v.number(),
 })
 
 export const editMessagePartArgsValidator = v.object({

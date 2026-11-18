@@ -101,7 +101,6 @@ export function MessageContextMenu({
   const hasNewer = useHasNewerMessages(message.id)
   const retryMessage = useRetryMessage()
   const highlight = useMessageHighlight()
-  const reply = useReplyAction(message, record)
   const [confirm, setConfirm] = useState<Confirm>(null)
   const isEditing = editCtx?.editingMessageId === message.id
 
@@ -115,6 +114,7 @@ export function MessageContextMenu({
       : null
   const [scope, setScope] = useState<GroupScope | null>(baseScope)
   const scopeRef = useRef<GroupScope | null>(baseScope)
+  const reply = useReplyAction(message, record, scope)
 
   const menu = useMemo(
     () => getMessageContextMenuState(message, slices, record, scope, canMutate),

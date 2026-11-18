@@ -81,7 +81,12 @@ export function useSendMessage() {
         content,
         ...(messageRole !== 'user' ? { role: messageRole } : {}),
         ...(pending.silent ? { silent: true } : {}),
-        ...(pending.replyTo && { replyToId: pending.replyTo.target.id }),
+        ...(pending.replyTo && {
+          replyToId: pending.replyTo.target.id,
+          ...(pending.replyTo.target.part && {
+            replyToPart: pending.replyTo.target.part,
+          }),
+        }),
       }
       const optimisticId = createOptimisticMessageId()
       const localFiles = pending.files.map((part) =>

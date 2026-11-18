@@ -2,6 +2,7 @@
 
 import { toReplyQuoteBlock } from '@cv/convex/lib/replyQuote'
 import { INJECTED_BLOCK_PREFIXES } from '@cv/convex/lib/workspace'
+import { toDisplayName } from '@cv/core/utils/names'
 import type { UIMessage } from 'ai'
 
 import type { Doc } from '../../_generated/dataModel'
@@ -55,14 +56,13 @@ export function prefixSenderName(
 export function insertReplyQuote(
   message: UIMessage,
   stored: Doc<'messages'>,
-  agent: Doc<'agents'>,
 ): UIMessage['parts'] {
   const quote = stored.replyTo
   if (!quote?.text) return message.parts
 
   const quotePart = {
     type: 'text' as const,
-    text: toReplyQuoteBlock(quote.text, quotedSenderLabel(quote, agent)),
+    text: toReplyQuoteBlock(quote.text, toDisplayName(quote.senderName)),
   }
   const index = ownTextIndex(message.parts)
   if (index < 0) return [...message.parts, quotePart]
@@ -74,19 +74,7 @@ export function insertReplyQuote(
   ]
 }
 
-/** Names who is being quoted, as far as the agent may know. */
-function quotedSenderLabel(
-  quote: NonNullable<Doc<'messages'>['replyTo']>,
-  agent: Doc<'agents'>,
-) {
-  const isOwnMessage =
-    quote.sender.type === 'agent' && quote.sender.id === agent._id
-  if (isOwnMessage) return 'you'
-
-  return sharesDisplayName(quote.sender, agent) ? quote.senderName : undefined
-}
-
-/** Whether the agent is told the display name of another participant. */
+/** Whether ordinary messages include another participant's display name. */
 function sharesDisplayName(
   sender: Doc<'messages'>['sender'],
   agent: Doc<'agents'>,

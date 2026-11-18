@@ -1,8 +1,11 @@
 import { clipReplyQuote, quotableText } from '@cv/core/reply-quote'
 import type { UIMessage } from 'ai'
+import { isTextUIPart } from 'ai'
 
 import { isOptimisticMessageId } from './message-uploads'
+import { segmentGroupsFor } from './rows'
 import type { MessageRecord, ReplyTarget } from './types'
+import type { GroupAddress } from './work-layout'
 
 /** The message each session's composer is replying to. */
 const targets = new Map<string, ReplyTarget>()
@@ -49,19 +52,44 @@ export function canReplyTo(
   return (message as { status?: string }).status !== 'processing'
 }
 
-/** Quotes a transcript message for the composer to reply to. */
+/** Quotes a selected text block, leaving other blocks unavailable for replies. */
 export function replyTargetFor(
   message: UIMessage,
   record: MessageRecord,
-): ReplyTarget {
-  const answerLast = message.role === 'assistant'
+  scope?: GroupAddress | null,
+): ReplyTarget | undefined {
+  const selected = scopedReplyPart(message, record, scope)
+  if (!selected) return undefined
+  const text = quotableText([selected.part], false)
+  if (!text) return undefined
+
   return {
     target: {
       id: message.id as ReplyTarget['target']['id'],
       creationTime: record._creationTime,
+      part: selected.address,
     },
     sender: record.sender,
     ...(record.senderName && { senderName: record.senderName }),
-    text: clipReplyQuote(quotableText(message.parts, answerLast)),
+    text: clipReplyQuote(text),
+  }
+}
+
+/** Resolves a scoped text block to its persistent segment and part indices. */
+function scopedReplyPart(
+  message: UIMessage,
+  record: MessageRecord,
+  scope: GroupAddress | null | undefined,
+) {
+  if (!scope) return undefined
+  const slice = segmentGroupsFor(message, record).find(
+    (slice) => slice.segmentIndex === scope.segmentIndex,
+  )
+  const group = slice?.groups[scope.groupIndex]
+  if (group?.type !== 'single' || !isTextUIPart(group.part)) return undefined
+
+  return {
+    part: group.part,
+    address: { segmentIndex: scope.segmentIndex, partIndex: group.index },
   }
 }

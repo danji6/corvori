@@ -3,14 +3,19 @@ import { clipReplyQuote, quotableText } from '@cv/core/reply-quote'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import type { ReplyQuote } from '../../types'
-import { queryMessageSegments } from '../messageContents'
+import type { PartAddress, ReplyQuote } from '../../types'
+import {
+  getSegmentRow,
+  listSelectedSegments,
+  queryMessageSegments,
+} from '../messageContents'
 
 /** Snapshots the message a reply quotes, rejecting ones that can't be quoted. */
 export async function quoteMessage(
   ctx: QueryCtx,
   sessionId: Id<'sessions'>,
   messageId: Id<'messages'>,
+  part?: PartAddress,
 ): Promise<ReplyQuote> {
   const message = await ctx.db.get(messageId)
   if (!message || message.sessionId !== sessionId) {
@@ -23,11 +28,42 @@ export async function quoteMessage(
   if (message.status === 'processing') error('Message is being processed', 409)
 
   return {
-    target: { id: message._id, creationTime: message._creationTime },
+    target: {
+      id: message._id,
+      creationTime: message._creationTime,
+      ...(part && { part }),
+    },
     sender: message.sender,
     ...(message.senderName && { senderName: message.senderName }),
-    text: clipReplyQuote(await quotedText(ctx, message)),
+    text: clipReplyQuote(
+      part
+        ? await quotedPartText(ctx, message, part)
+        : await quotedText(ctx, message),
+    ),
   }
+}
+
+/** Reads the selected text block without falling back to a different block. */
+async function quotedPartText(
+  ctx: QueryCtx,
+  message: Doc<'messages'>,
+  address: PartAddress,
+) {
+  const indicesAreNonnegativeIntegers = [
+    address.segmentIndex,
+    address.partIndex,
+  ].every((index) => Number.isSafeInteger(index) && index >= 0)
+  if (!indicesAreNonnegativeIntegers) error('Invalid quoted text block')
+
+  const segment = await getSegmentRow(
+    ctx,
+    message._id,
+    message.selectedVersion,
+    address.segmentIndex,
+  )
+  const text = quotableText([segment?.parts[address.partIndex]], false)
+  if (!text) error('Quoted text block not found', 404)
+  return text
 }
 
 /** Detaches replies from a deleted message and drops their copy of its text. */
@@ -62,9 +98,41 @@ export async function remapReplyQuote(
   const copy = copyId && (await ctx.db.get(copyId))
   if (!copy) return detached
 
+  const part =
+    target?.part && (await remapQuotedPart(ctx, target.id, copy, target.part))
   return {
     ...detached,
-    target: { id: copy._id, creationTime: copy._creationTime },
+    target: {
+      id: copy._id,
+      creationTime: copy._creationTime,
+      ...(part && { part }),
+    },
+  }
+}
+
+/** Keeps the same part when duplication packs it into different segments. */
+async function remapQuotedPart(
+  ctx: QueryCtx,
+  originalId: Id<'messages'>,
+  copy: Doc<'messages'>,
+  address: PartAddress,
+): Promise<PartAddress | undefined> {
+  const original = await ctx.db.get(originalId)
+  if (!original) return undefined
+  const segments = await listSelectedSegments(ctx, original)
+  const index = segments.findIndex(
+    (row) => row.segmentIndex === address.segmentIndex,
+  )
+  if (index < 0) return undefined
+
+  let partIndex = segments
+    .slice(0, index)
+    .reduce((count, row) => count + row.parts.length, address.partIndex)
+  for (const segment of await listSelectedSegments(ctx, copy)) {
+    if (partIndex < segment.parts.length) {
+      return { segmentIndex: segment.segmentIndex, partIndex }
+    }
+    partIndex -= segment.parts.length
   }
 }
 

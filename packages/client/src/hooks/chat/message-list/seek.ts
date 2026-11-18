@@ -4,7 +4,8 @@ import type { useMessageStore } from '@/hooks/chat'
 import { getNavPaddingPx } from '@/hooks/nav-padding'
 import type { WindowAnchor } from '@/lib/chat/message-store'
 import { revealNote } from '@/lib/chat/note-state'
-import { type MessageRow, findToolRow } from '@/lib/chat/rows'
+import type { PartAddress } from '@/lib/chat/parts'
+import { type MessageRow, findPartRow, findToolRow } from '@/lib/chat/rows'
 import {
   type ScrollRowAddress,
   findScrollContentRow,
@@ -35,6 +36,8 @@ export type SeekTargetOptions = {
    * the window has the message.
    */
   toolCallId?: string
+  /** Aligns to the row rendering this exact part, including inside collapsed work. */
+  part?: PartAddress
   /** Reports the row the seek settled on, or null when only the message was found. */
   onLocated?: (row: MessageRow | null) => void
   /** Called once the target has been reached and its position has settled. */
@@ -170,7 +173,7 @@ export function useSeek(
         ...options,
         id,
         creationTime,
-        segmentIndex,
+        segmentIndex: segmentIndex ?? options?.part?.segmentIndex,
         offset: options?.offset ?? 0,
         anchored: false,
       }
@@ -275,16 +278,17 @@ export function useSeek(
   )
   useEffect(() => clearNotFoundTimer, [clearNotFoundTimer])
 
-  const resolveToolRow = useCallback(
-    (messageId: string, toolCallId: string) => {
+  const resolveBlockRow = useCallback(
+    (messageId: string, options: SeekTargetOptions) => {
+      if (!options.toolCallId && !options.part) return undefined
       const message = messageStore.getMessage(messageId)
       if (!message) return undefined
-      return findToolRow(
-        messageStore.getRows(),
-        message,
-        messageStore.getMessageMetadata(messageId),
-        toolCallId,
-      )
+      const rows = messageStore.getRows()
+      const record = messageStore.getMessageMetadata(messageId)
+      if (options.toolCallId) {
+        return findToolRow(rows, message, record, options.toolCallId)
+      }
+      if (options.part) return findPartRow(rows, message, record, options.part)
     },
     [messageStore],
   )
@@ -325,9 +329,7 @@ export function useSeek(
         if (revealNote(noteRow)) return
       }
       // Now that the message is in the window, narrow the target to the block
-      const toolRow = target.toolCallId
-        ? resolveToolRow(target.id, target.toolCallId)
-        : undefined
+      const blockRow = resolveBlockRow(target.id, target)
       const hasVisibleBody = rows.some(
         (row) =>
           (row.messageId === target.id && row.kind !== 'footer') ||
@@ -339,7 +341,7 @@ export function useSeek(
             (row) =>
               row.messageId === target.id && row.kind === 'group' && row.workId,
           )
-      const hiddenRow = toolRow ?? savedRow ?? hiddenMessageRow
+      const hiddenRow = blockRow ?? savedRow ?? hiddenMessageRow
       const hiddenWorkId =
         hiddenRow?.kind === 'group' ? hiddenRow.workId : undefined
       const workCollapsed =
@@ -351,11 +353,11 @@ export function useSeek(
 
       if (target.toolCallId) openToolBlock(target.id, target.toolCallId)
       pendingTargetRef.current = null
-      target.onLocated?.(toolRow ?? noteRow ?? null)
+      target.onLocated?.(blockRow ?? noteRow ?? null)
 
       scrollToTargetSettled({
         ...target,
-        rowKey: toolRow?.key ?? target.rowKey ?? noteRow?.key,
+        rowKey: blockRow?.key ?? target.rowKey ?? noteRow?.key,
       })
 
       return
@@ -377,7 +379,7 @@ export function useSeek(
     seekTick,
     rows,
     scrollToTargetSettled,
-    resolveToolRow,
+    resolveBlockRow,
     anchorAround,
     abandonTarget,
     clearNotFoundTimer,

@@ -105,10 +105,11 @@ export async function buildProviderHistory(
 
   const attributed = messages.map((message, index) => {
     const stored = history[index]
+    // Inject quotes after attribution so literal reply tags stay sender text.
     const parts = prefixSenderName(message, stored, historyAgent)
     return {
       ...message,
-      parts: insertReplyQuote({ ...message, parts }, stored, historyAgent),
+      parts: insertReplyQuote({ ...message, parts }, stored),
     }
   })
   const approvalNotes = collectApprovalNotes(attributed)

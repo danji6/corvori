@@ -4,9 +4,11 @@ import { dequal } from 'dequal'
 import { messageExtra } from './messages'
 import { groupNoteRows } from './note-rows'
 import {
+  type PartAddress,
   type PartGroup,
   groupHasToolCall,
   groupKey,
+  groupPartIndices,
   groupPartsCached,
 } from './parts'
 import {
@@ -347,6 +349,29 @@ export function findToolRow(
       )
     )
   }
+}
+
+/** Finds the row rendering a stored part address once its segment is loaded. */
+export function findPartRow(
+  rows: MessageRow[],
+  message: UIMessage,
+  record: MessageRecord | undefined,
+  address: PartAddress,
+): MessageRow | undefined {
+  const slice = segmentGroupsFor(message, record).find(
+    (slice) => slice.segmentIndex === address.segmentIndex,
+  )
+  if (!slice) return undefined
+  const groupIndex = slice.groups.findIndex((group) =>
+    groupPartIndices(slice.parts, group).includes(address.partIndex),
+  )
+  return rows.find(
+    (row) =>
+      row.kind === 'group' &&
+      row.messageId === message.id &&
+      row.segmentIndex === address.segmentIndex &&
+      row.groupIndex === groupIndex,
+  )
 }
 
 export function rowKeysEqual(a: MessageRow[], b: MessageRow[]): boolean {

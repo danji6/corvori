@@ -1,4 +1,5 @@
 import { createOptionalContext } from '@/hooks/context'
+import type { PartAddress } from '@/lib/chat/parts'
 import type { MessageRow } from '@/lib/chat/rows'
 import { useMemo } from 'react'
 
@@ -14,6 +15,7 @@ export type SeekToMessage = (target: {
   creationTime?: number
   segmentIndex?: number
   toolCallId?: string
+  part?: PartAddress
   /** Reports the located row, or null when only the message was found. */
   onLocated?: (row: MessageRow | null) => void
 }) => void

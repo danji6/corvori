@@ -6,7 +6,7 @@ import { BotIcon, UserIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef } from 'react'
 
 import {
-  type HighlightTarget,
+  highlightTargetForRow,
   useMessageHighlight,
   useMessageHighlightRef,
 } from './message-highlight-context'
@@ -107,7 +107,7 @@ export function ReplyQuoteExcerpt({ quote, lines }: ReplyQuoteExcerptProps) {
   if (!quote.text) {
     return (
       <span className="text-muted-foreground text-sm italic">
-        {quote.target ? 'Attachment' : 'Original message unavailable'}
+        {quote.target ? 'No quoted text' : 'Original message unavailable'}
       </span>
     )
   }
@@ -138,19 +138,23 @@ function useJumpToMessage(target: ReplyQuote['target']) {
   const jump = useCallback(() => {
     if (!target || !seek) return
 
-    const highlighted: HighlightTarget = {
-      messageId: target.id,
-      segmentIndex: null,
-      groupIndex: null,
-    }
-    setHighlight?.(highlighted)
-    seek({ messageId: target.id, creationTime: target.creationTime })
-
     clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => {
-      // Leave a highlight that something else has since taken over
-      setHighlight?.((current) => (current === highlighted ? null : current))
-    }, JUMP_HIGHLIGHT_MS)
+    setHighlight?.(null)
+    seek({
+      messageId: target.id,
+      creationTime: target.creationTime,
+      part: target.part,
+      onLocated: (row) => {
+        const highlighted = highlightTargetForRow(target.id, row)
+        setHighlight?.(highlighted)
+        timerRef.current = setTimeout(() => {
+          // Leave a highlight that something else has since taken over
+          setHighlight?.((current) =>
+            current === highlighted ? null : current,
+          )
+        }, JUMP_HIGHLIGHT_MS)
+      },
+    })
   }, [target, seek, setHighlight])
 
   return target && seek ? jump : undefined

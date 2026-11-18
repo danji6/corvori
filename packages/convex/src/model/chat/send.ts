@@ -108,7 +108,7 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
   })
 
   const replyTo = args.replyToId
-    ? await quoteMessage(ctx, args.sessionId, args.replyToId)
+    ? await quoteMessage(ctx, args.sessionId, args.replyToId, args.replyToPart)
     : undefined
 
   const { messageId, segments } = await insertMessage(

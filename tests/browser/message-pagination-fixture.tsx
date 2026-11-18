@@ -1,5 +1,10 @@
 import type { ScrollDeps } from '@/components/chat/messages/message-list/deps'
 import { MessageListContent } from '@/components/chat/messages/message-list/message-list-content'
+import {
+  MessageSeekContext,
+  type SeekToMessage,
+} from '@/components/chat/messages/message-seek-context'
+import { ReplyQuoteCard } from '@/components/chat/messages/reply-quote'
 import '@/globals.css'
 import { useInitialPosition } from '@/hooks/chat/message-list/initial-position'
 import { usePageScroll } from '@/hooks/chat/message-list/page-scroll'
@@ -42,6 +47,7 @@ const grouped = new URLSearchParams(location.search).has('grouped')
 const persist = new URLSearchParams(location.search).has('persist')
 const middle = new URLSearchParams(location.search).has('middle')
 const clamped = new URLSearchParams(location.search).has('clamped')
+const replies = new URLSearchParams(location.search).has('replies')
 
 function message(time: number, segments = 1): WindowMessage {
   const loaded = Array.from({ length: segments }, (_, segmentIndex) => ({
@@ -92,6 +98,15 @@ const readClampedWindow = clampedWindow(
 )
 const short = message(1, middle ? 60 : persist ? 20 : 6)
 const lastSegment = short.segments.length - 1
+if (replies) {
+  for (const segmentIndex of [1, 4]) {
+    short.segments[segmentIndex].parts = [
+      { type: 'text', text: `Earlier text in segment ${segmentIndex}` },
+      { type: 'step-start' },
+      { type: 'text', text: `Quoted text in segment ${segmentIndex}` },
+    ]
+  }
+}
 if (withText) {
   short.segments[middle ? 40 : persist ? 14 : 4].parts = [
     { type: 'text', text: 'Original visible text before loading' },
@@ -267,6 +282,11 @@ function Transcript({
     messageStore: store,
     anchorAround: window.controls.anchorAround,
   })
+  const seekToMessage = useCallback<SeekToMessage>(
+    ({ messageId, creationTime, segmentIndex, ...options }) =>
+      requestScrollToMessage(messageId, creationTime, segmentIndex, options),
+    [requestScrollToMessage],
+  )
   const { restore } = useScrollPersistence(deps, {
     sessionId: persist ? 'pagination' : undefined,
     messageStore: store,
@@ -345,6 +365,28 @@ function Transcript({
           className={middle || clamped ? 'h-20' : 'h-screen'}
         />
       </main>
+      {replies && (
+        <aside className="bg-background fixed right-4 bottom-4 z-40 w-72">
+          <MessageSeekContext value={seekToMessage}>
+            {[1, 4].map((segmentIndex) => (
+              <ReplyQuoteCard
+                key={segmentIndex}
+                messageId={`reply-${segmentIndex}`}
+                quote={{
+                  target: {
+                    id: short._id,
+                    creationTime: short._creationTime,
+                    part: { segmentIndex, partIndex: 2 },
+                  },
+                  sender: short.sender,
+                  senderName: 'Agent',
+                  text: `Quoted text in segment ${segmentIndex}`,
+                }}
+              />
+            ))}
+          </MessageSeekContext>
+        </aside>
+      )}
     </>
   )
 }
