@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   type CSSProperties,
-  Fragment,
   type ReactElement,
   type ReactNode,
   type RefObject,
@@ -19,17 +18,14 @@ import {
   useRef,
   useState,
 } from 'react'
-import {
-  type CustomItemComponentProps,
-  WindowVirtualizer,
-  type WindowVirtualizerHandle,
-} from 'virtua'
+import type { CustomItemComponentProps, WindowVirtualizerHandle } from 'virtua'
 
 import { EmptyMessage } from '../../empty-message'
 import {
   VirtualizedRowTransition,
   useRowTransitions,
 } from '../virtualized-row-transition'
+import { TranscriptWindow } from './transcript-window'
 
 const CONTENT_FADE_TRANSITION = { duration: 0.18, ease: 'easeOut' } as const
 
@@ -243,15 +239,15 @@ function MessageRows({
       >
         <VirtualizedRowsContext value={rows}>
           <RowTransitionsContext value={transitions}>
-            <WindowVirtualizer
+            <TranscriptWindow
               ref={virtuaRef}
-              data={rows}
+              rows={rows}
+              transitions={transitions}
               item={VirtualizedItem}
               shift={shiftItems || layout.shift}
               onResize={layout.onResize}
-            >
-              {(row) => <Fragment key={row.key}>{renderRow(row)}</Fragment>}
-            </WindowVirtualizer>
+              renderRow={renderRow}
+            />
           </RowTransitionsContext>
         </VirtualizedRowsContext>
       </div>

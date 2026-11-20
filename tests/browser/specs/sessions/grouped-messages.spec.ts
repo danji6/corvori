@@ -228,6 +228,55 @@ test('opening work at the bottom holds the viewport, then reveals its details', 
   )
 })
 
+test('preparing a work summary keeps the existing reply visible in place', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1100, height: 690 })
+  await page.goto('/?fixture=notes&id=notes&tailWork')
+  const work = page.locator('[data-slot="work-block"]')
+  const reply = page
+    .getByText('Regression checks passed.', { exact: true })
+    .first()
+  await expect(work).toBeInViewport({ ratio: 1 })
+  await expect(reply).toBeInViewport()
+
+  const replyKey = await reply.evaluate((element) =>
+    element.closest('[data-row-key]')!.getAttribute('data-row-key')!,
+  )
+  const { before, preparing } = await work.evaluate(async (trigger, key) => {
+    const list = trigger.closest('[data-row-key]')!.parentElement!
+    const sample = () => {
+      const row = list.querySelector(`[data-row-key="${CSS.escape(key)}"]`)
+      return {
+        visible: !!row && getComputedStyle(row).visibility === 'visible',
+        top: row?.getBoundingClientRect().top ?? null,
+        scroll: scrollY,
+        height: document.documentElement.scrollHeight,
+      }
+    }
+
+    const before = sample()
+    const preparing = await new Promise<ReturnType<typeof sample>>(
+      (resolve) => {
+        const observer = new MutationObserver(() => {
+          if (!list.querySelector('[data-state="preparing"]')) return
+          observer.disconnect()
+          resolve(sample())
+        })
+        observer.observe(list, { childList: true })
+        ;(trigger as HTMLButtonElement).click()
+      },
+    )
+    return { before, preparing }
+  }, replyKey)
+
+  expect(before.visible).toBe(true)
+  expect(preparing.visible).toBe(true)
+  expect(Math.abs(preparing.top! - before.top!)).toBeLessThanOrEqual(1)
+  expect(Math.abs(preparing.scroll - before.scroll)).toBeLessThanOrEqual(1)
+  expect(Math.abs(preparing.height - before.height)).toBeLessThanOrEqual(1)
+})
+
 for (const phase of ['preparing', 'opening', 'open'] as const) {
   test(`collapsing work at the tail preserves position without bouncing (phase=${phase})`, async ({
     page,
