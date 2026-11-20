@@ -120,6 +120,7 @@ import type * as model_attachmentTransfers from "../model/attachmentTransfers.js
 import type * as model_attachments from "../model/attachments.js";
 import type * as model_avatars from "../model/avatars.js";
 import type * as model_caps from "../model/caps.js";
+import type * as model_changeLocations from "../model/changeLocations.js";
 import type * as model_changes from "../model/changes.js";
 import type * as model_chat_approvalMemory from "../model/chat/approvalMemory.js";
 import type * as model_chat_approvals from "../model/chat/approvals.js";
@@ -587,6 +588,7 @@ declare const fullApi: ApiFromModules<{
   "model/attachments": typeof model_attachments;
   "model/avatars": typeof model_avatars;
   "model/caps": typeof model_caps;
+  "model/changeLocations": typeof model_changeLocations;
   "model/changes": typeof model_changes;
   "model/chat/approvalMemory": typeof model_chat_approvalMemory;
   "model/chat/approvals": typeof model_chat_approvals;

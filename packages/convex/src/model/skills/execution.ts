@@ -1,4 +1,4 @@
-import type { Doc } from '../../_generated/dataModel'
+import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import type { OperationAttemptArgs } from '../../types'
@@ -23,7 +23,8 @@ type Context<K extends Operation['kind'], Targets = object> = {
 type AgentTarget = { agent: Doc<'agents'>; home: Doc<'agentHomes'> }
 
 export type ExecutionContext =
-  | Context<'ensure' | 'home' | 'detach', AgentTarget>
+  | Context<'ensure' | 'detach', AgentTarget>
+  | Context<'home', AgentTarget & { reservedOriginAgentId?: Id<'agents'> }>
   | Context<
       'duplicate',
       AgentTarget & {
@@ -166,8 +167,17 @@ async function resolveAgentCommand(
   switch (op.kind) {
     case 'ensure':
       return { kind: op.kind, operation: op, ...target }
-    case 'home':
-      return { kind: op.kind, operation: op, ...target }
+    case 'home': {
+      const reservedHome = op.reservation
+        ? await ctx.db.get(op.reservation.homeId)
+        : undefined
+      return {
+        kind: op.kind,
+        operation: op,
+        reservedOriginAgentId: reservedHome?.originAgentId,
+        ...target,
+      }
+    }
     case 'detach':
       return { kind: op.kind, operation: op, ...target }
   }

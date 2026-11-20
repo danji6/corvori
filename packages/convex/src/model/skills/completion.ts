@@ -37,7 +37,9 @@ export async function complete(ctx: MutationCtx, args: CompleteAgentFileArgs) {
   }
 
   const previousPath =
-    'homeId' in op ? (await ctx.db.get(op.homeId))?.path : undefined
+    op.kind === 'home' || op.kind === 'detach'
+      ? (args.previousPath ?? (await ctx.db.get(op.homeId))?.path)
+      : undefined
 
   await commitMetadata(ctx, op, args)
 

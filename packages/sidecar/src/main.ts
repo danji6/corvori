@@ -5,7 +5,7 @@ import { lockAgent, unlockAgent } from './agent-files/access'
 import { skillMetadata } from './agent-files/catalog'
 import { desktopCapability, openHomeFolder } from './agent-files/desktop'
 import { resolveDestination } from './agent-files/destination'
-import { inspectHome } from './agent-files/home-state'
+import { homePath, inspectHome } from './agent-files/home-state'
 import { importPage } from './agent-files/import-discovery'
 import { homeInfo, runFileOperation } from './agent-files/operations'
 import {
@@ -139,6 +139,10 @@ export function createApp(authenticate: MiddlewareHandler) {
 
   app.post('/agent-files/status', async (c) =>
     c.json(await inspectHome(homeSchema.parse(await c.req.json()))),
+  )
+
+  app.post('/agent-files/path', async (c) =>
+    c.json({ path: homePath(homeSchema.parse(await c.req.json())) }),
   )
 
   app.post('/agent-files/destination', async (c) =>

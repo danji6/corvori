@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 import { withWorkspaceOperation } from '../mcp/workspace/context'
 import { readSkillResource, skillResourceSchema } from './read-skill'
-import { inside } from './storage'
+import { inside, restorePath } from './storage'
 
 export const projectSkillReadSchema = skillResourceSchema.extend({
   root: z.string().min(1),
@@ -18,7 +18,7 @@ export async function readProjectSkill(
   input: z.infer<typeof projectSkillReadSchema>,
 ) {
   const directory = path.resolve(input.root, '.agents', 'skills', input.name)
-  if (input.agentDir && inside(path.resolve(input.agentDir), directory))
+  if (input.agentDir && inside(restorePath(input.agentDir), directory))
     throw new Error('Project skill cannot resolve inside the agent home')
   if (isPathForbidden(path.resolve(directory, input.resource)))
     throw new Error('Protected Git paths are unavailable through read_skill')

@@ -1,3 +1,4 @@
+import type { FolderWorkspace } from '@cv/core/types/workspace'
 import { assertPersonalScope } from '@cv/core/workspace/personal'
 import path from 'node:path'
 
@@ -61,7 +62,7 @@ async function prepareFile(
 }
 
 async function authorizeTarget(file: CheckpointFile, input: RestoreInput) {
-  const personal = input.workspaces?.find(
+  const personal = [input.workspace, ...(input.workspaces ?? [])].find(
     (workspace) =>
       workspace.agentHome && !isOutside(workspace.agentHome.path, file.target),
   )
@@ -75,7 +76,7 @@ async function authorizeTarget(file: CheckpointFile, input: RestoreInput) {
   const workspace = await requireWorkspace(
     input.sessionId,
     selected.workspaceId,
-    selected,
+    workspaceForTarget(selected, file.target),
   )
   assertPersonalScope(selected, file.target)
   const link = file.before?.symlink || file.after?.symlink
@@ -92,4 +93,23 @@ async function authorizeTarget(file: CheckpointFile, input: RestoreInput) {
     workspace.roots,
     workspace.grantRoot,
   )
+}
+
+/** Resolves only the source needed for an in-scope target. */
+function workspaceForTarget(workspace: FolderWorkspace, target: string) {
+  if (workspace.fileScope === 'session') return workspace
+  if (workspace.sources?.[0]?.path !== workspace.path) return workspace
+  const source = workspace.sources?.find(
+    (item) => !isOutside(item.path, target),
+  )
+  if (!source) return workspace
+
+  return {
+    ...workspace,
+    path: source.path,
+    sources: [source],
+    approvalRoot: workspace.approvalRoot ?? workspace.path,
+    agentHome:
+      workspace.fileScope === 'agent' ? workspace.agentHome : undefined,
+  }
 }

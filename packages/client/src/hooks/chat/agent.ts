@@ -20,6 +20,7 @@ import { useQuery as useCachedQuery } from 'convex-helpers/react/cache/hooks'
 import { useMutation, useQuery } from 'convex/react'
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 
+import { useAgentHomeStatus } from './agent-home-status'
 import { useActiveModel } from './models'
 import { usePromptPreviews } from './prompt-previews'
 import { usePromptRows } from './prompts'
@@ -123,6 +124,14 @@ export function useAgentPrompts(workDir?: string) {
     api.skills.getHome,
     isAdmin && agent ? { agentId: agent._id } : 'skip',
   )
+  const managedHome = useAgentHomeStatus(
+    agent?._id,
+    home?.managed ? home.path : undefined,
+    home?.revision,
+    !!home?.operationId,
+    false,
+  )
+  const agentDir = home?.managed ? managedHome?.path : home?.path
 
   const ownPrompts = useMemo(
     () => (ownRows ?? []).map((row) => row.item),
@@ -159,7 +168,7 @@ export function useAgentPrompts(workDir?: string) {
       userCount: 1,
       agentCount: agent ? 1 : 0,
       workDir: workDir ?? session?.workspace?.path,
-      agentDir: home?.path,
+      agentDir,
     }
 
     const messages = merged
@@ -198,7 +207,7 @@ export function useAgentPrompts(workDir?: string) {
     settings?.displayName,
     modelId,
     modelName,
-    home?.path,
+    agentDir,
     ownPrompts,
     libraryPrompts,
     isAdmin,

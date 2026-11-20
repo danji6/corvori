@@ -86,6 +86,15 @@ describe('previewWorkspaceDiff', () => {
       })
       const result = await response.json()
       expect(result.publication.files).toHaveLength(2)
+      const location = (project: string[]) =>
+        request('location', {
+          sessionId: context.sessionId,
+          checkpointId: 'route-turn',
+          locations: { project, homes: [], sessionFiles: false },
+        }).then((result) => result.json())
+      expect(await location([root])).toEqual({ stale: false })
+      expect(await location([])).toEqual({ stale: true })
+
       const restore = {
         ...context,
         checkpointId: 'route-turn',
@@ -425,7 +434,7 @@ describe('previewWorkspaceDiff', () => {
       })
       await capture.finish()
       workspace.sources.pop()
-      await expect(capture.restore()).rejects.toThrow()
+      expect(await capture.restore()).toMatchObject({ stale: true })
       expect(await readFile(path.join(secondary, 'same.txt'), 'utf8')).toBe(
         'edited',
       )
@@ -434,9 +443,9 @@ describe('previewWorkspaceDiff', () => {
         path: secondary,
         label: 'secondary',
       })
-      await capture.restore()
+      expect(await capture.restore()).toMatchObject({ stale: true })
       expect(await readFile(path.join(secondary, 'same.txt'), 'utf8')).toBe(
-        'secondary',
+        'edited',
       )
       await rm(root, { recursive: true, force: true })
       await expect(

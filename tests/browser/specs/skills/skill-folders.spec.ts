@@ -181,6 +181,14 @@ test('folder status waits for disk inspection and detects a folder removed outsi
     page.getByText("This agent's folder is being managed by the app."),
   ).toBeVisible()
   await page
+    .getByRole('button', { name: 'Choose directory', exact: true })
+    .click()
+  const picker = page.getByRole('dialog')
+  await expect(
+    picker.getByRole('combobox', { name: 'Folder path' }),
+  ).toHaveValue('/fixture/.data/sidecar/agents/fixture-owner/fixture-agent')
+  await picker.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page
     .getByRole('button', { name: 'Remove fixture folder on disk' })
     .click()
   await expect(

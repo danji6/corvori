@@ -1,3 +1,4 @@
+import { markChangesStale } from '@cv/convex/model/changeLocations'
 import {
   appendChanges,
   captureIssue,
@@ -22,7 +23,7 @@ const workspace = {
 function fixture() {
   const database = lifecycleDatabase({
     sessions: [{ _id: 'session', ownerId: 'owner' }],
-    users: [{ _id: 'owner', role: 'admin' }],
+    users: [{ _id: 'owner', subject: 'owner-subject', role: 'admin' }],
     agents: [{ _id: 'agent', ownerId: 'owner', name: 'Agent' }],
     userSessions: [
       {
@@ -187,6 +188,45 @@ describe('changes lifecycle', () => {
     expect(f.scheduled).toHaveLength(2)
     await releaseChangeGroup(f.ctx, { groupId: row.groupId })
     expect(f.rows('changeSets')[0].writersSettled).toBe(true)
+  })
+
+  test('marks only the checked location stale and keeps published diffs available', async () => {
+    const f = fixture()
+    const row = (await prepareChanges(f.ctx, prepareArgs))!
+    await appendChanges(f.ctx, { changeSetId: row._id, files: [file('one')] })
+    await publishChanges(f.ctx, {
+      changeSetId: row._id,
+      fileCount: 1,
+      additions: 1,
+      deletions: 1,
+      issues: [],
+    })
+    await releaseChangeGroup(f.ctx, { groupId: row.groupId })
+    const summaryArgs = { messageId: 'message' as never, version: 1 }
+    const ready = (await changeSummary(f.ctx, summaryArgs))!
+    const args = { changeSetId: row._id, subject: 'owner-subject' }
+    expect(await markChangesStale(f.ctx, { ...args, locationKey: 'old' })).toBe(
+      false,
+    )
+    expect(
+      await markChangesStale(f.ctx, {
+        ...args,
+        locationKey: ready.locationKey!,
+      }),
+    ).toBe(true)
+    expect(await changeSummary(f.ctx, summaryArgs)).toMatchObject({
+      phase: 'stale',
+      canRestore: false,
+      fileCount: 1,
+    })
+    expect(f.rows('changeFiles')).toHaveLength(1)
+    await expect(
+      restoreChanges(f.ctx, {
+        changeSetId: row._id,
+        revision: 0,
+        direction: 'reapply',
+      }),
+    ).rejects.toThrow('changed location')
   })
 
   test('hides warning-only publications, including existing ready summaries with no files', async () => {

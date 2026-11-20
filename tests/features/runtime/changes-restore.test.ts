@@ -3,7 +3,7 @@ import { restoreChanges } from '@cv/convex/actions/session/changes'
 import { expect, test } from 'bun:test'
 import { getFunctionName } from 'convex/server'
 
-function fixture(paths?: readonly string[], failure?: string) {
+function fixture(paths?: readonly string[], failure?: string, stale = false) {
   const requests: Record<string, unknown>[] = []
   const results: Record<string, unknown>[] = []
   const server = Bun.serve({
@@ -18,6 +18,7 @@ function fixture(paths?: readonly string[], failure?: string) {
           issues: ['Skipped locked.txt'],
         },
         conflicts: [],
+        ...(stale && { stale }),
       })
     },
   })
@@ -30,20 +31,22 @@ function fixture(paths?: readonly string[], failure?: string) {
     sources: [{ id: 'primary', path: '/project', label: 'Project' }],
   }
   const args = { changeSetId: 'changes' as never, operationId: 'revert' }
+  const row = {
+    _id: args.changeSetId,
+    sessionId: 'session',
+    operationId: args.operationId,
+    phase: 'restoring',
+    direction: 'revert',
+    revision: 0,
+    workspace,
+  }
   const ctx = {
     async runQuery(reference: Parameters<typeof getFunctionName>[0]) {
       switch (getFunctionName(reference)) {
         case 'chat:_getChangeSet':
-          return {
-            _id: args.changeSetId,
-            sessionId: 'session',
-            operationId: args.operationId,
-            direction: 'revert',
-            revision: 0,
-            workspace,
-          }
+          return row
         case 'chat:_changesRestoreContext':
-          return { workspace, agents: [] }
+          return { row, workspace, agents: [] }
         case 'sessions:_getApprovals':
           return { paths }
         default:
@@ -103,6 +106,16 @@ test('publishes the restore failure message without its serialized error envelop
   try {
     await f.run()
     expect(f.results[0].error).toBe(message)
+  } finally {
+    f.close()
+  }
+})
+
+test('publishes a stale checkpoint result from the sidecar', async () => {
+  const f = fixture(undefined, undefined, true)
+  try {
+    await f.run()
+    expect(f.results[0]).toMatchObject({ stale: true })
   } finally {
     f.close()
   }

@@ -8,6 +8,7 @@ import {
 import { useTurnChanges } from '@/hooks/chat/changes'
 import { useScrollIntoView } from '@/hooks/chat/scroll-into-view'
 import type { Id } from '@cv/convex/_generated/dataModel'
+import { CHECKPOINT_LOCATION_CHANGED } from '@cv/core/types/changes'
 import type { ChangedFile } from '@cv/core/types/changes'
 import {
   ChevronDownIcon,
@@ -34,10 +35,16 @@ export function ChangesSummary({
   messageId: string
   version: number
 }) {
-  const { summary, files, loadMore, fileStatus, act, error } = useTurnChanges(
-    messageId,
-    version,
-  )
+  const {
+    summary,
+    files,
+    loadMore,
+    fileStatus,
+    act,
+    error,
+    stale,
+    checkingLocation,
+  } = useTurnChanges(messageId, version)
   const growOnly = useGrowOnly()
   const messageList = useMessageList()
   const [showAll, setShowAll] = useState(false)
@@ -45,7 +52,9 @@ export function ChangesSummary({
   const [revealKey, setRevealKey] = useState<string>()
   const [hovered, setHovered] = useState<string>()
   const loadsFiles =
-    summary?.phase === 'ready' || summary?.phase === 'restoring'
+    summary?.phase === 'ready' ||
+    summary?.phase === 'restoring' ||
+    summary?.phase === 'stale'
   const loadingFiles = loadsFiles && fileStatus === 'LoadingFirstPage'
   usePendingMessageLayout(summary === undefined || loadingFiles)
 
@@ -112,7 +121,9 @@ export function ChangesSummary({
           <RippleButton
             variant="input"
             size="default"
-            disabled={restoring || !summary.canRestore}
+            disabled={
+              restoring || !summary.canRestore || stale || checkingLocation
+            }
             onClick={() => void act()}
           >
             {reverted ? <Redo2Icon /> : <Undo2Icon />}
@@ -210,9 +221,20 @@ export function ChangesSummary({
       {summary.issues.length > 0 && (
         <ChangeNotice
           role="status"
-          message="Some files were skipped. Other files can still be restored."
+          message={
+            stale
+              ? 'Some files were skipped.'
+              : 'Some files were skipped. Other files can still be restored.'
+          }
           warning
           details={summary.issues}
+        />
+      )}
+      {stale && (
+        <ChangeNotice
+          role="status"
+          message={CHECKPOINT_LOCATION_CHANGED}
+          warning
         />
       )}
       {problem && <ChangeNotice message={problem} />}

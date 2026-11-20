@@ -29,7 +29,7 @@ test('confirmation shows affected agents, cancels safely, and keeps usable agent
   const dialog = await openDeletion(page)
   await expect(dialog).toContainText('Affected agents:')
   await expect(dialog).toContainText('Fixture, Other')
-  await expect(dialog).not.toContainText('/fixture/managed-home')
+  await expect(dialog).not.toContainText('agents/fixture-owner/fixture-agent')
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(page.getByText('skill-00', { exact: true })).toBeVisible()
   await openDeletion(page)

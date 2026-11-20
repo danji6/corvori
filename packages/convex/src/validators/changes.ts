@@ -27,6 +27,7 @@ export const changePhaseValidator = v.union(
   v.literal('queued'),
   v.literal('ready'),
   v.literal('restoring'),
+  v.literal('stale'),
   v.literal('unavailable'),
   v.literal('empty'),
 )
@@ -110,4 +111,16 @@ export const restoreChangesResultValidator = v.object({
   conflicts: v.optional(v.array(v.string())),
   issues: v.optional(v.array(v.string())),
   error: v.optional(v.string()),
+  stale: v.optional(v.boolean()),
+})
+
+export const changesLocationContextValidator = v.object({
+  changeSetId: v.id('changeSets'),
+  subject: v.optional(v.string()),
+})
+
+export const markChangesStaleValidator = v.object({
+  changeSetId: v.id('changeSets'),
+  subject: v.string(),
+  locationKey: v.string(),
 })

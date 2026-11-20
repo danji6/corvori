@@ -13,6 +13,7 @@ const cache = new Map<string, unknown>()
 const subscriptions = new Map<string, number>()
 const params = new URLSearchParams(location.search)
 const delayed = params.has('delayed')
+const checkLocation = params.has('checkLocation')
 const binaryMode = params.get('binary')
 const ready = new Set<string>()
 const files = Array.from({ length: 8 }, (_, index) => {
@@ -35,6 +36,7 @@ let conflicts: string[] = []
 let issues: string[] = []
 let error: string | undefined
 let empty = false
+let folderMoved = false
 const notify = () => {
   cache.clear()
   for (const listener of listeners) listener()
@@ -82,6 +84,13 @@ const client = {
     phase = 'restoring'
     notify()
   },
+  async action() {
+    if (folderMoved) {
+      phase = 'stale'
+      notify()
+    }
+    return { stale: folderMoved }
+  },
 } as unknown as ConvexReactClient
 
 function result(name: string, args: Record<string, unknown>) {
@@ -97,7 +106,13 @@ function result(name: string, args: Record<string, unknown>) {
       issues,
       error,
       conflicts,
-      canRestore: true,
+      canRestore: phase !== 'stale',
+      locationKey:
+        checkLocation && phase === 'ready'
+          ? folderMoved
+            ? 'moved'
+            : 'original'
+          : undefined,
     }
   if (name === 'chat:changeFiles') {
     const { cursor, numItems } = args.paginationOpts as {
@@ -161,6 +176,16 @@ export function ChangesFixture() {
                 </button>
               ))}
             </>
+          )}
+          {checkLocation && (
+            <button
+              onClick={() => {
+                folderMoved = true
+                notify()
+              }}
+            >
+              Move fixture folder
+            </button>
           )}
           <button
             onClick={() => {

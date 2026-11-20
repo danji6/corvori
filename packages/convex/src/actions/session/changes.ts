@@ -9,6 +9,11 @@ import { internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { extractErrorMessage } from '../../errors'
+import { getSubject } from '../../functions'
+import {
+  checkpointLocationKey,
+  type restoreContext,
+} from '../../model/changeLocations'
 import { filesystemWorkspace } from '../../model/tool/sessionFilesystem'
 import type { StreamContext, StreamExecutionArgs } from '../../types'
 
@@ -67,7 +72,7 @@ export async function finishChanges(
       pendingParticipants: pending,
     })
 
-    const published = ['ready', 'empty', 'restoring'].includes(row.phase)
+    const published = ['ready', 'empty', 'restoring', 'stale'].includes(row.phase) // prettier-ignore
 
     if (result.publication && !published) {
       await publish(ctx, row._id, result.publication, !row.root)
@@ -178,6 +183,49 @@ async function publish(
   })
 }
 
+type CheckpointContext = NonNullable<Awaited<ReturnType<typeof restoreContext>>>
+
+export async function checkpointStatus(
+  ctx: ActionCtx,
+  { changeSetId }: { changeSetId: Id<'changeSets'> },
+): Promise<{ stale: boolean }> {
+  const subject = await getSubject(ctx)
+  const context = await ctx.runQuery(internal.chat._changesRestoreContext, {
+    changeSetId,
+    subject,
+  })
+  if (!context) return { stale: false }
+  if (context.row.phase === 'stale') return { stale: true }
+  if (context.row.phase !== 'ready' || !context.row.writersSettled)
+    return { stale: false }
+
+  const { stale } = await probeCheckpointLocation(context)
+  if (!stale) return { stale }
+
+  return {
+    stale: await ctx.runMutation(internal.chat._markChangesStale, {
+      changeSetId,
+      subject,
+      locationKey: await checkpointLocationKey(context.locations),
+    }),
+  }
+}
+
+function checkpointReference(row: CheckpointContext['row']) {
+  return {
+    checkpointId: row.checkpointId ?? String(row._id),
+    sessionId: row.sessionId,
+  }
+}
+
+async function probeCheckpointLocation(context: CheckpointContext) {
+  const { postSidecar } = await import('../../model/sidecar')
+  return postSidecar<{ stale: boolean }>('/checkpoints/location', {
+    ...checkpointReference(context.row),
+    locations: context.locations,
+  })
+}
+
 export async function restoreChanges(
   ctx: ActionCtx,
   args: { changeSetId: Id<'changeSets'>; operationId: string },
@@ -185,30 +233,23 @@ export async function restoreChanges(
   const row = await ctx.runQuery(internal.chat._getChangeSet, {
     changeSetId: args.changeSetId,
   })
-  if (!row || row.operationId !== args.operationId || !row.direction) {
+  if (
+    row?.phase !== 'restoring' ||
+    row.operationId !== args.operationId ||
+    !row.direction
+  ) {
     return
   }
 
   try {
     const { postSidecar } = await import('../../model/sidecar')
-    const { resolvePersonalWorkspace } = await import('../../model/skills/runtime') // prettier-ignore
-
     const context = await ctx.runQuery(internal.chat._changesRestoreContext, {
       changeSetId: row._id,
     })
     if (!context) throw new Error('Filesystem context is unavailable')
 
-    const workspaces = await Promise.all(
-      context.agents.map((agent) =>
-        resolvePersonalWorkspace(agent, context.workspace),
-      ),
-    )
-    const current =
-      workspaces.find((value) => value !== undefined) ?? context.workspace
-    const workspace = row.workspace.sessionFiles
-      ? filesystemWorkspace({ _id: row.sessionId, workspace: current })
-      : current
-    if (!workspace) throw new Error('Filesystem context is unavailable')
+    const workspaces = await restoreWorkspaces(ctx, context, args)
+    if (!workspaces) return
 
     const approvals = await ctx.runQuery(internal.sessions._getApprovals, {
       sessionId: row.sessionId,
@@ -217,13 +258,11 @@ export async function restoreChanges(
     const result = await postSidecar<RestoreChangesResult>(
       '/checkpoints/restore',
       {
-        checkpointId: row.checkpointId ?? String(row._id),
-        sessionId: row.sessionId,
+        ...checkpointReference(row),
         operationId: args.operationId,
         revision: row.revision,
         direction: row.direction,
-        workspace,
-        workspaces: workspaces.filter(Boolean),
+        ...workspaces,
         allowedPaths: approvals.paths ?? [],
       },
     )
@@ -234,6 +273,7 @@ export async function restoreChanges(
       revision: result.summary.revision,
       conflicts: result.conflicts,
       issues: result.summary.issues,
+      stale: result.stale,
     })
   } catch (error) {
     await ctx.runMutation(internal.chat._restoreChangesResult, {
@@ -241,6 +281,42 @@ export async function restoreChanges(
       error: extractErrorMessage(error),
     })
   }
+}
+
+async function restoreWorkspaces(
+  ctx: ActionCtx,
+  context: CheckpointContext,
+  args: { changeSetId: Id<'changeSets'>; operationId: string },
+) {
+  try {
+    return await resolveRestoreWorkspaces(context)
+  } catch (error) {
+    const location = await probeCheckpointLocation(context).catch(() => null)
+    if (!location?.stale) throw error
+    await ctx.runMutation(internal.chat._restoreChangesResult, {
+      ...args,
+      stale: true,
+    })
+  }
+}
+
+async function resolveRestoreWorkspaces({
+  row,
+  agents,
+  workspace: project,
+}: CheckpointContext) {
+  const { resolvePersonalWorkspace } =
+    await import('../../model/skills/runtime')
+  const resolved = await Promise.all(
+    agents.map((agent) => resolvePersonalWorkspace(agent, project)),
+  )
+  const workspaces = resolved.filter((workspace) => workspace !== undefined)
+  const current = workspaces[0] ?? project
+  const workspace = row.workspace.sessionFiles
+    ? filesystemWorkspace({ _id: row.sessionId, workspace: current })
+    : current
+  if (!workspace) throw new Error('Filesystem context is unavailable')
+  return { workspace, workspaces }
 }
 
 export async function removeChanges(

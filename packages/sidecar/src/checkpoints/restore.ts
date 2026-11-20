@@ -1,4 +1,7 @@
+import type { RestoreChangesResult } from '@cv/core/types/changes'
+
 import { installFile, restoreFiles } from './install'
+import { checkpointLocationChanged, restoreLocations } from './locations'
 import { planRestore } from './restore-plan'
 import { captureFile, sameFile } from './snapshot'
 import { type CheckpointStorage } from './storage'
@@ -9,7 +12,7 @@ export async function restore(
   storage: CheckpointStorage,
   checkpoint: Checkpoint,
   input: RestoreInput,
-) {
+): Promise<RestoreChangesResult> {
   const previous = checkpoint.operation
 
   if (previous?.id === input.operationId) {
@@ -23,6 +26,14 @@ export async function restore(
   const expectedState = input.direction === 'revert' ? 'applied' : 'reverted'
   if (checkpoint.publication.state !== expectedState) {
     throw new Error('Changes are already in the requested state')
+  }
+  if (await checkpointLocationChanged(checkpoint, restoreLocations(input))) {
+    if (!checkpoint.stale)
+      await storage.save('checkpoints', checkpoint.id, {
+        ...checkpoint,
+        stale: true,
+      })
+    return { summary: checkpoint.publication, conflicts: [], stale: true }
   }
 
   const reverting = input.direction === 'revert'

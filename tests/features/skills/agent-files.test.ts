@@ -1,3 +1,4 @@
+import { managedHomePath } from '@cv/core/skills/home-path'
 import {
   lockAgent,
   unlockAgent,
@@ -18,6 +19,7 @@ import {
   mkdtemp,
   open,
   readFile,
+  rename,
   rm,
   stat,
   symlink,
@@ -318,7 +320,7 @@ test('managed home authority rejects a substituted directory symlink', async () 
   ).rejects.toThrow('Symlink')
 })
 
-test('a publish interrupted before its acknowledgement preserves customized copies on retry', async () => {
+test('an interrupted publish can recover after storage moves and preserve edits', async () => {
   const operation = {
     id: 'recover-publish',
     kind: 'assign' as const,
@@ -333,9 +335,19 @@ test('a publish interrupted before its acknowledgement preserves customized copi
     'skills/code-review/SKILL.md',
   )
   await writeFile(copy, 'customized after publish')
-  await rm(path.join(operationRoot(operation.id), 'done.json'))
-  expect(await runFileOperation(operation)).toEqual({ ok: true })
-  expect(await readFile(copy, 'utf8')).toBe('customized after publish')
+  const previous = process.env.CHAT_SIDECAR_DATA_DIR!
+  const moved = path.join(root, 'moved-data')
+  await rename(previous, moved)
+  process.env.CHAT_SIDECAR_DATA_DIR = moved
+  try {
+    await rm(path.join(operationRoot(operation.id), 'done.json'))
+    expect(await runFileOperation(operation)).toEqual({ ok: true })
+    const relocated = path.join(moved, path.relative(previous, copy))
+    expect(await readFile(relocated, 'utf8')).toBe('customized after publish')
+  } finally {
+    process.env.CHAT_SIDECAR_DATA_DIR = previous
+    await rename(moved, previous)
+  }
 })
 
 test('interrupted home publishes reconcile their journal and preserve unrelated destination files', async () => {
@@ -364,8 +376,8 @@ test('availability checks never create missing folders, and managed selections s
   const input = { ownerId: owner, agentId: 'uninitialized', revision: 0 }
   expect((await inspectHome(input)).exists).toBe(false)
   const destination = await resolveDestination(input)
-  expect(destination.path).toBe(managedHome(owner, input.agentId))
-  await expect(stat(destination.path)).rejects.toThrow()
+  expect(destination.path).toBe(managedHomePath(owner, input.agentId))
+  await expect(stat(managedHome(owner, input.agentId))).rejects.toThrow()
 })
 
 test('changing a deleted custom source restores pristine skills even when carry-over was requested', async () => {
@@ -418,13 +430,13 @@ test('a deleted managed home can be recreated for a shared member using its orig
     ownerId: owner,
     agentId: 'shared-member',
     originAgentId: original,
-    homePath: destination,
+    homePath: managedHomePath(owner, original),
     destinationOriginAgentId: original,
-    destination,
+    destination: managedHomePath(owner, original),
     copyFiles: false,
   })
   expect(result).toEqual({
-    path: destination,
+    path: managedHomePath(owner, original),
     unchanged: false,
     sourceMissing: true,
   })

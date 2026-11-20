@@ -9,6 +9,7 @@ import {
   chmod,
   mkdir,
   readFile,
+  rename,
   rm,
   symlink,
   truncate,
@@ -102,6 +103,62 @@ describe('turn checkpoints', () => {
     expect(await readFile(path.join(f.root, 'unrelated'), 'utf8')).toBe(
       'manual',
     )
+  })
+
+  test('blocks restore when a used project root changes, even with approval for the old path', async () => {
+    const f = await fixture()
+    const target = path.join(f.root, 'changed.txt')
+    const replacement = path.join(f.base, 'replacement')
+    await mkdir(replacement)
+    await writeFile(target, 'before')
+    await f.manager.begin(f.begin)
+    await writeFile(target, 'after')
+    await f.manager.finish(f.finish)
+
+    const workspace = {
+      ...f.restore.workspace,
+      path: replacement,
+      sources: [{ ...f.restore.workspace.sources[0]!, path: replacement }],
+    }
+    const result = await f.manager.restore({
+      ...f.restore,
+      workspace,
+      allowedPaths: [target],
+    })
+    expect(result).toMatchObject({
+      stale: true,
+      conflicts: [],
+      summary: { revision: 0 },
+    })
+    expect((await f.manager.restore(f.restore)).stale).toBe(true)
+    expect(await readFile(target, 'utf8')).toBe('after')
+  })
+
+  test('can restore when a source that contributed no files moves', async () => {
+    const f = await fixture()
+    const unused = path.join(f.base, 'unused')
+    const moved = path.join(f.base, 'moved')
+    await mkdir(unused)
+    const workspace = {
+      ...f.begin.workspace,
+      sources: [
+        ...f.begin.workspace.sources,
+        { id: 'unused', path: unused, label: 'Unused' },
+      ],
+    }
+    const target = path.join(f.root, 'changed.txt')
+    await writeFile(target, 'before')
+    await f.manager.begin({ ...f.begin, workspace })
+    await writeFile(target, 'after')
+    await f.manager.finish(f.finish)
+    await rename(unused, moved)
+
+    const result = await f.manager.restore({
+      ...f.restore,
+      workspace,
+    })
+    expect(result.summary.state).toBe('reverted')
+    expect(await readFile(target, 'utf8')).toBe('before')
   })
 
   test('ignores generated files but captures explicit ignored targets and omits net-zero changes', async () => {

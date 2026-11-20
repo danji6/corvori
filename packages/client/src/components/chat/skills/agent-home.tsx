@@ -35,6 +35,7 @@ export function AgentHomeSettings({ agentId }: { agentId: Id<'agents'> }) {
   const [removing, setRemoving] = useState<'detach' | 'delete'>()
   const exists = !!home?.path && availability?.exists === true
   const missing = !!home?.path && availability?.exists === false
+  const resolvedPath = home?.managed ? availability?.path : home?.path
   const loading = home === undefined || (!!home.path && !availability)
   const busy = operation.busy || loading
   const removable = !!home?.managed && home.members.length === 1
@@ -109,10 +110,10 @@ export function AgentHomeSettings({ agentId }: { agentId: Id<'agents'> }) {
         </p>
       )}
       <div className="flex flex-wrap gap-2">
-        {home?.path && (
+        {resolvedPath && (
           <RippleButton
             variant="input"
-            onClick={() => void navigator.clipboard.writeText(home.path!)}
+            onClick={() => void navigator.clipboard.writeText(resolvedPath)}
           >
             <CopyIcon /> Copy path
           </RippleButton>
@@ -167,7 +168,7 @@ export function AgentHomeSettings({ agentId }: { agentId: Id<'agents'> }) {
       <WorkspacePickerDialog
         open={browsing}
         onOpenChange={setBrowsing}
-        initialPath={exists ? home?.path : undefined}
+        initialPath={exists ? resolvedPath : undefined}
         title="Select this agent’s personal folder"
         onSelect={(path) => select(path)}
       />

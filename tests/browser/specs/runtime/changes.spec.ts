@@ -54,6 +54,25 @@ test('previews collapsed files while other diffs stay expanded', async ({
     .toBeLessThan(expandedHeight)
 })
 
+test('disables restoring after a folder move and keeps the diff readable', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=changes&checkLocation')
+  const summary = page.getByRole('region', { name: 'Agent changes' })
+  const revert = summary.getByRole('button', { name: 'Revert changes' })
+  await expect(revert).toBeEnabled()
+
+  await page.getByRole('button', { name: 'Move fixture folder' }).click()
+  await expect(revert).toBeDisabled()
+  await expect(
+    summary.getByText('A folder used by this checkpoint changed location.'),
+  ).toBeVisible()
+  await summary.getByRole('button', { name: 'src/file-1.ts' }).click()
+  await expect(
+    summary.getByText('before file-1', { exact: true }),
+  ).toBeVisible()
+})
+
 test('toggles all listed diffs from the summary footer', async ({ page }) => {
   await page.goto('/?fixture=changes')
   const summary = page.getByRole('region', { name: 'Agent changes' })

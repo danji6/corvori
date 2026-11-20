@@ -1,3 +1,4 @@
+import { CHECKPOINT_LOCATION_CHANGED } from '@cv/core/types/changes'
 import type { PaginationOptions } from 'convex/server'
 
 import { internal } from '../_generated/api'
@@ -17,10 +18,14 @@ import type {
   RestoreChangesArgs,
   RestoreChangesResultArgs,
 } from '../types'
+import {
+  checkpointAgents,
+  checkpointLocationKey,
+  checkpointLocations,
+} from './changeLocations'
 import { agentIdentity } from './chat/identities'
 import { insertMessage } from './messageContents'
 import { requireEnabled, requireMember } from './session/memberships'
-import { agentWithHome } from './skills/homes'
 import { ownsExecution, scheduleStream } from './stream/execution'
 
 /** Reserves one capture identity across retries, handoffs and split segments. */
@@ -103,7 +108,7 @@ export async function captureIssue(
   args: { changeSetId: Id<'changeSets'>; message: string },
 ) {
   const row = await ctx.db.get(args.changeSetId)
-  if (!row) return
+  if (!row || row.phase === 'stale') return
   const published = row.phase === 'ready' || row.phase === 'restoring'
   await ctx.db.patch(row._id, {
     phase: published ? row.phase : 'unavailable',
@@ -234,7 +239,8 @@ export async function appendChanges(ctx: MutationCtx, args: AppendChangesArgs) {
     !row ||
     !(await ctx.db.get(row.sessionId)) ||
     row.phase === 'ready' ||
-    row.phase === 'restoring'
+    row.phase === 'restoring' ||
+    row.phase === 'stale'
   ) {
     return discardUploads(ctx, args.files)
   }
@@ -268,7 +274,7 @@ export async function publishChanges(
 ) {
   const row = await ctx.db.get(args.changeSetId)
 
-  if (!row || row.phase === 'ready' || row.phase === 'restoring') {
+  if (!row || ['ready', 'restoring', 'stale'].includes(row.phase)) {
     return
   }
   if (row.fileCount !== args.fileCount) {
@@ -296,8 +302,12 @@ export async function settleCapture(
   args: { changeSetId: Id<'changeSets'> },
 ) {
   const row = await ctx.db.get(args.changeSetId)
-  if (row && !['ready', 'restoring', 'unavailable'].includes(row.phase))
+  if (
+    row &&
+    !['ready', 'restoring', 'stale', 'unavailable'].includes(row.phase)
+  ) {
     await ctx.db.patch(row._id, { phase: 'empty' })
+  }
 }
 
 export async function changeSummary(
@@ -307,7 +317,7 @@ export async function changeSummary(
   const message = await ctx.db.get(args.messageId)
   if (!message) return null
 
-  await requireMember(ctx, message.sessionId, ctx.userId)
+  const { session } = await requireMember(ctx, message.sessionId, ctx.userId)
 
   const row = await ctx.db
     .query('changeSets')
@@ -327,10 +337,21 @@ export async function changeSummary(
     .collect()
 
   const writing = group.some((item) => !item.writersSettled)
+  const canRestore = row.phase === 'ready' && ctx.role === 'admin' && !writing
+  const locationKey = canRestore
+    ? await checkpointLocationKey(
+        checkpointLocations(
+          row,
+          session.workspace,
+          await checkpointAgents(ctx, group),
+        ),
+      )
+    : undefined
 
   return {
     ...row,
-    canRestore: ctx.role === 'admin' && !writing,
+    canRestore,
+    locationKey,
   }
 }
 
@@ -368,6 +389,7 @@ export async function restoreChanges(
   if (row.phase === 'restoring') {
     return
   }
+  if (row.phase === 'stale') error(CHECKPOINT_LOCATION_CHANGED, 409)
   if (row.phase !== 'ready') {
     error('Checkpoint is unavailable', 409)
   }
@@ -400,9 +422,9 @@ export async function restoreResult(
   args: RestoreChangesResultArgs,
 ) {
   const row = await ctx.db.get(args.changeSetId)
-  if (!row || row.operationId !== args.operationId) return
+  if (row?.phase !== 'restoring' || row.operationId !== args.operationId) return
   await ctx.db.patch(row._id, {
-    phase: 'ready',
+    phase: args.stale ? 'stale' : 'ready',
     state: args.state ?? row.state,
     revision: args.revision ?? row.revision,
     conflicts: args.conflicts ?? [],
@@ -469,36 +491,6 @@ export async function scheduleSettleChanges(
     internal.actions.workspaces._settleChanges,
     { ...args, sequence: 0 },
   )
-}
-
-export async function restoreContext(
-  ctx: QueryCtx,
-  args: { changeSetId: Id<'changeSets'> },
-) {
-  const row = await ctx.db.get(args.changeSetId)
-  if (!row) return null
-  if (!row.requestedBy) error('Restore requester is missing', 409)
-
-  const requester = await ctx.db.get(row.requestedBy)
-  requireRole(requester?.role, 'admin')
-  const { session } = await requireMember(ctx, row.sessionId, row.requestedBy)
-  requireEnabled(session)
-
-  const group = await ctx.db
-    .query('changeSets')
-    .withIndex('by_groupId', (q) => q.eq('groupId', row.groupId))
-    .collect()
-
-  const agents = await Promise.all(
-    [...new Set(group.map((item) => item.agentId))].map((id) =>
-      agentWithHome(ctx, id),
-    ),
-  )
-
-  return {
-    workspace: session.workspace,
-    agents: agents.filter((agent) => agent !== null),
-  }
 }
 
 export async function changeFiles(

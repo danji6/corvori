@@ -26,4 +26,8 @@ export type ChangePublication = ChangeSummary & {
 export type RestoreChangesResult = {
   summary: ChangeSummary
   conflicts: string[]
+  stale?: boolean
 }
+
+export const CHECKPOINT_LOCATION_CHANGED =
+  'A folder used by this checkpoint changed location.'

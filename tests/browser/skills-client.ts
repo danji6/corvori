@@ -38,6 +38,8 @@ let home = {
 let homeExists = false
 let lastOperation: Record<string, unknown> = {}
 let sequence = 0
+const managedHomeReference = 'agents/fixture-owner/fixture-agent'
+const managedHomePath = `/fixture/.data/sidecar/${managedHomeReference}`
 let failNext = false
 let failVerification = false
 const missingLibraryData = new Set(['skill-0', 'skill-84'])
@@ -62,7 +64,7 @@ export function setFixtureHome(managed: boolean) {
   home = {
     ...home,
     managed,
-    path: managed ? '/fixture/managed-home' : '/fixture/custom-home',
+    path: managed ? managedHomeReference : '/fixture/custom-home',
   }
   homeExists = true
   update()
@@ -114,7 +116,7 @@ function query(name: string, args: Record<string, unknown>) {
         ? [
             {
               id: home.homeId,
-              path: home.path ?? '/fixture/managed-home',
+              path: home.path ?? managedHomeReference,
               agents: home.members,
             },
           ]
@@ -161,7 +163,7 @@ function apply(args: Record<string, unknown>) {
   if (args.kind === 'ensure') {
     home = {
       ...home,
-      path: '/fixture/managed-home',
+      path: managedHomeReference,
       managed: true,
     }
     homeExists = true
@@ -175,7 +177,7 @@ function apply(args: Record<string, unknown>) {
     homeExists = true
     home = {
       ...home,
-      path: String(args.destination ?? '/fixture/managed-home'),
+      path: String(args.destination ?? managedHomeReference),
       managed: !args.destination,
     }
   }
@@ -321,7 +323,9 @@ const client = {
     }
     if (name === 'actions/skills:homeStatus') {
       await new Promise((resolve) => setTimeout(resolve, 400))
-      return { exists: homeExists }
+      const path =
+        home.path === managedHomeReference ? managedHomePath : home.path
+      return { exists: homeExists, path }
     }
     if (name === 'actions/skills:desktop')
       return { supported: false, machine: 'fixture' }

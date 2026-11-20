@@ -180,14 +180,14 @@ export async function openFolder(
 export async function homeStatus(
   ctx: ActionCtx,
   agentId: Id<'agents'>,
-): Promise<{ exists: boolean }> {
+): Promise<{ exists: boolean; path?: string }> {
   const { api } = await import('../../_generated/api')
 
   const home = await ctx.runQuery(api.skills.getHome, { agentId })
   const agent = await ctx.runQuery(internal.skills._agent, { agentId })
   if (!agent || !home.path) return { exists: false }
 
-  return postSidecar<{ exists: boolean }>('/agent-files/status', {
+  return postSidecar<{ exists: boolean; path: string }>('/agent-files/status', {
     ownerId: agent.ownerId,
     agentId,
     originAgentId: agent.home?.originAgentId,

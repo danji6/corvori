@@ -1,3 +1,4 @@
+import { managedHomePath } from '@cv/core/skills/home-path'
 import { SKILL_NAME_PATTERN } from '@cv/core/skills/names'
 import type { AgentHome } from '@cv/core/skills/types'
 import { createWriteStream } from 'node:fs'
@@ -30,7 +31,10 @@ import {
   libraryRoot,
   managedHome,
   operationRoot,
+  requestedHome,
   resolveHome,
+  restorePath,
+  storePath,
 } from './storage'
 import { stripUploadHeader } from './upload'
 import { extractSkillZip } from './zip'
@@ -288,21 +292,17 @@ async function prepareHome(input: FileOperation) {
     revision: 0,
   })
 
-  const destination = await resolveHome(
-    input.ownerId,
-    input.destinationOriginAgentId ?? input.agentId!,
-    input.destination ===
-      managedHome(
-        input.ownerId,
-        input.destinationOriginAgentId ?? input.agentId!,
-      )
+  const origin = input.destinationOriginAgentId ?? input.agentId!
+  const target = requestedHome(input.ownerId, origin, input.destination)
+  const override =
+    target === managedHome(input.ownerId, origin)
       ? undefined
-      : input.destination,
-    true,
-  )
+      : input.destination
+  const destination = await resolveHome(input.ownerId, origin, override, true)
+  const stored = storePath(destination)
 
   if (source.exists && source.path === destination)
-    return { path: destination, unchanged: true, sourceMissing: false }
+    return { path: stored, unchanged: true, sourceMissing: false }
 
   if (
     source.path !== destination &&
@@ -320,7 +320,7 @@ async function prepareHome(input: FileOperation) {
     await mkdir(staging, { recursive: true })
   }
 
-  return { path: destination, unchanged: false, sourceMissing: !source.exists }
+  return { path: stored, unchanged: false, sourceMissing: !source.exists }
 }
 
 async function publishHome(input: FileOperation) {
@@ -334,7 +334,7 @@ async function publishHome(input: FileOperation) {
   if (!prepared.unchanged) {
     await publishTree(
       path.join(operationRoot(input.homeOperationId!), 'home'),
-      prepared.path,
+      restorePath(prepared.path),
       operationRoot(input.id),
     )
   }
@@ -365,11 +365,10 @@ async function duplicateHome(input: FileOperation) {
     }
   }
 
-  await publishDirectory(staging, target, operationRoot(input.id), {
-    path: target,
-  })
+  const result = { path: storePath(target) }
+  await publishDirectory(staging, target, operationRoot(input.id), result)
 
-  return { path: target }
+  return result
 }
 
 export async function homeInfo(
@@ -387,11 +386,10 @@ export async function homeInfo(
 
 /** Removes only the exact managed root reserved by the authenticated backend. */
 async function removeManagedHome(input: FileOperation) {
-  const target = managedHome(
-    input.ownerId,
-    input.originAgentId ?? input.agentId!,
-  )
-  if (input.homePath && path.resolve(input.homePath) !== target)
+  const origin = input.originAgentId ?? input.agentId!
+  const target = managedHome(input.ownerId, origin)
+  const stored = managedHomePath(input.ownerId, origin)
+  if (input.homePath && input.homePath !== stored && input.homePath !== target)
     throw new Error('Cleanup target is not a managed folder')
   await assertPlainPath(target)
   try {

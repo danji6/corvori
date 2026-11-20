@@ -1,7 +1,7 @@
 import { lstat, readFile, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { assertPlainPath, isMissing } from './storage'
+import { assertPlainPath, isMissing, restorePath, storePath } from './storage'
 
 type PublishIntent = {
   target: string
@@ -24,11 +24,12 @@ export async function recoverDirectoryPublish(
     throw error
   }
 
-  await assertPlainPath(intent.target)
+  const filename = restorePath(intent.target)
+  await assertPlainPath(filename)
 
   let target
   try {
-    target = await lstat(intent.target, { bigint: true })
+    target = await lstat(filename, { bigint: true })
   } catch (error) {
     if (isMissing(error)) return null
     throw error
@@ -62,7 +63,7 @@ export async function publishDirectory(
 
   const info = await lstat(source, { bigint: true })
   const intent: PublishIntent = {
-    target,
+    target: storePath(target),
     device: info.dev.toString(),
     inode: info.ino.toString(),
     result,

@@ -33,6 +33,7 @@ export type Checkpoint = {
   roots: string[]
   files: CheckpointFile[]
   publication: ChangePublication
+  stale?: true
   operation?: { id: string; direction: 'revert' | 'reapply' }
 }
 

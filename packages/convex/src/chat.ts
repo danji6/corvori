@@ -3,6 +3,7 @@ import { v } from 'convex/values'
 
 import { internalMutation, internalQuery } from './_generated/server'
 import { authMutation, authQuery } from './functions'
+import * as ChangeLocations from './model/changeLocations'
 import * as Changes from './model/changes'
 import * as Chat from './model/chat'
 import * as ChangesV from './validators/changes'
@@ -298,8 +299,13 @@ export const _changesFinishContext = internalQuery({
 })
 
 export const _changesRestoreContext = internalQuery({
-  args: { changeSetId: v.id('changeSets') },
-  handler: Changes.restoreContext,
+  args: ChangesV.changesLocationContextValidator.fields,
+  handler: ChangeLocations.restoreContext,
+})
+
+export const _markChangesStale = internalMutation({
+  args: ChangesV.markChangesStaleValidator.fields,
+  handler: ChangeLocations.markChangesStale,
 })
 
 export const changeFiles = authQuery({

@@ -65,6 +65,12 @@ export const _restoreChanges = internalAction({
     (await import('./session/changes')).restoreChanges(ctx, args),
 })
 
+export const checkpointStatus = action({
+  args: { changeSetId: v.id('changeSets') },
+  handler: async (ctx, args): Promise<{ stale: boolean }> =>
+    (await import('./session/changes')).checkpointStatus(ctx, args),
+})
+
 export const _removeChanges = internalAction({
   args: { sessionId: v.id('sessions') },
   handler: async (ctx, args) =>

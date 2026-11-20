@@ -1,3 +1,4 @@
+import { managedHomePath } from '@cv/core/skills/home-path'
 import { createReadStream, createWriteStream, realpathSync } from 'node:fs'
 import { chmod, lstat, mkdir, opendir, realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
@@ -38,10 +39,39 @@ export function identifier(value: string) {
 export function managedHome(ownerId: string, agentId: string) {
   return path.join(
     dataRoot(),
-    'agents',
-    identifier(ownerId),
-    identifier(agentId),
+    managedHomePath(identifier(ownerId), identifier(agentId)),
   )
+}
+
+/** Stores paths inside sidecar data relative to its current root. */
+export function storePath(target: string) {
+  const root = dataRoot()
+  return inside(root, target)
+    ? path.relative(root, target).split(path.sep).join('/')
+    : target
+}
+
+/** Resolves an internal stored path, preserving absolute external paths. */
+export function restorePath(stored: string) {
+  if (path.isAbsolute(stored)) return stored
+  const root = dataRoot()
+  const target = path.resolve(root, stored)
+  if (!inside(root, target))
+    throw new Error('Stored path escapes server storage')
+  return target
+}
+
+/** Resolves a home reference only for its authorized storage identity. */
+export function requestedHome(
+  ownerId: string,
+  agentId: string,
+  stored?: string,
+) {
+  const managed = managedHome(ownerId, agentId)
+  if (!stored || stored === managedHomePath(ownerId, agentId)) return managed
+  const custom = expandHome(stored)
+  if (!path.isAbsolute(custom)) throw new Error('Invalid personal home path')
+  return path.resolve(custom)
 }
 
 export function libraryRoot(ownerId: string, skillId: string) {
@@ -91,9 +121,7 @@ export async function resolveHome(
   override?: string,
   selecting = false,
 ) {
-  const requested = override
-    ? path.resolve(expandHome(override))
-    : managedHome(ownerId, agentId)
+  const requested = requestedHome(ownerId, agentId, override)
 
   if (!override) {
     await assertPlainPath(requested)

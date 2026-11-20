@@ -1,6 +1,6 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
 import type { ActionCtx } from '@cv/convex/_generated/server'
-import { fail } from '@cv/convex/model/skills/completion'
+import { complete, fail } from '@cv/convex/model/skills/completion'
 import * as Endpoints from '@cv/convex/model/skills/endpoints'
 import { claimExecution } from '@cv/convex/model/skills/execution'
 import { run } from '@cv/convex/model/skills/filesAction'
@@ -10,16 +10,25 @@ import { assignmentLibrary } from '@cv/convex/model/skills/library'
 import { removeDeletedAssignment } from '@cv/convex/model/skills/libraryDeletion'
 import { start } from '@cv/convex/model/skills/operations'
 import { cleanupRecords } from '@cv/convex/model/skills/removal'
+import { managedHomePath } from '@cv/core/skills/home-path'
 import { lockAgent, unlockAgent } from '@cv/sidecar/agent-files/access'
 import { resolveDestination } from '@cv/sidecar/agent-files/destination'
+import { homePath, inspectHome } from '@cv/sidecar/agent-files/home-state'
 import { homeInfo, runFileOperation } from '@cv/sidecar/agent-files/operations'
 import { libraryRoot, managedHome } from '@cv/sidecar/agent-files/storage'
 import { expect, test } from 'bun:test'
 import { getFunctionName } from 'convex/server'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { completeFileOperation as complete } from '~/tests/helpers/file-operations'
 import { skillsDatabase } from '~/tests/helpers/skills-db'
 
 const agentId = 'agent' as Id<'agents'>
@@ -70,6 +79,8 @@ async function fixture(
       return Response.json(await runFileOperation(input))
     if (route === '/agent-files/home')
       return Response.json(await homeInfo(input))
+    if (route === '/agent-files/path')
+      return Response.json({ path: homePath(input) })
     throw new Error(`Unexpected sidecar route: ${route}`)
   }) as typeof fetch
   try {
@@ -112,7 +123,10 @@ function actionContext({ ctx }: ReturnType<typeof skillsDatabase>): ActionCtx {
 
 async function assign(f: ReturnType<typeof skillsDatabase>) {
   const created = await ensureHome(f.ctx, (await f.ctx.db.get(agentId))!)
-  await f.ctx.db.patch(created._id, { path: managedHome('owner', agentId) })
+  if (!created.path)
+    await f.ctx.db.patch(created._id, {
+      path: managedHomePath('owner', agentId),
+    })
   const home = (await f.ctx.db.get(created._id))!
   await f.ctx.db.insert('agentSkills', {
     homeId: home._id,
@@ -136,8 +150,12 @@ test('durable initialization recreates a missing shared managed home with all pr
     expect((await f.ctx.db.get(agentId))?.homeId).toBe(home._id)
     expect((await f.ctx.db.get(other))?.homeId).toBe(home._id)
     expect(f.rows('agentHomes')).toHaveLength(1)
+    expect((await f.ctx.db.get(home._id))?.path).toBe(home.path)
     expect(
-      await readFile(path.join(home.path!, 'skills/review/SKILL.md'), 'utf8'),
+      await readFile(
+        path.join(managedHome('owner', agentId), 'skills/review/SKILL.md'),
+        'utf8',
+      ),
     ).toContain('Pristine instructions')
   })
 })
@@ -179,18 +197,49 @@ test('durable folder changes recover a missing custom source and carry its assig
   })
 })
 
-test('durable managed-folder deletion detaches the agent and removes its assignments after disk cleanup', async () => {
+test('managed homes resolve and can be deleted after the data directory moves', async () => {
   await fixture(async (f) => {
+    const initial = await start(f.ctx, { kind: 'ensure', agentId })
+    await run(actionContext(f), { operationId: initial, attempt: 1 })
+    expect((await f.ctx.db.get(initial))?.state.phase).toBe('done')
+    const homeId = (await f.ctx.db.get(agentId))!.homeId!
+    expect((await f.ctx.db.get(homeId))?.path).toBe('agents/owner/agent')
     const home = await assign(f)
-    await mkdir(home.path!, { recursive: true })
-    await writeFile(path.join(home.path!, 'note.txt'), 'User file')
+    const folder = managedHome('owner', agentId)
+    await writeFile(path.join(folder, 'note.txt'), 'User file')
+
+    const originalData = process.env.CHAT_SIDECAR_DATA_DIR!
+    const movedData = path.join(path.dirname(originalData), 'relocated')
+    await rename(originalData, movedData)
+    process.env.CHAT_SIDECAR_DATA_DIR = movedData
+
+    const relocated = managedHome('owner', agentId)
+    const stored = (await f.ctx.db.get(home._id))?.path
+    expect(stored).toBe('agents/owner/agent')
+    expect(
+      await inspectHome({
+        ownerId: 'owner',
+        agentId,
+        path: stored,
+        revision: 0,
+      }),
+    ).toEqual({ path: relocated, exists: true })
+    expect(await readFile(path.join(relocated, 'note.txt'), 'utf8')).toBe(
+      'User file',
+    )
+    f.rows('sessionCache').push({ _id: 'cache', sessionId: 'session', agentId })
+    f.rows('sessionState').push({
+      _id: 'state',
+      sessionId: 'session',
+      toolApprovals: { paths: [path.join(relocated, 'note.txt'), '/project'] },
+    })
     const operationId = await start(f.ctx, {
       kind: 'detach',
       agentId,
       removeFolder: true,
     })
     await run(actionContext(f), { operationId, attempt: 1 })
-    expect((await f.ctx.db.get(operationId))?.state.phase).not.toBe('failed')
+    expect((await f.ctx.db.get(operationId))?.state.phase).toBe('invalidating')
     await invalidateHomeCaches(f.ctx, {
       operationId,
       attempt: 1,
@@ -198,7 +247,10 @@ test('durable managed-folder deletion detaches the agent and removes its assignm
     })
     await cleanupRecords(f.ctx, { operationId, attempt: 1 })
     expect((await f.ctx.db.get(agentId))?.homeId).toBeUndefined()
-    await expect(readFile(path.join(home.path!, 'note.txt'))).rejects.toThrow()
+    await expect(stat(relocated)).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(f.rows('sessionState')[0]?.toolApprovals).toEqual({
+      paths: ['/project'],
+    })
     expect(f.rows('agentSkills')).toHaveLength(0)
     expect(f.rows('agentHomes')).toHaveLength(0)
   })
@@ -206,8 +258,8 @@ test('durable managed-folder deletion detaches the agent and removes its assignm
 
 test('durable keep-copies deletion preserves edited skills through a fresh folder transition', async () => {
   await fixture(async (f) => {
-    const home = await assign(f)
-    const skill = path.join(home.path!, 'skills', 'review')
+    await assign(f)
+    const skill = path.join(managedHome('owner', agentId), 'skills', 'review')
     await mkdir(skill, { recursive: true })
     await writeFile(path.join(skill, 'SKILL.md'), 'Agent-edited instructions')
     await writeFile(path.join(skill, 'notes.txt'), 'Agent notes')

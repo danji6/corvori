@@ -6,6 +6,10 @@ import {
   withFilesystemOperation,
   workspaceContextSchema,
 } from '../mcp/workspace/context'
+import {
+  checkpointLocationChanged,
+  checkpointLocationsSchema,
+} from './locations'
 import { checkpoints } from './manager'
 
 const beginSchema = z.object({
@@ -34,6 +38,13 @@ const restoreSchema = z.object({
   workspaces: z.array(workspaceContextSchema).optional(),
   allowedPaths: z.array(z.string()),
 })
+
+const locationSchema = restoreSchema
+  .pick({
+    checkpointId: true,
+    sessionId: true,
+  })
+  .extend({ locations: checkpointLocationsSchema })
 
 export const checkpointRoutes = new Hono()
   .post('/begin', async (c) => {
@@ -73,6 +84,19 @@ export const checkpointRoutes = new Hono()
       return c.json(
         await withRestoreScopes(input, () => checkpoints().restore(input)),
       )
+    } catch (error) {
+      return ioError(c, error)
+    }
+  })
+  .post('/location', async (c) => {
+    try {
+      const input = locationSchema.parse(await c.req.json())
+      const checkpoint = await checkpoints().read(input.checkpointId)
+      if (!checkpoint || checkpoint.sessionId !== input.sessionId)
+        throw new Error('Checkpoint not found')
+      return c.json({
+        stale: await checkpointLocationChanged(checkpoint, input.locations),
+      })
     } catch (error) {
       return ioError(c, error)
     }

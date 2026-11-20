@@ -152,16 +152,24 @@ export const reserveDestination = async (
   args: ReserveHomeArgs,
 ) => {
   const op = await ctx.db.get(args.operationId)
+
   const expired =
     !isExecutingOperation(op, args.attempt) ||
     (op.kind !== 'home' && op.kind !== 'ensure')
   if (expired) error('Folder operation expired', 409)
+
   if (op.reservation) return resumeDestination(ctx, op, args.path)
+
   const home = await resolveDestination(ctx, op, args)
   const joined = !!home && home._id !== op.homeId
   const target = home ?? (await createDestination(ctx, op, args.path))
+
   await ctx.db.patch(target._id, { operationId: op._id })
-  await ctx.db.patch(op._id, { reservation: { homeId: target._id, joined } })
+  await ctx.db.patch(op._id, {
+    reservation: { homeId: target._id, joined },
+    ...(op.kind === 'home' && args.insideData && { destination: args.path }),
+  })
+
   return { home: target, joined }
 }
 

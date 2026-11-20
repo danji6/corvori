@@ -1,7 +1,9 @@
+import { managedHome } from '@cv/sidecar/agent-files/storage'
 import { snapshot } from '@cv/sidecar/checkpoints/snapshot'
+import { sessionDirectory } from '@cv/sidecar/session-files/storage'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { execFile } from 'node:child_process'
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { checkpointFixture } from '~/tests/helpers/turn-checkpoints'
@@ -16,6 +18,60 @@ afterEach(async () => {
 const fixture = () => checkpointFixture(cleanup)
 
 describe('checkpoint capture roots', () => {
+  test.each(['session', 'agent'] as const)(
+    'marks a checkpoint stale when its %s root moves with the data directory',
+    async (scope) => {
+      const f = await fixture()
+      const before = path.join(f.base, 'before')
+      const after = path.join(f.base, 'after')
+      const previous = process.env.CHAT_SIDECAR_DATA_DIR
+      const workspace = () => ({
+        ...f.begin.workspace,
+        ...(scope === 'session'
+          ? { sessionFiles: true }
+          : {
+              agentHome: {
+                ownerId: 'owner',
+                agentId: 'agent',
+                path: managedHome('owner', 'agent'),
+                revision: 0,
+              },
+            }),
+      })
+      const root = () =>
+        scope === 'session'
+          ? sessionDirectory(f.begin.sessionId)
+          : managedHome('owner', 'agent')
+      try {
+        process.env.CHAT_SIDECAR_DATA_DIR = path.join(
+          before,
+          '.data',
+          'sidecar',
+        )
+        const target = path.join(root(), 'notes.txt')
+        await mkdir(path.dirname(target), { recursive: true })
+        await writeFile(target, 'before')
+        await f.manager.begin({ ...f.begin, workspace: workspace() })
+        await writeFile(target, 'after')
+        await f.manager.finish(f.finish)
+
+        await rename(before, after)
+        process.env.CHAT_SIDECAR_DATA_DIR = path.join(after, '.data', 'sidecar')
+        const result = await f.manager.restore({
+          ...f.restore,
+          workspace: workspace(),
+        })
+        expect(result.stale).toBe(true)
+        expect(await readFile(path.join(root(), 'notes.txt'), 'utf8')).toBe(
+          'after',
+        )
+      } finally {
+        if (previous === undefined) delete process.env.CHAT_SIDECAR_DATA_DIR
+        else process.env.CHAT_SIDECAR_DATA_DIR = previous
+      }
+    },
+  )
+
   test('captures an agent home ignored by its enclosing project and preserves local ignores through undo/redo', async () => {
     const f = await fixture()
     await execute('git', ['init', '-q', f.root])

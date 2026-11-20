@@ -1,5 +1,6 @@
 'use node'
 
+import { managedHomePath } from '@cv/core/skills/home-path'
 import { SKILL_PAGE_SIZE } from '@cv/core/skills/types'
 import type { AgentHome } from '@cv/core/skills/types'
 import { errorMessage } from '@cv/core/utils/errors'
@@ -36,11 +37,13 @@ export async function run(ctx: ActionCtx, args: OperationAttemptArgs) {
   const locked: string[] = []
   try {
     await lockResources(data, token, locked)
+    const previousPath = await previousManagedPath(data)
     const result = await execute(ctx, data, token, locked)
     if (!result) return
     const done = await ctx.runMutation(internal.skills._complete, {
       ...args,
       result,
+      previousPath,
     })
     if (done && data.kind === 'install') await deleteImportedUpload(ctx, data)
   } catch (cause) {
@@ -55,6 +58,20 @@ export async function run(ctx: ActionCtx, args: OperationAttemptArgs) {
       )
     }
   }
+}
+
+async function previousManagedPath(data: ExecutionContext) {
+  if (data.kind !== 'home' && data.kind !== 'detach') return
+  if (!data.home.managed || !data.home.path) return
+
+  const { path } = await postSidecar<{ path: string }>('/agent-files/path', {
+    ownerId: data.operation.ownerId,
+    agentId: data.agent._id,
+    originAgentId: data.home.originAgentId,
+    path: data.home.path,
+  })
+
+  return path
 }
 
 async function lockResources(
@@ -180,7 +197,11 @@ async function ensureHome(data: AgentContext) {
     originAgentId: data.home.originAgentId,
     revision: data.home.revision,
   })
-  return { path: home.path }
+  return {
+    path: data.home.managed
+      ? managedHomePath(data.operation.ownerId, data.home.originAgentId)
+      : home.path,
+  }
 }
 
 async function changeHome(
@@ -199,7 +220,9 @@ async function changeHome(
       path:
         data.kind === 'ensure' ? data.home.path : data.operation.destination,
       originAgentId:
-        data.kind === 'ensure' ? data.home.originAgentId : undefined,
+        data.kind === 'ensure'
+          ? data.home.originAgentId
+          : data.reservedOriginAgentId,
     },
   )
 

@@ -15,11 +15,10 @@ import path from 'node:path'
 import { createInterface } from 'node:readline'
 import { pipeline } from 'node:stream/promises'
 
-import { assertPlainPath, isMissing } from './storage'
+import { assertPlainPath, isMissing, restorePath, storePath } from './storage'
 
 type CreatedEntry = {
   target: string
-  temporary: string
   inode: string
   device: string
 }
@@ -119,8 +118,7 @@ async function publishFile(
     await file.sync()
     const info = await file.stat({ bigint: true })
     const entry = {
-      target,
-      temporary,
+      target: storePath(target),
       inode: info.ino.toString(),
       device: info.dev.toString(),
     }
@@ -175,7 +173,7 @@ async function readJournal(filename: string): Promise<Journal> {
     for await (const line of lines) {
       if (!line) continue
       const entry = JSON.parse(line) as CreatedEntry
-      journal.entries.set(entry.target, entry)
+      journal.entries.set(restorePath(entry.target), entry)
     }
   } finally {
     await file.close()

@@ -6,7 +6,7 @@ import {
   useQuery as useCachedQuery,
   usePaginatedQuery,
 } from 'convex-helpers/react/cache/hooks'
-import { useMutation, useQuery } from 'convex/react'
+import { useAction, useMutation, useQuery } from 'convex/react'
 import { useEffect, useState } from 'react'
 
 const diffCache = new Map<string, string>()
@@ -21,7 +21,9 @@ export function useTurnChanges(messageId: string, version: number) {
 
   const filePage = usePaginatedQuery(
     api.chat.changeFiles,
-    summary?.phase === 'ready' || summary?.phase === 'restoring'
+    summary?.phase === 'ready' ||
+      summary?.phase === 'restoring' ||
+      summary?.phase === 'stale'
       ? { changeSetId: summary._id }
       : 'skip',
     { initialNumItems: 5 },
@@ -29,9 +31,12 @@ export function useTurnChanges(messageId: string, version: number) {
 
   const restore = useMutation(api.chat.restoreChanges)
   const [error, setError] = useState<string>()
+  const location = useCheckpointLocation(summary?._id, summary?.locationKey)
+  const stale = summary?.phase === 'stale' || location?.stale === true
+  const checkingLocation = !!summary?.locationKey && !location
 
   const act = async () => {
-    if (!summary) return
+    if (!summary?.canRestore || stale || checkingLocation) return
     setError(undefined)
     try {
       await restore({
@@ -51,7 +56,47 @@ export function useTurnChanges(messageId: string, version: number) {
     fileStatus: filePage.status,
     act,
     error,
+    stale,
+    checkingLocation,
   }
+}
+
+function useCheckpointLocation(
+  changeSetId?: Id<'changeSets'>,
+  locationKey?: string,
+) {
+  const check = useAction(api.actions.workspaces.checkpointStatus)
+  const [result, setResult] = useState<{ key: string; stale: boolean }>()
+  const key = locationKey && `${changeSetId}:${locationKey}`
+
+  useEffect(() => {
+    if (!changeSetId || !key) return
+    const id = changeSetId
+    const checkedKey = key
+    let active = true
+    let checking = false
+    async function refresh() {
+      if (checking) return
+      checking = true
+      try {
+        const { stale } = await check({ changeSetId: id })
+        if (active) setResult({ key: checkedKey, stale })
+      } catch {
+        // The restore route checks again before any write.
+        if (active) setResult({ key: checkedKey, stale: false })
+      } finally {
+        checking = false
+      }
+    }
+    void refresh()
+    window.addEventListener('focus', refresh)
+    return () => {
+      active = false
+      window.removeEventListener('focus', refresh)
+    }
+  }, [changeSetId, check, key])
+
+  return result?.key === key ? result : undefined
 }
 
 /** Loads immutable previews on demand, cancelling stale requests on row changes. */

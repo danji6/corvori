@@ -97,6 +97,7 @@ export const operationResultValidator = v.union(
 export const completeAgentFileArgsValidator = v.object({
   ...attemptFields,
   result: operationResultValidator,
+  previousPath: v.optional(v.string()),
 })
 
 export const invalidateAgentHomeArgsValidator = v.object({
