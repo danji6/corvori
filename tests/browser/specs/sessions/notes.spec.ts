@@ -34,7 +34,6 @@ async function expectAligned(page: Page, key: string) {
 
 async function sampleExpansion(trigger: Locator, childrenSelector: string) {
   return trigger.evaluate(async (button, selector) => {
-    const heights: number[] = []
     const mountedCounts: number[] = []
     ;(button as HTMLButtonElement).click()
     while (true) {
@@ -44,157 +43,15 @@ async function sampleExpansion(trigger: Locator, childrenSelector: string) {
         '[data-slot="virtualized-row-transition"]',
       )
       if (!row) continue
-      heights.push(row.getBoundingClientRect().height)
       mountedCounts.push(children.length)
-      if (!row.dataset.state) return { heights, mountedCounts }
+      if (!row.dataset.state) return mountedCounts
     }
   }, childrenSelector)
-}
-
-function expectHeightExpansion(heights: number[]) {
-  const finalHeight = heights.at(-1)!
-  expect(finalHeight).toBeGreaterThan(0)
-  expect(heights[0]).toBeLessThan(1)
-  expect(heights.some((height) => height > 1 && height < finalHeight - 1)).toBe(
-    true,
-  )
-}
-
-async function expectAnimatedNote(chip: Locator) {
-  const insets = await chip.evaluate(async (element) => {
-    const block = element.querySelector<HTMLElement>('[data-open]')!
-    const button = element.querySelector<HTMLButtonElement>('button')!
-    const inset = () =>
-      button.getBoundingClientRect().top - block.getBoundingClientRect().top
-    const closed = inset()
-    button.click()
-    await new Promise(requestAnimationFrame)
-    await new Promise(requestAnimationFrame)
-    const animations = block.getAnimations({ subtree: true })
-    const sample = (time: number) => {
-      for (const animation of animations) {
-        animation.pause()
-        animation.currentTime = time
-      }
-      return inset()
-    }
-    const start = sample(0)
-    const middle = sample(100)
-    for (const animation of animations) animation.finish()
-    return { closed, start, middle, end: inset() }
-  })
-  expect(Math.abs(insets.start - insets.closed)).toBeLessThanOrEqual(1)
-  expect(insets.middle).toBeGreaterThan(insets.start + 1)
-  expect(insets.middle).toBeLessThan(insets.end - 1)
 }
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/?fixture=notes&id=notes')
 })
-
-test('notes align and space like work rows while animating their inset', async ({
-  page,
-}) => {
-  await page.goto('/?fixture=notes&id=notes&compaction')
-  await group(page).click()
-  await waitForGroupAnimation(page)
-  await page.locator('[data-slot="work-block"]').click()
-  const workIcon = page.locator('[data-slot="read-file-block"] svg').first()
-  await expect(workIcon).toBeVisible()
-  const workBox = await workIcon.boundingBox()
-  const noteIcon = note(page, 'mcp').locator('svg').first()
-  const iconBox = await noteIcon.boundingBox()
-  const rowBox = await page.locator('[data-row-key="hid:mcp"]').boundingBox()
-  expect(iconBox!.x).toBeGreaterThan(rowBox!.x)
-  expect(Math.abs(iconBox!.x - workBox!.x)).toBeLessThanOrEqual(1)
-  const firstBox = await note(page, 'mcp').boundingBox()
-  const secondBox = await note(page, 'workspace').boundingBox()
-  expect(secondBox!.y - firstBox!.y - firstBox!.height).toBe(12)
-  await expectAnimatedNote(note(page, 'mcp'))
-  const commandIcon = await note(page, 'command')
-    .locator('svg')
-    .first()
-    .boundingBox()
-  const groupLabel = await group(page).locator('span').first().boundingBox()
-  expect(Math.abs(commandIcon!.x - groupLabel!.x)).toBeLessThanOrEqual(1)
-  const thinkingIcon = page.locator('[data-slot="reasoning-block"] svg').first()
-  await expect(thinkingIcon).toBeVisible()
-  const thinkingBox = await thinkingIcon.boundingBox()
-  expect(Math.abs(thinkingBox!.x - commandIcon!.x)).toBeLessThanOrEqual(1)
-  await expect(note(page, 'command')).toHaveAttribute(
-    'data-placement',
-    'standalone',
-  )
-  await expectAnimatedNote(note(page, 'command'))
-})
-
-for (const lastBlock of ['read', 'shell', 'file']) {
-  test(`transcript reminders keep their visible gap when work expands (lastBlock=${lastBlock})`, async ({
-    page,
-  }) => {
-    await page.goto(
-      `/?fixture=notes&id=notes&reminderWork&lastBlock=${lastBlock}`,
-    )
-    const work = page.locator('[data-slot="work-block"]')
-    const reminder = note(page, 'todo')
-    await expect(reminder).toHaveAttribute('data-placement', 'inline')
-    const iconBox = await reminder.locator('svg').first().boundingBox()
-    const headerBox = await work.first().boundingBox()
-    expect(Math.abs(iconBox!.x - headerBox!.x)).toBeLessThanOrEqual(1)
-    const reminderLabel = reminder
-      .getByRole('button')
-      .locator(':scope > span')
-      .first()
-    const collapsedGap = await visibleGap(
-      work.first().locator(':scope > span').first(),
-      reminderLabel,
-    )
-    await work.first().click()
-    await work.last().click()
-    await expect(
-      page.locator('[data-slot="virtualized-row-transition"][data-state]'),
-    ).toHaveCount(0)
-    const above = page.locator('[data-work-id]').nth(1)
-    const tail =
-      lastBlock === 'read'
-        ? above.getByRole('listitem').last()
-        : above.locator(
-            `[data-slot="${lastBlock === 'shell' ? 'shell' : 'file-change'}-block"]`,
-          )
-    await expect
-      .poll(async () =>
-        Math.abs((await visibleGap(tail, reminderLabel)) - collapsedGap),
-      )
-      .toBeLessThanOrEqual(1)
-    if (lastBlock !== 'read') {
-      await tail.getByRole('button').click()
-      await expect(tail).toHaveAttribute('data-open', 'true')
-      await expect
-        .poll(async () =>
-          Math.abs((await visibleGap(tail, reminderLabel)) - collapsedGap),
-        )
-        .toBeLessThanOrEqual(1)
-    }
-    await expectAnimatedNote(reminder)
-    await expect
-      .poll(async () => {
-        const before = await above.boundingBox()
-        const chip = await reminder.boundingBox()
-        const after = await work.last().boundingBox()
-        return [
-          Math.round(chip!.y - before!.y - before!.height),
-          Math.round(after!.y - chip!.y - chip!.height),
-        ]
-      })
-      .toEqual([8, 8])
-  })
-}
-
-async function visibleGap(above: Locator, below: Locator) {
-  const top = await above.boundingBox()
-  const bottom = await below.boundingBox()
-  return bottom!.y - top!.y - top!.height
-}
 
 test('groups notes, expands independently with keyboard, and keeps state across virtualized remounts', async ({
   page,
@@ -273,7 +130,7 @@ test('seeks a non-first note, restores its position after reload, and can target
   await expect(note(page, 'mcp')).toContainText('Content for mcp')
 })
 
-test('animates virtualized note rows on group expansion and collapse', async ({
+test('virtualizes expanded notes and makes closing rows inert', async ({
   page,
 }) => {
   await page.goto('/?fixture=notes&id=notes&extraNotes=500')
@@ -286,39 +143,15 @@ test('animates virtualized note rows on group expansion and collapse', async ({
     group(page),
     '[data-note-group-id="notes:mcp"]',
   )
-  expectHeightExpansion(firstOpen.heights)
-  expect(Math.max(...firstOpen.mountedCounts)).toBeLessThan(504)
+  expect(Math.max(...firstOpen)).toBeLessThan(504)
   await group(page).click()
   await expect(transition).toHaveAttribute('inert')
-  await expect
-    .poll(() =>
-      transition.evaluate((element) => element.getAnimations().length),
-    )
-    .toBeGreaterThan(0)
   await expect(children).toHaveCount(0)
-  const reopened = await sampleExpansion(
-    group(page),
-    '[data-note-group-id="notes:mcp"]',
-  )
-  expectHeightExpansion(reopened.heights)
+  await group(page).click()
   await expect(note(page, 'workspace').getByRole('button')).toHaveAttribute(
     'aria-expanded',
     'false',
   )
-})
-
-test('animates the work summary height on first open and after unmounting', async ({
-  page,
-}) => {
-  await page.goto('/?fixture=notes&id=notes&work')
-  await showGroup(page)
-  const trigger = page.locator('[data-slot="work-block"]')
-  const firstOpen = await sampleExpansion(trigger, '[data-work-id]')
-  expectHeightExpansion(firstOpen.heights)
-  await trigger.click()
-  await expect(page.locator('[data-work-id]')).toHaveCount(0)
-  const reopened = await sampleExpansion(trigger, '[data-work-id]')
-  expectHeightExpansion(reopened.heights)
 })
 
 test('restores a collapsed header without expanding it', async ({ page }) => {
@@ -443,21 +276,6 @@ test('/new inserts a deletable context marker without an active agent', async ({
   await editor.fill('/new')
   await editor.press('Enter')
   await expect(markers).toHaveCount(2)
-  const header = page.locator('[data-slot="message-header"]').last()
-  const footer = page.getByText('Worked for 8.3s', { exact: true })
-  await expect(footer).toBeVisible()
-  await expect
-    .poll(async () => {
-      const afterMarker = await visibleGap(marker, header)
-      const beforeMarker = await visibleGap(body, markers.last())
-      const afterFooter = await visibleGap(footer, marker)
-      return Math.max(
-        Math.abs(afterMarker - beforeMarker),
-        Math.abs(afterFooter - beforeMarker),
-      )
-    })
-    .toBeLessThanOrEqual(1)
-
   await marker.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
   await page

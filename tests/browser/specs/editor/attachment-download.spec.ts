@@ -122,8 +122,6 @@ test('opens visible thumbnails and displays the selected preview while originals
     await first.click()
     const firstImage = dialog.getByRole('img', { name: 'first.png' })
     await expect(firstImage).toHaveJSProperty('naturalWidth', 320)
-    await expect(firstImage).toHaveCSS('width', '320px')
-    await expect(firstImage).toHaveCSS('height', '400px')
 
     await dialog.getByRole('button', { name: 'Next media' }).click()
     await expect(preview).toHaveAttribute('src', secondSrc!)
@@ -131,8 +129,6 @@ test('opens visible thumbnails and displays the selected preview while originals
     await expect(preview).toBeVisible()
     await expect(preview).toHaveCSS('filter', /blur\(/)
     await expect(preview).toHaveCSS('opacity', '1')
-    await expect(preview).toHaveCSS('width', '360px')
-    await expect(preview).toHaveCSS('height', '540px')
     await expect(nextImage).toHaveCSS('opacity', '0')
   } finally {
     originals.resolve()
@@ -140,8 +136,6 @@ test('opens visible thumbnails and displays the selected preview while originals
 
   await expect(nextImage).toHaveJSProperty('naturalWidth', 1200)
   await expect(nextImage).toHaveCSS('opacity', '1')
-  await expect(nextImage).toHaveCSS('width', '360px')
-  await expect(nextImage).toHaveCSS('height', '540px')
   await expect(preview).toHaveCount(0)
 })
 

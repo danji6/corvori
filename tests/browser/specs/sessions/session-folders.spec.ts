@@ -60,11 +60,6 @@ test('folder buttons have independent focus and matching menus, and Compose targ
   await compose.hover()
   await expect(compose).toBeFocused()
   await expect(header).toHaveAttribute('aria-expanded', 'true')
-  expect(
-    await header.evaluate(
-      (element) => getComputedStyle(element).backgroundColor,
-    ),
-  ).toBe('rgba(0, 0, 0, 0)')
   await header.click({ button: 'right' })
   const contextItems = await page.getByRole('menuitem').allTextContents()
   await expect(

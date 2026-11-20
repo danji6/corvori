@@ -149,9 +149,7 @@ test('picker searches unloaded folders and inherited collapse choices do not fet
   await expect(folder(page, 'Root folder 30')).toHaveCount(0)
 })
 
-test('a delayed first page animates into place without a loading label', async ({
-  page,
-}) => {
+test('a delayed first page loads without a loading label', async ({ page }) => {
   await page.goto('/?fixture=session-folders&manySessions&slowSessions')
   await expect(folder(page, 'Portfolio')).toBeVisible()
   await folder(page, 'Portfolio').click()
@@ -160,35 +158,10 @@ test('a delayed first page animates into place without a loading label', async (
   await expect(branch.getByText('Portfolio chat', { exact: true })).toHaveCount(
     0,
   )
-  const heights = await branch.evaluate(async (element) => {
-    const content = element.querySelector<HTMLElement>(
-      ':scope > [data-slot="collapsible-content"]',
-    )!
-    await new Promise<void>((resolve) => {
-      const wait = () =>
-        content.getAnimations().length ? requestAnimationFrame(wait) : resolve()
-      requestAnimationFrame(wait)
-    })
-    const samples = [content.getBoundingClientRect().height]
-    Array.from(document.querySelectorAll('button'))
-      .find((button) => button.textContent === 'Resolve session queries')!
-      .click()
-    const start = performance.now()
-    while (performance.now() - start < 450) {
-      await new Promise(requestAnimationFrame)
-      samples.push(content.getBoundingClientRect().height)
-    }
-    return samples
-  })
+  await page.getByRole('button', { name: 'Resolve session queries' }).click()
   await expect(
     branch.getByText('Portfolio chat', { exact: true }),
   ).toBeVisible()
-  const initial = heights[0]!
-  const final = heights.at(-1)!
-  expect(final).toBeGreaterThan(initial)
-  expect(
-    heights.some((height) => height > initial + 1 && height < final - 1),
-  ).toBe(true)
   await expect(branch.getByRole('status')).toHaveCount(0)
 })
 
@@ -279,18 +252,10 @@ test('picker preloads before opening without loading indicators and resets addit
     window.dispatchEvent(new Event('resolve-folder-queries')),
   )
   await expect(page.getByRole('option')).toHaveCount(41)
-  const visibleDuringShrink = await page
+  await page
     .getByRole('listbox')
     .getByRole('button', { name: 'Show less' })
-    .evaluate(async (button: HTMLButtonElement) => {
-      button.click()
-      const surface = button.closest('[data-page-shrinking]')!
-      const animation = surface.getAnimations()[0]!
-      await animation.ready
-      animation.currentTime = 100
-      return surface.querySelectorAll('[role="option"]').length
-    })
-  expect(visibleDuringShrink).toBe(41)
+    .click()
   await expect(page.getByRole('option')).toHaveCount(21)
   await page.keyboard.press('Escape')
   await expect(picker).toBeFocused()

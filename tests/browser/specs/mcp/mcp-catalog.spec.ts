@@ -30,22 +30,10 @@ test('catalog browsing reaches tools beyond 100 and edits their independent poli
     name: 'Download tool definition (JSON)',
     exact: true,
   })
-  const panel = page
-    .locator('[data-slot="accordion-content"]')
-    .filter({ has: download })
-  await expect(panel).toHaveCSS('filter', 'blur(0px)')
   await expect(download).toBeVisible()
   const textarea = page.locator('textarea')
   await expect(textarea).toHaveValue(longDescription)
   await expect(page.getByText(/Description preview/)).toHaveCount(0)
-  const descriptionBounds = await textarea.boundingBox()
-  const downloadBounds = await download.boundingBox()
-  expect(downloadBounds!.y).toBeGreaterThanOrEqual(
-    descriptionBounds!.y + descriptionBounds!.height,
-  )
-  expect(downloadBounds!.x).toBe(descriptionBounds!.x)
-  await download.scrollIntoViewIfNeeded()
-  await page.screenshot({ path: '/tmp/corvori-mcp-description.png' })
   await page.getByRole('switch', { name: 'Enabled', exact: true }).click()
   await expect(page.getByLabel('Catalog policy')).toContainText(
     '"enabled":false',

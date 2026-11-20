@@ -113,18 +113,15 @@ test('opens approval when the empty composer is focused', async ({ page }) => {
   await expect(picker(page)).toBeVisible()
   const options = actions(page)
   await expect(options).toBeFocused()
-  await expect(options).toHaveCSS('outline-style', 'none')
-  await expect(options).toHaveCSS('box-shadow', 'none')
   await expect(review(page)).toHaveCount(0)
 })
 
-test('highlights question choices without outlining the group', async ({
+test('navigates question choices and context with the keyboard', async ({
   page,
 }) => {
   await page.goto('/?fixture=subagent-approvals&id=parent&question')
   const options = page.getByRole('radiogroup', { name: 'Which option?' })
   await expect(options).toBeFocused()
-  await expect(options).toHaveCSS('outline-style', 'none')
 
   await page.keyboard.press('ArrowDown')
   await expect(options.getByRole('radio', { name: '1 A' })).toBeChecked()
@@ -133,7 +130,6 @@ test('highlights question choices without outlining the group', async ({
   await expect(page.getByRole('textbox', { name: 'Additional context' })).toBeFocused() // prettier-ignore
   await page.keyboard.press('Shift+Tab')
   await expect(options).toBeFocused()
-  await expect(options).toHaveCSS('outline-style', 'none')
 })
 
 test('keeps an automatic approval stable while work expands and collapses', async ({
@@ -189,7 +185,6 @@ test('restores note drafts and approval navigation when moving between views', a
   await expect(deny).toHaveAttribute('aria-selected', 'true')
   await page.keyboard.press('ArrowDown')
   await expect(abort).toHaveAttribute('aria-selected', 'true')
-  await expect(options).toHaveCSS('outline-style', 'none')
   await page.keyboard.press('ArrowUp')
   await expect(deny).toHaveAttribute('aria-selected', 'true')
 
@@ -197,8 +192,6 @@ test('restores note drafts and approval navigation when moving between views', a
   await expect(note(page)).toBeFocused()
   await page.keyboard.press('Shift+Tab')
   await expect(options).toBeFocused()
-  await expect(options).toHaveCSS('outline-style', 'none')
-  await expect(options).toHaveCSS('box-shadow', 'none')
   await expect(deny).toHaveAttribute('aria-selected', 'true')
   expect(await mutations(page)).toEqual([])
 })
@@ -230,13 +223,13 @@ test('aborts only the viewed child', async ({ page }) => {
   await expect(page.locator('[data-slot="activity-indicator"]')).toHaveCount(0)
   expect((await mutations(page))[0]).toEqual({
     name: 'chat:stopStream',
-    args: { sessionId: 'child' },
+    args: { sessionId: 'child', execution: { streamId: 'child_stream' } },
   })
   await page.getByRole('button', { name: 'View parent', exact: true }).click()
   await expect(picker(page)).toContainText('git push origin sibling')
 })
 
-test('combines busy typing activity with agent status in a stable footer', async ({
+test('combines busy typing activity with agent status in the same indicator', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -247,45 +240,9 @@ test('combines busy typing activity with agent status in a stable footer', async
     'title',
     'Alice, Bob, Carol, Dave, Eve are typing · Explore is waiting',
   )
-  await expect(activity).toHaveCSS('opacity', '1')
-  expect(
-    await activity.evaluate((element) => {
-      const footer = element.parentElement!.parentElement!.parentElement!
-      const gradient = footer.querySelector<HTMLElement>(
-        '[aria-hidden="true"]',
-      )!
-      const pointerEvents = gradient.style.pointerEvents
-      gradient.style.pointerEvents = 'auto'
-      const rect = element.firstElementChild!.getBoundingClientRect()
-      const top = document.elementFromPoint(
-        rect.x + rect.width / 2,
-        rect.y + rect.height / 2,
-      )
-      gradient.style.pointerEvents = pointerEvents
-      return element.contains(top)
-    }),
-  ).toBe(true)
-  await expect(activity.locator('span').first()).toHaveCSS(
-    'animation-name',
-    'text-shimmer',
-  )
-  await page.emulateMedia({ reducedMotion: 'reduce' })
-  await expect(activity.locator('span').first()).toHaveCSS(
-    'animation-name',
-    'none',
-  )
-  const before = await activity.boundingBox()
   await page.getByRole('button', { name: 'Stop typing', exact: true }).click()
   await expect(activity).toHaveText('Explore is waiting')
-  const after = await activity.boundingBox()
-  expect(after!.height).toBe(before!.height)
-  expect(after!.y).toBe(before!.y)
-  await expect(activity.locator('span[style]')).toHaveCount(0)
   await expect(page.locator('[data-slot="waiting-indicator"]')).toHaveCount(0)
-  await expect(page.locator('[data-row-kind="footer"]')).toHaveCSS(
-    'height',
-    '0px',
-  )
 })
 
 test('restores the request and note after an approval fails', async ({

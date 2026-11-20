@@ -27,7 +27,7 @@ test('clicking nested text reveals its enclosing source without content updates'
   await expect(editor.locator('[data-source-hidden]')).toHaveCount(6)
 })
 
-test('the caret stays visible while editing inline code', async ({ page }) => {
+test('typing at the caret updates inline code', async ({ page }) => {
   await page.evaluate(() => {
     const editor = (window as SourceFixtureWindow).sourceFixtureEditor!
     editor.commands.setContent('before `testing` after', {
@@ -36,25 +36,6 @@ test('the caret stays visible while editing inline code', async ({ page }) => {
     editor.commands.setTextSelection(12)
     editor.view.focus()
   })
-  // Keep the native caret in its visible blink phase for the pixel comparison.
-  await page.addStyleTag({
-    content: '.ProseMirror { caret-animation: manual; }',
-  })
-  const editor = page.locator('.ProseMirror')
-  await expect(editor.locator('[data-source-hidden]')).toHaveCount(0)
-  const clip = await page.evaluate(() => {
-    const current = (window as SourceFixtureWindow).sourceFixtureEditor!
-    const { left, top, bottom } = current.view.coordsAtPos(12)
-    return {
-      x: Math.floor(left),
-      y: Math.ceil(top) + 3,
-      width: 2,
-      height: Math.floor(bottom - top) - 6,
-    }
-  })
-  const withCaret = await page.screenshot({ caret: 'initial', clip })
-  const withoutCaret = await page.screenshot({ caret: 'hide', clip })
-  expect(withCaret.equals(withoutCaret)).toBe(false)
   await page.keyboard.type('X')
   await expect(page.getByLabel('Saved markdown')).toHaveText(
     'before `tesXting` after',

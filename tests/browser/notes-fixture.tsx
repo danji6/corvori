@@ -48,7 +48,6 @@ const fileChanges = new URLSearchParams(location.search).has('fileChanges')
 const longShell = new URLSearchParams(location.search).has('longShell')
 const compaction = new URLSearchParams(location.search).has('compaction')
 const thinkingWork = new URLSearchParams(location.search).has('thinkingWork')
-const reminderWork = new URLSearchParams(location.search).has('reminderWork')
 const composerParams = new URLSearchParams(location.search)
 const showComposer =
   composerParams.has('shellComposer') || composerParams.has('composer')
@@ -72,7 +71,6 @@ function NoteRow({ row }: { row: MessageRow }) {
 
 function Transcript() {
   const [groupSettled, setGroupSettled] = useState(false)
-  const [hideDuration, setHideDuration] = useState(false)
   const rows = useMessageRows()
   const store = useMessageStore()
   const { anchorAround } = useWindowControls()
@@ -142,9 +140,6 @@ function Transcript() {
             Seek report
           </button>
         )}
-        {groupedWork && (
-          <button onClick={() => setHideDuration(true)}>Hide duration</button>
-        )}
         <button
           data-seek-settled={groupSettled}
           onClick={() => {
@@ -196,15 +191,8 @@ function Transcript() {
               shellReports ||
               fileChanges ||
               compaction ||
-              thinkingWork ||
-              reminderWork ? (
-                <MessageRowView
-                  row={
-                    hideDuration && row.kind === 'footer'
-                      ? { ...row, duration: undefined }
-                      : row
-                  }
-                />
+              thinkingWork ? (
+                <MessageRowView row={row} />
               ) : isNoteRow(row) || row.kind === 'work' ? (
                 <NoteRow row={row} />
               ) : (

@@ -104,7 +104,6 @@ function initialMessages() {
       message(`history${index}`, index),
     )
   }
-  if (params.has('reminderWork')) return reminderWorkMessages()
   if (params.has('compaction')) return compactionMessages()
   if (params.has('fileChanges')) return fileChangeMessages()
   if (params.has('shellReports')) return shellMessages()
@@ -119,45 +118,8 @@ function initialMessages() {
     ...Array.from({ length: Number(params.get('extraNotes') ?? 0) }, (_, i) =>
       message(`note${i}`, 44 + i / 1000, 'skills'),
     ),
-    ...(params.has('work') ? [message('work', 45)] : []),
     ...Array.from({ length: 35 }, (_, i) => message(`after${i}`, 50 + i)),
   ]
-}
-
-function reminderWorkMessages() {
-  const [first, second] = groupedWorkMessages()
-  first.segments[0].parts = [
-    { type: 'reasoning', text: 'Reviewing the work.', state: 'done' },
-    ...reminderWorkParts(),
-  ]
-  return [first, message('todo', 0.5, 'todo'), second]
-}
-
-function reminderWorkParts(): UIMessage['parts'] {
-  switch (params.get('lastBlock')) {
-    case 'shell':
-      return [
-        {
-          type: 'tool-shell',
-          toolCallId: 'command',
-          state: 'output-available',
-          input: { command: 'bun test' },
-          output: 'Tests passed.',
-        },
-      ]
-    case 'file':
-      return [
-        {
-          type: 'tool-write_file',
-          toolCallId: 'write',
-          state: 'output-available',
-          input: { path: 'notes.ts', content: 'export const done = true' },
-          output: { path: 'notes.ts', diff: '+export const done = true' },
-        },
-      ]
-    default:
-      return message('work', 0).segments[0].parts
-  }
 }
 
 function thinkingWorkMessages() {
@@ -198,7 +160,6 @@ function thinkingWorkMessages() {
 }
 
 function compactionMessages() {
-  const longSummary = params.has('longSummary')
   const command = {
     ...message('command', 0, 'command'),
     extra: { name: 'compact', argument: '', status: 'done' },
@@ -217,29 +178,17 @@ function compactionMessages() {
           },
           {
             type: 'text' as const,
-            text: longSummary
-              ? 'Summary of the completed work.\n\n'.repeat(24)
-              : 'Summary of the completed work.',
+            text: 'Summary of the completed work.\n\n'.repeat(24),
           },
         ],
         sizeBytes: 100,
       },
     ],
   }
-  if (longSummary) {
-    const history = Array.from({ length: 16 }, (_, index) =>
-      message(`before${index}`, index - 16),
-    )
-    return [...history, command, summary]
-  }
-  return [
-    command,
-    summary,
-    message('mcp', 2, 'mcp'),
-    message('workspace', 3, 'workspace'),
-    message('skills', 4, 'skills'),
-    message('work', 5),
-  ]
+  const history = Array.from({ length: 16 }, (_, index) =>
+    message(`before${index}`, index - 16),
+  )
+  return [...history, command, summary]
 }
 
 function fileChangeMessages(waitingForInput = false, extraOutput = '') {
@@ -335,7 +284,6 @@ function groupedWorkMessages() {
   return ['first', 'second'].map((id, index) => ({
     ...message('work', index),
     _id: id,
-    hasChanges: index === 0 && params.has('emptyChanges'),
     metadata: { duration: 8300 },
   }))
 }

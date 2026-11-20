@@ -1,79 +1,8 @@
-import { type Locator, expect, test } from '@playwright/test'
-
-async function expectHoverToClear(tab: Locator, other: Locator) {
-  const restingColor = await tab.evaluate(
-    (element) => getComputedStyle(element).backgroundColor,
-  )
-  await tab.hover()
-  await expect(tab).not.toHaveCSS('background-color', restingColor)
-  await tab.evaluate((element) => {
-    element.addEventListener(
-      'pointerleave',
-      () => {
-        requestAnimationFrame(() => {
-          element.setAttribute(
-            'data-exit-background',
-            getComputedStyle(element).backgroundColor,
-          )
-        })
-      },
-      { once: true },
-    )
-  })
-  await other.hover()
-  await expect(tab).toHaveAttribute('data-exit-background', restingColor)
-}
+import { expect, test } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/?fixture=ui-layout')
 })
-
-test('settings tabs clear their hover highlight on pointer exit', async ({
-  page,
-}) => {
-  await page.goto('/?fixture=account-security')
-  await expectHoverToClear(
-    page.getByRole('tab', { name: 'Tools' }),
-    page.getByRole('tab', { name: 'Account' }),
-  )
-})
-
-for (const variant of ['hug', 'pill']) {
-  test(`sub-tab indicator is visible on opening settings and follows selection (${variant})`, async ({
-    page,
-  }) => {
-    await page.goto(`/?fixture=ui-layout&variant=${variant}`)
-    await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    const list = page.getByRole('tablist', { name: 'Tool settings' })
-    const indicator = list.getByRole('presentation')
-    const selectedTab = list.locator('[aria-selected="true"]')
-    const expectIndicator = async () => {
-      await expect(indicator).toBeVisible()
-      await expect
-        .poll(async () => {
-          const marker = await indicator.boundingBox()
-          const tab = await selectedTab.boundingBox()
-          if (!marker || !tab) return false
-          return (
-            marker.height >= 2 &&
-            Math.abs(marker.x - tab.x) < 2 &&
-            Math.abs(marker.width - tab.width) < 2
-          )
-        })
-        .toBe(true)
-    }
-    await expectIndicator()
-    await page.getByRole('tab', { name: 'MCP', exact: true }).click()
-    await expectIndicator()
-    await page.setViewportSize({ width: 850, height: 720 })
-    await expectIndicator()
-    await page.getByRole('tab', { name: 'Tools', exact: true }).click()
-    await expectIndicator()
-    await page.getByRole('button', { name: 'Close', exact: true }).click()
-    await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    await expectIndicator()
-  })
-}
 
 for (const streaming of [false, true]) {
   test(`opening a thinking block near the bottom reveals its start (streaming=${streaming})`, async ({

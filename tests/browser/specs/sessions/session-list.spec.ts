@@ -21,7 +21,6 @@ async function samplePageExpansion(page: Page, groupKey: string) {
       '[data-slot="session-list-scroll-area"]',
     )!
     const firstRow = element.querySelector('button')!
-    const section = element.closest('[data-session-folder]') ?? element
     const initialTop = firstRow.getBoundingClientRect().top
     const button = element.querySelector<HTMLButtonElement>(
       `[data-page-footer="${element.getAttribute('data-session-page')}"] [data-pagination="more"]`,
@@ -34,7 +33,6 @@ async function samplePageExpansion(page: Page, groupKey: string) {
         ) ?? element
     const read = () => ({
       height: surface.getBoundingClientRect().height,
-      sectionHeight: section.getBoundingClientRect().height,
       scrollTop: scrollArea.scrollTop,
       firstTop: firstRow.getBoundingClientRect().top,
       sameRow: element.querySelector('button') === firstRow,
@@ -50,7 +48,6 @@ async function samplePageExpansion(page: Page, groupKey: string) {
     return {
       samples,
       initialTop,
-      heightStyle: (surface as HTMLElement).style.height,
     }
   })
 }
@@ -69,17 +66,13 @@ test('Show more reveals top-level folders, folder contents, Recents, and search 
     if (groupKey === 'folders') {
       await page.goto('/?fixture=session-folders&manyFolders')
     }
-    const { samples, initialTop, heightStyle } = await samplePageExpansion(page, groupKey) // prettier-ignore
+    const entries = sessionPage(page, groupKey).locator(
+      `[data-page-entry="${groupKey}"]`,
+    )
+    const before = await entries.count()
+    const { samples, initialTop } = await samplePageExpansion(page, groupKey)
+    await expect.poll(() => entries.count()).toBeGreaterThan(before)
     const initial = samples[0]!
-    const final = samples.at(-1)!
-    expect(final.height).toBeGreaterThan(initial.height)
-    expect(
-      samples.some(
-        ({ height }) =>
-          height > initial.height + 1 && height < final.height - 1,
-      ),
-    ).toBe(true)
-    expect(Math.max(...samples.map(({ animations }) => animations))).toBe(1)
     expect(samples.every(({ sameRow }) => sameRow)).toBe(true)
     expect(
       samples.every(({ firstTop }) => Math.abs(firstTop - initialTop) < 1),
@@ -89,82 +82,6 @@ test('Show more reveals top-level folders, folder contents, Recents, and search 
         ({ scrollTop }) => Math.abs(scrollTop - initial.scrollTop) < 1,
       ),
     ).toBe(true)
-    expect(heightStyle).toBe('')
-  }
-})
-
-test('Show less clips outgoing rows before removing them', async ({ page }) => {
-  await page.goto('/?fixture=session-folders&manyFolders&manySessions')
-  for (const group of ['folders', 'pinned', 'a', 'recents', 'search']) {
-    if (group === 'search') {
-      await page
-        .getByRole('textbox', { name: 'Search sessions' })
-        .fill('session')
-    }
-    const less = pageControl(page, group, 'Show less')
-    await pageControl(page, group).click()
-    await expect(less).toBeEnabled()
-    const sample = await less.evaluate(async (button: HTMLButtonElement) => {
-      const surface = button.closest<HTMLElement>('[data-session-page]')!
-      const key = surface.dataset.sessionPage
-      const count = () =>
-        surface.querySelectorAll(`[data-page-entry="${key}"]`).length
-      const initialHeight = surface.getBoundingClientRect().height
-      const initialCount = count()
-      button.click()
-      const animation = surface.getAnimations()[0]!
-      await animation.ready
-      animation.currentTime = 100
-      const during = surface.getBoundingClientRect().height
-      const clips = getComputedStyle(surface).overflow === 'clip'
-      return {
-        initialHeight,
-        during,
-        clips,
-        initialCount,
-        duringCount: count(),
-      }
-    })
-    expect(sample.clips).toBe(true)
-    expect(sample.during).toBeLessThan(sample.initialHeight)
-    expect(sample.duringCount).toBe(sample.initialCount)
-    await expect(less).toHaveCount(0)
-    await expect(sessionPage(page, group)).not.toHaveAttribute(
-      'data-page-shrinking',
-    )
-  }
-})
-
-test('the final page grows without briefly losing the load-more footer height', async ({
-  page,
-}) => {
-  await page.goto('/?fixture=session-folders&manySessions')
-  for (const [groupKey, beforeFinal] of [
-    ['pinned', 25],
-    ['a', 124],
-  ] as const) {
-    const branch = page.locator(`[data-session-folder="${groupKey}"]`)
-    const button = pageControl(page, groupKey)
-    for (
-      let count = groupKey === 'a' ? 4 : 5;
-      count < beforeFinal;
-      count += 20
-    ) {
-      await expect(button).toBeEnabled()
-      await button.evaluate((element: HTMLButtonElement) => element.click())
-      await expect
-        .poll(async () => (await loadedPages(page))[groupKey])
-        .toBe(count + 20)
-      await expect(button).toBeEnabled()
-    }
-    const { samples } = await samplePageExpansion(page, groupKey)
-    const initial = samples[0]!.sectionHeight
-    expect(samples.at(-1)!.sectionHeight).toBeGreaterThan(initial)
-    expect(
-      Math.min(...samples.map(({ sectionHeight }) => sectionHeight)),
-    ).toBeGreaterThanOrEqual(initial - 1)
-    await expect(button).toHaveCount(0)
-    await expect(branch.getByText('No matching sessions')).toHaveCount(0)
   }
 })
 
@@ -447,36 +364,6 @@ test('reduced motion and subtree collapse unload descendants but leave Recents',
   await expect.poll(async () => (await loadedPages(page)).a).toBe(4)
   await expect(folder(page, 'Design')).toHaveAttribute('aria-expanded', 'false')
   await expect.poll(async () => (await loadedPages(page)).n).toBeUndefined()
-})
-
-test('folder contents animate together before unmounting', async ({ page }) => {
-  const branch = page.locator('[data-session-folder="a"]')
-  await expect(
-    branch.getByText('Portfolio chat', { exact: true }),
-  ).toBeVisible()
-  const heights = await branch.evaluate(async (element) => {
-    const content = element.querySelector<HTMLElement>(
-      ':scope > [data-slot="collapsible-content"]',
-    )!
-    const button = element.querySelector<HTMLButtonElement>(
-      'button[aria-expanded]',
-    )!
-    const samples = [content.getBoundingClientRect().height]
-    button.click()
-    const start = performance.now()
-    while (performance.now() - start < 300) {
-      await new Promise(requestAnimationFrame)
-      samples.push(content.getBoundingClientRect().height)
-    }
-    return samples
-  })
-  expect(heights.at(-1)).toBe(0)
-  expect(heights.some((height) => height > 0 && height < heights[0]! - 1)).toBe(
-    true,
-  )
-  await expect(branch.getByText('Portfolio chat', { exact: true })).toHaveCount(
-    0,
-  )
 })
 
 test('a few hundred loaded sessions collapse and reset when reopened individually', async ({

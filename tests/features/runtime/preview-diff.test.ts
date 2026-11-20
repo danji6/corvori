@@ -86,12 +86,14 @@ describe('previewWorkspaceDiff', () => {
       })
       const result = await response.json()
       expect(result.publication.files).toHaveLength(2)
-      const location = (project: string[]) =>
-        request('location', {
+      const location = async (project: string[]) => {
+        const response = await request('location', {
           sessionId: context.sessionId,
           checkpointId: 'route-turn',
           locations: { project, homes: [], sessionFiles: false },
-        }).then((result) => result.json())
+        })
+        return response.json()
+      }
       expect(await location([root])).toEqual({ stale: false })
       expect(await location([])).toEqual({ stale: true })
 

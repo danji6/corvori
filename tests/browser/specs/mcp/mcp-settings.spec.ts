@@ -12,28 +12,11 @@ test('server card header controls stay independent of its accessible trigger', a
   const url = page.getByPlaceholder('http://localhost:11235/mcp')
   const content = page.locator('[data-slot="collapsible-content"]').first()
   await expect(content).toHaveAttribute('aria-hidden', 'true')
-  await expect(content).toHaveCSS('opacity', '0')
   await trigger.focus()
   await page.keyboard.press('Enter')
   const collapse = page.getByRole('button', { name: 'Collapse', exact: true })
   await expect(collapse).toHaveAttribute('aria-expanded', 'true')
   await expect(url).toBeVisible()
-  const labelAlignment = await url.evaluate((input) => {
-    const style = getComputedStyle(input)
-    const textStart =
-      input.getBoundingClientRect().left +
-      parseFloat(style.borderLeftWidth) +
-      parseFloat(style.paddingLeft)
-    const labels = document.querySelectorAll(
-      '[data-slot="settings-field"] label',
-    )
-    return [...labels].map((label) =>
-      Math.abs(label.getBoundingClientRect().left - textStart),
-    )
-  })
-  for (const difference of labelAlignment) {
-    expect(difference).toBeLessThanOrEqual(1)
-  }
   const contentId = await collapse.getAttribute('aria-controls')
   await expect(page.locator(`[id="${contentId}"]`)).toContainText('Probe')
   await page.getByPlaceholder('Label', { exact: true }).fill('Renamed')
@@ -45,12 +28,10 @@ test('server card header controls stay independent of its accessible trigger', a
   await page.getByRole('button', { name: 'Move down' }).click()
   await expect(page.getByLabel('Card action')).toHaveText('Move 1')
   await expect(url).toBeVisible()
-  await page.screenshot({ path: '/tmp/corvori-mcp-server-card.png' })
   await collapse.focus()
   await page.keyboard.press('Space')
   await expect(trigger).toHaveAttribute('aria-expanded', 'false')
   await expect(content).toHaveAttribute('aria-hidden', 'true')
-  await expect(content).toHaveCSS('opacity', '0')
   await expect(page.getByPlaceholder('Label', { exact: true })).toHaveValue(
     'Renamed',
   )

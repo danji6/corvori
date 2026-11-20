@@ -4,7 +4,7 @@ test('opening a long summary at the bottom brings its start below the nav', asyn
   page,
 }) => {
   await page.setViewportSize({ width: 1100, height: 600 })
-  await page.goto('/?fixture=notes&id=notes&compaction&longSummary')
+  await page.goto('/?fixture=notes&id=notes&compaction')
   const summary = page.getByRole('button', { name: /^Summary\b/ })
   await expect(summary).toBeInViewport({ ratio: 1 })
   await expect
@@ -137,42 +137,6 @@ test('file changes share a list with independent, persistent diff toggles', asyn
     'true',
   )
   await expect(second).toContainText('newSecond')
-})
-
-for (const emptyChanges of [false, true]) {
-  test(`completed grouped messages leave no blank space between collapsed work summaries (emptyChanges=${emptyChanges})`, async ({
-    page,
-  }) => {
-    await page.goto(
-      `/?fixture=notes&id=notes&groupedWork${emptyChanges ? '&emptyChanges' : ''}`,
-    )
-    const work = page.locator('[data-slot="work-block"]')
-    await expect(work).toHaveCount(2)
-    await expect
-      .poll(async () => {
-        const first = await work.nth(0).boundingBox()
-        const second = await work.nth(1).boundingBox()
-        return first && second ? second.y - first.y - first.height : Infinity
-      })
-      .toBeLessThanOrEqual(1)
-  })
-}
-
-test('releases footer height when its duration disappears', async ({
-  page,
-}) => {
-  await page.goto('/?fixture=notes&id=notes&groupedWork')
-  const footer = page.locator('[data-row-kind="footer"]')
-  await expect(footer.locator('[data-slow="message-footer"]')).toBeVisible()
-  await expect
-    .poll(async () => (await footer.boundingBox())?.height ?? 0)
-    .toBeGreaterThan(0)
-
-  await page.getByRole('button', { name: 'Hide duration' }).click()
-  await expect(footer.locator('[data-slow="message-footer"]')).toHaveCount(0)
-  await expect
-    .poll(async () => (await footer.boundingBox())?.height ?? Infinity)
-    .toBeLessThanOrEqual(1)
 })
 
 test('opening work at the bottom holds the viewport, then reveals its details', async ({

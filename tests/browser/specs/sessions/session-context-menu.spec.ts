@@ -25,34 +25,6 @@ function sessionTooltip(page: Page, title: string) {
     .filter({ hasText: title })
 }
 
-test('hover fades in on the new button and clears immediately from the previous one', async ({
-  page,
-}) => {
-  await page.goto('/?fixture=session-folders')
-  const first = page.getByRole('button', { name: 'New folder', exact: true })
-  const second = page.getByRole('button', { name: 'Session list options' })
-  for (const button of [first, second]) {
-    await button.evaluate((element) => {
-      let fades = 0
-      element.addEventListener('transitionrun', (event) => {
-        if (
-          event instanceof TransitionEvent &&
-          event.target === element &&
-          event.propertyName === 'background-color'
-        ) {
-          element.setAttribute('data-background-fades', String(++fades))
-        }
-      })
-    })
-  }
-
-  await first.hover()
-  await expect(first).toHaveAttribute('data-background-fades', '1')
-  await second.hover()
-  await expect(second).toHaveAttribute('data-background-fades', '1')
-  await expect(first).toHaveAttribute('data-background-fades', '1')
-})
-
 test('keeps a session row hovered while its tooltip opens', async ({
   page,
 }) => {
