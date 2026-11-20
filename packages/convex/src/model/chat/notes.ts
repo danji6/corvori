@@ -323,7 +323,6 @@ function workspaceNoteBody(
           'Use absolute paths for other source directories.',
         ]
       : []),
-    'Existing tool and path approval rules still apply.',
     ...(previous ? [WORKSPACE_CHANGE_GUIDANCE] : []),
   ]
 }
