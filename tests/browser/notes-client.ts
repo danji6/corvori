@@ -67,6 +67,7 @@ function noteExtra(type?: NoteType) {
 }
 
 const params = new URLSearchParams(location.search)
+let continuationActive = params.has('continuation')
 let messages = initialMessages()
 let planContent = 'Original plan'
 let submittedShell: ReturnType<typeof message> | undefined
@@ -82,6 +83,22 @@ function initialMessages() {
     ]
   }
   if (params.has('thinkingWork')) return thinkingWorkMessages()
+  if (continuationActive) {
+    const [earlier, current] = groupedWorkMessages()
+    return [
+      earlier,
+      message('prompt', 1),
+      { ...current, _creationTime: 2, metadata: { duration: 4200 } },
+      message('todo', 3, 'todo'),
+      {
+        ...message('continuation', 4),
+        role: 'assistant',
+        status: 'processing',
+        segments: [],
+        sizeBytes: 0,
+      },
+    ]
+  }
   if (params.has('shellComposer') || params.has('composer')) {
     return Array.from({ length: 32 }, (_, index) =>
       message(`history${index}`, index),
@@ -404,6 +421,14 @@ const cache = new Map<string, unknown>()
 const listeners = new Set<() => void>()
 
 function query(name: string, args: Record<string, unknown>) {
+  if (name === 'chat:getActiveStream' && continuationActive) {
+    return {
+      _id: 'stream',
+      status: 'running',
+      invokedBy: 'owner',
+      processingMessageId: 'continuation',
+    }
+  }
   const readOnly = new URLSearchParams(location.search).has('readOnly')
   if (name === 'settings:get')
     return {
@@ -450,6 +475,12 @@ function query(name: string, args: Record<string, unknown>) {
   if (name.endsWith(':list') || name === 'chat:processingMessageSegments')
     return []
   return null
+}
+
+export function stopContinuation() {
+  continuationActive = false
+  messages = messages.filter((message) => message._id !== 'continuation')
+  refresh()
 }
 
 export const notesClient = {

@@ -298,8 +298,12 @@ function getRowSpacing(row?: MessageRow, previousRow?: MessageRow) {
     return 'h-(--message-sender-gap)'
   }
 
-  const isNoteRow = row.kind === 'hidden' && row.noteGroupId
-  if (isNoteRow) return 'h-(--work-row-gap)'
+  if (row.kind === 'hidden' && row.noteGroupId) {
+    const followsSibling =
+      previousRow?.kind === 'hidden' &&
+      previousRow.noteGroupId === row.noteGroupId
+    return followsSibling ? 'h-(--message-card-gap)' : 'h-(--work-row-gap)'
+  }
 
   const startsSenderGroup =
     previousRow && !row.grouped && previousRow.messageId !== row.messageId

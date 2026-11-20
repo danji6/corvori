@@ -2,7 +2,11 @@ import { registerAvatarIds } from '@/hooks/chat/avatars'
 import { useMessageWindow } from '@/hooks/chat/message-window'
 import { useActiveSession } from '@/hooks/chat/session'
 import { useSettings } from '@/hooks/chat/settings'
-import { useStreamStore } from '@/hooks/chat/stream'
+import {
+  useChatStatus,
+  useStreamProcessingMessageId,
+  useStreamStore,
+} from '@/hooks/chat/stream'
 import { createUsableContext } from '@/hooks/context'
 import { ChatError, ChatWarning, RateLimitError } from '@/lib/chat/errors'
 import {
@@ -19,6 +23,8 @@ import {
 import { projectNoteRows } from '@/lib/chat/note-rows'
 import { noteExpansion } from '@/lib/chat/note-state'
 import type { MessageRow } from '@/lib/chat/rows'
+import { isTranscriptDivider } from '@/lib/chat/sender-groups'
+import { isOngoingStream } from '@/lib/chat/stream'
 import type { UIMetadata } from '@/lib/chat/types'
 import { projectWorkRows } from '@/lib/chat/work-rows'
 import { workExpansion } from '@/lib/chat/work-state'
@@ -209,6 +215,28 @@ export function useHasNewerMessages(messageId: string): boolean {
   )
   const { canLoadNewer } = useWindowMetadata()
   return !isLast || canLoadNewer
+}
+
+/** Checks whether the live transcript ends here while the next output is still hidden. */
+export function useIsAwaitingVisibleContinuation(messageId: string): boolean {
+  const store = useMessageStore()
+  const active = isOngoingStream(useChatStatus())
+  const processingId = useStreamProcessingMessageId()
+
+  return useSyncExternalStore(store.subscribe, () => {
+    if (!active || !store.getWindowMetadata().isAtLiveTail) return false
+    if (processingId && store.getMessage(processingId)) return false
+
+    const ids = store.getIds()
+    for (let index = ids.length - 1; index >= 0; index--) {
+      const id = ids[index]
+      const record = store.getMessageMetadata(id)
+      if (!record?.hidden || isTranscriptDivider(record)) {
+        return id === messageId
+      }
+    }
+    return false
+  })
 }
 
 export function useChatError(

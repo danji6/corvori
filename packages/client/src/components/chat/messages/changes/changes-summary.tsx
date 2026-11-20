@@ -94,7 +94,7 @@ export function ChangesSummary({
   return (
     <section
       aria-label="Agent changes"
-      className="bg-m3-surface-container-low border-input/50 my-3 mt-5 w-full min-w-0 rounded-lg border p-4 text-sm sm:p-5"
+      className="bg-m3-surface-container-low border-input/50 my-3 mt-5 w-full min-w-0 rounded-lg border p-4 pb-2 text-sm sm:p-5 sm:pb-3"
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
@@ -169,7 +169,7 @@ export function ChangesSummary({
         ))}
       </Accordion>
       {(remaining > 0 || hasExpandableFiles) && (
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
           {remaining > 0 && (
             <RippleButton
               variant="stealth"

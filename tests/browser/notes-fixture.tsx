@@ -35,6 +35,7 @@ import {
   isNoteRow,
   notesClient,
   publishSubmittedShellOutput,
+  stopContinuation,
   waitForShellInput,
 } from './notes-client'
 
@@ -237,7 +238,7 @@ function Composer() {
       status={useChatStatus()}
       error={null}
       onSubmit={useSendMessage()}
-      onStop={noop}
+      onStop={composerParams.has('continuation') ? stopContinuation : noop}
       onRunCommand={async () => {}}
       onContinueAgent={noop}
       hasActiveAgent={false}

@@ -109,7 +109,7 @@ test('notes align and space like work rows while animating their inset', async (
   expect(Math.abs(iconBox!.x - workBox!.x)).toBeLessThanOrEqual(1)
   const firstBox = await note(page, 'mcp').boundingBox()
   const secondBox = await note(page, 'workspace').boundingBox()
-  expect(secondBox!.y - firstBox!.y - firstBox!.height).toBe(4)
+  expect(secondBox!.y - firstBox!.y - firstBox!.height).toBe(12)
   await expectAnimatedNote(note(page, 'mcp'))
   const commandIcon = await note(page, 'command')
     .locator('svg')
@@ -471,4 +471,24 @@ test('/new inserts a deletable context marker without an active agent', async ({
   await expect(
     page.getByText('Message after reset', { exact: true }),
   ).toBeVisible()
+})
+
+test('defers the live work duration while an empty continuation is active', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=notes&id=notes&composer&continuation')
+  const activity = page.getByRole('status', { name: 'Agent is working' })
+  const earlierDuration = page.getByText('Worked for 8.3s', { exact: true })
+  const liveDuration = page.getByText('Worked for 4.2s', { exact: true })
+
+  await expect(activity).toBeVisible()
+  await expect(earlierDuration).toBeVisible()
+  await expect(liveDuration).toHaveCount(0)
+
+  await page
+    .locator('[data-slot="chat-box"]')
+    .getByRole('button', { name: 'Send', exact: true })
+    .click()
+  await expect(liveDuration).toBeVisible()
+  await expect(activity).toHaveCount(0)
 })

@@ -7,6 +7,7 @@ import {
   useMessageAppearance,
   useUserProfile,
 } from '@/hooks/chat'
+import { useIsAwaitingVisibleContinuation } from '@/hooks/chat/messages'
 import {
   canMutateMessage,
   extractTextFromMessage,
@@ -364,8 +365,10 @@ type FooterRowProps = {
 
 function FooterRow({ duration, message, messageMeta, isLast }: FooterRowProps) {
   const isStreaming = useIsMessageStreaming(message.id)
+  const awaitingContinuation = useIsAwaitingVisibleContinuation(message.id)
 
-  const showDuration = duration !== undefined && !isStreaming
+  const showDuration =
+    duration !== undefined && !isStreaming && !awaitingContinuation
 
   const error = messageMeta?.metadata?.error
 

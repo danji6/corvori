@@ -2,7 +2,7 @@
 @layer components {
   :root {
     --work-row-gap: --spacing(1);
-    --work-command-gap: --spacing(3);
+    --message-card-gap: --spacing(3);
     --work-header-padding-y: --spacing(1);
     --work-body-padding: --spacing(2.5);
     --work-surface-padding: --spacing(4);

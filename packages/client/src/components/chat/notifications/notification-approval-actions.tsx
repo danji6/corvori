@@ -29,7 +29,7 @@ export function NotificationApprovalActions({
   }
 
   return (
-    <div className="mt-2 flex flex-wrap justify-end gap-1">
+    <div className="mt-2 flex flex-wrap gap-1">
       {options.map((option) => (
         <RippleButton
           key={option.action}

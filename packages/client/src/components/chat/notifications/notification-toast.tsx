@@ -49,7 +49,7 @@ function NotificationToast({
             onRespond={onRespond}
           />
         ) : (
-          <div className="mt-2 flex justify-end gap-1">
+          <div className="mt-2 flex flex-wrap gap-1">
             {!isPendingNotification(notification) && (
               <RippleButton variant="stealth" size="sm" onClick={onRead}>
                 Dismiss
@@ -61,7 +61,7 @@ function NotificationToast({
           </div>
         )}
         {controls && (
-          <div className="mt-2 flex justify-end gap-1">
+          <div className="mt-2 flex flex-wrap gap-1">
             <RippleButton
               variant="stealth"
               size="sm"
