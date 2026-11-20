@@ -11,6 +11,63 @@ const NUMBERED_FILES =
 const GIT_LISTINGS = 'git branch -a && git tag --sort=-creatordate | head -20'
 
 describe('read-only shell queries', () => {
+  test('recognizes lookup flags without allowing command execution', () => {
+    expect(isReadOnlyShellCommand('command -V bun rg')).toBe(true)
+    expect(isReadOnlyShellCommand('command -v -- bun')).toBe(true)
+    expect(analyzeShellPathCandidates('command -V bun rg')).toEqual({
+      candidates: [],
+      complete: true,
+    })
+    expect(isReadOnlyShellCommand('command bun run build')).toBe(false)
+    expect(isReadOnlyShellCommand('command -p bun run build')).toBe(false)
+    expect(analyzeShellPathCandidates('command -v /outside/bun')).toEqual({
+      candidates: ['/outside/bun'],
+      complete: true,
+    })
+  })
+
+  test.each(['test -f README.md', '[ -f README.md ]'])(
+    'recognizes simple file tests: %s',
+    (command) => {
+      expect(isReadOnlyShellCommand(command)).toBe(true)
+      expect(analyzeShellPathCandidates(command)).toEqual({
+        candidates: ['README.md'],
+        complete: true,
+      })
+    },
+  )
+
+  test.each(['test "$?" -eq 1', '[ "$?" -ne 0 ]', 'test -2 -lt +1'])(
+    'recognizes numeric tests without path operands: %s',
+    (command) => {
+      expect(isReadOnlyShellCommand(command)).toBe(true)
+      expect(analyzeShellPathCandidates(command)).toEqual({
+        candidates: [],
+        complete: true,
+      })
+    },
+  )
+
+  test.each([
+    'test "$value" -eq 1',
+    'test "$(cat README.md)" -eq 1',
+    'test "$?" -eq 1 > output.txt',
+  ])('keeps dynamic tests and output redirects gated: %s', (command) => {
+    expect(isReadOnlyShellCommand(command)).toBe(false)
+  })
+
+  test.each([
+    'git diff --output=report.txt',
+    'git log --ext-diff',
+    'git show --future-option HEAD',
+    'sort -o sorted.txt README.md',
+    'uniq README.md unique.txt',
+    'tree -o listing.txt src',
+    'tree -L 2 -R src',
+  ])('does not auto-approve writes or opaque options: %s', (command) => {
+    expect(isReadOnlyShellCommand(command)).toBe(false)
+  })
+
   test.each([NUMBERED_FILES, GIT_LISTINGS])(
     'recognizes the reported command: %s',
     (command) => {
@@ -157,4 +214,42 @@ describe('read-only shell queries', () => {
       analyzeShellPathCandidates('git ls-remote /outside/repo').candidates,
     ).toContain('/outside/repo')
   })
+
+  test('Git diff checks include repository paths and explicit pathspecs', () => {
+    expect(analyzeShellPathCandidates('git diff --check').candidates).toEqual(
+      [],
+    )
+    expect(
+      analyzeShellPathCandidates('git -C/outside diff --check -- src/view.ts')
+        .candidates,
+    ).toEqual(['/outside', 'src/view.ts'])
+  })
+
+  test.each([
+    ['git status --porcelain=v2', []],
+    ['git status -sb -uno -- README.md', ['README.md']],
+    ['git diff --cached --check', []],
+    [
+      'git diff --no-index -- README.md ../README.md',
+      ['README.md', '../README.md'],
+    ],
+    [
+      'git log --since "1 week ago" -n 10 --format="%h %s" HEAD -- README.md',
+      ['README.md'],
+    ],
+    ['git show --format=fuller HEAD -- README.md', ['README.md']],
+    ['git log -- README.md', ['README.md']],
+    ['git log README.md', ['README.md']],
+    ['git ls-files -z -- README.md', ['README.md']],
+    ['git rev-parse --verify HEAD', []],
+  ] as const)(
+    'classifies Git inspection operands: %s',
+    (command, candidates) => {
+      expect(isReadOnlyShellCommand(command)).toBe(true)
+      expect(analyzeShellPathCandidates(command)).toEqual({
+        candidates: [...candidates],
+        complete: true,
+      })
+    },
+  )
 })

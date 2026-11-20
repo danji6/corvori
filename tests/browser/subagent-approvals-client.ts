@@ -34,16 +34,29 @@ const part = (id: string): Part => ({
 })
 
 const hasLocalApproval = new URLSearchParams(location.search).has('localApproval') // prettier-ignore
+const hasQuestion = new URLSearchParams(location.search).has('question')
+const hasParentRequest = hasLocalApproval || hasQuestion
 const deferSend = new URLSearchParams(location.search).has('deferSend')
 
+const questionPart = {
+  type: 'tool-ask',
+  toolCallId: 'question',
+  state: 'input-available',
+  input: {
+    questions: [
+      { question: 'Which option?', options: [{ label: 'A' }, { label: 'B' }] },
+    ],
+  },
+}
+
 let requests = [
-  ...(hasLocalApproval
+  ...(hasParentRequest
     ? [
         {
           sessionId: 'parent',
           title: 'Parent',
           agentName: 'Writer',
-          parts: [part('local')],
+          parts: hasQuestion ? [] : [part('local')],
         },
       ]
     : []),
@@ -101,13 +114,17 @@ function pendingParts(sessionId: string) {
 }
 
 function stream(sessionId: string) {
-  if (sessionId === 'parent' && (!hasLocalApproval || !approvalsReady)) return null // prettier-ignore
+  const awaitingQuestion = sessionId === 'parent' && hasQuestion
+  if (sessionId === 'parent' && (!hasParentRequest || !approvalsReady)) return null // prettier-ignore
   if (stopped.includes(sessionId)) return null
+  const status = pendingParts(sessionId).length
+    ? 'awaiting_approval'
+    : 'pending'
   return {
     _id: `${sessionId}_stream`,
     sessionId,
     processingMessageId: `${sessionId}_message`,
-    status: pendingParts(sessionId).length ? 'awaiting_approval' : 'pending',
+    status: awaitingQuestion ? 'awaiting_input' : status,
     invokedBy: 'owner',
   }
 }
@@ -212,12 +229,13 @@ function query(name: string, args: Record<string, unknown>) {
   }
   if (name === 'chat:processingMessageSegments') {
     const request = requests.find((request) => request.sessionId === sessionId)
-    return request
+    const parts = sessionId === 'parent' && hasQuestion ? [questionPart] : request?.parts // prettier-ignore
+    return parts
       ? [
           {
             messageId: `${sessionId}_message`,
             selectedVersion: 1,
-            segment: { segmentIndex: 0, parts: request.parts, sizeBytes: 100 },
+            segment: { segmentIndex: 0, parts, sizeBytes: 100 },
           },
         ]
       : []

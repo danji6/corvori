@@ -117,6 +117,10 @@ test('notes align and space like work rows while animating their inset', async (
     .boundingBox()
   const groupLabel = await group(page).locator('span').first().boundingBox()
   expect(Math.abs(commandIcon!.x - groupLabel!.x)).toBeLessThanOrEqual(1)
+  const thinkingIcon = page.locator('[data-slot="reasoning-block"] svg').first()
+  await expect(thinkingIcon).toBeVisible()
+  const thinkingBox = await thinkingIcon.boundingBox()
+  expect(Math.abs(thinkingBox!.x - commandIcon!.x)).toBeLessThanOrEqual(1)
   await expect(note(page, 'command')).toHaveAttribute(
     'data-placement',
     'standalone',

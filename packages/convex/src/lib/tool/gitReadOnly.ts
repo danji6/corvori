@@ -1,3 +1,5 @@
+import { gitInspectionArgs } from './gitInspectionArgs'
+
 /** Git global options whose next argument is a value. */
 export const GIT_VALUE_FLAGS: ReadonlySet<string> = new Set([
   '-C',
@@ -128,6 +130,9 @@ export function isReadOnlyGitInvocation(args: string[]): boolean {
     const action = rest.find((arg) => !arg.startsWith('-'))
     return action === undefined || /^(show|get-url)$/.test(action)
   }
+  const inspection = gitInspectionArgs(command, rest)
+  if (inspection) return inspection.readOnly
+
   const nested =
     command === 'stash' || command === 'worktree' || command === 'reflog'
   const key = nested ? `${command} ${rest[0]}` : (command ?? '')

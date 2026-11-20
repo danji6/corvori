@@ -18,7 +18,7 @@ import {
   tokenizeShell,
 } from './shellParse'
 import { analyzeShellPathCandidates } from './shellPathAnalysis'
-import { commandLookupPattern, prettierCheckPattern } from './shellQueries'
+import { prettierCheckPattern, readOnlyShellQuery } from './shellQueries'
 
 export {
   isPathAllowed,
@@ -247,11 +247,11 @@ function subcommandIndex(program: string, rest: ShellToken[]): number {
 /** Derive the allowlist pattern for one chain segment. */
 function patternFromSegment(text: string) {
   const tokens = tokenizeShell(text)
-  const lookup = commandLookupPattern(tokens)
-  if (lookup) {
+  const query = readOnlyShellQuery(tokens)
+  if (query) {
     return {
-      pattern: lookup.join(' '),
-      parts: lookup,
+      pattern: query.parts.join(' '),
+      parts: query.parts,
       builtInSafe: true,
       scopedParts: null,
     }

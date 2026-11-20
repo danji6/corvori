@@ -5,6 +5,7 @@
  * approval like any unlisted program.
  */
 import { isReadOnlyGitInvocation } from './gitReadOnly'
+import { listingPathValues } from './listingPathArgs'
 
 type ArgumentGate = (args: string[]) => boolean
 
@@ -34,6 +35,9 @@ const GATES = new Map<string, ArgumentGate>([
   ['find', (args) => !args.some((arg) => FIND_MUTATING_ARGS.test(arg))],
   ['sed', isReadOnlySedInvocation],
   ['git', isReadOnlyGitInvocation],
+  ['sort', (args) => listingPathValues('sort', args)?.readOnly === true],
+  ['tree', (args) => listingPathValues('tree', args)?.readOnly === true],
+  ['uniq', (args) => listingPathValues('uniq', args)?.readOnly === true],
 ])
 
 /** Whether `program args` stays read-only. True for ungated programs. */

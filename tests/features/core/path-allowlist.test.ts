@@ -20,13 +20,18 @@ describe('sidecar path resolution', () => {
     await mkdir(path.join(root, 'src'), { recursive: true })
     await mkdir(path.join(external, 'nested'), { recursive: true })
     await Bun.$`git init -q ${root}`.quiet()
-    await writeFile(path.join(root, '.gitignore'), 'ignored/\nalias.txt\n')
+    await writeFile(
+      path.join(root, '.gitignore'),
+      'ignored/\nalias.txt\nsrc/local-alias\n',
+    )
     await mkdir(path.join(root, 'ignored'))
     await writeFile(path.join(root, 'ignored', 'file.txt'), 'fixture')
     await writeFile(path.join(root, 'src', 'file.txt'), 'fixture')
     await writeFile(path.join(external, 'file.txt'), 'outside')
     await symlink(external, path.join(root, 'src', 'escape'))
     await symlink(path.join(root, '.git'), path.join(root, 'git-alias'))
+    await symlink('.', path.join(root, 'src', 'local-alias'))
+    await symlink('ignored', path.join(root, 'ignored-target'))
     await symlink(
       path.join(root, 'src', 'file.txt'),
       path.join(root, 'alias.txt'),
@@ -200,7 +205,21 @@ describe('sidecar path resolution', () => {
       paths: ['.git/config', 'git-alias/config'],
       allowedPaths: ['.git'],
     })
+    expect(result.complete).toBe(true)
     expect(result.uncovered).toEqual([])
+  })
+
+  test('checks both a symlink from a nested cwd and its resolved target for ignore rules', async () => {
+    const result = await checkPaths(
+      path.join(root, 'src'),
+      { paths: ['local-alias/file.txt', '../ignored-target/file.txt'] },
+      [root],
+    )
+    expect(result.complete).toBe(true)
+    expect(result.uncovered).toEqual([
+      'file.txt',
+      path.join(root, 'ignored/file.txt'),
+    ])
   })
 
   test('retains ignored-path metadata while covering grants', async () => {

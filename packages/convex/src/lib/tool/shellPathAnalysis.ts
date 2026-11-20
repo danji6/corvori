@@ -1,6 +1,8 @@
 import { bunTestPathValues } from './bunPathArgs'
+import { gitInspectionArgs } from './gitInspectionArgs'
 import { gitSubcommandIndex, hasGitRefOperands } from './gitReadOnly'
 import { grepPathValues } from './grepPathArgs'
+import { jqQueryPaths } from './jqPathArgs'
 import { listingPathValues } from './listingPathArgs'
 import { isReadOnlySedScript } from './readOnlyArgs'
 import {
@@ -20,7 +22,7 @@ import {
   splitShellChain,
   tokenizeShell,
 } from './shellParse'
-import { commandLookupPattern } from './shellQueries'
+import { readOnlyShellQuery } from './shellQueries'
 
 export interface ShellPathAnalysis {
   /** Explicit path operands found in the command. */
@@ -93,7 +95,8 @@ export function extractPathCandidates(command: string): string[] {
 
 function pathValuesFromSegment(text: string): SegmentPathAnalysis {
   const tokens = tokenizeShell(text)
-  if (commandLookupPattern(tokens)) return { values: [], complete: true }
+  const query = readOnlyShellQuery(tokens)
+  if (query) return { values: query.paths, complete: true }
 
   const invocation = invocationFromTokens(tokens)
   if (!invocation) return { values: [], complete: false }
@@ -118,28 +121,20 @@ function pathValuesFromInvocation(
     }
   }
   if (program === 'sed') return mergePathValues(values, sedPathValues(args))
+  const words = args.map((token) => token.value)
   if (GREP_PROGRAMS.has(program)) {
-    return mergePathValues(
-      values,
-      grepPathValues(
-        program,
-        args.map((token) => token.value),
-      ),
-    )
+    return mergePathValues(values, grepPathValues(program, words))
   }
-  if (program === 'head' || program === 'ls') {
-    return mergePathValues(
-      values,
-      listingPathValues(
-        program,
-        args.map((token) => token.value),
-      ),
-    )
+  const listing = listingPathValues(program, words)
+  if (listing) return mergePathValues(values, listing)
+  if (program === 'jq') {
+    const paths = jqQueryPaths(words)
+    if (paths) return { values: [...values, ...paths], complete: true }
   }
   if (program === 'find') return mergePathValues(values, findPathValues(args))
   if (NO_PATH_PROGRAMS.has(program)) return { values, complete: true }
   if (program === 'git') {
-    return { values: [...values, ...gitPathValues(args)], complete: true }
+    return mergePathValues(values, gitPathValues(args))
   }
   if (!DEFAULT_SAFE_PROGRAMS.has(program)) {
     return {
@@ -191,22 +186,26 @@ function executedPathValues(
 }
 
 /** Distinguish Git queries from their explicit filesystem operands. */
-function gitPathValues(args: ShellToken[]): string[] {
+function gitPathValues(args: ShellToken[]): SegmentPathAnalysis {
   const words = args.map((token) => token.value)
   const index = gitSubcommandIndex(words)
-  const separator = words[index + 2]
-  const diffCheck =
-    words[index] === 'diff' &&
-    words[index + 1] === '--check' &&
-    (separator === undefined || separator === '--')
-  if (!diffCheck && !hasGitRefOperands(words)) return genericPathValues(args)
+  const inspection = gitInspectionArgs(words[index], words.slice(index + 1))
+  if (!inspection && !hasGitRefOperands(words)) {
+    return { values: genericPathValues(args), complete: true }
+  }
 
   const globals = args.slice(0, index)
   const directories = globals
     .filter((token) => token.value.startsWith('-C') && token.value.length > 2)
     .map((token) => token.value.slice(2))
-  const operands = diffCheck ? words.slice(index + 3) : []
-  return [...genericPathValues(globals), ...directories, ...operands]
+  return {
+    values: [
+      ...genericPathValues(globals),
+      ...directories,
+      ...(inspection?.values ?? []),
+    ],
+    complete: inspection?.complete ?? true,
+  }
 }
 
 /** Locate the effective program through simple wrapper and env prefixes. */

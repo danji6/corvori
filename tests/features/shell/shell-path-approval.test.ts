@@ -30,6 +30,7 @@ async function createFixture() {
     'src/main',
     'src/composition',
     'ignored',
+    'node_modules/.bun/example',
     'tests/browser',
   ]) {
     await mkdir(path.join(root, directory), { recursive: true })
@@ -41,21 +42,27 @@ async function createFixture() {
     'src/main.ts',
     'src/server/createServer.ts',
     'ignored/patterns.txt',
+    'node_modules/.bun/example/input.ts',
     '50',
     'auto',
     '-notes',
     'format',
     'test',
+    'diff',
+    'status',
+    'log',
+    '.scripts',
     'tests/browser/excluded.test.ts',
   ]) {
     await writeFile(path.join(root, file), 'fixture')
   }
   await writeFile(
     path.join(root, '.gitignore'),
-    'ignored/\n50\nauto\n-notes\nformat\ntest\ntests/browser/\n',
+    'ignored/\nnode_modules/\n50\nauto\n-notes\nformat\ntest\ndiff\nstatus\nlog\n.scripts\ntests/browser/\n',
   )
   await writeFile(path.join(external, 'file.txt'), 'outside')
   await symlink(external, path.join(root, 'src/escape'))
+  await symlink('.bun/example', path.join(root, 'node_modules/example'))
   await symlink(path.join(external, 'missing'), path.join(root, 'dangling'))
   context = {
     sessionId: 'shell-paths',
@@ -153,6 +160,23 @@ describe('shell approval through scoped MCP path checks', () => {
     })
   })
 
+  test('honors check-only Prettier grants after verifying the brace paths', async () => {
+    const pattern = 'bun x --no-install prettier --check'
+    const command = `${pattern} src/{main,server/createServer}.ts README.md && git diff --check`
+    const shell = [pattern]
+    expect(await approvalPreview(command)).toMatchObject({
+      approvalPathStatus: null,
+    })
+    expect(await needsApproval(command)).toBe(true)
+    expect(await needsApproval(command, { shell })).toBe(false)
+    expect(await needsApproval(command, { shell, plan: true })).toBe(true)
+    const ignored = `${pattern} ignored/{patterns,other}.txt`
+    expect(await needsApproval(ignored, { shell })).toBe(true)
+    expect(await approvalPreview(ignored)).toMatchObject({
+      approvalPathStatus: 'paths',
+    })
+  })
+
   test('Bun runner prefixes retain path and plan approval gates', async () => {
     const shell = ['bun run']
     const command = 'bun run tests README.md'
@@ -230,6 +254,11 @@ describe('shell approval through scoped MCP path checks', () => {
     'ls -I auto src',
     'grep -eauto README.md',
     'rg --files-with-matches auto src',
+    'tail -n 50 README.md',
+    'cut -d / -f 1 README.md',
+    'git status --porcelain=v2 && git log -n 50 --format="%s" -- README.md',
+    "jq -r '.scripts' README.md",
+    '[ -f README.md ] && test -d src',
   ])(
     'auto-approves safe reads without treating option data as ignored files: %s',
     async (command) => {
@@ -243,6 +272,7 @@ describe('shell approval through scoped MCP path checks', () => {
     'grep -ifignored/patterns.txt README.md',
     'grep -if ignored/patterns.txt README.md',
     'rg --files-with-matches needle ignored',
+    'rg needle ignored/patterns.txt || test "$?" -eq 1',
     'rg --ignore-file ignored/patterns.txt needle src',
     'cat .git/config',
     'head -- -notes',
@@ -253,16 +283,48 @@ describe('shell approval through scoped MCP path checks', () => {
     'rg --pre=custom needle src',
     'cat src/escape/file.txt',
     'cat dangling',
+    'test -f ignored/patterns.txt',
+    'command -v ./ignored/patterns.txt',
+    'git ls-files --exclude-from=ignored/patterns.txt',
+    "jq -r '.scripts' ignored/patterns.txt",
     'echo $(pwd)',
     'ls > output.txt',
   ])('retains approval requirements: %s', async (command) => {
     expect(await needsApproval(command)).toBe(true)
   })
 
+  test('remembered output commands still check protected destinations', async () => {
+    for (const command of [
+      'git diff --output=.git/report.txt',
+      'sort -o .git/report.txt README.md',
+      'uniq README.md .git/report.txt',
+      'tree -o .git/report.txt src',
+    ]) {
+      expect(
+        await needsApproval(command, {
+          shell: ['git diff', 'sort', 'uniq', 'tree'],
+        }),
+      ).toBe(true)
+    }
+  })
+
   test('external operands still require a grant', async () => {
     const command = `head -n 50 ${external}/file.txt`
     expect(await needsApproval(command)).toBe(true)
     expect(await needsApproval(command, { paths: [external] })).toBe(false)
+  })
+
+  test('honors a grant for dependency files reached through a package symlink', async () => {
+    const command =
+      "rg -n 'function (doPaste|editHandlers.paste)|capturePaste' node_modules/example/input.ts; rg -n 'needle' src"
+    expect(
+      await needsApproval(command, { paths: ['node_modules'], plan: true }),
+    ).toBe(false)
+    expect(await needsApproval(command)).toBe(true)
+    expect(await approvalPreview(command)).toMatchObject({
+      approvalPathStatus: 'paths',
+      approvalPaths: [path.join(root, 'node_modules/.bun/example/input.ts')],
+    })
   })
 
   test('uses the actual cwd and respects ignored and external directories', async () => {

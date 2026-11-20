@@ -111,8 +111,29 @@ test('opens approval when the empty composer is focused', async ({ page }) => {
 
   await releaseApprovals(page)
   await expect(picker(page)).toBeVisible()
-  await expect(actions(page)).toBeFocused()
+  const options = actions(page)
+  await expect(options).toBeFocused()
+  await expect(options).toHaveCSS('outline-style', 'none')
+  await expect(options).toHaveCSS('box-shadow', 'none')
   await expect(review(page)).toHaveCount(0)
+})
+
+test('highlights question choices without outlining the group', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=subagent-approvals&id=parent&question')
+  const options = page.getByRole('radiogroup', { name: 'Which option?' })
+  await expect(options).toBeFocused()
+  await expect(options).toHaveCSS('outline-style', 'none')
+
+  await page.keyboard.press('ArrowDown')
+  await expect(options.getByRole('radio', { name: '1 A' })).toBeChecked()
+
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('textbox', { name: 'Additional context' })).toBeFocused() // prettier-ignore
+  await page.keyboard.press('Shift+Tab')
+  await expect(options).toBeFocused()
+  await expect(options).toHaveCSS('outline-style', 'none')
 })
 
 test('keeps an automatic approval stable while work expands and collapses', async ({
@@ -160,21 +181,24 @@ test('restores note drafts and approval navigation when moving between views', a
   await expect(note(page)).toHaveText('Shared child note')
   await page.getByRole('button', { name: 'View child', exact: true }).click()
   await expect(note(page)).toHaveText('Shared child note')
-  await expect(actions(page)).toBeFocused()
-
+  const options = actions(page)
+  await expect(options).toBeFocused()
   const deny = picker(page).getByRole('option', { name: /^Deny/ })
   const abort = picker(page).getByRole('option', { name: /^Abort/ })
   await deny.hover()
   await expect(deny).toHaveAttribute('aria-selected', 'true')
   await page.keyboard.press('ArrowDown')
   await expect(abort).toHaveAttribute('aria-selected', 'true')
+  await expect(options).toHaveCSS('outline-style', 'none')
   await page.keyboard.press('ArrowUp')
   await expect(deny).toHaveAttribute('aria-selected', 'true')
 
   await page.keyboard.press('Tab')
   await expect(note(page)).toBeFocused()
   await page.keyboard.press('Shift+Tab')
-  await expect(actions(page)).toBeFocused()
+  await expect(options).toBeFocused()
+  await expect(options).toHaveCSS('outline-style', 'none')
+  await expect(options).toHaveCSS('box-shadow', 'none')
   await expect(deny).toHaveAttribute('aria-selected', 'true')
   expect(await mutations(page)).toEqual([])
 })

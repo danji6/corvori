@@ -1,9 +1,13 @@
-import type { PathCheckResult } from '@cv/core/workspace/path-policy'
+import type {
+  CheckedPath,
+  PathCheckResult,
+} from '@cv/core/workspace/path-policy'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { glob } from 'tinyglobby'
 
 import {
+  firstSymlink,
   inspectPath,
   isOutside,
   pathCandidate,
@@ -55,13 +59,14 @@ export async function checkPaths(
       result.uncovered.push(candidate)
     }
   }
-  await flagSensitivePaths(roots, result, Boolean(input.literal))
+  await flagSensitivePaths(root, roots, result, Boolean(input.literal))
   result.flagged = [...new Set(result.flagged)]
   result.uncovered = [...new Set(result.uncovered)]
   return result
 }
 
 async function flagSensitivePaths(
+  cwd: string,
   roots: string[],
   result: PathCheckResult,
   literal: boolean,
@@ -70,30 +75,11 @@ async function flagSensitivePaths(
 
   if (!literal) {
     for (const root of roots) {
-      const candidates = result.resolved.filter(
-        (item) => !isOutside(root, item.absolutePath),
+      const matches = await gitIgnoredPaths(root, cwd, result.resolved).catch(
+        () => null,
       )
-
-      const pathsForCandidate = (item: PathCheckResult['resolved'][number]) => [
-        gitRelativePath(root, item.absolutePath),
-        gitRelativePath(root, path.resolve(roots[0]!, item.inputPath)),
-      ]
-      const relativePaths = candidates
-        .flatMap(pathsForCandidate)
-        .filter((value) => value !== '..' && !value.startsWith(`..${path.sep}`))
-
-      const matches = await gitCheckIgnore(root, [...new Set(relativePaths)])
-      if (matches === null) {
-        result.complete = false
-      } else {
-        for (const candidate of candidates) {
-          if (
-            pathsForCandidate(candidate).some((value) => matches.has(value))
-          ) {
-            ignored.add(candidate.path)
-          }
-        }
-      }
+      if (matches === null) result.complete = false
+      else for (const match of matches) ignored.add(match)
     }
   }
 
@@ -103,6 +89,39 @@ async function flagSensitivePaths(
       if (!item.allowed) result.uncovered.push(item.path)
     }
   }
+}
+
+async function gitIgnoredPaths(
+  root: string,
+  cwd: string,
+  items: CheckedPath[],
+): Promise<string[] | null> {
+  const checks: { target: string; gitPaths: string[] }[] = []
+  for (const item of items) {
+    if (isOutside(root, item.absolutePath)) continue
+    const gitPaths = await gitPathsForItem(root, cwd, item)
+    checks.push({ target: item.path, gitPaths })
+  }
+
+  const paths = [...new Set(checks.flatMap((check) => check.gitPaths))]
+  const matches = await gitCheckIgnore(root, paths)
+  if (matches === null) return null
+  return checks
+    .filter(({ gitPaths }) =>
+      gitPaths.some((candidate) => matches.has(candidate)),
+    )
+    .map(({ target }) => target)
+}
+
+async function gitPathsForItem(root: string, cwd: string, item: CheckedPath) {
+  const paths = [gitRelativePath(root, item.absolutePath)]
+  const input = path.resolve(cwd, item.inputPath)
+  if (input === item.absolutePath || isOutside(root, input)) return paths
+
+  // Git can check the link itself, but rejects pathspecs below it.
+  const alias = await firstSymlink(root, path.relative(root, input))
+  paths.push(gitRelativePath(root, alias ?? input))
+  return paths
 }
 
 /** Represent the root as a valid Git pathspec, including during result matching. */

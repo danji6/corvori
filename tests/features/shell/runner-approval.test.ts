@@ -47,6 +47,24 @@ describe('package and environment runners', () => {
     ).toBe(false)
   })
 
+  test('remembers only no-install Prettier checks under the scoped pattern', () => {
+    const pattern = 'bun x --no-install prettier --check'
+    const command = `${pattern} src/{app,view}.ts README.md`
+    expect(analyzeShellCommand(command, []).unapproved).toEqual([pattern])
+    expect(isShellCommandAutoApproved(command, [pattern])).toBe(true)
+    expect(isShellCommandAutoApproved(command, ['bun x prettier'])).toBe(true)
+
+    for (const invocation of [
+      'bun x prettier --check README.md',
+      'bun x --no-install prettier --write README.md',
+      `${pattern} README.md --write`,
+      `${pattern} --plugin ./local-plugin.js README.md`,
+      `${pattern} {--write,README.md}`,
+    ]) {
+      expect(isShellCommandAutoApproved(invocation, [pattern])).toBe(false)
+    }
+  })
+
   test('runner prefixes cover their tasks and executables', () => {
     expect(
       isShellCommandAutoApproved('bun run tests toolkits', ['bun run']),

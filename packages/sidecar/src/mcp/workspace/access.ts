@@ -34,6 +34,23 @@ export async function canonicalPath(candidate: string): Promise<string> {
   return current
 }
 
+/** Locate the first symlink under root in a normalized relative path. */
+export async function firstSymlink(
+  root: string,
+  relativePath: string,
+): Promise<string | undefined> {
+  let current = root
+  for (const segment of relativePath.split(path.sep)) {
+    current = path.join(current, segment)
+    try {
+      if ((await lstat(current)).isSymbolicLink()) return current
+    } catch (error) {
+      if (isMissing(error)) return
+      throw error
+    }
+  }
+}
+
 function isMissing(error: unknown): boolean {
   return (
     typeof error === 'object' &&

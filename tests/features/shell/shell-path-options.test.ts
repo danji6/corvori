@@ -74,6 +74,19 @@ describe('shell path option classification', () => {
     'head --bytes=50 README.md',
     'head -qn50 README.md',
     'head -50 README.md',
+    'tail -n 50 README.md',
+    'tail --lines=50 README.md',
+    'tail -qn50 README.md',
+    'du -h --max-depth 1 README.md',
+    'df -h -t ext4 README.md',
+    'cut -d / -f 1 README.md',
+    'sort --key=2,2 README.md',
+    'sort -k 2 README.md',
+    'uniq -w 10 README.md',
+    'nl -ba -w 2 README.md',
+    'tree -L 2 -I "node_modules|dist" README.md',
+    "jq -r '.scripts' README.md",
+    "jq '.items[] | .name // empty' README.md",
     'ls --color=auto README.md',
     'ls --color README.md',
     'ls -I "*.js" README.md',
@@ -128,6 +141,8 @@ describe('shell path option classification', () => {
 
   test.each([
     ['head -- -notes', ['-notes']],
+    ['tail -n 50 -- -notes', ['-notes']],
+    ['du -- -', ['./-']],
     ['ls -- -notes', ['-notes']],
     ['ls -- -', ['./-']],
     ['grep -- needle -notes', ['-notes']],
@@ -159,10 +174,34 @@ describe('shell path option classification', () => {
     'ls --future-option README.md',
     'grep --future-option needle README.md',
     'rg --pre=custom needle README.md',
+    'du --files0-from=names.txt',
+    'sort --files0-from=names.txt',
+    'sort --compress-program=custom README.md',
+    'tree -L 2 -R src',
   ])(
     'fails closed for missing values or unsupported options: %s',
     (command) => {
       expect(analyzeShellPathCandidates(command).complete).toBe(false)
     },
   )
+
+  test('keeps auxiliary files and output destinations as operands', () => {
+    for (const command of [
+      'du --exclude-from patterns.txt README.md',
+      'sort --random-source patterns.txt README.md',
+      'tree --infofile=patterns.txt README.md',
+      'git ls-files -X patterns.txt -- README.md',
+    ]) {
+      expect(analyzeShellPathCandidates(command)).toEqual({
+        candidates: ['patterns.txt', 'README.md'],
+        complete: true,
+      })
+    }
+    expect(analyzeShellPathCandidates('sort -o- README.md').candidates).toEqual(
+      ['./-', 'README.md'],
+    )
+    expect(
+      analyzeShellPathCandidates('jq -f patterns.txt README.md').candidates,
+    ).toContain('patterns.txt')
+  })
 })

@@ -16,6 +16,7 @@ export interface ShellOptionArgs {
   options: ShellOption[]
   complete: boolean
   terminated: boolean
+  operandBoundary?: number
 }
 
 /** Classify options without confusing their values with filesystem operands. */
@@ -33,6 +34,7 @@ export function parseShellOptionArgs(
     const arg = args[i]!
     if (arg === '--') {
       result.terminated = true
+      result.operandBoundary = result.operands.length
       result.operands.push(...args.slice(i + 1))
       break
     }
@@ -79,7 +81,7 @@ function splitOptions(arg: string, spec: ShellOptionSpec): ShellOption[] {
   const options: ShellOption[] = []
   for (let i = 1; i < arg.length; i++) {
     const flag = `-${arg[i]}`
-    if (spec.required.has(flag)) {
+    if (spec.required.has(flag) || spec.optional?.has(flag)) {
       options.push({ flag, value: arg.slice(i + 1) || undefined })
       break
     }
