@@ -1,4 +1,33 @@
 /* --- Tailwind --- */
+/* Let an embedded control own its hover state. */
+@custom-variant row-hover {
+  @media (hover: hover) {
+    &:hover:not(
+        :has(
+          :where(
+              button,
+              a[href],
+              [role='button'],
+              [role='combobox'],
+              input,
+              select,
+              textarea
+            ):not(
+              :where(
+                [data-row-trigger],
+                [role='checkbox'],
+                [role='switch'],
+                [type='checkbox'],
+                [type='radio']
+              )
+            ):hover
+        )
+      ) {
+      @slot;
+    }
+  }
+}
+
 @custom-variant data-open {
   &:where([data-state='open']),
   &:where([data-open]:not([data-open='false'])) {

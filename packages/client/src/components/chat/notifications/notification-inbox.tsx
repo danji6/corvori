@@ -182,12 +182,13 @@ function NotificationRow({
     <div
       data-notification-id={notification._id}
       className={cn(
-        'hover:bg-m3-surface-container-high group flex flex-wrap items-center rounded-lg',
+        'row-hover:bg-m3-surface-container-high group flex flex-wrap items-center rounded-lg',
         !unread && 'text-muted-foreground',
         notification.attention && 'bg-m3-primary/8 ring-m3-primary/15 ring-1',
       )}
     >
       <Popover.Close
+        data-row-trigger=""
         render={
           <RippleButton variant={null} size={null} rippleVariant="stealth" />
         }

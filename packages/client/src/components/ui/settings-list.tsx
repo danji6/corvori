@@ -72,12 +72,14 @@ function SettingsListItem({
       data-slot="settings-list-item"
       ref={internalRef}
       className={cn(
-        'relative isolate flex overflow-hidden px-4 py-3 transition-colors select-none',
+        'motion-safe:row-hover:transition-colors relative isolate flex overflow-hidden px-4 py-3 select-none',
         ...(disabled
           ? ['cursor-not-allowed opacity-50']
           : [
-              !unhoverable && 'hover:bg-m3-surface-container-high/70',
-              unclickable && unhoverable && 'hover:bg-m3-surface-container/50',
+              !unhoverable && 'row-hover:bg-m3-surface-container-high/70',
+              unclickable &&
+                unhoverable &&
+                'row-hover:bg-m3-surface-container/50',
               !unclickable && 'cursor-pointer',
             ]),
         isHorizontal ? 'items-center justify-between gap-4' : 'flex-col gap-2',
@@ -212,7 +214,7 @@ const SettingsListRadioItem = ({
         <div
           ref={ref}
           className={cn(
-            'hover:bg-m3-surface-container-high active:bg-m3-surface-container-highest relative isolate flex cursor-pointer items-center justify-between gap-4 overflow-hidden px-4 py-3 transition-colors select-none',
+            'row-hover:bg-m3-surface-container-high active:bg-m3-surface-container-highest motion-safe:row-hover:transition-colors relative isolate flex cursor-pointer items-center justify-between gap-4 overflow-hidden px-4 py-3 select-none',
             className,
           )}
         >
