@@ -95,6 +95,7 @@ import type * as lib_tool_shellConfig from "../lib/tool/shellConfig.js";
 import type * as lib_tool_shellOptionArgs from "../lib/tool/shellOptionArgs.js";
 import type * as lib_tool_shellParse from "../lib/tool/shellParse.js";
 import type * as lib_tool_shellPathAnalysis from "../lib/tool/shellPathAnalysis.js";
+import type * as lib_tool_shellQueries from "../lib/tool/shellQueries.js";
 import type * as lib_userShell from "../lib/userShell.js";
 import type * as lib_utils from "../lib/utils.js";
 import type * as lib_workspace from "../lib/workspace.js";
@@ -559,6 +560,7 @@ declare const fullApi: ApiFromModules<{
   "lib/tool/shellOptionArgs": typeof lib_tool_shellOptionArgs;
   "lib/tool/shellParse": typeof lib_tool_shellParse;
   "lib/tool/shellPathAnalysis": typeof lib_tool_shellPathAnalysis;
+  "lib/tool/shellQueries": typeof lib_tool_shellQueries;
   "lib/userShell": typeof lib_userShell;
   "lib/utils": typeof lib_utils;
   "lib/workspace": typeof lib_workspace;

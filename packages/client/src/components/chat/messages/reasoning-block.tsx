@@ -11,6 +11,7 @@ export type ReasoningBlockProps = {
   messageId: string
   segmentIndex: number
   groupIndex: number
+  inWorkGroup?: boolean
   version?: number
 }
 
@@ -19,6 +20,7 @@ export function ReasoningBlock({
   messageId,
   segmentIndex,
   groupIndex,
+  inWorkGroup,
   version,
 }: ReasoningBlockProps) {
   const { label, isStreaming } = useReasoningLabel(part)
@@ -45,7 +47,8 @@ export function ReasoningBlock({
       open={open}
       onOpenChange={onOpenChange}
       dense
-      surface="inset-row"
+      surface={inWorkGroup ? 'inset-row' : 'inset'}
+      triggerClassName="py-(--work-header-padding-y)"
     >
       <div
         className="wrap-break-word whitespace-pre-wrap opacity-70"

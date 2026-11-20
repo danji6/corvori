@@ -315,12 +315,14 @@ function GroupRow({ row, message, messageMeta, partMeta }: GroupRowProps) {
 
   if (!group) return null
 
+  const inWorkGroup = Boolean(row.workId && !row.promotedToolCallIds)
+
   return (
     <div
       data-slot="message-group"
       className={cn(
         'w-full max-w-full wrap-break-word',
-        row.workId && !row.promotedToolCallIds && 'pl-(--message-group-inset)',
+        inWorkGroup && 'pl-(--message-group-inset)',
       )}
     >
       <div
@@ -343,6 +345,7 @@ function GroupRow({ row, message, messageMeta, partMeta }: GroupRowProps) {
           }
           segmentIndex={row.segmentIndex}
           groupIndex={row.groupIndex}
+          inWorkGroup={inWorkGroup}
           version={messageMeta?.selectedVersion ?? 1}
           attachmentIds={attachmentIds}
           partMeta={partMeta}

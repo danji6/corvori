@@ -20,6 +20,7 @@ import {
   splitShellChain,
   tokenizeShell,
 } from './shellParse'
+import { commandLookupPattern } from './shellQueries'
 
 export interface ShellPathAnalysis {
   /** Explicit path operands found in the command. */
@@ -91,7 +92,10 @@ export function extractPathCandidates(command: string): string[] {
 }
 
 function pathValuesFromSegment(text: string): SegmentPathAnalysis {
-  const invocation = invocationFromTokens(tokenizeShell(text))
+  const tokens = tokenizeShell(text)
+  if (commandLookupPattern(tokens)) return { values: [], complete: true }
+
+  const invocation = invocationFromTokens(tokens)
   if (!invocation) return { values: [], complete: false }
   return pathValuesFromInvocation(invocation)
 }
@@ -134,14 +138,8 @@ function pathValuesFromInvocation(
   }
   if (program === 'find') return mergePathValues(values, findPathValues(args))
   if (NO_PATH_PROGRAMS.has(program)) return { values, complete: true }
-  if (
-    program === 'git' &&
-    hasGitRefOperands(args.map((token) => token.value))
-  ) {
-    return {
-      values: [...values, ...gitGlobalPathValues(args)],
-      complete: true,
-    }
+  if (program === 'git') {
+    return { values: [...values, ...gitPathValues(args)], complete: true }
   }
   if (!DEFAULT_SAFE_PROGRAMS.has(program)) {
     return {
@@ -192,14 +190,23 @@ function executedPathValues(
   return { ...analysis, complete: analysis.complete && !remoteScript }
 }
 
-/** Preserve global repository paths, including Git's attached `-Cpath` form. */
-function gitGlobalPathValues(args: ShellToken[]): string[] {
-  const index = gitSubcommandIndex(args.map((token) => token.value))
+/** Distinguish Git queries from their explicit filesystem operands. */
+function gitPathValues(args: ShellToken[]): string[] {
+  const words = args.map((token) => token.value)
+  const index = gitSubcommandIndex(words)
+  const separator = words[index + 2]
+  const diffCheck =
+    words[index] === 'diff' &&
+    words[index + 1] === '--check' &&
+    (separator === undefined || separator === '--')
+  if (!diffCheck && !hasGitRefOperands(words)) return genericPathValues(args)
+
   const globals = args.slice(0, index)
-  const attachedDirectories = globals
+  const directories = globals
     .filter((token) => token.value.startsWith('-C') && token.value.length > 2)
     .map((token) => token.value.slice(2))
-  return [...genericPathValues(globals), ...attachedDirectories]
+  const operands = diffCheck ? words.slice(index + 3) : []
+  return [...genericPathValues(globals), ...directories, ...operands]
 }
 
 /** Locate the effective program through simple wrapper and env prefixes. */

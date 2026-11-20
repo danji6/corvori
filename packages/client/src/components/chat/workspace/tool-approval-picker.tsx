@@ -139,7 +139,7 @@ export function ToolApprovalPicker({
               event.stopPropagation()
             }
           }}
-          className="focus-within:ring-ring focus-within:ring-1"
+          className="outline-none"
         >
           <Command.CommandList>
             {actions.map((action) => (

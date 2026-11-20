@@ -18,6 +18,7 @@ import {
   tokenizeShell,
 } from './shellParse'
 import { analyzeShellPathCandidates } from './shellPathAnalysis'
+import { commandLookupPattern, prettierCheckPattern } from './shellQueries'
 
 export {
   isPathAllowed,
@@ -108,15 +109,18 @@ export function analyzeShellCommand(
     if (!segment.text) continue
 
     for (const text of expandShellControlSegment(segment.text)) {
-      const { pattern, parts, helpOnly, readOnlyArgs } =
+      const { pattern, parts, builtInSafe, scopedParts } =
         patternFromSegment(text)
       if (!pattern) continue
       if (!patterns.includes(pattern)) patterns.push(pattern)
 
       const covered =
-        helpOnly ||
-        (readOnlyArgs && DEFAULT_SAFE_SHELL_PATTERNS.has(pattern)) ||
-        prefixes.some((prefix) => matchesCommandPrefix(parts, prefix))
+        builtInSafe ||
+        prefixes.some(
+          (prefix) =>
+            matchesCommandPrefix(parts, prefix) ||
+            matchesScopedPattern(scopedParts, prefix),
+        )
       if (!covered && !unapproved.includes(pattern)) unapproved.push(pattern)
     }
   }
@@ -131,6 +135,13 @@ function matchesCommandPrefix(parts: string[], prefix: string[]): boolean {
     prefix.length <= parts.length &&
     prefix.every((word, index) => word === parts[index])
   )
+}
+
+function matchesScopedPattern(
+  parts: string[] | null,
+  prefix: string[],
+): boolean {
+  return parts?.length === prefix.length && matchesCommandPrefix(parts, prefix)
 }
 
 export function isShellCommandAutoApproved(
@@ -236,6 +247,16 @@ function subcommandIndex(program: string, rest: ShellToken[]): number {
 /** Derive the allowlist pattern for one chain segment. */
 function patternFromSegment(text: string) {
   const tokens = tokenizeShell(text)
+  const lookup = commandLookupPattern(tokens)
+  if (lookup) {
+    return {
+      pattern: lookup.join(' '),
+      parts: lookup,
+      builtInSafe: true,
+      scopedParts: null,
+    }
+  }
+
   const names: string[] = []
   let program: string | null = null
   let hasOpaquePayload = false
@@ -292,16 +313,20 @@ function patternFromSegment(text: string) {
     rest.length > 0 &&
     rest.every((token) => VERSION_OR_HELP.test(token.value))
 
+  const pattern = names.join(' ')
+  const readOnly =
+    program !== null &&
+    DEFAULT_SAFE_SHELL_PATTERNS.has(pattern) &&
+    hasReadOnlyArguments(
+      program,
+      rest.map((token) => token.value),
+    )
+  const scopedParts = prettierCheckPattern(tokens)
   return {
-    pattern: names.join(' '),
+    pattern: scopedParts?.join(' ') ?? pattern,
     parts: names,
-    helpOnly,
-    readOnlyArgs:
-      program === null ||
-      hasReadOnlyArguments(
-        program,
-        rest.map((token) => token.value),
-      ),
+    builtInSafe: helpOnly || readOnly,
+    scopedParts,
   }
 }
 

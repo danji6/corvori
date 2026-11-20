@@ -41,6 +41,7 @@ export type RenderGroupProps = {
   segmentIndex?: number
   /** Position of this group within its segment, which addresses the block. */
   groupIndex: number
+  inWorkGroup?: boolean
   type?: UIMessageType
   version?: number
   attachmentIds?: Record<string, string>
@@ -127,6 +128,7 @@ export const RenderGroup = memo(function RenderGroup(props: RenderGroupProps) {
         messageId={props.message.id}
         segmentIndex={props.segmentIndex ?? 0}
         groupIndex={props.groupIndex}
+        inWorkGroup={props.inWorkGroup}
         version={props.version}
       />
     )
