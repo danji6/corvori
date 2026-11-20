@@ -86,10 +86,6 @@ export function buildTodoNudgeContent(items: TodoItem[]) {
     'Your todo list has not been updated in a while. Current todos:',
     '',
     formatTodoList(items),
-    '',
-    'Continue the task if it still applies and update statuses with ' +
-      'edit_todo as you make progress, or clear the list with an empty ' +
-      'write_todo call if it is no longer relevant.',
   )
 }
 

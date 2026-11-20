@@ -64,7 +64,7 @@ export class McpRegistry {
       (previous.epoch > epoch ||
         (previous.epoch === epoch && previous.key !== scope.key))
     if (superseded) {
-      throw new Error('MCP authorization was superseded; reconnect explicitly')
+      throw new Error('MCP authorization was superseded; connect again')
     }
 
     this.fences.set(binding, { epoch, key: scope.key, at: Date.now() })
@@ -85,14 +85,14 @@ export class McpRegistry {
   private assertExpected(entry: Entry | undefined, expected: Expectation) {
     if (expected.bootId && expected.bootId !== this.bootId) {
       throw new Error(
-        'MCP session lost after sidecar restart; reconnect explicitly. The previous outcome may be unknown.',
+        'MCP session lost after server restart; connect again. The previous outcome may be unknown.',
       )
     }
     if (
       expected.generation &&
       expected.generation !== entry?.status.generation
     ) {
-      throw new Error('MCP connection generation changed; reconnect explicitly')
+      throw new Error('MCP connection generation changed; connect again')
     }
   }
 
@@ -130,12 +130,12 @@ export class McpRegistry {
     if (existing) {
       await this.checkToolkit(existing)
       if (existing.fingerprint !== fingerprint) {
-        throw new Error('MCP configuration changed; reconnect explicitly')
+        throw new Error('MCP configuration changed; connect again')
       }
       await existing.connecting
       if (existing.status.state !== 'connected') {
         throw new Error(
-          existing.status.reason ?? 'MCP session lost; reconnect explicitly',
+          existing.status.reason ?? 'MCP session lost; connect again',
         )
       }
       return this.view(existing)
@@ -213,7 +213,7 @@ export class McpRegistry {
           entry.status.state = 'lost'
           entry.status.reason =
             'MCP process or connection exited; analysis state was lost. ' +
-            `Reconnect explicitly.${detail}`
+            `Connect again.${detail}`
         }
       }
 
@@ -301,14 +301,14 @@ export class McpRegistry {
     this.assertExpected(entry, expected)
     this.status(scope)
     if (!entry) {
-      throw new Error('MCP connection missing; reconnect explicitly')
+      throw new Error('MCP connection missing; connect again')
     }
 
     const operation = entry.queue
       .catch(() => {})
       .then(async () => {
         if (entry.status.state !== 'connected' || !entry.client) {
-          throw new Error('MCP session unavailable; reconnect explicitly')
+          throw new Error('MCP session unavailable; connect again')
         }
         await this.checkToolkit(entry)
         const authorizationExpired =
@@ -360,13 +360,13 @@ export class McpRegistry {
     const entry = this.entries.get(scope.key)
     this.assertExpected(entry, expected)
     this.status(scope)
-    if (!entry) throw new Error('MCP connection missing; reconnect explicitly')
+    if (!entry) throw new Error('MCP connection missing; connect again')
 
     const operation = entry.queue
       .catch(() => {})
       .then(async () => {
         if (entry.status.state !== 'connected' || !entry.client)
-          throw new Error('MCP session unavailable; reconnect explicitly')
+          throw new Error('MCP session unavailable; connect again')
         signal?.throwIfAborted()
         await this.checkToolkit(entry)
         const authorizationExpired =
@@ -458,7 +458,7 @@ export class McpRegistry {
     this.shuttingDown = true
     const results = await Promise.allSettled(
       this.list().map((item) =>
-        this.disconnect(item.scope, 'Sidecar shutting down'),
+        this.disconnect(item.scope, 'Server shutting down'),
       ),
     )
     const failures = results.filter((result) => result.status === 'rejected')

@@ -114,7 +114,7 @@ export async function authorizeRuntime(ctx: MutationCtx, input: RuntimeInput) {
   if (row.state === 'disconnected' || row.state === 'lost') {
     const reason = row.reason ? ` Reason: ${row.reason.slice(0, 512)}` : ''
     error(
-      `MCP session is ${row.state}; reconnect explicitly before retrying.${reason}`,
+      `MCP session is ${row.state}; reconnect before retrying.${reason}`,
       409,
     )
   }

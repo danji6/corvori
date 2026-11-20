@@ -204,7 +204,7 @@ async function resolveDestination(
   if (existing?.operationId && existing.operationId !== op._id)
     error('Destination folder is being updated', 409)
   if (args.insideData && !existing?.managed && op.kind === 'home')
-    error('Custom homes cannot overlap sidecar storage', 409)
+    error('Custom homes cannot overlap server storage', 409)
   if (existing) await assertDestinationMembersIdle(ctx, existing._id, op)
   return existing
 }

@@ -128,7 +128,7 @@ async function recordSnapshotStatus(
     state: sidecarRestarted ? 'lost' : (status?.state ?? 'lost'),
     reason:
       sidecarRestarted || !status
-        ? 'MCP session lost; reconnect explicitly'
+        ? 'MCP session lost; connect again'
         : status.reason,
   })
 }
@@ -150,7 +150,7 @@ export async function runtimeStatus(
     state: status?.state ?? 'lost',
     reason:
       status?.reason ??
-      (status ? undefined : 'MCP session lost; reconnect explicitly'),
+      (status ? undefined : 'MCP session lost; connect again'),
   })
 
   return status

@@ -29,7 +29,7 @@ export async function recoverCaptures(storage: CheckpointStorage) {
     await recoverSealedBaseline(storage, group)
     group.interrupted = true
     group.issues.push(
-      'Sidecar restarted during capture; changes may be incomplete.',
+      'Server restarted during capture; changes may be incomplete.',
     )
     groups.set(group.id, group)
     await storage.save('groups', group.id, group)

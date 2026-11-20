@@ -73,7 +73,7 @@ export function ChatGPTConnection({
     } catch {
       tab?.close()
       toast.error(
-        'Could not start ChatGPT sign-in. Check that the sidecar is running.',
+        'Could not start ChatGPT sign-in. Check that the server is running.',
       )
     } finally {
       setBusy(false)
@@ -92,7 +92,7 @@ export function ChatGPTConnection({
         )
       }
     } catch {
-      toast.error('Could not disconnect. Check the sidecar and retry.')
+      toast.error('Could not disconnect. Check the server and retry.')
     } finally {
       setBusy(false)
     }

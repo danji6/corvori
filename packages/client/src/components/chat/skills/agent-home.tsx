@@ -129,7 +129,7 @@ export function AgentHomeSettings({ agentId }: { agentId: Id<'agents'> }) {
           <RippleButton
             variant="input"
             disabled={busy}
-            title={`Open on ${capability.machine} (sidecar machine)`}
+            title={`Open on ${capability.machine} (server machine)`}
             onClick={() =>
               void openFolder({ agentId }).catch((error) =>
                 toastError(error, 'Could not open folder'),

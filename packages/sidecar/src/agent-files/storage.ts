@@ -9,7 +9,7 @@ let canonicalData: { requested: string; path: string } | undefined
 
 export function dataRoot() {
   const root = process.env.CHAT_SIDECAR_DATA_DIR
-  if (!root) throw new Error('Sidecar data directory must be set')
+  if (!root) throw new Error('Server data directory must be set')
 
   const requested = path.resolve(expandHome(root))
   if (canonicalData?.requested === requested) return canonicalData.path
@@ -110,7 +110,7 @@ export async function resolveHome(
     override &&
     inside(dataRoot(), root) &&
     root !== managedHome(ownerId, agentId)
-  if (insideData) throw new Error('Custom homes cannot overlap sidecar storage')
+  if (insideData) throw new Error('Custom homes cannot overlap server storage')
 
   return root
 }

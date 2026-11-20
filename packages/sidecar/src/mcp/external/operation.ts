@@ -79,7 +79,7 @@ export class McpOperations {
           record.updatedAt = Date.now()
           record.state = 'lost'
           record.error =
-            'Sidecar restarted during execution; outcome unknown. This operation will not be replayed.'
+            'Server restarted during execution; outcome unknown. This operation will not be replayed.'
           await this.store.save(record)
         }
 
@@ -165,7 +165,7 @@ export class McpOperations {
     if (this.connectionLost(input)) {
       record.state = 'lost'
       record.error =
-        'MCP session lost before dispatch; outcome may be unknown. Reconnect explicitly.'
+        'MCP session lost before dispatch; outcome may be unknown. Connect again.'
     } else if (input.deadlineAt <= Date.now()) {
       record.state = 'timedOut'
       record.error = 'MCP absolute operation deadline elapsed before dispatch'

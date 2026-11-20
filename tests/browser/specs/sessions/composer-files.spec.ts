@@ -52,6 +52,33 @@ function completeSend(page: Page, success: boolean) {
   }, success)
 }
 
+test('picking a file keeps typing on the current composer line', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=empty-chat')
+  const editor = composer(page).locator('[contenteditable="true"]')
+  await editor.pressSequentially('## Review')
+  const heading = editor.getByRole('heading', { name: 'Review' })
+  await expect(heading).toBeVisible()
+
+  await composer(page).getByRole('button', { name: 'Composer actions' }).click()
+  const choosingFile = page.waitForEvent('filechooser')
+  await page.getByRole('menuitem', { name: 'Add files' }).click()
+  const chooser = await choosingFile
+  await chooser.setFiles({
+    name: 'notes.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('notes'),
+  })
+  await expect(
+    composer(page).getByRole('button', { name: 'Preview notes.txt' }),
+  ).toBeVisible()
+  await expect(editor).toBeFocused()
+
+  await page.keyboard.insertText(' these notes')
+  await expect(editor.getByRole('heading')).toHaveText('Review these notes')
+})
+
 test('shows mixed attachments immediately and keeps them visible through confirmation', async ({
   page,
 }) => {

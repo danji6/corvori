@@ -368,7 +368,9 @@ export function ChatComposer({
     dropZoneRef.current?.clear()
     const editor = editorRef.current
     if (!editor || editor.isDestroyed || props.inert) return
-    if (!isCovered(editor.view.dom)) editor.commands.focus('end')
+    if (!isCovered(editor.view.dom)) {
+      editor.commands.focus(null, { scrollIntoView: false })
+    }
   }
 
   const placeholder =

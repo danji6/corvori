@@ -203,7 +203,7 @@ test.each(['lost', 'disconnected'])(
     }
     expect(message).toContain(`MCP session is ${state}`)
     expect(message).toContain('Sidecar restarted.')
-    expect(message).toContain('reconnect explicitly')
+    expect(message).toContain('connect again')
     expect(message).not.toContain('in MCP settings')
     expect(message.length).toBeLessThan(650)
   },

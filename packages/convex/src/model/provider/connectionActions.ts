@@ -34,7 +34,7 @@ export async function discover(
     if (!status)
       return force
         ? {
-            error: 'Model discovery failed. Check that the sidecar is running.',
+            error: 'Model discovery failed. Check that the server is running.',
           }
         : {}
     if (status.status !== 'connected' || !status.planEnabled) return {}

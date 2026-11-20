@@ -245,7 +245,7 @@ const termStreamHandler = httpAction(async (ctx, req) => {
       }),
     )
   } catch {
-    return jsonResponse({ error: 'Sidecar unavailable' }, 502, origin)
+    return jsonResponse({ error: 'Server unavailable' }, 502, origin)
   }
 
   if (!upstream.ok || !upstream.body) {

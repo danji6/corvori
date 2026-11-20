@@ -22,7 +22,7 @@ export const MESSAGE_WINDOW_MAX_ROWS = 160
 export const STREAM_PATCH_INTERVAL_MS = 200
 
 /** Steps without a todo write/edit before unresolved todos trigger a nudge. */
-export const TODO_NUDGE_INTERVAL_STEPS = 10
+export const TODO_NUDGE_INTERVAL_STEPS = 20
 
 /** Single agent settings toggle covering both todo tools. */
 export const TODO_TOOL_TOGGLE = 'todo'

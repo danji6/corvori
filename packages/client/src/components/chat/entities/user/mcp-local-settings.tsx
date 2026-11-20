@@ -29,7 +29,7 @@ export function McpLocalSettings({ item, onChange }: Props) {
       <Input
         aria-label="MCP working directory"
         value={item.cwd ?? ''}
-        placeholder="Working directory (sidecar default if omitted)"
+        placeholder="Working directory (server default if omitted)"
         onValueChange={(cwd) => onChange({ cwd: cwd || undefined })}
       />
       <Textarea

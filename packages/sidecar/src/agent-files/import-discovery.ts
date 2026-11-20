@@ -32,7 +32,7 @@ export async function discoverImport(input: FileOperation) {
   if (!(await stat(source)).isDirectory())
     throw new Error('Choose a directory containing skills')
   if (inside(source, root))
-    throw new Error('Import source cannot contain sidecar operation storage')
+    throw new Error('Import source cannot contain server operation storage')
 
   const temporary = path.join(root, 'skills.tmp')
   const writer = createWriteStream(temporary)

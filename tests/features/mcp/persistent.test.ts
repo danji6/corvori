@@ -187,7 +187,7 @@ test('process exit and sidecar replacement require explicit reconnection without
   )
   await expect(
     registry().connect(status.scope, connection, status),
-  ).rejects.toThrow('sidecar restart')
+  ).rejects.toThrow('server restart')
   const fresh = await value.connect(
     { ...status.scope, key: randomUUID(), epoch: 1 },
     connection,
