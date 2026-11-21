@@ -1,14 +1,25 @@
 import type { FileItem } from '@/hooks/file-previews'
+import { normalizeBrowserUrl } from '@/lib/auth/site-url'
 import {
+  type ComposerAttachmentDraft,
   clearComposerAttachmentDraft,
   readComposerAttachmentDraft,
+  sharedFilePart,
   writeComposerAttachmentDraft,
 } from '@/lib/chat/composer-attachment-draft-store'
 import { processFileForUpload } from '@/lib/chat/io'
 import { buildFileItemFromPart } from '@/lib/chat/parts'
-import type { PendingFilePart, PendingMessage } from '@/lib/chat/types'
+import type {
+  PendingFilePart,
+  PendingMessage,
+  SharedAttachment,
+} from '@/lib/chat/types'
 import { toastError } from '@/lib/notifications'
 import { generateId } from '@/lib/utils'
+import {
+  attachmentNameSuffix,
+  suffixFilename,
+} from '@cv/core/utils/attachment-names'
 import type { Editor } from '@tiptap/react'
 import {
   useCallback,
@@ -40,7 +51,6 @@ export function useComposerAttachments({
   const [originalFiles, setOriginalFiles] = useState<Record<string, File>>({})
   const [pastedText, setPastedText] = useState<PastedText>({})
   const [restoredDraftKey, setRestoredDraftKey] = useState<string | null>(null)
-  const pasteIndexRef = useRef(0)
   const revision = useRef(0)
   const filePartsRef = useRef(fileParts)
   const attachmentQueue = useRef<AttachmentQueue | null>(null)
@@ -81,13 +91,16 @@ export function useComposerAttachments({
   useEffect(() => {
     if (!draftKey || restoredDraftKey !== draftKey) return
     const timeout = window.setTimeout(() => {
-      const attachments = fileParts.flatMap((part) => {
-        const file = originalFiles[part.id]
-        const pasted = pastedText[part.id]
-        return file && pasted
-          ? [{ id: part.id, file, pastePosition: pasted.position }]
-          : []
-      })
+      const attachments = fileParts.flatMap(
+        (part): ComposerAttachmentDraft[] => {
+          if (part.share) return [{ id: part.id, share: part.share }]
+          const file = originalFiles[part.id]
+          const pasted = pastedText[part.id]
+          return file && pasted
+            ? [{ id: part.id, file, pastePosition: pasted.position }]
+            : []
+        },
+      )
       void writeComposerAttachmentDraft(draftKey, attachments)
     }, 300)
     return () => window.clearTimeout(timeout)
@@ -95,10 +108,7 @@ export function useComposerAttachments({
 
   const files = useMemo<FileItem[]>(
     () =>
-      fileParts.map((part) => ({
-        ...buildFileItemFromPart(part, part.id),
-        canInsertInline: part.id in pastedText,
-      })),
+      fileParts.map((part) => buildDraftFileItem(part, part.id in pastedText)),
     [fileParts, pastedText],
   )
 
@@ -173,9 +183,8 @@ export function useComposerAttachments({
 
   const addLargeTextPaste = useCallback(
     (text: string, position: number) => {
-      const index = ++pasteIndexRef.current
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-      const file = new File([text], `pasted-text-${stamp}-${index}.txt`, {
+      const filename = suffixFilename('pasted-text.txt', attachmentNameSuffix())
+      const file = new File([text], filename, {
         type: 'text/plain;charset=utf-8',
       })
 
@@ -200,6 +209,16 @@ export function useComposerAttachments({
     },
     [enqueueAttachment],
   )
+
+  const addSharedFiles = useCallback((shares: SharedAttachment[]) => {
+    if (shares.length === 0) return
+    revision.current++
+    setFileParts((previous) => {
+      const parts = new Map(previous.map((part) => [part.id, part]))
+      for (const share of shares) parts.set(share.fileId, sharedFilePart(share))
+      return [...parts.values()]
+    })
+  }, [])
 
   const removeFile = useCallback((id: string) => {
     revision.current++
@@ -231,6 +250,7 @@ export function useComposerAttachments({
   return {
     addFiles,
     addLargeTextPaste,
+    addSharedFiles,
     clearAttachmentDraft,
     fileParts,
     files,
@@ -251,16 +271,36 @@ type RestoredAttachmentDraft = {
   pastedText: PastedText
 }
 
+type RestoredDraftFile = {
+  part: PendingFilePart
+  file?: File
+  pastePosition?: number
+}
+
+function buildDraftFileItem(part: PendingFilePart, canInsertInline: boolean) {
+  const share = part.share
+  const file = buildFileItemFromPart(
+    part,
+    part.id,
+    normalizeBrowserUrl(share?.url) ?? undefined,
+    normalizeBrowserUrl(share?.previewUrl) ?? undefined,
+    share?.shareUrl,
+    share?.byteLength ?? undefined,
+  )
+  return { ...file, canInsertInline, imageDimensions: share?.imageDimensions }
+}
+
 async function restoreAttachmentDraft(
   draftKey: string,
 ): Promise<RestoredAttachmentDraft | null> {
   const saved = await readComposerAttachmentDraft(draftKey)
   const processed = await Promise.allSettled(
-    saved.map(async ({ id, file, pastePosition }) => ({
-      ...(await processComposerFile(file, id)),
-      file,
-      pastePosition,
-    })),
+    saved.map(async (item): Promise<RestoredDraftFile> => {
+      if ('share' in item) return { part: sharedFilePart(item.share) }
+      const { id, file, pastePosition } = item
+      const { part } = await processComposerFile(file, id)
+      return { part, file, pastePosition }
+    }),
   )
   const restored = processed.flatMap((result) =>
     result.status === 'fulfilled' ? [result.value] : [],
@@ -269,7 +309,7 @@ async function restoreAttachmentDraft(
 
   const pastedEntries = await Promise.allSettled(
     restored.flatMap(({ part, file, pastePosition }) =>
-      pastePosition === undefined
+      !file || pastePosition === undefined
         ? []
         : [
             file
@@ -284,7 +324,7 @@ async function restoreAttachmentDraft(
   return {
     fileParts: restored.map(({ part }) => part),
     originalFiles: Object.fromEntries(
-      restored.map(({ part, file }) => [part.id, file]),
+      restored.flatMap(({ part, file }) => (file ? [[part.id, file]] : [])),
     ),
     pastedText: Object.fromEntries(
       pastedEntries.flatMap((result) =>

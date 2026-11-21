@@ -7,7 +7,6 @@ import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import {
   generatedFileCacheKey,
-  generatedFilename,
   isGeneratedFilePart,
   parseDataUrl,
 } from '../../model/stream/generatedFiles'
@@ -70,7 +69,6 @@ export async function offloadGeneratedFiles(
       if (!parsed) return part
 
       const mediaType = part.mediaType ?? parsed.mediaType
-      const filename = part.filename ?? generatedFilename(mediaType, cache.size)
       const { readAttachmentImageDimensions } =
         await import('../io/attachmentImage')
       const imageDimensions = await readAttachmentImageDimensions(parsed.bytes)
@@ -79,7 +77,7 @@ export async function offloadGeneratedFiles(
         new Blob([parsed.bytes], { type: mediaType }),
       )
 
-      const attachmentId = await ctx.runMutation(
+      const stored = await ctx.runMutation(
         internal.attachments._createGenerated,
         {
           streamId: opts.streamId,
@@ -89,12 +87,13 @@ export async function offloadGeneratedFiles(
           uploaderId: opts.uploaderId,
           storageId,
           mediaType,
-          filename,
+          filename: part.filename ?? '',
           imageDimensions,
         },
       )
 
-      if (!attachmentId) return part
+      if (!stored) return part
+      const { attachmentId, filename } = stored
       const compact = {
         type: 'file' as const,
         url: `attachment:${attachmentId}`,

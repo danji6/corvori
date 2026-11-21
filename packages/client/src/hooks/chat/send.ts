@@ -14,11 +14,11 @@ import {
   createOptimisticMessageId,
   showMessageUpload,
 } from '@/lib/chat/message-uploads'
+import type { SharedAttachment } from '@/lib/chat/types'
 import { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
 import type { ResolvedSettings } from '@cv/convex/model/defaults'
 import type { ConfirmAttachmentArgs, ReplyQuote } from '@cv/convex/types'
-import { attachmentReferences } from '@cv/core/attachments'
 import { parseFileMentions } from '@cv/core/mentions/parse'
 import { parseShellCommand, unescapeShellPrefix } from '@cv/core/shell/command'
 import type { WorkspaceLinkSnapshot } from '@cv/core/types/workspace'
@@ -74,8 +74,10 @@ export function useSendMessage() {
   return useCallback(
     async (pending: PendingMessage, role?: MessageRole) => {
       if (!session) throw new Error('Chat session is unavailable')
+
       const content = pending.content.trim()
       const messageRole = role ?? pending.role ?? 'user'
+
       const args: SendArgs = {
         sessionId: session._id,
         content,
@@ -88,14 +90,21 @@ export function useSendMessage() {
           }),
         }),
       }
+
       const optimisticId = createOptimisticMessageId()
-      const localFiles = pending.files.map((part) =>
+      const uploadsOnly = pending.files.filter((part) => !part.share)
+
+      const localFiles = uploadsOnly.map((part) =>
         localAttachment(part, pending.originalFiles?.[part.id], optimisticId),
+      )
+      const localById = new Map(
+        uploadsOnly.map((part, index) => [part.id, localFiles[index].part]),
       )
 
       const storeBlob: StoreBlob = async (blob, mediaType) => {
         const uploadUrl = normalizeBrowserUrl(await generateUploadUrl({}))
         if (!uploadUrl) throw new Error('Upload URL not available')
+
         const response = await fetch(uploadUrl, {
           method: 'POST',
           headers: { 'Content-Type': mediaType },
@@ -104,6 +113,7 @@ export function useSendMessage() {
         if (!response.ok) {
           throw new Error(`Upload failed: ${response.statusText}`)
         }
+
         const { storageId } = (await response.json()) as {
           storageId: Id<'_storage'>
         }
@@ -117,25 +127,31 @@ export function useSendMessage() {
         parseShellCommand(content) === null
 
       let attachments: StagedAttachment[] = []
+
       const previews = localFiles.length
         ? keepAttachmentSendPreviews(localFiles)
         : undefined
+
       const optimistic = buildOptimisticMessage(
         args,
-        localFiles.map(({ part }) => part),
+        pending.files.map((part) =>
+          part.share ? sharedFilePreview(part.share) : localById.get(part.id)!,
+        ),
         profile,
         settings,
         agent,
         optimisticId,
         pending.replyTo,
       )
+
       const upload =
         previews && optimistic ? showMessageUpload(optimistic) : undefined
+
       let sent = false
       try {
         const [uploads, links] = await Promise.allSettled([
           uploadFiles(
-            pending.files,
+            uploadsOnly,
             pending.originalFiles,
             storeBlob,
             async (args) => {
@@ -154,14 +170,23 @@ export function useSendMessage() {
             resolveFileLinks,
           ),
         ])
+
         if (uploads.status === 'rejected') throw uploads.reason
         attachments = uploads.value
         if (links.status === 'rejected') throw links.reason
-        const attachmentLinks = attachmentReferences(content)
+
+        const uploadedById = new Map(
+          uploadsOnly.map((part, index) => [part.id, attachments[index]]),
+        )
+
         const confirmedMessage = previews
           ? buildOptimisticMessage(
               args,
-              attachments.map(confirmedFilePart),
+              pending.files.map((part) =>
+                part.share
+                  ? sharedFilePreview(part.share)
+                  : confirmedFilePart(uploadedById.get(part.id)!),
+              ),
               profile,
               settings,
               agent,
@@ -169,19 +194,25 @@ export function useSendMessage() {
               pending.replyTo,
             )
           : optimistic
+
         previews?.confirm(attachments)
         if (attachments.length > 0) upload?.matchAttachment(attachments[0].id)
+
         const messageId = await sendMutation.withOptimisticUpdate((store) => {
           if (confirmedMessage)
             optimisticallyInsertMessage(store, confirmedMessage)
         })({
           ...args,
-          ...(attachments.length > 0 && {
-            attachments: attachments.map(({ id }) => ({ id })),
+          ...(pending.files.length > 0 && {
+            attachments: pending.files.map((part) =>
+              part.share
+                ? { shareUrl: part.share.shareUrl }
+                : { id: uploadedById.get(part.id)!.id },
+            ),
           }),
-          ...(attachmentLinks.length > 0 ? { attachmentLinks } : {}),
           ...(links.value !== undefined ? { fileLinks: links.value } : {}),
         })
+
         sent = true
         return messageId
       } catch (error) {
@@ -243,14 +274,17 @@ async function uploadFiles(
       }
     }),
   )
+
   const uploaded = settled.flatMap((result) =>
     result.status === 'fulfilled' ? [result.value] : [],
   )
   const failed = settled.find((result) => result.status === 'rejected')
+
   if (failed?.status === 'rejected') {
     await Promise.allSettled(uploaded.map(({ id }) => remove(id)))
     throw failed.reason
   }
+
   return uploaded
 }
 
@@ -281,12 +315,24 @@ function confirmedFilePart({ id, mediaType, filename }: StagedAttachment) {
   } satisfies MessageFile
 }
 
+function sharedFilePreview({
+  mediaType,
+  filename,
+  url,
+}: SharedAttachment): MessageFile {
+  return {
+    type: 'file',
+    mediaType,
+    filename,
+    url: normalizeBrowserUrl(url) ?? url,
+  }
+}
+
 function fileMeta(part: FileUIPart, original: File | undefined): UploadMeta {
   const mediaType =
     original?.type || part.mediaType || 'application/octet-stream'
   const filename =
-    original?.name ??
-    part.filename ??
+    (original?.name || part.filename) ??
     `attachment.${mediaType.split('/')[1]?.split('+')[0] ?? 'bin'}`
   return { mediaType, filename }
 }
@@ -323,6 +369,7 @@ function buildOptimisticMessage(
   const role = args.role ?? 'user'
   // `$ <command>` renders as a shell block
   const command = role === 'user' ? parseShellCommand(args.content) : null
+
   const parts = command
     ? [
         {
@@ -333,6 +380,7 @@ function buildOptimisticMessage(
         },
       ]
     : [...fileParts, ...(content ? [{ type: 'text', text: content }] : [])]
+
   return {
     _id: id,
     _creationTime: Date.now(),

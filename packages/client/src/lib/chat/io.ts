@@ -1,6 +1,11 @@
 import { normalizeBrowserUrl } from '@/lib/auth/site-url'
 import type { SessionArchive } from '@/lib/chat'
 import type { Id } from '@cv/convex/_generated/dataModel'
+import {
+  attachmentNameSuffix,
+  namelessAttachment,
+  suffixFilename,
+} from '@cv/core/utils/attachment-names'
 import type { FileUIPart } from 'ai'
 
 import { ImageTool } from '../io'
@@ -17,6 +22,9 @@ export type ProcessedFile = {
 }
 
 export async function processFileForUpload(file: File): Promise<ProcessedFile> {
+  const filename = file.name.trim()
+    ? file.name
+    : suffixFilename(namelessAttachment(file.type), attachmentNameSuffix())
   let url: string
 
   if (file.type.startsWith('image/')) {
@@ -41,7 +49,7 @@ export async function processFileForUpload(file: File): Promise<ProcessedFile> {
         type: 'file',
         url,
         mediaType: file.type,
-        filename: file.name,
+        filename,
       },
     }
   }
@@ -53,7 +61,7 @@ export async function processFileForUpload(file: File): Promise<ProcessedFile> {
       type: 'file',
       url,
       mediaType: file.type,
-      filename: file.name,
+      filename,
     },
   }
 }

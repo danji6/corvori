@@ -9,6 +9,7 @@ import {
 } from '@/hooks/chat/composer-editor'
 import type { ComposerHandle } from '@/hooks/chat/composer-editor'
 import { useComposerMentions } from '@/hooks/chat/composer-mentions'
+import { useComposerSharePaste } from '@/hooks/chat/composer-share-paste'
 import { useComposerSubmission } from '@/hooks/chat/composer-submission'
 import type { WorkspaceFileIndex } from '@/hooks/chat/workspace'
 import { useFullscreenView } from '@/hooks/fullscreen'
@@ -24,7 +25,9 @@ import { pasteCollapsedText } from '@/lib/tiptap/paste'
 import { serializeBlocksToMarkdown } from '@/lib/tiptap/serialize'
 import { cn } from '@/lib/utils'
 import { shouldAttachTextPaste } from '@cv/core/attachments'
+import { parseShellCommand } from '@cv/core/shell/command'
 import { truncate } from '@cv/core/utils/strings'
+import type { Slice } from '@tiptap/pm/model'
 import type { Editor } from '@tiptap/react'
 import type { ChatStatus } from 'ai'
 import { MessageSquareWarningIcon } from 'lucide-react'
@@ -142,6 +145,7 @@ export function ChatComposer({
 
   const { compact, layout, toolbarRef } = useMeasuredComposerLayout()
   const attachments = useComposerAttachments({ draftKey, editorRef })
+  const shares = useComposerSharePaste(draftKey, attachments.addSharedFiles)
   const { sending, failed, isSending, send, discardFailed } =
     useComposerSubmission(draftKey, onSubmit)
 
@@ -231,7 +235,7 @@ export function ChatComposer({
   })
 
   function handleSubmit(silent = false) {
-    if (isSending()) return
+    if (isSending() || shares.isResolving) return
     if (!hasContent) {
       if (canContinue) onContinueAgent?.()
       return
@@ -344,7 +348,7 @@ export function ChatComposer({
     return false
   }
 
-  function handleEditorPaste(e: ClipboardEvent): boolean {
+  function handleEditorPaste(e: ClipboardEvent, slice: Slice): boolean {
     const pasted = e.clipboardData?.files
 
     if (pasted && pasted.length > 0) {
@@ -353,13 +357,19 @@ export function ChatComposer({
     }
 
     const text = e.clipboardData?.getData('text/plain') ?? ''
-    if (shouldAttachTextPaste(text, isCommandMode || shellCommand !== null)) {
-      const position = editorRef.current?.state.selection.from ?? 0
+    const editor = editorRef.current
+    const commandMode = isCommandMode || shellCommand !== null
+    if (shouldAttachTextPaste(text, commandMode)) {
+      const position = editor?.state.selection.from ?? 0
       void attachments.addLargeTextPaste(text, position)
       return true
     }
+    const pastedCommand =
+      !message && (text.startsWith('/') || parseShellCommand(text) !== null)
+    if (editor && !commandMode && !pastedCommand) {
+      if (shares.pasteShareLinks(editor, e, slice)) return true
+    }
 
-    const editor = editorRef.current
     return editor ? pasteCollapsedText(editor, e) : false
   }
 
@@ -470,7 +480,9 @@ export function ChatComposer({
                   editorClassName="pt-2 pr-6! group-data-[fullscreen]/fullscreen:pr-0!"
                   onReady={handleEditorReady}
                   handleKeyDown={(_view, event) => handleEditorKeyDown(event)}
-                  handlePaste={(_view, event) => handleEditorPaste(event)}
+                  handlePaste={(_view, event, slice) =>
+                    handleEditorPaste(event, slice)
+                  }
                 />
               </Suspense>
             </div>
@@ -498,6 +510,7 @@ export function ChatComposer({
                   sending={sending}
                   disabled={
                     (isStop ? stopDisabled : !hasContent && !canContinue) ||
+                    (!isStop && shares.isResolving) ||
                     (sendDisabled && hasContent) ||
                     shellBlocked
                   }

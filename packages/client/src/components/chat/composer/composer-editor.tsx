@@ -5,6 +5,7 @@ import { MentionDecoration } from '@/lib/tiptap/decorations/mention'
 import { ShellHighlight } from '@/lib/tiptap/decorations/shell'
 import { editorKit } from '@/lib/tiptap/kit'
 import { cn } from '@/lib/utils'
+import type { Slice } from '@tiptap/pm/model'
 import type { EditorView } from '@tiptap/pm/view'
 import { EditorContent, useEditor } from '@tiptap/react'
 import type { Editor } from '@tiptap/react'
@@ -18,7 +19,11 @@ export type ComposerEditorProps = {
   /** ProseMirror keydown hook. Return true to stop default handling. */
   handleKeyDown?: (view: EditorView, event: KeyboardEvent) => boolean
   /** ProseMirror paste hook. Return true to suppress default paste. */
-  handlePaste?: (view: EditorView, event: ClipboardEvent) => boolean
+  handlePaste?: (
+    view: EditorView,
+    event: ClipboardEvent,
+    slice: Slice,
+  ) => boolean
 }
 
 export function ComposerEditor({
@@ -62,8 +67,8 @@ export function ComposerEditor({
       },
       handleKeyDown: (view, event) =>
         handleKeyDownRef.current?.(view, event) ?? false,
-      handlePaste: (view, event) =>
-        handlePasteRef.current?.(view, event) ?? false,
+      handlePaste: (view, event, slice) =>
+        handlePasteRef.current?.(view, event, slice) ?? false,
     },
   })
 

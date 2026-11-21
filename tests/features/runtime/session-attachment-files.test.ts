@@ -172,7 +172,9 @@ test('transfer routes reject escapes, hard links, incomplete copies, and existin
   expect((await call('commit-copy', target)).ok).toBe(false)
   expect((await call('stage-copy', target)).ok).toBe(true)
   await writeFile(path.join(session.cwd, 'partial.txt'), 'existing')
-  expect((await call('commit-copy', target)).ok).toBe(false)
+  expect(await (await call('commit-copy', target)).json()).toEqual({
+    status: 'occupied',
+  })
   await call('cleanup-transfer', {
     operationId: target.operationId,
     rollback: target,
@@ -181,6 +183,46 @@ test('transfer routes reject escapes, hard links, incomplete copies, and existin
   expect(await readFile(path.join(session.cwd, 'partial.txt'), 'utf8')).toBe(
     'existing',
   )
+})
+
+test('two staged copies cannot commit to the same filename', async () => {
+  const target = { sessionId: 'race', path: 'session://attachments/notes.txt' }
+  const copies = ['race1', 'race2'].map((operationId) => ({
+    ...target,
+    operationId,
+    url: storage.url.href,
+    byteLength: original.length,
+  }))
+  await Promise.all(
+    copies.map(async (copy) => {
+      expect((await call('stage-copy', copy)).ok).toBe(true)
+    }),
+  )
+  const outcomes = await Promise.all(
+    copies.map(
+      async (copy) =>
+        (await call('commit-copy', copy)).json() as Promise<{ status: string }>,
+    ),
+  )
+  expect(outcomes.map(({ status }) => status).sort()).toEqual([
+    'committed',
+    'occupied',
+  ])
+  const loser =
+    copies[outcomes.findIndex(({ status }) => status === 'occupied')]
+  const next = { ...loser, path: 'session://attachments/notes-2.txt' }
+  expect(await (await call('commit-copy', next)).json()).toEqual({
+    status: 'committed',
+  })
+  expect(await (await call('commit-copy', next)).json()).toEqual({
+    status: 'committed',
+  })
+
+  const { cwd } = await resolveShellDirectory(workspace('race'))
+  await rm(path.join(cwd, 'attachments', 'notes.txt'))
+  expect(await (await call('commit-copy', loser)).json()).toEqual({
+    status: 'occupied',
+  })
 })
 
 test('duplicates working files and permanently fences a deleted root', async () => {
@@ -221,7 +263,6 @@ test('provides the original PDF reference alongside an active preview', async ()
       previewMediaType: 'image/jpeg',
       filename: 'scan.pdf',
       mediaType: 'application/pdf',
-      shareToken: 'share',
       byteLength: 99,
     }),
     storage: { get: async () => new Blob(['preview']) },
@@ -240,7 +281,7 @@ test('provides the original PDF reference alongside an active preview', async ()
   expect(result).toEqual([
     {
       type: 'text',
-      text: expect.stringContaining('attachment:share/scan.pdf'),
+      text: expect.stringContaining('attachment:original/scan.pdf'),
     },
     {
       type: 'file',

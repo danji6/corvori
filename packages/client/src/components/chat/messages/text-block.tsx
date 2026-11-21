@@ -1,6 +1,7 @@
 import type { TextUIPart } from 'ai'
 
 import { EditableText } from './editor/editable-text'
+import { LinkPreviews } from './link-previews'
 import { SmoothText } from './smooth-text'
 
 const fontStyle = {
@@ -18,14 +19,17 @@ export function TextBlock({ part, segmentIndex, index }: TextBlockProps) {
   if (!part.text) return null
 
   return (
-    <EditableText
-      data-slot="text-block"
-      part={part}
-      segmentIndex={segmentIndex}
-      index={index}
-      style={fontStyle}
-    >
-      <SmoothText part={part} />
-    </EditableText>
+    <>
+      <EditableText
+        data-slot="text-block"
+        part={part}
+        segmentIndex={segmentIndex}
+        index={index}
+        style={fontStyle}
+      >
+        <SmoothText part={part} />
+      </EditableText>
+      {part.state !== 'streaming' && <LinkPreviews text={part.text} />}
+    </>
   )
 }

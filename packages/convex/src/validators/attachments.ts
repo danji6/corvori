@@ -54,7 +54,6 @@ export const attachmentFileSchema = v.object({
   filename: v.string(),
   mediaType: v.string(),
   byteLength: v.number(),
-  shareToken: v.string(),
 })
 
 const attachmentCursorScope = {

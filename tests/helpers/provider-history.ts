@@ -113,7 +113,6 @@ export function attachmentHistoryCtx({
     previewMediaType?: string
     mediaType: string
     filename: string
-    shareToken?: string
     byteLength?: number
   }
   blobs: Record<string, Blob>

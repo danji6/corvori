@@ -1,4 +1,3 @@
-import { attachmentReferences } from '@cv/core/attachments'
 import type { Editor } from '@tiptap/react'
 
 /** Whether the clipboard contains a slice written by an editor. */
@@ -8,16 +7,14 @@ function hasEditorSlice(event: ClipboardEvent): boolean {
 }
 
 /** Pasted plain text, or null when the default paste should run instead. */
-function pastedText(editor: Editor, event: ClipboardEvent): string | null {
+export function multilinePasteText(
+  editor: Editor,
+  event: ClipboardEvent,
+): string | null {
   if (editor.state.selection.$from.parent.type.spec.code) return null
   if (hasEditorSlice(event)) return null
   const text = event.clipboardData?.getData('text/plain')
-  if (
-    !text ||
-    (!/\r|\n/.test(text) && attachmentReferences(text).length === 0)
-  ) {
-    return null
-  }
+  if (!text || !/\r|\n/.test(text)) return null
   return text.replace(/\r\n?/g, '\n')
 }
 
@@ -31,7 +28,7 @@ export function pasteCollapsedText(
   editor: Editor,
   event: ClipboardEvent,
 ): boolean {
-  const text = pastedText(editor, event)
+  const text = multilinePasteText(editor, event)
   if (text === null) return false
 
   editor.commands.insertContent(text.replace(/\n/g, '\n\n'), {
@@ -46,7 +43,7 @@ export function pasteCollapsedText(
  * @returns true when it handled the paste.
  */
 export function pasteTextLines(editor: Editor, event: ClipboardEvent): boolean {
-  const text = pastedText(editor, event)
+  const text = multilinePasteText(editor, event)
   if (text === null) return false
 
   editor.commands.insertContent(text, { contentType: 'markdown' })

@@ -1,10 +1,8 @@
 import { LARGE_PASTE_BYTES } from './const'
 
-const ATTACHMENT_LINK =
-  /(?:\/attachments\/|attachment:)([^/?#\s]+)\/([^/?#\s)]+)/g
 const ATTACHMENT_SCHEME = 'attachment:'
 
-export type AttachmentReference = { token: string; filename: string }
+export type AttachmentReference = { attachmentId: string; filename: string }
 
 /** Whether a composer paste should be represented as an attachment. */
 export function shouldAttachTextPaste(
@@ -15,100 +13,48 @@ export function shouldAttachTextPaste(
   return new TextEncoder().encode(text).byteLength >= LARGE_PASTE_BYTES
 }
 
-/** Builds the stable HTTP path for a bearer attachment token. */
-export function attachmentPath(token: string, filename: string): string {
-  return `/attachments/${encodeURIComponent(token)}/${encodeAttachmentFilename(filename)}`
-}
-
-/** Builds a host-independent attachment reference. */
-export function attachmentRef(token: string, filename: string): string {
-  return `${ATTACHMENT_SCHEME}${encodeURIComponent(token)}/${encodeAttachmentFilename(filename)}`
-}
-
-/** Escapes filename characters that also delimit Markdown link targets. */
-function encodeAttachmentFilename(filename: string): string {
-  return encodeURIComponent(filename)
+/** Builds a host-independent reference to an attachment in a session. */
+export function attachmentRef(attachmentId: string, filename: string): string {
+  const encoded = encodeURIComponent(filename)
     .replaceAll('(', '%28')
     .replaceAll(')', '%29')
+  return `${ATTACHMENT_SCHEME}${attachmentId}/${encoded}`
 }
 
-/** Builds a clickable Markdown attachment reference for copying. */
-export function attachmentMarkdownLink(
-  token: string,
-  filename: string,
-): string {
-  const label = filename.replace(/\r?\n/g, ' ').replace(/([[\]\\])/g, '\\$1')
-  return `[📎 ${label}](${attachmentRef(token, filename)})`
-}
-
-/** Extracts and deduplicates permanent attachment references from message text. */
-export function attachmentReferences(text: string): AttachmentReference[] {
-  const references = new Map<string, AttachmentReference>()
-  for (const match of withoutMarkdownCode(text).matchAll(ATTACHMENT_LINK)) {
-    if (!match[1] || !match[2]) continue
-    try {
-      const reference = {
-        token: decodeURIComponent(match[1]),
-        filename: decodeURIComponent(match[2]),
-      }
-      references.set(JSON.stringify(reference), reference)
-    } catch {
-      // Malformed URLs aren't attachment links
-    }
-  }
-  return [...references.values()]
-}
-
-/** Extracts and deduplicates bearer attachment tokens from message text. */
-export function attachmentTokens(text: string): string[] {
-  return [...new Set(attachmentReferences(text).map(({ token }) => token))]
-}
-
-function withoutMarkdownCode(text: string): string {
-  let fence: { marker: '`' | '~'; length: number } | null = null
-  const visible = text.split('\n').map((line) => {
-    const match = line.match(/^ {0,3}(`{3,}|~{3,})/)
-    if (match?.[1]) {
-      const marker = match[1][0] as '`' | '~'
-      if (!fence) fence = { marker, length: match[1].length }
-      else if (marker === fence.marker && match[1].length >= fence.length) {
-        fence = null
-      }
-      return ''
-    }
-    return fence ? '' : line
-  })
-  return visible.join('\n').replace(/(`+)[\s\S]*?\1/g, '')
-}
-
-/** Parses the bearer token and filename from a permanent reference or URL. */
+/** Parses a reference emitted in agent context. */
 export function attachmentReference(value: string): AttachmentReference | null {
+  if (!value.startsWith(ATTACHMENT_SCHEME)) return null
+  const match = /^([a-z0-9]+)\/([^/?#]+)$/.exec(
+    value.slice(ATTACHMENT_SCHEME.length),
+  )
+  if (!match) return null
   try {
-    if (value.startsWith(ATTACHMENT_SCHEME)) {
-      return parseReferenceSegments(value.slice(ATTACHMENT_SCHEME.length))
-    }
-
-    const url = new URL(value, 'https://attachment.invalid')
-    const marker = '/attachments/'
-    if (!url.pathname.startsWith(marker)) return null
-    return parseReferenceSegments(url.pathname.slice(marker.length))
+    return { attachmentId: match[1], filename: decodeURIComponent(match[2]) }
   } catch {
     return null
   }
 }
 
-function parseReferenceSegments(value: string): AttachmentReference | null {
-  const segments = value.split('/')
-  if (segments.length !== 2 || !segments[0] || !segments[1]) return null
-  return {
-    token: decodeURIComponent(segments[0]),
-    filename: decodeURIComponent(segments[1]),
-  }
+/** Adds a file record hint to a public storage URL. */
+export function attachmentShareUrl(value: string, fileId: string): string {
+  const url = new URL(value)
+  url.hash = `attachment=${fileId}`
+  return url.href
 }
 
-/** Returns the bearer token contained in a permanent reference or URL. */
-export function attachmentToken(value: string): string | null {
-  return attachmentReference(value)?.token ?? null
+/** Reads the record hint without treating it as authorization. */
+export function attachmentShare(value: string) {
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null
+    const match = /^#attachment=([a-z0-9]+)$/.exec(url.hash)
+    if (!match) return null
+
+    url.hash = ''
+    return { fileId: match[1], url: url.href }
+  } catch {
+    return null
+  }
 }
 
 export type Utf8Range = {

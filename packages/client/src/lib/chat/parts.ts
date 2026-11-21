@@ -275,7 +275,7 @@ export function buildFileItemFromPart(
   id: string,
   originalUrl?: string,
   previewUrl?: string,
-  permaUrl?: string,
+  shareUrl?: string,
   byteLength?: number,
 ): FileItem {
   const isPlaceholder = part.url.startsWith('attachment:')
@@ -310,7 +310,7 @@ export function buildFileItemFromPart(
     id,
     url,
     originalUrl,
-    permaUrl,
+    shareUrl,
     byteLength,
     file: new File([], filename, { type }),
   }

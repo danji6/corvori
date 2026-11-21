@@ -122,6 +122,22 @@ export async function requireActive(
   return { row, ...context }
 }
 
+export async function advanceCopyPath(
+  ctx: MutationCtx,
+  args: StreamExecutionArgs & {
+    id: Id<'attachmentTransfers'>
+    previousPath: string
+    nextPath: string
+  },
+) {
+  const { row } = await requireActive(ctx, args.id, args)
+  if (row.kind !== 'copy_attachment') error('Invalid attachment transfer', 409)
+  if (row.result || row.path !== args.previousPath) return row
+
+  await ctx.db.patch(row._id, { path: args.nextPath })
+  return { ...row, path: args.nextPath }
+}
+
 export async function finishCopy(
   ctx: MutationCtx,
   id: Id<'attachmentTransfers'>,
@@ -130,6 +146,7 @@ export async function finishCopy(
 ) {
   const { row } = await requireActive(ctx, id, execution)
   if (row.result) return row.result
+  if (row.path !== result.path) error('Attachment destination changed', 409)
   await recordResult(ctx, row, result)
   return result
 }
@@ -159,8 +176,8 @@ export async function finishPublish(
   })
   const result = {
     attachmentId,
-    reference: attachmentRef(metadata.shareToken, file.filename),
-    filename: file.filename,
+    reference: attachmentRef(attachmentId, metadata.filename),
+    filename: metadata.filename,
     mediaType: file.mediaType,
     byteLength: metadata.byteLength,
   }

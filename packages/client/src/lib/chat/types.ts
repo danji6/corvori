@@ -1,3 +1,4 @@
+import type { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
 import type { ReplyQuote, SessionSummary, TokenUsage } from '@cv/convex/types'
 import type {
@@ -10,6 +11,7 @@ import type {
   MessageRole,
 } from '@cv/core/types'
 import type { ChatStatus, FileUIPart, UIMessage } from 'ai'
+import type { FunctionReturnType } from 'convex/server'
 
 export type { UIMessage }
 export type * from '@cv/core/types'
@@ -108,8 +110,15 @@ export type MessagesEventData = {
 
 export type { UIModel, UIModelConfig } from '@cv/core/types/providers'
 
-/** Identifies one attachment occurrence before it is uploaded. */
-export type PendingFilePart = FileUIPart & { id: string }
+export type SharedAttachment = NonNullable<
+  FunctionReturnType<typeof api.attachments.previewShares>[number]
+>
+
+/** Identifies an attachment in a draft, including links to existing files. */
+export type PendingFilePart = FileUIPart & {
+  id: string
+  share?: SharedAttachment
+}
 
 export type PendingMessage = {
   content: string

@@ -1,4 +1,5 @@
 import { lookup } from 'mime-types'
+import { createHash } from 'node:crypto'
 import { constants, createReadStream, createWriteStream } from 'node:fs'
 import {
   link,
@@ -93,19 +94,26 @@ async function streamFile(
 export async function commitCopy(input: Transfer) {
   const target = sessionFilePath(input.sessionId, input.path)
   const stage = stagedFile(input.operationId)
+  const candidate = createHash('sha256').update(input.path).digest('hex')
+  const collision = path.join(path.dirname(stage), `occupied-${candidate}`)
 
   await assertPlainPath(stage)
+  if (await lstat(collision).catch(missing)) return 'occupied'
+
   await ensurePlainDirectory(path.dirname(target))
-  await assertPlainPath(target)
-
-  const existing = await lstat(target).catch(missing)
-  if (existing) {
-    const staged = await lstat(stage)
-    if (existing.ino === staged.ino && existing.dev === staged.dev) return
-    throw new Error('The destination file already exists')
+  try {
+    await link(stage, target)
+    return 'committed'
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+    const [existing, staged] = await Promise.all([lstat(target), lstat(stage)])
+    if (existing.ino === staged.ino && existing.dev === staged.dev) {
+      return 'committed'
+    }
+    // A stale retry must not reopen a candidate after Convex advances the path.
+    await writeFile(collision, '', { flag: 'wx', mode: 0o600 })
+    return 'occupied'
   }
-
-  await link(stage, target)
 }
 
 export async function rollbackCopy(input: Transfer) {

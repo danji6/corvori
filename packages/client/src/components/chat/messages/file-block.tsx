@@ -33,7 +33,7 @@ export function FileBlock({ parts, attachmentIds }: FileBlockProps) {
           local?.key ?? `${index}:${attachmentId ?? part.url}`,
           resolved?.url ?? undefined,
           resolved?.previewUrl ?? local?.preview.url,
-          resolved?.permaUrl ?? undefined,
+          resolved?.shareUrl ?? undefined,
           resolved?.byteLength ?? local?.byteLength,
         )
         return {

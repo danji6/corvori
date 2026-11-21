@@ -1,31 +1,25 @@
 import { T } from '@/components/ui/typography'
-import { convexSiteUrl } from '@/hooks/http'
-import { downloadAttachment } from '@/lib/chat/attachment-download'
-import { attachmentPath, attachmentReference } from '@cv/core/attachments'
+import { useAttachmentUrls } from '@/hooks/chat/attachment-urls'
+import { attachmentReference } from '@cv/core/attachments'
+import { useMemo } from 'react'
 
-/** Resolves an attachment reference when it is clicked. */
+/** Resolves a session attachment to its current browser URL. */
 export function AttachmentAnchor({
   href,
-  onClick,
   ...props
 }: { href: string } & React.ComponentProps<'a'>) {
   const reference = attachmentReference(href)
-  if (!reference) return <T.a {...props} />
+  const id = reference?.attachmentId
+  const ids = useMemo(() => (id ? [id] : []), [id])
+  const resolved = useAttachmentUrls(ids)
+  const url = id ? resolved[id]?.url : null
 
   return (
     <T.a
-      href={href}
-      title={`Download ${reference.filename}`}
-      data-attachment-reference=""
       {...props}
-      onClick={(event) => {
-        event.preventDefault()
-        const downloadUrl = `${convexSiteUrl()}${attachmentPath(reference.token, reference.filename)}`
-        void downloadAttachment(downloadUrl, reference.filename, {
-          shared: true,
-        })
-        onClick?.(event)
-      }}
+      href={url ?? undefined}
+      target="_blank"
+      rel="noopener noreferrer"
     />
   )
 }

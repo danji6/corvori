@@ -8,7 +8,7 @@ export type FileItem = {
   url: string
   file: File
   originalUrl?: string
-  permaUrl?: string
+  shareUrl?: string
   byteLength?: number
   imageDimensions?: AttachmentImageDimensions
   canInsertInline?: boolean

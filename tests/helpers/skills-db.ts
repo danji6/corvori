@@ -14,6 +14,8 @@ export function skillsDatabase(indexes: Record<string, string[]> = {}) {
     return tables.get(table)!
   }
   const db = {
+    normalizeId: (table: string, id: string) =>
+      rows(table).some((row) => row._id === id) ? id : null,
     get: async (id: string) =>
       [...tables.values()].flat().find((row) => row._id === id) ?? null,
     insert: async (table: string, fields: Record<string, unknown>) => {

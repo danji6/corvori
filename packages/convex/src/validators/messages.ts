@@ -178,15 +178,14 @@ export const sendMessageArgsValidator = v.object({
   replyToPart: v.optional(partAddressValidator),
   attachments: v.optional(
     v.array(
-      v.object({
-        id: v.id('attachments'),
-        data: v.optional(v.string()), // used for client optimistic updates
-      }),
+      v.union(
+        v.object({
+          id: v.id('attachments'),
+          data: v.optional(v.string()), // used for client optimistic updates
+        }),
+        v.object({ shareUrl: v.string() }),
+      ),
     ),
-  ),
-  /** Permanent attachment references parsed from URLs in the message. */
-  attachmentLinks: v.optional(
-    v.array(v.object({ token: v.string(), filename: v.string() })),
   ),
   fileLinks: v.optional(
     v.array(

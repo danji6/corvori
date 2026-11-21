@@ -2,7 +2,7 @@
 import type { useComposerAttachments } from '@/hooks/chat/composer-attachments'
 import * as draftStore from '@/lib/chat/composer-attachment-draft-store'
 import * as chatIO from '@/lib/chat/io'
-import type { PendingMessage } from '@/lib/chat/types'
+import type { PendingMessage, SharedAttachment } from '@/lib/chat/types'
 import { editorKit } from '@/lib/tiptap/kit'
 import { Editor } from '@tiptap/core'
 import { afterEach, beforeAll, beforeEach, expect, spyOn, test } from 'bun:test'
@@ -92,6 +92,45 @@ test('preparing a video preserves bytes beyond the JavaScript argument limit', a
   expect(part.url.startsWith(prefix)).toBe(true)
   const decoded = Buffer.from(part.url.slice(prefix.length), 'base64')
   expect(decoded.equals(Buffer.from(bytes))).toBe(true)
+})
+
+test('gives nameless files and large pastes readable filenames', async () => {
+  await mount()
+  await act(async () => {
+    await attachments.addFiles([file('')])
+    await attachments.addLargeTextPaste('pasted text', 0)
+  })
+  expect(attachments.fileParts).toHaveLength(2)
+  for (const part of attachments.fileParts) {
+    expect(part.filename).toMatch(/^pasted-text-[a-z]+(?:-[a-z]+)+\.txt$/)
+  }
+})
+
+test('restores pasted attachment links as removable cards and deduplicates them', async () => {
+  const url = 'https://storage.example.test/api/storage/key'
+  const share: SharedAttachment = {
+    fileId: 'file1' as SharedAttachment['fileId'],
+    filename: 'Logo.png',
+    mediaType: 'image/png',
+    byteLength: 20,
+    previewUrl: null,
+    shareUrl: url + '#attachment=file1',
+    url,
+  }
+  savedDraft = [{ id: share.fileId, share }]
+  await mount('shared-draft')
+  expect(attachments.files).toHaveLength(1)
+  expect(attachments.files[0]).toMatchObject({
+    originalUrl: url,
+    byteLength: 20,
+    canInsertInline: false,
+  })
+  expect(attachments.fileParts[0].share).toEqual(share)
+  expect(attachments.originalFiles).toEqual({})
+  act(() => attachments.addSharedFiles([share, share]))
+  expect(attachments.files).toHaveLength(1)
+  act(() => attachments.removeFile(share.fileId))
+  expect(attachments.fileParts).toHaveLength(0)
 })
 
 test('overlapping file additions and text pastes append in invocation order', async () => {

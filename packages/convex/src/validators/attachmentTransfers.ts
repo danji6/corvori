@@ -33,3 +33,10 @@ export const attachmentTransferSchema = v.object({
   expiresAt: v.number(),
   cleaned: v.optional(v.boolean()),
 })
+
+export const advanceCopyPathArgs = v.object({
+  ...streamExecutionArgsValidator.fields,
+  id: v.id('attachmentTransfers'),
+  previousPath: v.string(),
+  nextPath: v.string(),
+})

@@ -1,4 +1,3 @@
-import { attachmentReference } from '@cv/core/attachments'
 import { httpRouter } from 'convex/server'
 import { ConvexError } from 'convex/values'
 
@@ -28,7 +27,6 @@ const http = httpRouter()
 // httpActions cap a response body at 20 MiB, so we recycle the connection
 // once it goes above this limit
 const STREAM_BYTE_BUDGET = 8 * 1024 * 1024
-const ATTACHMENT_BODY_BUDGET = 16 * 1024 * 1024
 
 /**
  * The origin to answer with, or `null` when the caller is not allowed one.
@@ -152,50 +150,6 @@ const avatarUploadHandler = httpAction(async (ctx, req) => {
   }
 })
 
-/** Resolves a stable bearer URL to the current Convex storage URL. */
-const attachmentDownloadHandler = httpAction(async (ctx, req) => {
-  const reference = attachmentReference(req.url)
-  const headers = {
-    ...corsHeaders(allowedOrigin(req)),
-    'Cache-Control': 'private, no-store',
-  }
-  const notFound = () => new Response('Not found', { status: 404, headers })
-  if (!reference) return notFound()
-
-  const file = await ctx.runQuery(internal.attachments._getSharedFile, {
-    token: reference.token,
-  })
-  if (!file || file.filename !== reference.filename) return notFound()
-
-  const resolveUrl = new URL(req.url).searchParams.get('resolve') === '1'
-  const canServeBody =
-    file.byteLength > 0 && file.byteLength <= ATTACHMENT_BODY_BUDGET
-  if (!resolveUrl && canServeBody) {
-    const blob = await ctx.storage.get(file.storageId)
-    if (!blob) return notFound()
-    return new Response(blob, {
-      headers: {
-        ...headers,
-        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
-        'Content-Type': file.mediaType || 'application/octet-stream',
-        'X-Content-Type-Options': 'nosniff',
-      },
-    })
-  }
-
-  const storageUrl = await ctx.storage.getUrl(file.storageId)
-  if (!storageUrl) return notFound()
-  if (resolveUrl) return Response.json({ url: storageUrl }, { headers })
-
-  return new Response(null, {
-    status: 302,
-    headers: {
-      ...headers,
-      Location: storageUrl,
-    },
-  })
-})
-
 /**
  * Streams a terminal's live output to the browser by proxying the
  * sidecar SSE endpoint. The client reconnects with its last offset.
@@ -314,12 +268,6 @@ http.route({
   path: '/shell/stream',
   method: 'GET',
   handler: termStreamHandler,
-})
-
-http.route({
-  pathPrefix: '/attachments/',
-  method: 'GET',
-  handler: attachmentDownloadHandler,
 })
 
 http.route({

@@ -24,7 +24,8 @@ export async function resolveAttachmentHistoryParts(
   part: unknown,
   options: AttachmentResolveOptions,
 ) {
-  if (!options.copyEnabled || !isAttachmentPart(part) || part.publishedByTool)
+  const toolEnabled = options.readerEnabled || options.copyEnabled
+  if (!toolEnabled || !isAttachmentPart(part) || part.publishedByTool)
     return [await resolveAttachmentPart(ctx, part, options)]
 
   const attachment = await getAttachment(ctx, part.attachmentId)
@@ -34,7 +35,10 @@ export async function resolveAttachmentHistoryParts(
   if (!isFilePart(resolved)) return [resolved]
 
   return [
-    { type: 'text' as const, text: attachmentDescriptor(attachment, options) },
+    {
+      type: 'text' as const,
+      text: attachmentDescriptor(part.attachmentId, attachment, options),
+    },
     resolved,
   ]
 }
@@ -64,20 +68,20 @@ function getAttachment(ctx: ActionCtx, attachmentId: Id<'attachments'>) {
 
 async function resolveStoredAttachment(
   ctx: ActionCtx,
-  part: { publishedByTool?: boolean },
+  part: { attachmentId: string; publishedByTool?: boolean },
   options: AttachmentResolveOptions,
   attachment: StoredAttachment,
 ) {
   if (isKnownTextFile(attachment.mediaType, attachment.filename)) {
     return {
       type: 'text' as const,
-      text: attachmentDescriptor(attachment, options),
+      text: attachmentDescriptor(part.attachmentId, attachment, options),
     }
   }
   if (!options.mediaActive || part.publishedByTool) {
     return {
       type: 'text' as const,
-      text: attachmentDescriptor(attachment, {
+      text: attachmentDescriptor(part.attachmentId, attachment, {
         ...options,
         readerEnabled: false,
       }),
@@ -90,7 +94,7 @@ async function resolveStoredAttachment(
   if (!blob)
     return {
       type: 'text' as const,
-      text: attachmentDescriptor(attachment, options),
+      text: attachmentDescriptor(part.attachmentId, attachment, options),
     }
 
   const mediaType =
@@ -108,17 +112,15 @@ async function resolveStoredAttachment(
 }
 
 function attachmentDescriptor(
+  attachmentId: string,
   attachment: {
     filename: string
     mediaType: string
     byteLength?: number
-    shareToken?: string
   },
   { readerEnabled, copyEnabled }: AttachmentResolveOptions,
 ) {
-  const reference = attachment.shareToken
-    ? attachmentRef(attachment.shareToken, attachment.filename)
-    : null
+  const reference = attachmentRef(attachmentId, attachment.filename)
   return block(
     'attachment',
     [
@@ -132,7 +134,7 @@ function attachmentDescriptor(
         : []),
     ].join(' ') || 'Reader unavailable; attachment contents were not loaded.',
     {
-      reference: reference ?? 'unavailable',
+      reference,
       filename: attachment.filename,
       mediaType: attachment.mediaType,
       bytes: String(attachment.byteLength ?? 'unknown'),

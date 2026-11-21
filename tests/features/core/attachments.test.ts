@@ -1,76 +1,57 @@
 /// <reference types="bun-types" />
 import {
-  attachmentMarkdownLink,
-  attachmentPath,
   attachmentRef,
   attachmentReference,
-  attachmentReferences,
-  attachmentToken,
-  attachmentTokens,
+  attachmentShare,
+  attachmentShareUrl,
   readUtf8Range,
   shouldAttachTextPaste,
 } from '@cv/core/attachments'
+import { markdownHttpLinks } from '@cv/core/utils/markdown-links'
 import { describe, expect, test } from 'bun:test'
 
 describe('durable attachment links', () => {
-  test('round trips encoded tokens and filenames', () => {
-    const path = attachmentPath('secret token', 'notes #1.txt')
-    const ref = attachmentRef('secret token', 'notes #1.txt')
-    expect(path).toBe('/attachments/secret%20token/notes%20%231.txt')
-    expect(ref).toBe('attachment:secret%20token/notes%20%231.txt')
-    expect(attachmentMarkdownLink('secret token', 'notes #1.txt')).toBe(
-      '[📎 notes #1.txt](attachment:secret%20token/notes%20%231.txt)',
-    )
-    expect(attachmentToken(`https://example.test${path}`)).toBe('secret token')
-    expect(attachmentReference(`https://example.test${path}`)).toEqual({
-      token: 'secret token',
-      filename: 'notes #1.txt',
-    })
+  test('round trips attachment IDs and encoded filenames', () => {
+    const ref = attachmentRef('record1', 'notes (#1).txt')
+    expect(ref).toBe('attachment:record1/notes%20%28%231%29.txt')
     expect(attachmentReference(ref)).toEqual({
-      token: 'secret token',
-      filename: 'notes #1.txt',
+      attachmentId: 'record1',
+      filename: 'notes (#1).txt',
     })
+    expect(attachmentReference('attachment:record1/%E0%A4%A')).toBeNull()
   })
 
-  test('finds ordinary and markdown links but ignores code', () => {
+  test('preserves the exact storage URL when adding and parsing a share hint', () => {
+    const url = 'http://localhost:3210/api/storage/key?component=chat'
+    const share = attachmentShareUrl(url, 'file1')
+    expect(share).toBe(url + '#attachment=file1')
+    expect(attachmentShare(share)).toEqual({ url, fileId: 'file1' })
+    expect(attachmentShare(url)).toBeNull()
+    expect(attachmentShare(share + '&x=other')).toBeNull()
+  })
+
+  test('locates shared URLs and ignores code', () => {
+    const localUrl = 'http://localhost:3210/api/storage/key#attachment=file1'
+    const external = 'https://example.test/attachment#attachment=file2'
     const text = [
-      'https://example.test/attachments/one/a.txt',
-      '[two](https://example.test/attachments/two/b.txt)',
-      '[three](attachment:three/c.txt)',
-      '`https://example.test/attachments/inline/c.txt`',
-      '```',
-      'https://example.test/attachments/fenced/d.txt',
-      '```',
-    ].join('\n')
-    expect(attachmentTokens(text)).toEqual(['one', 'two', 'three'])
-    expect(attachmentReferences(text)).toEqual([
-      { token: 'one', filename: 'a.txt' },
-      { token: 'two', filename: 'b.txt' },
-      { token: 'three', filename: 'c.txt' },
-    ])
-  })
-
-  test('extracts adjacent links with parentheses in their filenames', () => {
-    const url = `https://example.test${attachmentPath('one', 'image ((1)).png')}`
-    const copied = attachmentMarkdownLink('two', 'image ).png')
-
-    expect(attachmentReferences(`[one](${url})${copied}`)).toEqual([
-      { token: 'one', filename: 'image ((1)).png' },
-      { token: 'two', filename: 'image ).png' },
-    ])
-  })
-
-  test('ignores mismatched fence markers and malformed tokens', () => {
-    const text = [
+      `See ${localUrl}.`,
+      `[external link](${external})`,
+      '`' + external + '`',
       '````text',
-      '/attachments/hidden/file.txt',
+      external,
       '~~~',
-      '/attachments/still-hidden/file.txt',
+      localUrl,
       '````',
-      '/attachments/visible/file.txt',
     ].join('\n')
-    expect(attachmentTokens(text)).toEqual(['visible'])
-    expect(attachmentToken('/attachments/%E0%A4%A/file.txt')).toBeNull()
+    expect(
+      markdownHttpLinks(text).map(({ start, end, url }) => [
+        text.slice(start, end),
+        url,
+      ]),
+    ).toEqual([
+      [localUrl, localUrl],
+      [`[external link](${external})`, external],
+    ])
   })
 })
 

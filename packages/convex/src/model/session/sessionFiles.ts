@@ -1,9 +1,5 @@
+import { attachmentNameSuffix } from '@cv/core/utils/attachment-names'
 import { transitionActive } from '@cv/core/workspace/transition'
-import {
-  adjectives,
-  animals,
-  uniqueNamesGenerator,
-} from 'unique-names-generator'
 
 import { internal } from '../../_generated/api'
 import type { Doc, Id } from '../../_generated/dataModel'
@@ -21,15 +17,7 @@ export async function reserveTaskDirectory(
 ) {
   let name = ''
   for (let index = 0; index < 4; index++) {
-    name = uniqueNamesGenerator({
-      dictionaries: [adjectives, animals],
-      length: 2,
-      separator: '-',
-    })
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
+    name = attachmentNameSuffix()
     if (!(await directoryReserved(ctx, rootId, name)))
       return reserve(ctx, rootId, name)
   }

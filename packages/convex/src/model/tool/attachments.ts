@@ -88,9 +88,12 @@ async function readAttachment(
   options: CallOptions,
 ) {
   validateInput(input)
+  if (!options.execution)
+    throw new ToolError('Attachment reading requires an active chat execution')
+
   // Media still uses the existing single-call path and does not create an operation.
   const initialFile = input.reference
-    ? await findAttachment(ctx, input.reference)
+    ? await findAttachment(ctx, input.reference, options.execution)
     : undefined
   const isMediaAttachment =
     initialFile &&
@@ -103,9 +106,6 @@ async function readAttachment(
       initialFile.reference,
     )
   }
-
-  if (!options.execution)
-    throw new ToolError('Attachment reading requires an active chat execution')
 
   const call: AttachmentCursorCall = {
     ...options.execution,
@@ -127,7 +127,8 @@ async function readAttachment(
   if (!reference)
     throw new ToolError('Attachment operation is unavailable or expired')
 
-  const resolved = initialFile ?? (await findAttachment(ctx, reference))
+  const resolved =
+    initialFile ?? (await findAttachment(ctx, reference, options.execution))
   const attachmentChanged =
     cursor &&
     (cursor.fileId !== resolved.file._id ||
@@ -166,15 +167,25 @@ function validateInput(input: ReadAttachmentInput) {
     throw new ToolError('Use offset only for forward plain attachment reads')
 }
 
-export async function findAttachment(ctx: ActionCtx, value: string) {
+export async function findAttachment(
+  ctx: ActionCtx,
+  value: string,
+  execution: StreamExecutionArgs,
+) {
   const reference = attachmentReference(value)
-  if (!reference) throw new ToolError('Invalid permanent attachment reference')
-  const file = await ctx.runQuery(internal.attachments._getSharedFile, {
-    token: reference.token,
+  if (!reference) throw new ToolError('Invalid attachment reference')
+
+  const file = await ctx.runQuery(internal.attachments._getToolFile, {
+    ...execution,
+    attachmentId: reference.attachmentId,
   })
   if (!file || file.filename !== reference.filename)
-    throw new ToolError('Attachment link is invalid or expired')
-  return { file, reference: attachmentRef(reference.token, reference.filename) }
+    throw new ToolError('Attachment is unavailable in this session')
+
+  return {
+    file,
+    reference: attachmentRef(reference.attachmentId, file.filename),
+  }
 }
 
 type ReadOptions = {

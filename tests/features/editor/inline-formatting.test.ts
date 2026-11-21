@@ -6,10 +6,7 @@ import {
   serializeBlocksToMarkdown,
   serializeDocumentToMarkdown,
 } from '@/lib/tiptap/serialize'
-import {
-  attachmentMarkdownLink,
-  attachmentReferences,
-} from '@cv/core/attachments'
+import { attachmentShareUrl } from '@cv/core/attachments'
 import { Editor } from '@tiptap/core'
 import { afterEach, expect, test } from 'bun:test'
 import { setupDom } from '~/tests/setup/dom'
@@ -176,22 +173,15 @@ test('multiline composer paste preserves its blank lines', () => {
   expect(serializeBlocksToMarkdown(e)).toBe('one\n\ntwo')
 })
 
-test('single-line attachment paste renders its link immediately', () => {
+test('single-line public attachment URL stays with the native paste handler', () => {
   const e = open('', { collapseBlocks: true })
-  const filename = 'image (1).png'
-  const link = attachmentMarkdownLink('token', filename)
   const clipboardData = new DataTransfer()
-  clipboardData.setData('text/plain', link)
+  const url = 'https://example.test/api/storage/key'
+  clipboardData.setData('text/plain', attachmentShareUrl(url, 'file1'))
 
   expect(
     pasteCollapsedText(e, new ClipboardEvent('paste', { clipboardData })),
-  ).toBe(true)
-  const markdown = serializeBlocksToMarkdown(e)
-  expect(markdown).toBe(link)
-  expect(attachmentReferences(markdown)).toEqual([{ token: 'token', filename }])
-  expect(e.view.dom.querySelector('a')?.getAttribute('href')).toBe(
-    'attachment:token/image%20%281%29.png',
-  )
+  ).toBe(false)
 })
 
 test('ordinary single-line paste stays with the native handler', () => {

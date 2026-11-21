@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { type Locator, expect, test } from '@playwright/test'
 import { buffer } from 'node:stream/consumers'
 import sharp from 'sharp'
 
@@ -8,34 +8,52 @@ const png = Buffer.from(
   'base64',
 )
 
-test('downloads original files from attachment buttons and Markdown links', async ({
+test('copies and pastes public links, opens previews, and downloads originals by name', async ({
   page,
   context,
 }) => {
-  const notes = '{"title":"Shared notes"}\n'
-
-  await page.route('https://storage.example.test/image-original', (route) =>
+  const fileUrl = 'https://storage.example.test/api/storage/image'
+  const pdf = Buffer.from('%PDF-1.7 card')
+  await context.route(fileUrl, (route) =>
     route.fulfill({ headers: cors, contentType: 'image/png', body: png }),
   )
-  await page.route('**/attachments/notes/caf%C3%A9.json?resolve=1', (route) =>
-    route.fulfill({
-      headers: cors,
-      json: { url: 'https://storage.example.test/notes-original' },
-    }),
-  )
-  await page.route('https://storage.example.test/notes-original', (route) =>
-    route.fulfill({
-      headers: cors,
-      contentType: 'application/json',
-      body: notes,
-    }),
-  )
-  const pdf = Buffer.from('%PDF-1.7 card')
   await page.route('https://storage.example.test/published-pdf', (route) =>
     route.fulfill({ headers: cors, contentType: 'application/pdf', body: pdf }),
   )
+  await page.addInitScript(() => {
+    let clipboard = ''
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: async (value: string) => {
+          clipboard = value
+        },
+        readText: async () => clipboard,
+      },
+    })
+  })
   await page.goto('/?fixture=attachment-download')
-  const url = page.url()
+
+  await page.getByRole('button', { name: 'Copy link to image.png' }).click()
+  const copied = await page.evaluate(() => navigator.clipboard.readText())
+  expect(copied).toBe(fileUrl + '#attachment=image')
+
+  const composer = page.getByRole('region', { name: 'Receiving session' })
+  const editor = composer.locator('[data-slot="editor"]')
+  await paste(editor, copied)
+  await expect(composer.getByRole('img', { name: 'image.png' })).toBeVisible()
+  await expect(editor).toHaveText('')
+  await page.getByRole('button', { name: 'Send', exact: true }).click()
+
+  const message = page.getByTestId('sent-message')
+  await expect(message).toHaveText('')
+  await expect(message.getByRole('link')).toHaveCount(0)
+  await message.getByRole('button', { name: 'Open image.png' }).click()
+  const gallery = page.getByRole('dialog', { name: 'Media viewer' })
+  await expect(
+    gallery.getByRole('img', { name: 'image.png' }),
+  ).toHaveJSProperty('naturalWidth', 1)
+  await page.keyboard.press('Escape')
+  await expect(gallery).toBeHidden()
 
   const cases = [
     {
@@ -44,26 +62,47 @@ test('downloads original files from attachment buttons and Markdown links', asyn
       bytes: pdf,
     },
     {
-      control: page.getByRole('button', { name: 'Download image.png' }),
+      control: message.getByRole('button', { name: 'Download image.png' }),
       filename: 'image.png',
       bytes: png,
     },
-    {
-      control: page.getByRole('link', { name: 'Shared notes' }),
-      filename: 'café.json',
-      bytes: Buffer.from(notes),
-    },
   ]
-  for (const { control, filename, bytes } of cases) {
+  const url = page.url()
+  for (const { control, filename: name, bytes } of cases) {
     const event = page.waitForEvent('download')
     await control.click()
     const download = await event
 
-    expect(download.suggestedFilename()).toBe(filename)
+    expect(download.suggestedFilename()).toBe(name)
     expect(await buffer(await download.createReadStream())).toEqual(bytes)
     expect(page.url()).toBe(url)
     expect(context.pages()).toHaveLength(1)
   }
+})
+
+test('converts mixed pastes and leaves unmatched URLs editable', async ({
+  page,
+}) => {
+  const fileUrl = 'https://storage.example.test/api/storage/image'
+  await page.route(fileUrl, (route) =>
+    route.fulfill({ headers: cors, contentType: 'image/png', body: png }),
+  )
+  await page.goto('/?fixture=attachment-download')
+  const composer = page.getByRole('region', { name: 'Receiving session' })
+  const editor = composer.locator('[data-slot="editor"]')
+  const forged = fileUrl.replace('/image', '/wrong') + '#attachment=image'
+  const shared = fileUrl + '#attachment=image'
+  await paste(editor, forged)
+  await expect(editor).toHaveText(forged)
+  const card = composer.getByRole('button', { name: 'Remove file image.png' })
+  await expect(card).toHaveCount(0)
+  await page.keyboard.press('ControlOrMeta+a')
+  await paste(editor, `See ${shared} and ${shared} today. Also ${fileUrl}`)
+  await expect(editor).toHaveText(`See and today. Also ${fileUrl}`)
+  await expect(composer.getByRole('img', { name: 'image.png' })).toHaveCount(1)
+  await card.click()
+  await expect(card).toHaveCount(0)
+  await expect(editor).toHaveText(`See and today. Also ${fileUrl}`)
 })
 
 test('opens visible thumbnails and displays the selected preview while originals load', async ({
@@ -143,4 +182,15 @@ function solidPng(width: number, height: number) {
   return sharp({ create: { width, height, channels: 3, background: 'blue' } })
     .png()
     .toBuffer()
+}
+
+async function paste(editor: Locator, value: string) {
+  await editor.evaluate((node, text) => {
+    node.focus()
+    const clipboardData = new DataTransfer()
+    clipboardData.setData('text/plain', text)
+    node.dispatchEvent(
+      new ClipboardEvent('paste', { bubbles: true, clipboardData }),
+    )
+  }, value)
 }

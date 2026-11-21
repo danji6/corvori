@@ -29,6 +29,7 @@ import {
   reserveResumableStream,
   reserveStream,
 } from './reserve'
+import { resolveAttachmentShares, resolveShare } from './sharedAttachments'
 import { runShellCommand } from './shell'
 import { maybeInsertStarters } from './starters'
 
@@ -57,9 +58,14 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
   }
 
   const activeStream = await Memberships.getActiveStream(ctx, args.sessionId)
-  const attachments = await loadAttachments(ctx, args)
+  const command = role === 'user' ? parseShellCommand(args.content) : null
+  const { attachments, content: messageText } = await loadAttachments(
+    ctx,
+    args,
+    command === null,
+  )
 
-  if (!args.content.trim() && attachments.length === 0) {
+  if (!messageText.trim() && attachments.length === 0) {
     error('Message is empty')
   }
 
@@ -70,7 +76,6 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
 
   const silent = args.silent ?? false
 
-  const command = role === 'user' ? parseShellCommand(args.content) : null
   if (command !== null) {
     return runShellCommand(ctx, {
       session,
@@ -82,7 +87,7 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
     })
   }
 
-  const content = unescapeShellPrefix(args.content)
+  const content = unescapeShellPrefix(messageText)
 
   const fileLinkParts = session.workspace
     ? snapshotFileLinkParts(parseFileMentions(content), args.fileLinks)
@@ -269,10 +274,61 @@ export async function executeImpersonate(
   })
 }
 
-async function loadAttachments(ctx: AuthMutationCtx, args: SendMessageArgs) {
-  const staged: { attachment: Doc<'attachments'> }[] = []
-  const seenFiles = new Set<string>()
-  for (const { id } of args.attachments ?? []) {
+async function loadAttachments(
+  ctx: AuthMutationCtx,
+  args: SendMessageArgs,
+  resolveShares: boolean,
+) {
+  const staged = await loadStagedAttachments(ctx, args)
+  const seen = new Set([...staged.values()].map((attachment) => attachment.fileId)) // prettier-ignore
+  const attachments: { attachment: Doc<'attachments'> }[] = []
+  const matches = new Map<string, Awaited<ReturnType<typeof resolveShare>>>()
+
+  async function addSharedFile(file: Doc<'attachmentFiles'>) {
+    if (seen.has(file._id)) return
+    seen.add(file._id)
+    const attachment = await Attachments.createReference(ctx, {
+      file,
+      sessionId: args.sessionId,
+      uploaderId: ctx.userId,
+    })
+    attachments.push({ attachment })
+  }
+
+  for (const input of args.attachments ?? []) {
+    if ('id' in input) {
+      const attachment = staged.get(input.id)
+      if (attachment) attachments.push({ attachment })
+      staged.delete(input.id)
+      continue
+    }
+    if (matches.has(input.shareUrl)) continue
+    const share = await resolveShare(ctx, input.shareUrl)
+    if (!share) error('Shared attachment is no longer available', 409)
+    matches.set(input.shareUrl, share)
+    await addSharedFile(share.file)
+  }
+
+  if (!resolveShares) return { attachments, content: args.content }
+
+  const { files, content } = await resolveAttachmentShares(
+    ctx,
+    args.content,
+    matches,
+  )
+  for (const file of files.values()) await addSharedFile(file)
+
+  return { attachments, content }
+}
+
+async function loadStagedAttachments(
+  ctx: AuthMutationCtx,
+  args: SendMessageArgs,
+) {
+  const staged = new Map<Id<'attachments'>, Doc<'attachments'>>()
+  for (const input of args.attachments ?? []) {
+    if (!('id' in input) || staged.has(input.id)) continue
+    const { id } = input
     const attachment = await ctx.db.get(id)
     if (
       !attachment ||
@@ -282,29 +338,7 @@ async function loadAttachments(ctx: AuthMutationCtx, args: SendMessageArgs) {
     ) {
       error('Invalid staged attachment', 409)
     }
-    seenFiles.add(attachment.fileId)
-    staged.push({ attachment })
-  }
-
-  const linked = new Map(
-    (args.attachmentLinks ?? []).map((reference) => [
-      JSON.stringify(reference),
-      reference,
-    ]),
-  )
-  for (const { token, filename } of linked.values()) {
-    const file = await Attachments._getSharedFile(ctx, { token })
-    if (!file || file.filename !== filename)
-      error('Attachment link is invalid or has expired', 404)
-    if (seenFiles.has(file._id)) continue
-
-    const attachment = await Attachments.createReference(ctx, {
-      token,
-      sessionId: args.sessionId,
-      uploaderId: ctx.userId,
-    })
-    seenFiles.add(file._id)
-    staged.push({ attachment })
+    staged.set(id, attachment)
   }
   return staged
 }

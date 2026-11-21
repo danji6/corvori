@@ -7,6 +7,7 @@ import {
   activeAttachmentMessages,
   hasLoadedAttachmentMedia,
 } from '@cv/convex/model/attachmentMedia'
+import { getToolFile } from '@cv/convex/model/attachments'
 import {
   attachmentToModelOutput,
   createReadAttachmentTool,
@@ -28,7 +29,7 @@ test('settled media attachment tool output expires after its turn', () => {
     output: {
       kind: 'media',
       url: 'https://storage.test/file',
-      reference: 'attachment:token/file.png',
+      reference: 'attachment:local/file.png',
       filename: 'file.png',
       mediaType: 'image/png',
       byteLength: 123,
@@ -54,7 +55,7 @@ test('media attachment tool output maps to provider file content', () => {
   const output = {
     kind: 'media' as const,
     url: 'https://storage.test/file',
-    reference: 'attachment:token/file.png',
+    reference: 'attachment:local/file.png',
     filename: 'file.png',
     mediaType: 'image/png',
     byteLength: 123,
@@ -117,7 +118,7 @@ describe('active attachment media', () => {
   })
 })
 
-const reference = 'attachment:token/notes.txt'
+const reference = 'attachment:local/notes.txt'
 const utf8 = new TextEncoder()
 const storageUrl = 'https://storage.test/blob1'
 
@@ -144,6 +145,8 @@ function mockDatabase() {
     rows,
     tables,
     db: {
+      normalizeId: (table: string, id: string) =>
+        tables.get(table)?.some((row) => row._id === id) ? id : null,
       insert,
       get: (id: string) => rows.get(id) ?? null,
       patch: (id: string, value: Record<string, unknown>) => {
@@ -209,6 +212,9 @@ async function attachmentTool(blob: Blob, options: FixtureOptions = {}) {
     return { streamId: streamId as never, generation: 1 }
   }
   const execution = addExecution('chat', 'user', 'agent', 'message')
+  const attachment = { _id: 'local', sessionId: 'chat', fileId }
+  rows.set(attachment._id, attachment)
+  tables.set('attachments', [attachment])
   const ranges: [number, number][] = []
   const fetchRange = async (...[url, init]: Parameters<typeof fetch>) => {
     if (String(url) !== storageUrl) throw new Error('Unexpected storage URL')
@@ -235,11 +241,11 @@ async function attachmentTool(blob: Blob, options: FixtureOptions = {}) {
   const ctx = {
     runQuery: (
       ref: FunctionReference<'query', 'internal'>,
-      args: AttachmentCursorCall,
+      args: AttachmentCursorCall & { attachmentId: string },
     ) => {
       if (getFunctionName(ref) === 'attachments:_readCursor')
         return readCursor({ db } as never, args)
-      return rows.get(fileId) ?? null
+      return getToolFile({ db } as never, args)
     },
     runMutation: (_ref: unknown, args: SaveAttachmentCursorArgs) => {
       const result = saveQueue.then(() => saveCursor({ db } as never, args))
@@ -336,11 +342,11 @@ describe('read_attachment tool', () => {
     await expect(read({ from: 'end' })).rejects.toThrow('not valid UTF-8')
   })
 
-  test('rejects a reference whose filename does not match its token', async () => {
+  test('rejects a reference whose filename does not match the attachment', async () => {
     const { read } = await attachmentTool(new Blob(['hello']))
     await expect(
-      read({ reference: 'attachment:token/wrong-name.pdf' }),
-    ).rejects.toThrow('Attachment link is invalid or expired')
+      read({ reference: 'attachment:local/wrong-name.pdf' }),
+    ).rejects.toThrow('Attachment is unavailable in this session')
   })
 
   test('returns media as a temporary storage URL plus permanent reference', async () => {
@@ -349,7 +355,7 @@ describe('read_attachment tool', () => {
       filename,
       mediaType: 'image/png',
     })
-    const reference = 'attachment:token/pixel.png'
+    const reference = 'attachment:local/pixel.png'
     expect(await read({ reference })).toEqual({
       kind: 'media',
       url: storageUrl,
@@ -603,7 +609,7 @@ describe('attachment operation state', () => {
     const file = rows.get(fileId)!
     rows.delete(fileId)
     await expect(read(resume)).rejects.toThrow(
-      'Attachment link is invalid or expired',
+      'Attachment is unavailable in this session',
     )
     rows.set(fileId, file)
     tables.get('attachmentCursors')![0]!.expiresAt = 0

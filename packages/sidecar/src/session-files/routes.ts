@@ -71,14 +71,14 @@ function activeSession<T>(id: string, action: () => Promise<T>) {
 
 type Transfer = z.infer<typeof transfer>
 
-function writeTransfer(
+function writeTransfer<T>(
   input: Transfer,
-  write: (input: Transfer) => Promise<void>,
+  write: (input: Transfer) => Promise<T>,
 ) {
   const target = sessionFilePath(input.sessionId, input.path)
   return checkpoints().write(input.sessionId, [target], async (writer) => {
     await writer.trackFile(target)
-    await write(input)
+    return write(input)
   })
 }
 
@@ -95,10 +95,10 @@ export function sessionFileRoutes() {
 
   app.post('/commit-copy', async (c) => {
     const input = transfer.parse(await c.req.json())
-    await exclusive(input.operationId, () =>
+    const status = await exclusive(input.operationId, () =>
       activeSession(input.sessionId, () => writeTransfer(input, commitCopy)),
     )
-    return c.json({ ok: true })
+    return c.json({ status })
   })
 
   app.post('/publish', async (c) => {

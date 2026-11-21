@@ -1,13 +1,21 @@
+import type { Id } from '@cv/convex/_generated/dataModel'
 import {
+  type TransferResult,
+  advanceCopyPath,
   begin,
+  finishCopy,
   finishPublish,
   mergePublishedAttachments,
+  requireActive,
 } from '@cv/convex/model/attachmentTransfers'
 import {
   cleanUpGeneratedAttachments,
+  getToolFile,
   getUrlMap,
 } from '@cv/convex/model/attachments'
-import { expect, test } from 'bun:test'
+import { createAttachmentTransferTool } from '@cv/convex/model/tool/attachmentTransfers'
+import { expect, spyOn, test } from 'bun:test'
+import { type FunctionReference, getFunctionName } from 'convex/server'
 import { skillsDatabase } from '~/tests/helpers/skills-db'
 
 const execution = { streamId: 'stream' as never, generation: 1 }
@@ -155,4 +163,94 @@ test('returns original image dimensions with the published attachment URL', asyn
   })
   const urls = await getUrlMap(ctx, { ids: [attachmentId] })
   expect(urls[attachmentId]?.imageDimensions).toEqual(imageDimensions)
+})
+
+test('automatic copies advance on collision and retry an uncertain write at the same path', async () => {
+  const { ctx, rows } = fixture()
+  rows('attachments').push({ _id: 'local', sessionId: 'child', fileId: 'file' })
+  rows('attachmentFiles').push({
+    _id: 'file',
+    storageId: 'blob',
+    filename: 'report.txt',
+    mediaType: 'text/plain',
+    byteLength: 6,
+  })
+  rows('userSessions').push({
+    _id: 'child-member',
+    sessionId: 'child',
+    userId: 'owner',
+  })
+  const writes: string[] = []
+  const fetcher = spyOn(globalThis, 'fetch').mockImplementation(
+    Object.assign(
+      async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        if (!String(url).endsWith('/commit-copy')) return Response.json({})
+        const { path } = JSON.parse(String(init?.body))
+        writes.push(path)
+        if (writes.length === 1) return Response.json({ status: 'occupied' })
+        if (writes.length === 2)
+          throw new TypeError('Connection lost after commit')
+        return Response.json({ status: 'committed' })
+      },
+      { preconnect: fetch.preconnect },
+    ),
+  )
+  const toolCtx = {
+    storage: { getUrl: async () => 'https://storage.example.test/file' },
+    runQuery: async (
+      ref: FunctionReference<'query', 'internal'>,
+      args: never,
+    ) => {
+      if (getFunctionName(ref) === 'attachments:_getToolFile')
+        return getToolFile(ctx, args)
+      const { id, ...execution } = args as {
+        id: Id<'attachmentTransfers'>
+      } & typeof call
+      return (await requireActive(ctx, id, execution)).row.result ?? null
+    },
+    runMutation: async (
+      ref: FunctionReference<'mutation', 'internal'>,
+      args: never,
+    ) => {
+      switch (getFunctionName(ref)) {
+        case 'attachments:_beginTransfer':
+          return begin(ctx, args)
+        case 'attachments:_advanceCopyPath':
+          return advanceCopyPath(ctx, args)
+        case 'attachments:_finishCopy': {
+          const { id, result, ...execution } = args as {
+            id: Id<'attachmentTransfers'>
+            result: TransferResult
+          } & typeof call
+          return finishCopy(ctx, id, execution, result)
+        }
+      }
+    },
+  }
+  try {
+    const tool = await createAttachmentTransferTool(
+      'copy_attachment',
+      toolCtx as never,
+      execution,
+    )
+    const input = { reference: 'attachment:local/report.txt' } as never
+    const options = {
+      toolCallId: 'copy',
+      messages: [],
+      context: undefined as never,
+    }
+    const result = await tool.execute!(input, options)
+    expect(result).toMatchObject({ path: 'session://attachments/report-2.txt' })
+    expect(rows('attachmentTransfers')[0].path).toBe(
+      'session://attachments/report-2.txt',
+    )
+    expect(await tool.execute!(input, options)).toEqual(result)
+    expect(writes).toEqual([
+      'session://attachments/report.txt',
+      'session://attachments/report-2.txt',
+      'session://attachments/report-2.txt',
+    ])
+  } finally {
+    fetcher.mockRestore()
+  }
 })

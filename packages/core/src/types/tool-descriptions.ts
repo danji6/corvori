@@ -17,6 +17,13 @@ const read_attachment = inline`
   start (line) or the end (lineFromEnd). To inspect a hit in context, start a
   plain read with reference and set offset to lineStartOffset.`
 
+const copy_attachment = inline`
+  Copy an attachment to a file you can work with to the session:// folder.`
+
+const attach_file = inline`
+  Publish a snapshot of a regular session:// file as a downloadable attachment
+  in your response.`
+
 const write_file = inline`
   Create or overwrite a text file in the selected filesystem scope. Prefer
   edit_file for targeted changes.`
@@ -170,6 +177,8 @@ export const TOOL_DESCRIPTIONS = {
   web_search,
   read_file,
   read_attachment,
+  copy_attachment,
+  attach_file,
   write_file,
   edit_file,
   shell_output,

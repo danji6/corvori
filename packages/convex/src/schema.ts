@@ -225,13 +225,13 @@ export default defineSchema({
 
   attachments: defineTable(V.attachmentSchema)
     .index('by_sessionId', ['sessionId'])
+    .index('by_sessionId_filename', ['sessionId', 'filename'])
     .index('by_messageId', ['messageId'])
     .index('by_streamId', ['streamId'])
     .index('by_fileId', ['fileId']),
 
   attachmentFiles: defineTable(V.attachmentFileSchema)
-    .index('by_storageId', ['storageId'])
-    .index('by_shareToken', ['shareToken']),
+    .index('by_storageId', ['storageId']),
 
   sessionFileOperations: defineTable(sessionFileOperationSchema)
     .index('by_nextAttemptAt', ['nextAttemptAt']),

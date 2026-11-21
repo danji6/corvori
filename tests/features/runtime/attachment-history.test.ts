@@ -16,7 +16,6 @@ describe('provider attachment history', () => {
         storageId: 'blob_text',
         mediaType: 'text/plain',
         filename: 'notes.txt',
-        shareToken: 'share-text',
         byteLength: 11,
       },
       blobs: { blob_text: new Blob(['hello\nworld']) },
@@ -31,7 +30,7 @@ describe('provider attachment history', () => {
           {
             type: 'text',
             text:
-              '<attachment reference="attachment:share-text/notes.txt" filename="notes.txt" mediaType="text/plain" bytes="11">\n' +
+              '<attachment reference="attachment:att_text/notes.txt" filename="notes.txt" mediaType="text/plain" bytes="11">\n' +
               'Use read_attachment with this reference to read its contents.\n' +
               '</attachment>',
           },
@@ -49,7 +48,6 @@ describe('provider attachment history', () => {
           storageId: 'blob_md',
           mediaType,
           filename: 'README.md',
-          shareToken: 'share-md',
           byteLength: 9,
         },
         blobs: { blob_md: new Blob(['# Project']) },
@@ -64,7 +62,7 @@ describe('provider attachment history', () => {
             {
               type: 'text',
               text:
-                `<attachment reference="attachment:share-md/README.md" filename="README.md" mediaType="${mediaType}" bytes="9">\n` +
+                `<attachment reference="attachment:att_md/README.md" filename="README.md" mediaType="${mediaType}" bytes="9">\n` +
                 'Use read_attachment with this reference to read its contents.\n' +
                 '</attachment>',
             },
@@ -74,7 +72,7 @@ describe('provider attachment history', () => {
     })
   }
 
-  test('keeps image attachments as file data urls', async () => {
+  test('includes the session reference alongside inline image previews', async () => {
     const message = attachmentMessage('att_png', 'image/png', 'pixel.png')
     const ctx = attachmentHistoryCtx({
       message,
@@ -102,6 +100,10 @@ describe('provider attachment history', () => {
         role: 'user',
         content: [
           {
+            type: 'text',
+            text: expect.stringContaining('attachment:att_png/pixel.png'),
+          },
+          {
             type: 'file',
             mediaType: 'image/jpeg',
             filename: 'pixel.png',
@@ -112,7 +114,7 @@ describe('provider attachment history', () => {
     ])
   })
 
-  test('keeps binary attachments as file data urls', async () => {
+  test('includes the session reference alongside inline binary attachments', async () => {
     const message = attachmentMessage('att_pdf', 'application/pdf', 'doc.pdf')
     const ctx = attachmentHistoryCtx({
       message,
@@ -134,6 +136,10 @@ describe('provider attachment history', () => {
       {
         role: 'user',
         content: [
+          {
+            type: 'text',
+            text: expect.stringContaining('attachment:att_pdf/doc.pdf'),
+          },
           {
             type: 'file',
             mediaType: 'application/pdf',
@@ -157,7 +163,6 @@ describe('provider attachment history', () => {
         storageId: 'blob_escape',
         mediaType: 'text/plain',
         filename,
-        shareToken: 'share-escape',
         byteLength: 7,
       },
       blobs: { blob_escape: new Blob(['content']) },
@@ -172,7 +177,7 @@ describe('provider attachment history', () => {
           {
             type: 'text',
             text:
-              '<attachment reference="attachment:share-escape/bad%22%0A%3Cname%3E.txt" filename="bad&quot; &lt;name&gt;.txt" mediaType="text/plain" bytes="7">\n' +
+              '<attachment reference="attachment:att_escape/bad%22%0A%3Cname%3E.txt" filename="bad&quot; &lt;name&gt;.txt" mediaType="text/plain" bytes="7">\n' +
               'Use read_attachment with this reference to read its contents.\n' +
               '</attachment>',
           },
@@ -189,7 +194,6 @@ describe('provider attachment history', () => {
         storageId: 'blob_long',
         mediaType: 'text/plain',
         filename: 'long.txt',
-        shareToken: 'share-long',
         byteLength: 50_001,
       },
       blobs: { blob_long: new Blob(['x'.repeat(50_001)]) },

@@ -1,18 +1,26 @@
+import { ChatComposer } from '@/components/chat/composer/chat-composer'
 import { FileBlock } from '@/components/chat/messages/file-block'
-import { AttachmentAnchor } from '@/components/markdown/attachment-anchor'
 import { FileStrip } from '@/components/ui/file-strip'
 import { LightboxProvider } from '@/components/ui/lightbox'
 import { AttachmentUrlProvider } from '@/hooks/chat/attachment-urls'
 import type { FileItem } from '@/hooks/file-previews'
+import type { PendingMessage } from '@/lib/chat/types'
+import { previewShares } from '@cv/convex/model/chat/sharedAttachments'
+import { attachmentShareUrl } from '@cv/core/attachments'
+import { ConvexQueryCacheProvider } from 'convex-helpers/react/cache'
 import { ConvexProvider, type ConvexReactClient } from 'convex/react'
+import { type FunctionReference, getFunctionName } from 'convex/server'
+import { useState } from 'react'
 
+const originalUrl = 'https://storage.example.test/api/storage/image'
+const shareUrl = attachmentShareUrl(originalUrl, 'image')
 const files: FileItem[] = [
   {
     id: 'image',
     file: new File([], 'image.png', { type: 'image/png' }),
-    url: 'attachment:image',
-    originalUrl: 'https://storage.example.test/image-original',
-    permaUrl: 'https://site.example.test/attachments/image/image.png',
+    url: originalUrl,
+    originalUrl,
+    shareUrl,
   },
 ]
 
@@ -39,8 +47,47 @@ const attachmentUrls = {
     ]),
   ),
 }
+const shareResults = new Map<
+  string,
+  Awaited<ReturnType<typeof previewShares>>
+>()
+
 const attachmentClient = {
-  watchQuery() {
+  watchQuery(query: FunctionReference<'query'>, args: { urls: string[] }) {
+    if (getFunctionName(query) === 'attachments:previewShares') {
+      const key = JSON.stringify(args.urls)
+      return {
+        onUpdate: (update: () => void) => {
+          let subscribed = true
+          void previewShares(
+            {
+              db: {
+                normalizeId: (_table: string, id: string) => id,
+                get: (id: string) =>
+                  id === 'image'
+                    ? {
+                        _id: id,
+                        storageId: 'image',
+                        filename: 'image.png',
+                        mediaType: 'image/png',
+                      }
+                    : null,
+              },
+              storage: { getUrl: () => originalUrl },
+            } as never,
+            args,
+          ).then((shares) => {
+            shareResults.set(key, shares)
+            if (subscribed) update()
+          })
+          return () => {
+            subscribed = false
+          }
+        },
+        localQueryResult: () => shareResults.get(key),
+        journal: () => undefined,
+      }
+    }
     return {
       onUpdate: () => () => {},
       localQueryResult: () => attachmentUrls,
@@ -97,9 +144,29 @@ export function AttachmentDownloadFixture() {
           attachmentIds={{ [publishedUrl]: 'published' }}
         />
       </ConvexProvider>
-      <AttachmentAnchor href="attachment:notes/caf%C3%A9.json">
-        Shared notes
-      </AttachmentAnchor>
+      <ConvexProvider client={attachmentClient}>
+        <ConvexQueryCacheProvider>
+          <AttachmentShareFixture />
+        </ConvexQueryCacheProvider>
+      </ConvexProvider>
     </>
+  )
+}
+
+function AttachmentShareFixture() {
+  const [sent, setSent] = useState<PendingMessage>()
+
+  return (
+    <LightboxProvider>
+      <section aria-label="Receiving session">
+        <ChatComposer hideTokenWidget onSubmit={setSent} />
+      </section>
+      <div data-testid="sent-message">
+        {sent?.content}
+        {sent?.files.some((part) => part.share?.shareUrl === shareUrl) && (
+          <FileStrip files={files} noAnimation />
+        )}
+      </div>
+    </LightboxProvider>
   )
 }

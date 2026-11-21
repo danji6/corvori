@@ -38,8 +38,3 @@ export function parseDataUrl(
     return null
   }
 }
-
-export function generatedFilename(mediaType: string, index: number): string {
-  const ext = mediaType.split('/')[1]?.split(';')[0]?.split('+')[0] || 'bin'
-  return `generated-${index + 1}.${ext}`
-}

@@ -1,13 +1,24 @@
 import { APP_ID } from '@cv/core/const'
 
+import type { PendingFilePart, SharedAttachment } from './types'
+
 const DATABASE_NAME = `${APP_ID}-composer-drafts`
 const STORE_NAME = 'attachments'
 
-/** A converted large text paste retained outside localStorage size limits. */
-export type ComposerAttachmentDraft = {
-  id?: string
-  file: File
-  pastePosition?: number
+/** Retains converted text and pasted attachment links with the draft. */
+export type ComposerAttachmentDraft =
+  | { id?: string; file: File; pastePosition?: number }
+  | { id: string; share: SharedAttachment; pastePosition?: never }
+
+export function sharedFilePart(share: SharedAttachment): PendingFilePart {
+  return {
+    type: 'file',
+    id: share.fileId,
+    filename: share.filename,
+    mediaType: share.mediaType,
+    url: `attachment:${share.fileId}`,
+    share,
+  }
 }
 
 type DraftRecord = {

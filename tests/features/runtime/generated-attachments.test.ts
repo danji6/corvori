@@ -8,7 +8,6 @@ import {
   unreferencedAttachmentIds,
 } from '@cv/convex/model/attachments'
 import {
-  generatedFilename,
   isGeneratedFilePart,
   parseDataUrl,
 } from '@cv/convex/model/stream/generatedFiles'
@@ -40,16 +39,6 @@ describe('parseDataUrl', () => {
 
   test('returns null for non data urls', () => {
     expect(parseDataUrl('attachment:abc')).toBeNull()
-  })
-})
-
-describe('generatedFilename', () => {
-  test('derives an extension from the media type', () => {
-    expect(generatedFilename('image/png', 0)).toBe('generated-1.png')
-    expect(generatedFilename('image/svg+xml', 1)).toBe('generated-2.svg')
-    expect(generatedFilename('application/octet-stream;x=1', 0)).toBe(
-      'generated-1.octet-stream',
-    )
   })
 })
 
@@ -193,7 +182,15 @@ describe('shared attachment lifecycle', () => {
     const inserts: Array<{ table: string; value: Record<string, unknown> }> = []
     const ctx = {
       db: {
-        get: async () => ({ generation: 0, state: { phase: 'streaming' } }),
+        query: () => ({ withIndex: () => ({ first: async () => null }) }),
+        get: async (id: string) => {
+          if (id === 'stream1')
+            return { generation: 0, state: { phase: 'streaming' } }
+          return inserts.find(
+            ({ table }) =>
+              id === (table === 'attachments' ? 'attachment1' : 'file1'),
+          )?.value
+        },
         system: {
           get: async (_table: string, id: string) =>
             id === 'blob1' ? { size: 42, contentType: 'image/jpeg' } : null,
@@ -243,7 +240,7 @@ describe('shared attachment lifecycle', () => {
     )
   })
 
-  test('creates a session-local reference from a permanent token', async () => {
+  test('creates a session-local reference from an existing file', async () => {
     const file = {
       _id: 'file1',
       storageId: 'blob1',
@@ -251,14 +248,10 @@ describe('shared attachment lifecycle', () => {
       filename: 'notes.txt',
       mediaType: 'text/plain',
       byteLength: 10,
-      shareToken: 'token1',
     }
     let inserted: Record<string, unknown> | undefined
     const ctx = {
       db: {
-        query: () => ({
-          withIndex: () => ({ unique: async () => file }),
-        }),
         insert: async (_table: string, value: Record<string, unknown>) => {
           inserted = value
           return 'attachment2'
@@ -268,7 +261,7 @@ describe('shared attachment lifecycle', () => {
     }
 
     const reference = await createReference(ctx as never, {
-      token: 'token1',
+      file: file as never,
       sessionId: 'session2' as never,
       uploaderId: 'user1' as never,
     })

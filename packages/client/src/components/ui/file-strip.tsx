@@ -8,10 +8,6 @@ import { downloadAttachment } from '@/lib/chat/attachment-download'
 import { ACCEPTED_VIDEO_TYPES, isDisplayableUrl } from '@/lib/io'
 import { toast, toastError } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
-import {
-  attachmentMarkdownLink,
-  attachmentReference,
-} from '@cv/core/attachments'
 import { formatByteLength } from '@cv/core/utils/size'
 import { truncateToExtension } from '@cv/core/utils/strings'
 import {
@@ -104,49 +100,45 @@ export function FileStrip(props: FileStripProps) {
       render={(item) => {
         const { preview, media } = previewsById.get(item.id)!
         return (
-          <div
-            className="relative isolate shrink-0"
-            style={{ width: size, height: size }}
-          >
-            {media ? (
-              <MediaThumbnail
-                src={
-                  media.kind === 'video'
-                    ? media.poster
-                    : (preview?.thumbnailUrl ?? undefined)
-                }
-                video={media.kind === 'video'}
-                alt={item.file.name}
-                onOpen={
-                  lightbox
-                    ? (trigger) =>
-                        lightbox.openGallery(gallery, item.id, trigger)
-                    : undefined
-                }
-              />
-            ) : preview.isThumbnailable && !preview.thumbnailUrl ? (
-              <Skeleton className="size-full shrink-0 rounded-lg" />
-            ) : isTextFileItem(item) ? (
-              <TextFileViewer item={item}>
-                <UnknownFile
-                  name={item.file.name}
-                  byteLength={item.byteLength ?? item.file.size}
+          <div className="shrink-0" style={{ width: size }}>
+            <div className="relative isolate" style={{ height: size }}>
+              {media ? (
+                <MediaThumbnail
+                  src={
+                    media.kind === 'video'
+                      ? media.poster
+                      : (preview?.thumbnailUrl ?? undefined)
+                  }
+                  video={media.kind === 'video'}
+                  alt={item.file.name}
+                  onOpen={
+                    lightbox
+                      ? (trigger) =>
+                          lightbox.openGallery(gallery, item.id, trigger)
+                      : undefined
+                  }
                 />
-              </TextFileViewer>
-            ) : (
-              <UnknownFile
-                name={item.file.name}
-                byteLength={item.byteLength ?? item.file.size}
-              />
-            )}
-            <RemoveButton item={item} onRemove={onRemove} />
-            {(item.byteLength ?? item.file.size) > 0 &&
-              preview?.thumbnailUrl && (
-                <span className="bg-m3-surface-container/90 absolute top-1 left-1 rounded-full px-2 py-0.5 text-[10px]">
-                  {formatByteLength(item.byteLength ?? item.file.size)}
-                </span>
+              ) : preview.isThumbnailable && !preview.thumbnailUrl ? (
+                <Skeleton className="size-full shrink-0 rounded-lg" />
+              ) : isTextFileItem(item) ? (
+                <TextFileViewer item={item}>
+                  <UnknownFile
+                    name={item.file.name}
+                    byteLength={item.byteLength ?? item.file.size}
+                  />
+                </TextFileViewer>
+              ) : (
+                <FileLinkThumbnail item={item} />
               )}
-            <FileActions item={item} onInsertInline={onInsertInline} />
+              <RemoveButton item={item} onRemove={onRemove} />
+              {(item.byteLength ?? item.file.size) > 0 &&
+                preview?.thumbnailUrl && (
+                  <span className="bg-m3-surface-container/90 absolute top-1 left-1 rounded-full px-2 py-0.5 text-[10px]">
+                    {formatByteLength(item.byteLength ?? item.file.size)}
+                  </span>
+                )}
+              <FileActions item={item} onInsertInline={onInsertInline} />
+            </div>
           </div>
         )
       }}
@@ -180,11 +172,8 @@ function FileActions({
   onInsertInline?: (id: string) => void
 }) {
   const [downloading, setDownloading] = useState(false)
-  const downloadUrl = item.originalUrl ?? item.permaUrl
-  const reference = item.permaUrl ? attachmentReference(item.permaUrl) : null
-  const copyText = reference
-    ? attachmentMarkdownLink(reference.token, reference.filename)
-    : null
+  const downloadUrl = item.originalUrl
+  const copyText = item.shareUrl
   if (!downloadUrl && !item.canInsertInline) return null
 
   return (
@@ -229,11 +218,7 @@ function FileActions({
           onClick={async () => {
             setDownloading(true)
             try {
-              await downloadAttachment(
-                downloadUrl,
-                reference?.filename ?? item.file.name,
-                { shared: !item.originalUrl },
-              )
+              await downloadAttachment(downloadUrl, item.file.name)
             } finally {
               setDownloading(false)
             }
@@ -309,6 +294,28 @@ function MediaThumbnail({ src, video, alt, onOpen }: MediaThumbnailProps) {
     >
       {content}
     </button>
+  )
+}
+
+function FileLinkThumbnail({ item }: { item: FileItem }) {
+  const thumbnail = (
+    <UnknownFile
+      name={item.file.name}
+      byteLength={item.byteLength ?? item.file.size}
+    />
+  )
+  if (!item.shareUrl || !item.originalUrl) return thumbnail
+
+  return (
+    <a
+      className="file-preview-focus block size-full rounded-lg"
+      aria-label={`Open ${item.file.name}`}
+      href={item.originalUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {thumbnail}
+    </a>
   )
 }
 

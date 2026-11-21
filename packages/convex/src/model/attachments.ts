@@ -1,13 +1,16 @@
-import type { Id } from '../_generated/dataModel'
+import { attachmentShareUrl } from '@cv/core/attachments'
+
+import type { Doc, Id } from '../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../_generated/server'
 import { error } from '../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../functions'
-import { generateId } from '../lib/utils'
 import type {
   AttachmentImageDimensions,
   ConfirmAttachmentWithDimensionsArgs,
   CreateGeneratedAttachmentArgs,
+  StreamExecutionArgs,
 } from '../types'
+import { allocateAttachmentName } from './attachmentNames'
 import { allVersionParts } from './messageContents'
 import { getMember, requireEnabled, requireMember } from './session/memberships'
 import { ownsExecution } from './stream/execution'
@@ -26,12 +29,12 @@ export async function confirm(
   const { imageDimensions, ...attachment } = args
   const { session } = await requireMember(ctx, args.sessionId, uploaderId)
   requireEnabled(session)
-  const fileId = await createFile(ctx, { ...attachment, imageDimensions })
-  return ctx.db.insert('attachments', {
+  const stored = await storeAttachment(ctx, {
     ...attachment,
-    fileId,
+    imageDimensions,
     uploaderId,
   })
+  return stored.attachmentId
 }
 
 type CreateFileArgs = {
@@ -60,7 +63,6 @@ async function createFile(ctx: MutationCtx, args: CreateFileArgs) {
     filename: args.filename,
     mediaType: args.mediaType,
     byteLength: metadata.size,
-    shareToken: generateId(),
   })
 }
 
@@ -97,18 +99,25 @@ export async function _get(
     mediaType: file.mediaType,
     filename: file.filename,
     byteLength: file.byteLength,
-    shareToken: file.shareToken,
   }
 }
 
-export async function _getSharedFile(
+export async function getToolFile(
   ctx: QueryCtx,
-  { token }: { token: string },
+  args: StreamExecutionArgs & { attachmentId: string },
 ) {
-  return ctx.db
-    .query('attachmentFiles')
-    .withIndex('by_shareToken', (q) => q.eq('shareToken', token))
-    .unique()
+  const stream = await ctx.db.get(args.streamId)
+  if (!ownsExecution(stream, args)) return null
+
+  const id = ctx.db.normalizeId('attachments', args.attachmentId)
+  if (!id) return null
+  const attachment = await ctx.db.get(id)
+  if (attachment?.sessionId !== stream.sessionId) return null
+
+  const member = await getMember(ctx, stream.sessionId, stream.invokedBy)
+  if (!member) return null
+  requireEnabled(member.session)
+  return ctx.db.get(attachment.fileId)
 }
 
 export async function listBySession(
@@ -136,37 +145,13 @@ export async function remove(
   await removeAttachment(ctx, attachment)
 }
 
-export async function getUrlPair(
-  ctx: AuthQueryCtx,
-  args: { attachmentId: Id<'attachments'> },
-) {
-  const attachment = await requireReadable(ctx, args.attachmentId)
-  const file = await ctx.db.get(attachment.fileId)
-  if (!file) return null
-
-  const url = await ctx.storage.getUrl(file.storageId)
-  return (
-    url && {
-      url,
-      permaUrl: permaUrl(file.shareToken, file.filename),
-      byteLength: file.byteLength,
-      mediaType: file.mediaType,
-      filename: file.filename,
-      createdAt: attachment._creationTime,
-    }
-  )
-}
-
-export async function getUrlMap(
-  ctx: AuthQueryCtx,
-  { ids }: { ids: Id<'attachments'>[] },
-) {
+export async function getUrlMap(ctx: AuthQueryCtx, { ids }: { ids: string[] }) {
   const result: Record<
     string,
     {
       url: string
       previewUrl: string | null
-      permaUrl: string | null
+      shareUrl: string
       byteLength: number | null
       imageDimensions?: AttachmentImageDimensions
       mediaType: string
@@ -174,7 +159,9 @@ export async function getUrlMap(
       createdAt: number
     }
   > = {}
-  for (const id of ids) {
+  for (const value of ids) {
+    const id = ctx.db.normalizeId('attachments', value)
+    if (!id) continue
     const attachment = await readableOrNull(ctx, id)
     if (!attachment) continue
 
@@ -191,7 +178,7 @@ export async function getUrlMap(
       result[id] = {
         url,
         previewUrl,
-        permaUrl: permaUrl(file.shareToken, file.filename),
+        shareUrl: attachmentShareUrl(url, file._id),
         byteLength: file.byteLength,
         imageDimensions: file.imageDimensions,
         mediaType: file.mediaType,
@@ -211,33 +198,50 @@ export async function _createGenerated(
     await ctx.storage.delete(args.storageId)
     return null
   }
-  return (await createGeneratedAttachment(ctx, args)).attachmentId
+  const { attachmentId, metadata } = await createGeneratedAttachment(ctx, args)
+  return { attachmentId, filename: metadata.filename }
 }
 
 export async function createGeneratedAttachment(
   ctx: MutationCtx,
   args: CreateGeneratedAttachmentArgs,
 ) {
-  const { generation: _generation, imageDimensions, ...attachment } = args
-  const fileId = await createFile(ctx, { ...attachment, imageDimensions })
-  const attachmentId = await ctx.db.insert('attachments', {
-    ...attachment,
-    fileId,
-  })
+  const { generation: _generation, ...attachment } = args
+  const { attachmentId, fileId } = await storeAttachment(ctx, attachment)
   return { attachmentId, metadata: (await ctx.db.get(fileId))! }
 }
 
-/** Creates a message-local reference from a bearer attachment token. */
+type NewAttachment = Omit<
+  Doc<'attachments'>,
+  '_id' | '_creationTime' | 'fileId'
+> & { imageDimensions?: AttachmentImageDimensions }
+
+async function storeAttachment(ctx: MutationCtx, args: NewAttachment) {
+  const { imageDimensions, ...attachment } = args
+  const filename = await allocateAttachmentName(ctx, attachment)
+  const fileId = await createFile(ctx, {
+    ...attachment,
+    filename,
+    imageDimensions,
+  })
+  const attachmentId = await ctx.db.insert('attachments', {
+    ...attachment,
+    filename,
+    fileId,
+  })
+  return { attachmentId, fileId }
+}
+
+/** Creates a session attachment pointing to an existing file. */
 export async function createReference(
   ctx: MutationCtx,
   args: {
-    token: string
+    file: Doc<'attachmentFiles'>
     sessionId: Id<'sessions'>
     uploaderId: Id<'users'>
   },
 ) {
-  const file = await _getSharedFile(ctx, { token: args.token })
-  if (!file) error('Attachment link is invalid or has expired', 404)
+  const { file } = args
   const attachmentId = await ctx.db.insert('attachments', {
     fileId: file._id,
     storageId: file.storageId,
@@ -384,11 +388,6 @@ export async function removeAttachment(
     await ctx.storage.delete(file.previewStorageId).catch(() => {})
   }
   await ctx.db.delete(fileId)
-}
-
-function permaUrl(token: string, filename: string): string {
-  const base = process.env.CONVEX_SITE_URL ?? 'http://localhost:3211'
-  return `${base.replace(/\/$/, '')}/attachments/${encodeURIComponent(token)}/${encodeURIComponent(filename)}`
 }
 
 async function requireReadable(

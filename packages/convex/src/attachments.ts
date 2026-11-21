@@ -11,7 +11,9 @@ import {
 import * as Cursors from './model/attachmentCursors'
 import * as Transfers from './model/attachmentTransfers'
 import * as Attachments from './model/attachments'
+import { previewShares as getSharePreviews } from './model/chat/sharedAttachments'
 import {
+  advanceCopyPathArgs,
   attachmentTransferCall,
   attachmentTransferResult,
 } from './validators/attachmentTransfers'
@@ -59,9 +61,9 @@ export const _get = internalQuery({
   handler: Attachments._get,
 })
 
-export const _getSharedFile = internalQuery({
-  args: { token: v.string() },
-  handler: Attachments._getSharedFile,
+export const _getToolFile = internalQuery({
+  args: { ...streamExecutionArgsValidator.fields, attachmentId: v.string() },
+  handler: Attachments.getToolFile,
 })
 
 export const _createGenerated = internalMutation({
@@ -79,14 +81,14 @@ export const remove = authMutation({
   handler: Attachments.remove,
 })
 
-export const getUrlPair = authQuery({
-  args: { attachmentId: v.id('attachments') },
-  handler: Attachments.getUrlPair,
+export const getUrlMap = authQuery({
+  args: { ids: v.array(v.string()) },
+  handler: Attachments.getUrlMap,
 })
 
-export const getUrlMap = authQuery({
-  args: { ids: v.array(v.id('attachments')) },
-  handler: Attachments.getUrlMap,
+export const previewShares = authQuery({
+  args: { urls: v.array(v.string()) },
+  handler: getSharePreviews,
 })
 
 export const pruneOrphans = internalMutation({
@@ -120,11 +122,17 @@ export const _beginTransfer = internalMutation({
 })
 
 export const _assertTransfer = internalQuery({
-  args: transferExecution,
-  async handler(ctx, { id, ...execution }) {
-    await Transfers.requireActive(ctx, id, execution)
-    return true
+  args: { ...transferExecution, path: v.string() },
+  async handler(ctx, { id, path, ...execution }) {
+    const { row } = await Transfers.requireActive(ctx, id, execution)
+    if (row.path !== path) error('Attachment destination changed', 409)
+    return row.result ?? null
   },
+})
+
+export const _advanceCopyPath = internalMutation({
+  args: advanceCopyPathArgs.fields,
+  handler: Transfers.advanceCopyPath,
 })
 
 export const _finishCopy = internalMutation({
