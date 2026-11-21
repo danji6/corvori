@@ -1,4 +1,4 @@
-import { resolveAttachmentHistoryParts } from '@cv/convex/actions/stream/attachmentHistory'
+import { resolveAttachmentHistoryParts } from '@cv/convex/model/stream/attachmentHistory'
 import { canReplayToolContext } from '@cv/core/tool-context'
 import * as checkpointModule from '@cv/sidecar/checkpoints/manager'
 import { CheckpointManager } from '@cv/sidecar/checkpoints/manager'

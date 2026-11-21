@@ -14,7 +14,7 @@ import type {
   toolkitContextValidator,
 } from '../../validators/tools'
 import type { SpawnableAgent } from '../agent/subagents'
-import { isMcpServerSelected, isMcpToolSelected } from '../mcpToolPolicy'
+import { isMcpServerSelected, isMcpToolSelected } from '../mcp/toolPolicy'
 import {
   type ToolResources,
   enabledMcpServers,

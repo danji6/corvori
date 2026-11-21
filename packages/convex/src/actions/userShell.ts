@@ -11,7 +11,7 @@ export const _run = internalAction({
     silent: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const { _run } = await import('./tool/userShell')
+    const { _run } = await import('../model/shell/userShellActions')
     return _run(ctx, args)
   },
 })

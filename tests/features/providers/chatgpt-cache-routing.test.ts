@@ -1,9 +1,9 @@
-import { createCacheDiagnostics } from '@cv/convex/actions/stream/cacheDiagnostics'
 import { chatGPTFetch } from '@cv/convex/model/provider/openai/chatgpt'
 import {
   type ProviderOptions,
   getProviderOptions,
 } from '@cv/convex/model/provider/options'
+import { createCacheDiagnostics } from '@cv/convex/model/stream/cacheDiagnostics'
 import { accumulateSessionUsage } from '@cv/convex/model/stream/lifecycleMeta'
 import { resolveUsage } from '@cv/convex/model/stream/usage'
 import type { CacheDiagnostic } from '@cv/convex/types'

@@ -192,7 +192,7 @@ Performance audit updated on 2026-11-19.
   separately from inbox delivery. Sidebar ordering still depends on the
   indexed member activity updates.
 
-- **Tool-heavy turns.** [Provider setup](../packages/convex/src/actions/stream/engine.ts)
+- **Tool-heavy turns.** [Provider setup](../packages/convex/src/model/stream/engine.ts)
   reuses completed history within a stream action. A transactionally updated
   per-session revision invalidates the snapshot after a completed transcript
   write. The processing output and anchored notes are read on every setup.

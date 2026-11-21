@@ -2,7 +2,6 @@ import { v } from 'convex/values'
 
 import { internalMutation, internalQuery } from './_generated/server'
 import { authMutation, authQuery } from './functions'
-import * as Transfers from './model/attachmentTransfers'
 import * as SessionArchive from './model/session/archive'
 import * as SessionFiles from './model/session/sessionFiles'
 import * as Sessions from './model/session/sessions'
@@ -186,8 +185,5 @@ export const _finishSessionFiles = internalMutation({
 
 export const _sweepSessionFiles = internalMutation({
   args: {},
-  async handler(ctx) {
-    await SessionFiles.sweep(ctx)
-    await Transfers.sweep(ctx)
-  },
+  handler: SessionFiles.sweep,
 })

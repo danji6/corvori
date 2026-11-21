@@ -1,5 +1,5 @@
-import { _getExecution } from '@cv/convex/model/mcp'
-import { connected } from '@cv/convex/model/mcpRuntime'
+import { connected } from '@cv/convex/model/mcp/runtime'
+import { _getExecution } from '@cv/convex/model/mcp/servers'
 import { createExternalMcpTool } from '@cv/convex/model/tool/mcp'
 import { mcpOperationRoutes } from '@cv/sidecar/mcp/external/operation-routes'
 import { afterEach, expect, test } from 'bun:test'

@@ -3,8 +3,11 @@ import {
   bindReference,
   findReference,
   removeShellReferences,
-} from '@cv/convex/model/shellReferences'
-import { finishShellWait, pendingShellWaits } from '@cv/convex/model/shellWaits'
+} from '@cv/convex/model/shell/references'
+import {
+  finishShellWait,
+  pendingShellWaits,
+} from '@cv/convex/model/shell/waits'
 import { expect, test } from 'bun:test'
 import { lifecycleDatabase } from '~/tests/helpers/lifecycle-db'
 

@@ -10,12 +10,12 @@ import type {
   StreamExecutionArgs,
   StreamState,
 } from '../../types'
-import { expireStreamTransfers } from '../attachmentTransfers'
-import { cleanUpGeneratedAttachments } from '../attachments'
-import { finishChanges } from '../changes'
+import { cleanUpGeneratedAttachments } from '../attachments/files'
+import { expireStreamTransfers } from '../attachments/transfers'
+import { finishChanges } from '../changes/sets'
 import { refreshHistoryContext } from '../chat/notes'
 import { handleStreamEnd } from '../chat/scheduling'
-import { cancelForStream } from '../mcpOperations'
+import { cancelForStream } from '../mcp/operations/records'
 import {
   finalizeTurn,
   getProcessingSegmentRow,
@@ -29,11 +29,11 @@ import {
   syncActivity,
   textFromParts,
 } from '../messages'
-import { settleStream } from '../notificationRequests'
 import {
   notificationPreviewFromParts,
   notifyAgentEvent,
-} from '../notifications'
+} from '../notifications/records'
+import { settleStream } from '../notifications/requests'
 import { createPlanLinkPart, getBySession as getPlan } from '../plans'
 import { ownsExecution } from './execution'
 import { cleanUpOffloadedOutputs } from './lifecycleCleanup'

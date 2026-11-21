@@ -1,9 +1,10 @@
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import { findUserBySubject, requireRole } from '../../functions'
+import { requireRole } from '../../functions'
 import type { AuthQueryCtx } from '../../functions'
-import { hasInvocationAccess } from '../mcpRuntime'
+import { hasInvocationAccess } from '../mcp/runtime'
+import { findUserBySubject } from '../users'
 
 export async function toolkitActor(ctx: QueryCtx, subject: string) {
   const user = await findUserBySubject(ctx, subject)

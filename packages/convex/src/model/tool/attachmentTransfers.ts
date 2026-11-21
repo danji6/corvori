@@ -8,7 +8,7 @@ import type { Doc, Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { ToolError } from '../../errors'
 import { type StreamExecutionArgs } from '../../types'
-import { type TransferResult, transferTarget } from '../attachmentTransfers'
+import { type TransferResult, transferTarget } from '../attachments/transfers'
 import { postSidecar } from '../sidecar'
 import { findAttachment } from './attachments'
 
@@ -263,7 +263,7 @@ async function publishedImageDimensions(
   if (!mediaType.startsWith('image/')) return
 
   const { readStoredAttachmentImageDimensions } =
-    await import('../../actions/io/attachmentImage')
+    await import('../attachments/imageDimensions')
   return readStoredAttachmentImageDimensions(ctx.storage, storageId)
 }
 

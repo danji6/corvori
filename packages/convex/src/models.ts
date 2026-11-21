@@ -2,10 +2,7 @@ import { v } from 'convex/values'
 
 import { internalQuery, query } from './_generated/server'
 import { authQuery } from './functions'
-import {
-  KNOWN_PROVIDER_TYPES,
-  providerRequiresBaseURL,
-} from './model/provider/known'
+import { listProviderIds } from './model/provider/known'
 import * as Models from './model/provider/providers'
 
 export const list = authQuery({
@@ -15,16 +12,7 @@ export const list = authQuery({
 
 export const providerIds = query({
   args: {},
-  handler: () =>
-    KNOWN_PROVIDER_TYPES.map(
-      ({ value, label, defaultReasoning, binaryReasoningParameter }) => ({
-        value,
-        label,
-        requiresBaseURL: providerRequiresBaseURL(value),
-        defaultReasoning,
-        binaryReasoningParameter,
-      }),
-    ).sort((a, b) => a.label.localeCompare(b.label)),
+  handler: listProviderIds,
 })
 
 export const _getProviderForModel = internalQuery({

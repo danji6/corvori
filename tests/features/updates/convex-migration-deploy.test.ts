@@ -14,7 +14,7 @@ import {
 
 test('resolves root and workspace dependencies from an external migration project', async () => {
   const root = await mkdtemp(join(tmpdir(), 'convex-migration-deps-'))
-  const action = 'packages/convex/src/actions/io/attachmentImage.ts'
+  const action = 'packages/convex/src/model/attachments/imageDimensions.ts'
   try {
     await mkdir(join(root, action, '..'), { recursive: true })
     await mkdir(join(root, 'packages/core/src'), { recursive: true })

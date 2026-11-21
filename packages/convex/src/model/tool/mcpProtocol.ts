@@ -79,7 +79,7 @@ export async function createMcpProtocolTools(context: McpBrokerContext) {
       description: TOOL_DESCRIPTIONS.read_mcp_output,
       inputSchema: mcpOutputReadSchema,
       execute: async (input) => {
-        const { readMcpOutput } = await import('../mcpOutputActions')
+        const { readMcpOutput } = await import('../mcp/outputActions')
         return readMcpOutput(
           context.operation.ctx,
           context.operation.execution,

@@ -9,7 +9,7 @@ import {
   toolNamesForApproval,
 } from '../../lib/tool/approval'
 import type { RememberScope, Session } from '../../types'
-import { approvalTarget, findName } from '../mcpBrokerNames'
+import { approvalTarget, findName } from '../mcp/brokerNames'
 import { _allowToolPaths as allowToolPaths } from '../session/sessions'
 import { appendApprovals, getApprovals } from '../session/state'
 

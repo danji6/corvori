@@ -3,7 +3,7 @@ import {
   insertReplyQuote,
   prefixSenderName,
   representMessage,
-} from '@cv/convex/actions/stream/history'
+} from '@cv/convex/model/stream/history'
 import type { UIMessage } from 'ai'
 import { describe, expect, test } from 'bun:test'
 import {

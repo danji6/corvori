@@ -10,7 +10,7 @@ import {
   operationOutput,
   settle,
   waitForOperation,
-} from '../mcpOperationActions'
+} from '../mcp/operations/actions'
 import type { RuntimeAuthorization } from './mcp'
 
 export type McpOperationContext = {

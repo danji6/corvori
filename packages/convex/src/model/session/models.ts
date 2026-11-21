@@ -1,8 +1,8 @@
 import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import type { ModelSelection } from '../../types'
+import { resolve as resolveProviders } from '../provider/connections'
 import { findModelSelection } from '../provider/providers'
-import { resolve as resolveProviders } from '../providers'
 import { getByOwnerId } from '../settings'
 
 /** Resolves a session selection, preserving unknown model ids. */

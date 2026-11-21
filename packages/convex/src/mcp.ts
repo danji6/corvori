@@ -2,9 +2,9 @@ import { v } from 'convex/values'
 
 import { internalMutation, internalQuery } from './_generated/server'
 import { authMutation, authQuery } from './functions'
-import * as Mcp from './model/mcp'
-import * as Cleanup from './model/mcpCleanup'
-import * as Runtime from './model/mcpRuntime'
+import * as Cleanup from './model/mcp/cleanup'
+import * as Runtime from './model/mcp/runtime'
+import * as Mcp from './model/mcp/servers'
 import * as V from './validators/mcp'
 
 export const list = authQuery({

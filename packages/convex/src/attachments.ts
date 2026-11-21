@@ -1,16 +1,10 @@
 import { v } from 'convex/values'
 
 import { internalMutation, internalQuery } from './_generated/server'
-import { error } from './errors'
-import {
-  authMutation,
-  authQuery,
-  findUserBySubject,
-  getSubject,
-} from './functions'
-import * as Cursors from './model/attachmentCursors'
-import * as Transfers from './model/attachmentTransfers'
-import * as Attachments from './model/attachments'
+import { authMutation, authQuery } from './functions'
+import * as Cursors from './model/attachments/cursors'
+import * as Attachments from './model/attachments/files'
+import * as Transfers from './model/attachments/transfers'
 import { previewShares as getSharePreviews } from './model/chat/sharedAttachments'
 import {
   advanceCopyPathArgs,
@@ -39,11 +33,7 @@ export const confirm = authMutation({
 
 export const _confirmWithDimensions = internalMutation({
   args: confirmAttachmentWithDimensionsArgsValidator.fields,
-  handler: async (ctx, args) => {
-    const user = await findUserBySubject(ctx, await getSubject(ctx))
-    if (!user) error('Profile not initialized', 409)
-    return Attachments.confirm(ctx, args, user._id)
-  },
+  handler: Attachments.confirmWithDimensions,
 })
 
 export const getUrl = authQuery({
@@ -123,11 +113,7 @@ export const _beginTransfer = internalMutation({
 
 export const _assertTransfer = internalQuery({
   args: { ...transferExecution, path: v.string() },
-  async handler(ctx, { id, path, ...execution }) {
-    const { row } = await Transfers.requireActive(ctx, id, execution)
-    if (row.path !== path) error('Attachment destination changed', 409)
-    return row.result ?? null
-  },
+  handler: Transfers.assertTransfer,
 })
 
 export const _advanceCopyPath = internalMutation({
@@ -155,7 +141,7 @@ export const _finishPublish = internalMutation({
 
 export const _getTransfer = internalQuery({
   args: { id: v.id('attachmentTransfers') },
-  handler: (ctx, { id }) => ctx.db.get(id),
+  handler: Transfers.getTransfer,
 })
 
 export const _cleanTransfer = internalMutation({

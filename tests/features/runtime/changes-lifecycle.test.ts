@@ -1,4 +1,4 @@
-import { markChangesStale } from '@cv/convex/model/changeLocations'
+import { markChangesStale } from '@cv/convex/model/changes/locations'
 import {
   appendChanges,
   captureIssue,
@@ -10,7 +10,7 @@ import {
   reservePublication,
   restoreChanges,
   restoreResult,
-} from '@cv/convex/model/changes'
+} from '@cv/convex/model/changes/sets'
 import { describe, expect, test } from 'bun:test'
 import { lifecycleDatabase } from '~/tests/helpers/lifecycle-db'
 

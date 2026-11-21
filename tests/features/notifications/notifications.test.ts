@@ -1,7 +1,6 @@
 /// <reference types="bun-types" />
 import type { Id } from '@cv/convex/_generated/dataModel'
 import type { AuthQueryCtx } from '@cv/convex/functions'
-import { insertUnreadNotification } from '@cv/convex/model/notificationRetention'
 import {
   clearRead,
   discardSession,
@@ -16,7 +15,8 @@ import {
   notifyUserMessage,
   removeForMembership,
   removeForSession,
-} from '@cv/convex/model/notifications'
+} from '@cv/convex/model/notifications/records'
+import { insertUnreadNotification } from '@cv/convex/model/notifications/retention'
 import { MAX_UNREAD_NOTIFICATIONS } from '@cv/core/limits'
 import { describe, expect, test } from 'bun:test'
 import { fakeCtx } from '~/tests/setup/notifications'

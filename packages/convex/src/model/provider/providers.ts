@@ -10,7 +10,7 @@ import type {
   ModelProviderConfig,
   ModelSelection,
 } from '../../types'
-import { listProviders, resolve as resolveProviders } from '../providers'
+import { listProviders, resolve as resolveProviders } from './connections'
 import { resolveModelReasoning } from './known'
 
 export type ProviderCredentials = {

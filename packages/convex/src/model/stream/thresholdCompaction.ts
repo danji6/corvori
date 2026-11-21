@@ -18,7 +18,7 @@ import { effectiveAgentSelection } from '../agent/modelOverride'
 import { insertCommandChip } from '../chat/commandChips'
 import { senderIdentity } from '../chat/identities'
 import { scheduledCompactForStream } from '../chat/scheduling'
-import { pending as pendingMcp } from '../mcpOperations'
+import { pending as pendingMcp } from '../mcp/operations/records'
 import {
   finalizeTurn,
   getProcessingSegmentRow,

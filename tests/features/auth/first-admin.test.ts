@@ -1,5 +1,5 @@
 /// <reference types="bun-types" />
-import { getNewUserRole } from '@cv/convex/functions'
+import { getNewUserRole } from '@cv/convex/model/users'
 import { describe, expect, test } from 'bun:test'
 
 function ctxWithUsers(users: unknown[]) {

@@ -1,4 +1,4 @@
-import { guidanceSnapshot } from '@cv/convex/model/mcpCatalogContext'
+import { guidanceSnapshot } from '@cv/convex/model/mcp/catalogs/context'
 import { expect, test } from 'bun:test'
 
 test('guidance previews retain literal server/session provenance and point to full scoped retrieval', () => {

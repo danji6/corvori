@@ -4,7 +4,12 @@ import {
   finish,
   stage,
 } from '@cv/convex/model/provider/catalog'
-import { create, list, resolve, update } from '@cv/convex/model/providers'
+import {
+  create,
+  list,
+  resolve,
+  update,
+} from '@cv/convex/model/provider/connections'
 import { expect, test } from 'bun:test'
 import { providerFixture } from '~/tests/helpers/provider-db'
 

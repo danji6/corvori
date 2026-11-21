@@ -1,10 +1,5 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
 import type { ActionCtx } from '@cv/convex/_generated/server'
-import { buildProviderHistory } from '@cv/convex/actions/stream/history'
-import {
-  type ProviderHistorySnapshot,
-  readHistorySnapshot,
-} from '@cv/convex/actions/stream/historySnapshot'
 import { deleteMessage } from '@cv/convex/model/chat/mutations'
 import {
   addVersion,
@@ -14,6 +9,11 @@ import {
   setSelectedVersion,
 } from '@cv/convex/model/messageContents'
 import { prepareContextNote } from '@cv/convex/model/stream/contextNotes'
+import { buildProviderHistory } from '@cv/convex/model/stream/history'
+import {
+  type ProviderHistorySnapshot,
+  readHistorySnapshot,
+} from '@cv/convex/model/stream/historySnapshot'
 import {
   _getProviderHistory,
   _getProviderHistorySnapshot,

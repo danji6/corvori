@@ -1,7 +1,7 @@
 import type { Id } from '../../_generated/dataModel'
 import { error } from '../../errors'
 import { type AuthMutationCtx } from '../../functions'
-import * as Attachments from '../attachments'
+import * as Attachments from '../attachments/files'
 import { remapReplyQuote } from '../chat/replies'
 import { insertMessage, withParts } from '../messageContents'
 import { finalizeMessageParts, notACommandChip } from '../messages'

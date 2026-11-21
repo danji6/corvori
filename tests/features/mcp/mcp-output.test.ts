@@ -1,6 +1,6 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
 import type { ActionCtx } from '@cv/convex/_generated/server'
-import { resolveOffloadedOutput } from '@cv/convex/actions/stream/historyContent'
+import { resolveOffloadedOutput } from '@cv/convex/model/stream/historyContent'
 import { makeOutputPreview } from '@cv/convex/model/stream/toolOutput'
 import {
   hasToolResultMedia,

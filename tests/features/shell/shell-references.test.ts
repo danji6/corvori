@@ -3,7 +3,7 @@ import {
   bindReference,
   saveTerminal,
   transcriptReference,
-} from '@cv/convex/model/shellReferences'
+} from '@cv/convex/model/shell/references'
 import { expect, test } from 'bun:test'
 import { lifecycleDatabase } from '~/tests/helpers/lifecycle-db'
 

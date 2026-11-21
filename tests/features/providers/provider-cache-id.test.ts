@@ -1,5 +1,5 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
-import { providerPrefixDigest } from '@cv/convex/actions/stream/providerCacheId'
+import { providerPrefixDigest } from '@cv/convex/model/stream/providerCacheId'
 import { resolveProviderCacheId } from '@cv/convex/model/stream/providerRequests'
 import type { Prompt, PromptItem } from '@cv/convex/types'
 import { expect, test } from 'bun:test'

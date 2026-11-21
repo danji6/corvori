@@ -1,6 +1,6 @@
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
 import type { MutationCtx } from '@cv/convex/_generated/server'
-import { notificationPreview } from '@cv/convex/model/notifications'
+import { notificationPreview } from '@cv/convex/model/notifications/records'
 import {
   type DocumentByName,
   type GenericMutationCtx,

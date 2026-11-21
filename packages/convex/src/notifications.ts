@@ -2,8 +2,8 @@ import { paginationOptsValidator } from 'convex/server'
 import { v } from 'convex/values'
 
 import { authMutation, authQuery } from './functions'
-import * as Requests from './model/notificationRequests'
-import * as Notifications from './model/notifications'
+import * as Notifications from './model/notifications/records'
+import * as Requests from './model/notifications/requests'
 import {
   notificationApprovalActionValidator,
   notificationStatusValidator,

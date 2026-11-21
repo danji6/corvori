@@ -1,6 +1,6 @@
 import type { ActionCtx } from '@cv/convex/_generated/server'
-import { requestFingerprints } from '@cv/convex/actions/stream/cacheDiagnostics'
-import { createCacheDiagnostics } from '@cv/convex/actions/stream/cacheDiagnostics'
+import { requestFingerprints } from '@cv/convex/model/stream/cacheDiagnostics'
+import { createCacheDiagnostics } from '@cv/convex/model/stream/cacheDiagnostics'
 import type { CacheDiagnostic } from '@cv/convex/types'
 import { expect, test } from 'bun:test'
 import { getFunctionName } from 'convex/server'

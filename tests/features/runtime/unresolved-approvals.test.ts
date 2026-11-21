@@ -1,5 +1,5 @@
 /// <reference types="bun-types" />
-import { removeOrphanToolCalls } from '@cv/convex/actions/stream/history'
+import { removeOrphanToolCalls } from '@cv/convex/model/stream/history'
 import { shellHistoryTools } from '@cv/convex/model/tool/shell'
 import {
   UNRESOLVED_APPROVAL_REASON,

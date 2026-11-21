@@ -4,7 +4,11 @@ import {
   discover,
   refreshDetails,
 } from '@cv/convex/model/provider/connectionActions'
-import { create, list, resolve } from '@cv/convex/model/providers'
+import * as Connections from '@cv/convex/model/provider/connections'
+import {
+  enrichModel,
+  finishDiscovery,
+} from '@cv/convex/model/provider/mutations'
 import { expect, test } from 'bun:test'
 import { getFunctionName } from 'convex/server'
 import type { FunctionReference } from 'convex/server'
@@ -12,7 +16,7 @@ import { providerFixture } from '~/tests/helpers/provider-db'
 
 test('publishes the catalog before optional details and ignores stale scheduled enrichment', async () => {
   const { ctx } = providerFixture()
-  const providerId = await create(ctx, {
+  const providerId = await Connections.create(ctx, {
     key: 'ollama',
     enabled: true,
     models: [{ id: 'selected', label: 'My label' }],
@@ -34,9 +38,9 @@ test('publishes the catalog before optional details and ignores stale scheduled 
       args: Record<string, unknown>,
     ) => {
       const name = getFunctionName(reference)
-      if (name === 'providers:get') return (await list(ctx))[0]
+      if (name === 'providers:get') return Connections.get(ctx, args as never)
       if (name === 'providers:_connection')
-        return (await resolve(ctx, ctx.userId))[0]
+        return Connections.connection(ctx, args as never)
       if (name === 'providers:catalog')
         return Catalog.catalog(ctx, args as never)
       if (name === 'providers:_detailTargets')
@@ -53,9 +57,9 @@ test('publishes the catalog before optional details and ignores stale scheduled 
       if (name === 'providers:_stageDiscovery')
         return Catalog.stage(ctx, args as never)
       if (name === 'providers:_finishDiscovery')
-        return Catalog.finish(ctx, args as never)
+        return finishDiscovery(ctx, args as never)
       if (name === 'providers:_enrichModel')
-        return Catalog.enrich(ctx, args as never)
+        return enrichModel(ctx, args as never)
       if (name === 'providers:_cleanupCatalog') return
       throw new Error(name)
     },
@@ -87,7 +91,9 @@ test('publishes the catalog before optional details and ignores stale scheduled 
     expect(job.args.modelIds).toEqual(['selected'])
     await refreshDetails(actionCtx, job.args as never)
     expect(requests).toHaveLength(2)
-    expect((await resolve(ctx, ctx.userId))[0].models[0]).toMatchObject({
+    expect(
+      (await Connections.resolve(ctx, ctx.userId))[0].models[0],
+    ).toMatchObject({
       label: 'My label',
       discovered: { contextWindow: 128000 },
     })

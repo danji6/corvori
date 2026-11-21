@@ -12,7 +12,7 @@ export const _evalMessage = internalAction({
     segmentIndex: v.number(),
   },
   handler: async (ctx, args) => {
-    const { _evalMessage } = await import('./stream/evalMessage')
+    const { _evalMessage } = await import('../model/stream/evalMessage')
     return _evalMessage(ctx, args)
   },
 })

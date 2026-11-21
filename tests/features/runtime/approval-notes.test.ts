@@ -3,7 +3,7 @@ import {
   collectApprovalNotes,
   collectRespondedApprovalNotes,
   insertApprovalNoteMessages,
-} from '@cv/convex/actions/stream/history'
+} from '@cv/convex/model/stream/history'
 import type { ModelMessage, UIMessage } from 'ai'
 import { describe, expect, test } from 'bun:test'
 

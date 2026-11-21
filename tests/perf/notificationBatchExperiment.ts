@@ -42,7 +42,7 @@ export async function installNotificationBatches(functions: string) {
   const send = join(functions, 'model/chat/send.ts')
   await edit(
     send,
-    "import { notifyUserMessage } from '../notifications'",
+    "import { notifyUserMessage } from '../notifications/records'",
     "import { enqueueUserNotification } from '../../notificationBatch'",
   )
   await edit(

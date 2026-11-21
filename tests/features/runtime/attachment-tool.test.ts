@@ -2,12 +2,12 @@
 import {
   read as readCursor,
   save as saveCursor,
-} from '@cv/convex/model/attachmentCursors'
+} from '@cv/convex/model/attachments/cursors'
+import { getToolFile } from '@cv/convex/model/attachments/files'
 import {
   activeAttachmentMessages,
   hasLoadedAttachmentMedia,
-} from '@cv/convex/model/attachmentMedia'
-import { getToolFile } from '@cv/convex/model/attachments'
+} from '@cv/convex/model/attachments/media'
 import {
   attachmentToModelOutput,
   createReadAttachmentTool,

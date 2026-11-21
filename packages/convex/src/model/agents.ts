@@ -12,7 +12,7 @@ import {
   normalizeAgentPaths,
 } from './caps'
 import { DEFAULT_CONTEXT_OPTIONS, createDefaultAgent } from './defaults'
-import { revoke as revokeMcp } from './mcpRuntime'
+import { revoke as revokeMcp } from './mcp/runtime'
 import * as Prompts from './prompts'
 import * as Reminders from './reminders'
 import { removeCacheRow } from './session/cache'

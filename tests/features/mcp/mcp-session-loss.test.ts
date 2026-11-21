@@ -1,5 +1,5 @@
-import { consumeProviderStep } from '@cv/convex/actions/stream/engineStep'
 import { setApprovalMode } from '@cv/convex/model/session/state'
+import { consumeProviderStep } from '@cv/convex/model/stream/engineStep'
 import { getEnabledTools } from '@cv/convex/model/tool/build'
 import { type ToolSet, tool } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'

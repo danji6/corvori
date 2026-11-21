@@ -1,4 +1,4 @@
-import { createOperationPlan } from '@cv/convex/actions/stream/operations'
+import { createOperationPlan } from '@cv/convex/model/stream/operations'
 import { getEnabledTools } from '@cv/convex/model/tool/build'
 import { resolveToolManifest } from '@cv/convex/model/tool/manifest'
 import type { ManifestInput } from '@cv/convex/model/tool/manifest'

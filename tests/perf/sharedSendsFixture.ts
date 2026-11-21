@@ -4,11 +4,11 @@ import {
   internalMutation,
 } from '@cv/convex/_generated/server'
 import type { AuthMutationCtx } from '@cv/convex/functions'
-import { insertUnreadNotification } from '@cv/convex/model/notificationRetention'
 import {
   discardSession,
   notifyAgentEvent,
-} from '@cv/convex/model/notifications'
+} from '@cv/convex/model/notifications/records'
+import { insertUnreadNotification } from '@cv/convex/model/notifications/retention'
 import { MAX_UNREAD_NOTIFICATIONS } from '@cv/core/limits'
 import { v } from 'convex/values'
 

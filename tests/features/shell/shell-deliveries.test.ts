@@ -4,14 +4,14 @@ import {
   deleteVersions,
   replaceSelectedContent,
 } from '@cv/convex/model/messageContents'
-import { _report } from '@cv/convex/model/shellJobs'
+import { _report } from '@cv/convex/model/shell/jobs'
 import {
   executionPosition,
   positionFromRanges,
   readPosition,
   recordDelivery,
   removeDeliveriesForParts,
-} from '@cv/convex/model/shellOutputDeliveries'
+} from '@cv/convex/model/shell/outputDeliveries'
 import { _patchMessage } from '@cv/convex/model/stream/lifecycleProgress'
 import { makeOutputPreview } from '@cv/convex/model/stream/toolOutput'
 import type { ShellOutputRange, ShellToolOutput } from '@cv/core/types/tools'

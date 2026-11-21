@@ -85,6 +85,18 @@ export const KNOWN_PROVIDER_TYPES: ProviderDefinition[] = [
   },
 ]
 
+export function listProviderIds() {
+  return KNOWN_PROVIDER_TYPES.map(
+    ({ value, label, defaultReasoning, binaryReasoningParameter }) => ({
+      value,
+      label,
+      requiresBaseURL: providerRequiresBaseURL(value),
+      defaultReasoning,
+      binaryReasoningParameter,
+    }),
+  ).sort((a, b) => a.label.localeCompare(b.label))
+}
+
 export function getProviderDefinition(providerId: string): ProviderDefinition {
   return (
     KNOWN_PROVIDER_TYPES.find(({ value }) => value === providerId) ?? {

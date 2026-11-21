@@ -10,7 +10,7 @@ import { mutation as _mutation, query as _query } from './_generated/server'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import { error } from './errors'
 import { ROLE, type Role, minRole } from './lib/roles'
-import * as Settings from './model/settings'
+import { findUserBySubject, provisionUser } from './model/users'
 
 type Ctx = QueryCtx | MutationCtx | GenericActionCtx<DataModel>
 
@@ -48,19 +48,7 @@ export const authMutation = customMutation(_mutation, {
   args: {},
   async input(ctx: MutationCtx) {
     const identity = await authorize(ctx)
-    const existing = await findUserBySubject(ctx, identity.subject)
-    const role = existing?.role ?? (await getNewUserRole(ctx))
-
-    const userId =
-      existing?._id ??
-      (await ctx.db.insert('users', {
-        subject: identity.subject,
-        role,
-      }))
-
-    if (!existing && identity.name) {
-      await Settings.ensureForUser(ctx, userId, { displayName: identity.name })
-    }
+    const { userId, role } = await provisionUser(ctx, identity)
 
     return {
       ctx: {
@@ -99,19 +87,4 @@ export async function authorizeAdmin(ctx: Ctx): Promise<UserIdentity> {
 export function requireRole(role: Role | undefined | null, required: Role) {
   if (!role) error('Unauthorized', 401)
   if (ROLE[role] < ROLE[required]) error('Forbidden', 403)
-}
-
-export async function findUserBySubject(
-  ctx: QueryCtx | MutationCtx,
-  subject: string,
-) {
-  return ctx.db
-    .query('users')
-    .withIndex('by_subject', (q) => q.eq('subject', subject))
-    .unique()
-}
-
-export async function getNewUserRole(ctx: QueryCtx | MutationCtx) {
-  const firstUser = await ctx.db.query('users').first()
-  return firstUser ? 'user' : 'admin'
 }

@@ -1,6 +1,6 @@
 import { api } from '@cv/convex/_generated/api'
-import type { McpServerView } from '@cv/convex/model/mcp'
-import type { ModelProviderView } from '@cv/convex/model/providers'
+import type { McpServerView } from '@cv/convex/model/mcp/servers'
+import type { ModelProviderView } from '@cv/convex/model/provider/connections'
 import { useQuery } from 'convex-helpers/react/cache/hooks'
 import { useAction, useMutation } from 'convex/react'
 

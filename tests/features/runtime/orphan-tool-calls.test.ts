@@ -1,4 +1,4 @@
-import { removeOrphanToolCalls } from '@cv/convex/actions/stream/history'
+import { removeOrphanToolCalls } from '@cv/convex/model/stream/history'
 import { describe, expect, test } from 'bun:test'
 
 describe('removeOrphanToolCalls', () => {

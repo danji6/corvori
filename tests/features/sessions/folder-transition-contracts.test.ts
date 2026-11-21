@@ -1,4 +1,4 @@
-import { commitPrepared } from '@cv/convex/actions/session/folders'
+import { commitPrepared } from '@cv/convex/model/session/folderActions'
 import { cancel } from '@cv/convex/model/session/folderTransitionLocks'
 import { begin, commit } from '@cv/convex/model/session/folderTransitions'
 import {

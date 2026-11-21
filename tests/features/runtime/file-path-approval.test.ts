@@ -1,10 +1,10 @@
 import { buildApprovalActions } from '@/lib/chat/tool-approval-policy'
-import { attachApprovalPreviews } from '@cv/convex/actions/stream/engineApproval'
 import { alwaysLabel, approvalHold } from '@cv/convex/lib/tool/approvalPolicy'
 import { rememberApproval } from '@cv/convex/model/chat/approvalMemory'
 import { patchToolApproval } from '@cv/convex/model/chat/approvals'
 import { getSessionWithWorkspace } from '@cv/convex/model/session/folderContext'
 import { getApprovals } from '@cv/convex/model/session/state'
+import { attachApprovalPreviews } from '@cv/convex/model/stream/engineApproval'
 import type { WorkspaceToolContext } from '@cv/convex/model/tool/context'
 import {
   createEditFileTool,

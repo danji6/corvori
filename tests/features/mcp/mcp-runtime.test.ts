@@ -1,9 +1,8 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
-import { _getExecution, list, replaceAll } from '@cv/convex/model/mcp'
 import {
   done as finishCleanup,
   get as getCleanup,
-} from '@cv/convex/model/mcpCleanup'
+} from '@cv/convex/model/mcp/cleanup'
 import {
   authorizeRuntime,
   connected,
@@ -12,7 +11,8 @@ import {
   retireCurrent,
   revoke,
   updateStatus,
-} from '@cv/convex/model/mcpRuntime'
+} from '@cv/convex/model/mcp/runtime'
+import { _getExecution, list, replaceAll } from '@cv/convex/model/mcp/servers'
 import { expect, test } from 'bun:test'
 import { skillsDatabase } from '~/tests/helpers/skills-db'
 
@@ -203,7 +203,7 @@ test.each(['lost', 'disconnected'])(
     }
     expect(message).toContain(`MCP session is ${state}`)
     expect(message).toContain('Sidecar restarted.')
-    expect(message).toContain('connect again')
+    expect(message).toContain('reconnect')
     expect(message).not.toContain('in MCP settings')
     expect(message.length).toBeLessThan(650)
   },

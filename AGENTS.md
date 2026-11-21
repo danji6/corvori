@@ -127,8 +127,9 @@ The `package.json` contains most scripts you will need, including running tests.
 
 6. **Convex**
    - Use camelCase for Convex file names, otherwise they'll be rejected.
-   - Query/Mutation handlers should be thin wrappers around business logic that
-     lives in the `model` folder.
+   - Query, mutation, and action handlers should be thin wrappers around
+     business logic. Group related model modules in domain folders under
+     `model/`, including workflows that only actions call.
    - On the client, always use query/mutation hooks and avoid non-reactive calls.
    - Whenever possible, use Convex's Infer to infer types from validator objects
      instead of rewriting a separate type.
@@ -139,11 +140,16 @@ The `package.json` contains most scripts you will need, including running tests.
    - Prefix all internal queries, mutations and actions with an underscore (e.g. \_save).
    - Use dynamic imports in Convex actions (NOT queries/mutations) to avoid
      memory carry-over errors.
-   - All actions go in the "convex/actions" folder.
+   - Register actions under `actions/` and preserve established function paths.
+     Keep Node-only helpers in separate model modules with `'use node'` and
+     load them dynamically from Node action handlers. Keep HTTP route
+     registrations in `http.ts` and their domain handlers compatible with the
+     default Convex runtime.
    - We have `convex-helpers`, always check if it offers a solution to a complex
      db-related issue before implementing your own.
    - A schema change that an existing database can't satisfy needs a migration
-     listed in `releaseMigrations` (`migrations.ts`).
+     listed in `releaseMigrations` (`model/migrations/release.ts`). Keep the
+     migration runner and launcher-facing registrations in `migrations.ts`.
 
 7. **Sidecar Server**
    - The sidecar currently doesn't support hot-reloading. If you make changes to

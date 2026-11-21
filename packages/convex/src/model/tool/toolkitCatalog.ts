@@ -32,7 +32,7 @@ export async function ensureToolkitCatalog(
   })
   if (!refresh) return
 
-  const { refreshCatalog } = await import('../mcpCatalogActions')
+  const { refreshCatalog } = await import('../mcp/catalogs/actions')
 
   await refreshCatalog(ctx, refresh.catalogId, {
     scope: live.runtime.scope,

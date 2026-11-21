@@ -1,9 +1,9 @@
 /// <reference types="bun-types" />
+import { getProviderOptions } from '@cv/convex/model/provider/options'
 import {
   collectRespondedApprovalNotes,
   insertApprovalNoteMessages,
-} from '@cv/convex/actions/stream/history'
-import { getProviderOptions } from '@cv/convex/model/provider/options'
+} from '@cv/convex/model/stream/history'
 import {
   type UIMessage,
   type UIMessageChunk,

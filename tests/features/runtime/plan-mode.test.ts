@@ -1,7 +1,7 @@
-import { prefixSenderName } from '@cv/convex/actions/stream/history'
 import { toPlanBlock } from '@cv/convex/lib/workspace'
 import { applyPlanModeTransition } from '@cv/convex/model/chat'
 import { _edit, createPlanLinkPart } from '@cv/convex/model/plans'
+import { prefixSenderName } from '@cv/convex/model/stream/history'
 import { getEnabledTools } from '@cv/convex/model/tool/build'
 import { resolveToolManifest } from '@cv/convex/model/tool/manifest'
 import { PLAN_TOOL_TOGGLE } from '@cv/core/const'

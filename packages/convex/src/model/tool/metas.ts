@@ -7,7 +7,7 @@ import { mcpServerSelection } from '@cv/core/types/mcp-catalog'
 
 import type { AuthQueryCtx } from '../../functions'
 import { minRole } from '../../lib/roles'
-import { resolve as resolveMcpServers } from '../mcp'
+import { resolve as resolveMcpServers } from '../mcp/servers'
 import type { ToolMeta } from './context'
 import { enabledMcpServers } from './settings'
 

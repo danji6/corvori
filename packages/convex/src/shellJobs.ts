@@ -2,9 +2,9 @@ import { v } from 'convex/values'
 
 import { internalMutation, internalQuery } from './_generated/server'
 import { authQuery } from './functions'
-import * as ShellJobs from './model/shellJobs'
-import * as References from './model/shellReferences'
-import * as Waits from './model/shellWaits'
+import * as ShellJobs from './model/shell/jobs'
+import * as References from './model/shell/references'
+import * as Waits from './model/shell/waits'
 import * as V from './validators/shell'
 import { streamExecutionArgsValidator } from './validators/streams'
 

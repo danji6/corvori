@@ -15,11 +15,11 @@ import {
   effectiveAgentSelection,
   unavailableModelOverride,
 } from '../agent/modelOverride'
+import { resolve as resolveProviders } from '../provider/connections'
 import {
   findCredentialsForModel,
   findModelSelection,
 } from '../provider/providers'
-import { resolve as resolveProviders } from '../providers'
 
 export type SubagentModelSettings = {
   model?: ModelSelection

@@ -1,4 +1,4 @@
-import { removeAttachment } from '@cv/convex/model/attachments'
+import { removeAttachment } from '@cv/convex/model/attachments/files'
 import { describe, expect, test } from 'bun:test'
 import { OWNER, makeCtx } from '~/tests/helpers/session-duplicate'
 

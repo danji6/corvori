@@ -1,6 +1,6 @@
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
 import type { MutationCtx } from '@cv/convex/_generated/server'
-import { ordinaryNotifications } from '@cv/convex/model/notificationRetention'
+import { ordinaryNotifications } from '@cv/convex/model/notifications/retention'
 import { MAX_UNREAD_NOTIFICATIONS } from '@cv/core/limits'
 
 type OrdinaryNotification = Pick<

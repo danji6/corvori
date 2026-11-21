@@ -1,5 +1,5 @@
-import { withApprovalPaths } from '@cv/convex/actions/stream/engineApproval'
 import { analyzeShellPathCandidates } from '@cv/convex/lib/tool/approval'
+import { withApprovalPaths } from '@cv/convex/model/stream/engineApproval'
 import type { WorkspaceToolContext } from '@cv/convex/model/tool/context'
 import { createShellTool } from '@cv/convex/model/tool/shellTools'
 import { checkPaths } from '@cv/sidecar/mcp/workspace/check-paths'

@@ -1,13 +1,13 @@
 import { providerForm, providerSaveInput } from '@/lib/provider-settings'
-import { deletePreview, storePreview } from '@cv/convex/model/provider/previews'
-import { ensureConnection, saveProviders } from '@cv/convex/model/provider/save'
 import {
   create,
   list,
   resolve,
   setModelInference,
   update,
-} from '@cv/convex/model/providers'
+} from '@cv/convex/model/provider/connections'
+import { deletePreview, storePreview } from '@cv/convex/model/provider/previews'
+import { ensureConnection, saveProviders } from '@cv/convex/model/provider/save'
 import { discoveryFingerprint } from '@cv/core/discovery-fingerprint'
 import { modelReference } from '@cv/core/model-reference'
 import { expect, test } from 'bun:test'

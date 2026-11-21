@@ -6,10 +6,10 @@ import { error } from '../../errors'
 import {
   type AuthMutationCtx,
   type AuthQueryCtx,
-  findUserBySubject,
   requireRole,
 } from '../../functions'
 import type { FolderCreateArgs, FolderCreateBasicArgs } from '../../types'
+import { findUserBySubject } from '../users'
 import { requireFolder, sessionGroup } from './folderContext'
 import { folderView, ownerFolders } from './folderTree'
 import { requireMember } from './memberships'

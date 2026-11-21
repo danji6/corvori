@@ -2,12 +2,11 @@ import { v } from 'convex/values'
 
 import { internalMutation, internalQuery } from './_generated/server'
 import { authMutation, authQuery } from './functions'
-import type { AuthMutationCtx } from './functions'
 import * as Catalog from './model/provider/catalog'
+import * as Connections from './model/provider/connections'
+import * as Mutations from './model/provider/mutations'
 import * as Previews from './model/provider/previews'
 import * as Save from './model/provider/save'
-import * as Providers from './model/providers'
-import * as SessionModels from './model/session/models'
 import { storePreviewArgsValidator } from './validators/discovery'
 import {
   beginDiscoveryArgsValidator,
@@ -22,52 +21,37 @@ import * as V from './validators/providers'
 
 export const list = authQuery({
   args: {},
-  handler: Providers.list,
+  handler: Connections.list,
 })
 
 export const create = authMutation({
   args: V.createModelProviderArgsValidator.fields,
-  handler: async (ctx: AuthMutationCtx, args) => {
-    const id = await Providers.create(ctx, args)
-    await SessionModels.refreshForOwner(ctx, ctx.userId)
-    return id
-  },
+  handler: Mutations.create,
 })
 
 export const update = authMutation({
   args: V.updateModelProviderArgsValidator.fields,
-  handler: async (ctx: AuthMutationCtx, args) => {
-    await Providers.update(ctx, args)
-    if (args.models) await SessionModels.refreshForOwner(ctx, ctx.userId)
-  },
+  handler: Mutations.update,
 })
 
 export const setModelInference = authMutation({
   args: V.setModelInferenceArgsValidator.fields,
-  handler: Providers.setModelInference,
+  handler: Connections.setModelInference,
 })
 
 export const setApiKey = authMutation({
   args: { providerId: v.id('modelProviders'), apiKey: v.string() },
-  handler: Providers.setApiKey,
+  handler: Connections.setApiKey,
 })
 
 export const remove = authMutation({
   args: { providerId: v.id('modelProviders') },
-  handler: async (ctx: AuthMutationCtx, args) => {
-    await Providers.remove(ctx, args)
-    await SessionModels.refreshForOwner(ctx, ctx.userId)
-  },
+  handler: Mutations.remove,
 })
 
 export const get = authQuery({
   args: { providerId: v.id('modelProviders') },
-  handler: async (ctx, { providerId }) => {
-    await Providers.requireOwned(ctx, providerId)
-    return (await Providers.list(ctx)).find(
-      (provider) => provider._id === providerId,
-    )!
-  },
+  handler: Connections.get,
 })
 
 export const catalog = authQuery({
@@ -77,10 +61,7 @@ export const catalog = authQuery({
 
 export const _connection = internalQuery({
   args: { providerId: v.id('modelProviders'), ownerId: v.id('users') },
-  handler: async (ctx, { providerId, ownerId }) =>
-    (await Providers.resolve(ctx, ownerId)).find(
-      (provider) => provider.connectionId === providerId,
-    ) ?? null,
+  handler: Connections.connection,
 })
 
 export const _beginDiscovery = internalMutation({
@@ -95,10 +76,7 @@ export const _stageDiscovery = internalMutation({
 
 export const _finishDiscovery = internalMutation({
   args: finishDiscoveryArgsValidator.fields,
-  handler: async (ctx, args) => {
-    const published = await Catalog.finish(ctx, args)
-    if (published) await SessionModels.refreshForOwner(ctx, args.ownerId)
-  },
+  handler: Mutations.finishDiscovery,
 })
 
 export const _cleanupCatalog = internalMutation({
@@ -145,10 +123,7 @@ export const previewCatalog = authQuery({
 
 export const _enrichModel = internalMutation({
   args: enrichModelArgsValidator.fields,
-  handler: async (ctx, args) => {
-    const updated = await Catalog.enrich(ctx, args)
-    if (updated) await SessionModels.refreshForOwner(ctx, args.ownerId)
-  },
+  handler: Mutations.enrichModel,
 })
 
 export const _enrichPreview = internalMutation({

@@ -6,7 +6,7 @@ import { protocolRequestValidator } from '../validators/mcpProtocol'
 export const check = action({
   args: protocolRequestValidator.fields,
   handler: async (ctx, args) => {
-    const { checkProtocol } = await import('../model/mcpProtocolActions')
+    const { checkProtocol } = await import('../model/mcp/protocolActions')
     return checkProtocol(ctx, args)
   },
 })

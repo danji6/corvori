@@ -1,10 +1,10 @@
 import { internal } from '../../_generated/api'
 import type { Doc } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
-import { finishChanges } from '../changes'
-import { cancelForStream } from '../mcpOperations'
+import { finishChanges } from '../changes/sets'
+import { cancelForStream } from '../mcp/operations/records'
 import { scheduleTitle } from '../messages'
-import { settleStream } from '../notificationRequests'
+import { settleStream } from '../notifications/requests'
 import { cancelScheduledExecution } from './execution'
 
 type StopOptions = { suppressReport?: boolean }

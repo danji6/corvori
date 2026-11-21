@@ -1,4 +1,4 @@
-import { positionFromRanges } from '@cv/convex/model/shellOutputDeliveries'
+import { positionFromRanges } from '@cv/convex/model/shell/outputDeliveries'
 import {
   executeShellOutput,
   shellToModelOutput,

@@ -2,7 +2,7 @@ import { internalQuery } from './_generated/server'
 import {
   executionPosition,
   reportPosition,
-} from './model/shellOutputDeliveries'
+} from './model/shell/outputDeliveries'
 import {
   shellDeliveryPositionArgsValidator,
   shellJobExecutionArgsValidator,

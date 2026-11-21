@@ -2,8 +2,8 @@ import type { QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import { requireRole } from '../../functions'
 import type { StreamExecutionArgs } from '../../types'
-import { requireExecution } from '../mcpOperationAccess'
-import { hasInvocationAccess } from '../mcpRuntime'
+import { requireExecution } from '../mcp/operations/access'
+import { hasInvocationAccess } from '../mcp/runtime'
 import { availableToolkits } from './access'
 
 export async function executionToolkits(

@@ -178,16 +178,16 @@ describe('extractPathCandidates', () => {
   test('classifies the reported sed and grep chain precisely', () => {
     const command =
       'cd /home/user/projects/example && ' +
-      "sed -n '120,152p' packages/convex/src/actions/session/workspace.ts && " +
+      "sed -n '120,152p' packages/convex/src/model/session/workspaceActions.ts && " +
       'grep -n "postWorkspaceSidecar\\|requireAdminWorkspaceAction" -A 20 ' +
-      'packages/convex/src/actions/session/workspace.ts | ' +
+      'packages/convex/src/model/session/workspaceActions.ts | ' +
       "sed -n '/function postWorkspaceSidecar/,/^}/p;" +
       "/function requireAdminWorkspaceAction/,/^}/p'"
 
     expect(analyzeShellPathCandidates(command)).toEqual({
       candidates: [
         '/home/user/projects/example',
-        'packages/convex/src/actions/session/workspace.ts',
+        'packages/convex/src/model/session/workspaceActions.ts',
       ],
       complete: true,
     })

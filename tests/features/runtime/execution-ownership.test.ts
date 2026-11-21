@@ -1,10 +1,10 @@
-import { _createGenerated } from '@cv/convex/model/attachments'
+import { _createGenerated } from '@cv/convex/model/attachments/files'
 import {
   _beginWindow,
   _carry,
   _report,
   refresh,
-} from '@cv/convex/model/shellJobs'
+} from '@cv/convex/model/shell/jobs'
 import { _claim, _handoff } from '@cv/convex/model/stream/lifecycleClaims'
 import { _trackOffloadedOutput } from '@cv/convex/model/stream/lifecycleCleanup'
 import {

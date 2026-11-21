@@ -1,6 +1,6 @@
 import type { Doc } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
-import { settleStream } from '../notificationRequests'
+import { settleStream } from '../notifications/requests'
 import { cancelScheduledExecution } from './execution'
 import { _finalizeStopped, failStream } from './lifecycleTerminal'
 

@@ -2,9 +2,9 @@ import { v } from 'convex/values'
 
 import { internalMutation, internalQuery } from './_generated/server'
 import { authMutation, authQuery } from './functions'
-import * as Access from './model/mcpCatalogAccess'
-import { sweepOrphanDefinitions } from './model/mcpCatalogCleanup'
-import * as Catalogs from './model/mcpCatalogs'
+import * as Access from './model/mcp/catalogs/access'
+import { sweepOrphanDefinitions } from './model/mcp/catalogs/cleanup'
+import * as Catalogs from './model/mcp/catalogs/records'
 import * as V from './validators/mcpCatalogs'
 import { streamExecutionArgsValidator } from './validators/streams'
 

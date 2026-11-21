@@ -1,5 +1,5 @@
 import type { LanguageModelV4StreamPart } from '@ai-sdk/provider'
-import { consumeProviderStep } from '@cv/convex/actions/stream/engineStep'
+import { consumeProviderStep } from '@cv/convex/model/stream/engineStep'
 import { MockLanguageModelV4 } from 'ai/test'
 import { expect, test } from 'bun:test'
 import { getFunctionName } from 'convex/server'

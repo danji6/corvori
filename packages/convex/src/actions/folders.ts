@@ -6,7 +6,7 @@ import * as V from '../validators/folders'
 export const change = action({
   args: V.folderChangeArgs.fields,
   handler: async (ctx, args) => {
-    const { changeFolder } = await import('./session/folders')
+    const { changeFolder } = await import('../model/session/folderActions')
     return changeFolder(ctx, args)
   },
 })
@@ -14,7 +14,7 @@ export const change = action({
 export const move = action({
   args: V.folderMoveArgs.fields,
   handler: async (ctx, args) => {
-    const { changeFolder } = await import('./session/folders')
+    const { changeFolder } = await import('../model/session/folderActions')
     return changeFolder(ctx, { command: { kind: 'move-folder', ...args } })
   },
 })
@@ -22,7 +22,7 @@ export const move = action({
 export const create = action({
   args: V.folderCreateArgs.fields,
   handler: async (ctx, args) => {
-    const { createFolder } = await import('./session/folders')
+    const { createFolder } = await import('../model/session/folderActions')
     return createFolder(ctx, args)
   },
 })

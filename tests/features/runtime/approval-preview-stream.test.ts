@@ -1,6 +1,6 @@
 import { buildApprovalActions } from '@/lib/chat/tool-approval-policy'
-import { consumeProviderStep } from '@cv/convex/actions/stream/engineStep'
 import { approvalHold } from '@cv/convex/lib/tool/approvalPolicy'
+import { consumeProviderStep } from '@cv/convex/model/stream/engineStep'
 import type { PathApprovalStatus } from '@cv/core/workspace/path-policy'
 import { type UIMessage, tool } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'

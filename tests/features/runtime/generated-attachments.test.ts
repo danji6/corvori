@@ -1,12 +1,12 @@
 /// <reference types="bun-types" />
-import { readAttachmentImageDimensions } from '@cv/convex/actions/io/attachmentImage'
 import {
   _createGenerated,
   cleanUpGeneratedAttachments,
   createReference,
   removeAttachment,
   unreferencedAttachmentIds,
-} from '@cv/convex/model/attachments'
+} from '@cv/convex/model/attachments/files'
+import { readAttachmentImageDimensions } from '@cv/convex/model/attachments/imageDimensions'
 import {
   isGeneratedFilePart,
   parseDataUrl,

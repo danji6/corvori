@@ -1,7 +1,7 @@
 import type { ProviderFormValues } from '@/components/chat/entities/user/settings-schema'
 import { providerSchema } from '@/components/chat/entities/user/settings-schema'
 import type { Id } from '@cv/convex/_generated/dataModel'
-import type { ModelProviderView } from '@cv/convex/model/providers'
+import type { ModelProviderView } from '@cv/convex/model/provider/connections'
 
 export function providerForm(
   connection: ModelProviderView,

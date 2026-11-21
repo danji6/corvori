@@ -6,7 +6,7 @@ import * as V from '../validators/mcp'
 export const discoverMcpTools = action({
   args: V.discoverMcpToolsArgsValidator.fields,
   handler: async (ctx, args) => {
-    const { discoverMcpTools } = await import('../model/mcpDiscoveryAction')
+    const { discoverMcpTools } = await import('../model/mcp/discoveryActions')
     return discoverMcpTools(ctx, args)
   },
 })
@@ -14,7 +14,7 @@ export const discoverMcpTools = action({
 export const _cleanup = internalAction({
   args: V.mcpCleanupArgsValidator.fields,
   handler: async (ctx, args) => {
-    const { cleanup } = await import('../model/mcpRuntimeActions')
+    const { cleanup } = await import('../model/mcp/runtimeActions')
     await cleanup(ctx, args)
   },
 })
@@ -22,7 +22,7 @@ export const _cleanup = internalAction({
 export const _reconcile = internalAction({
   args: {},
   handler: async (ctx) => {
-    const { reconcile } = await import('../model/mcpRuntimeActions')
+    const { reconcile } = await import('../model/mcp/runtimeActions')
     await reconcile(ctx)
   },
 })
@@ -30,7 +30,7 @@ export const _reconcile = internalAction({
 export const runtimeStatus = action({
   args: V.mcpRuntimeArgsValidator.fields,
   handler: async (ctx, args) => {
-    const { runtimeStatus } = await import('../model/mcpRuntimeActions')
+    const { runtimeStatus } = await import('../model/mcp/runtimeActions')
     return runtimeStatus(ctx, args)
   },
 })

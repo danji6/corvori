@@ -1,12 +1,6 @@
 import type { ModelMessage } from '@ai-sdk/provider-utils'
 import type { Id } from '@cv/convex/_generated/dataModel'
 import type { ActionCtx } from '@cv/convex/_generated/server'
-import { _stream } from '@cv/convex/actions/stream/engine'
-import {
-  compactBeforeDispatch,
-  reachesCompactionThreshold,
-} from '@cv/convex/actions/stream/engineCompaction'
-import * as EngineSetup from '@cv/convex/actions/stream/engineSetup'
 import {
   autoCompact,
   runScheduledEvent,
@@ -14,6 +8,12 @@ import {
 } from '@cv/convex/model/chat/scheduling'
 import { sendMessage } from '@cv/convex/model/chat/send'
 import { insertMessage } from '@cv/convex/model/messageContents'
+import { _stream } from '@cv/convex/model/stream/engine'
+import {
+  compactBeforeDispatch,
+  reachesCompactionThreshold,
+} from '@cv/convex/model/stream/engineCompaction'
+import * as EngineSetup from '@cv/convex/model/stream/engineSetup'
 import { _claim } from '@cv/convex/model/stream/lifecycleClaims'
 import { _saveMeta } from '@cv/convex/model/stream/lifecycleMeta'
 import {

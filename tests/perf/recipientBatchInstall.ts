@@ -27,7 +27,7 @@ export async function installRecipientBatches(functions: string) {
   const send = join(functions, 'model/chat/send.ts')
   await edit(
     send,
-    "import { notifyUserMessage } from '../notifications'",
+    "import { notifyUserMessage } from '../notifications/records'",
     "import { enqueueUserNotification } from '../../recipientBatch'",
   )
   await edit(
@@ -56,8 +56,8 @@ export async function installRecipientBatches(functions: string) {
 
 async function installInboxFences(functions: string) {
   const importFlush =
-    "import { flushPendingNotifications } from '../recipientBatch'\n"
-  const model = join(functions, 'model/notifications.ts')
+    "import { flushPendingNotifications } from '../../recipientBatch'\n"
+  const model = join(functions, 'model/notifications/records.ts')
   await edit(
     model,
     'type NotificationEvent = {',
@@ -79,7 +79,7 @@ async function installInboxFences(functions: string) {
       `${signature}\n  await flushPendingNotifications(ctx, ctx.userId)`,
     )
   }
-  const retention = join(functions, 'model/notificationRetention.ts')
+  const retention = join(functions, 'model/notifications/retention.ts')
   await edit(
     retention,
     'export function statusLimit',

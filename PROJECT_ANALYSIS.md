@@ -327,8 +327,8 @@ The major orchestration files now delegate to modules with distinct owners:
 
 | Area                   | Coordinator / public API                           | Extracted responsibilities                                                                                                                                                                    |
 | ---------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Stream engine          | `actions/stream/engine.ts`                         | `engine_setup`, `engine_step`, `engine_output`, `engine_approval`, `engine_log`, `engine_watchdog`                                                                                            |
-| Provider history       | `actions/stream/history.ts`                        | Ordered content conversion, tool pairing, approval preview, and sender handling in `history_*`                                                                                                |
+| Stream engine          | `model/stream/engine.ts`                         | `engine_setup`, `engine_step`, `engine_output`, `engine_approval`, `engine_log`, `engine_watchdog`                                                                                            |
+| Provider history       | `model/stream/history.ts`                        | Ordered content conversion, tool pairing, approval preview, and sender handling in `history_*`                                                                                                |
 | Provider options       | `model/provider/options.ts`                        | `model_factory`, `reasoning_options`, `reasoning_replay`, `inference_options`                                                                                                                 |
 | Durable streams        | `model/stream/lifecycle.ts`                        | Claims, progress, metadata, terminal transitions, cleanup, control, and reservations in `lifecycle_*`                                                                                         |
 | Sessions               | `model/session/sessions.ts`                        | Access, queries, settings, duplication, workspace, and teardown in `session_*`                                                                                                                |
@@ -638,7 +638,7 @@ Important areas:
   the origin rules shared by auth and the CORS layer.
 - `packages/convex/src/model`: backend business logic split by domain.
   Note the two-level split for prompts and providers: `model/prompts.ts` and
-  `model/providers.ts` own the _rows_, while `model/prompt/*` and
+  `model/provider/connections.ts` own the _rows_, while `model/prompt/*` and
   `model/provider/*` own prompt merging/markers/snapshots and provider
   construction/options/caching.
 - `packages/convex/src/actions`: Node actions for streams, sessions,
@@ -958,7 +958,7 @@ stream needs in one pass, including the compaction/impersonation fallback to
 the owner. A stale agent reference resolves to nothing on reads instead of
 throwing, while writes still reject.
 
-`model/providers.ts` and `model/mcp.ts` follow the same shape and return
+`model/provider/connections.ts` and `model/mcp/servers.ts` follow the same shape and return
 **views** (`ModelProviderView`, `McpServerView`) that omit `apiKey` and carry a
 `hasApiKey` flag instead; keys are written separately through
 `credentials.set`, where an empty string clears the credential. Removing a
@@ -1412,7 +1412,7 @@ Key backend domains:
   side table, memberships, sharing, workspace metadata, the denormalized active
   model, title generation, archive import/export, session agents, request logs,
   and the prompt/tool snapshot cache
-- `model/prompts`, `model/reminders`, `model/providers`, `model/mcp`,
+- `model/prompts`, `model/reminders`, `model/provider/connections`, `model/mcp/servers`,
   `model/credentials`, `model/appearances`: the row-owning halves of the
   configuration tables
 - `model/caps`: the assertion helpers that enforce `core/limits.ts` on every
@@ -2023,7 +2023,7 @@ its deadline. The tool part settles with status `background`, which prompts
 is released when the agent reads the job's final status or uses `kill_shell`.
 
 A registration is a `shellJobs` row, watched by a self-rescheduling internal
-action (`actions/tool/shellJobs.ts`) built on the same windowing as the
+action (`model/shell/jobActions.ts`) built on the same windowing as the
 user-shell runner: `_beginWindow` refreshes a heartbeat and returns the
 scrollback, `_carry` hands a still-running job to a fresh window, and `_report`
 settles it. Unlike the user-shell runner it writes nothing per tick, because
@@ -2035,7 +2035,7 @@ foreground jobs it owns, while `stopForSession` (removal, disable, agent
 unlink) releases the watches first and then kills with `includeBackground`,
 because a torn down session has nothing left to hand the output to.
 
-The result is delivered exactly like a sub-agent report (`model/shellJobs.ts`
+The result is delivered exactly like a sub-agent report (`model/shell/jobs.ts`
 mirrors `deliverChildReport`): a `shell-report` part on its own user-role
 message attributed to the agent that started the job, which wakes an idle
 session through `reserveInvokeTurn` and is otherwise picked up by the running

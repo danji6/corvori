@@ -3,7 +3,7 @@ import {
   toShellReportBlock,
 } from '@cv/convex/lib/shellReport'
 import { INJECTED_BLOCK_PREFIXES } from '@cv/convex/lib/workspace'
-import { _report } from '@cv/convex/model/shellJobs'
+import { _report } from '@cv/convex/model/shell/jobs'
 import { describe, expect, test } from 'bun:test'
 import {
   agent,

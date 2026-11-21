@@ -1,6 +1,6 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
-import { _getExecution } from '@cv/convex/model/mcp'
-import { isAuthorized } from '@cv/convex/model/mcpRuntime'
+import { isAuthorized } from '@cv/convex/model/mcp/runtime'
+import { _getExecution } from '@cv/convex/model/mcp/servers'
 import { link, refresh } from '@cv/convex/model/toolkits/actions'
 import { select } from '@cv/convex/model/toolkits/selection'
 import { previewSkills } from '@cv/convex/model/toolkits/skillPreview'

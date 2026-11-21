@@ -4,7 +4,7 @@ import {
   register,
   release,
   releaseForSession,
-} from '@cv/convex/model/shellJobs'
+} from '@cv/convex/model/shell/jobs'
 import { stopForSession } from '@cv/convex/model/stream/lifecycle'
 import { describe, expect, test } from 'bun:test'
 import {

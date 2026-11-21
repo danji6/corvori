@@ -1,10 +1,10 @@
 import type { LanguageModelV4StreamPart } from '@ai-sdk/provider'
 import type { ActionCtx } from '@cv/convex/_generated/server'
-import { prepare } from '@cv/convex/actions/stream/engineSetup'
+import { prepare } from '@cv/convex/model/stream/engineSetup'
 import {
   ProviderStreamFailure,
   consumeProviderStep,
-} from '@cv/convex/actions/stream/engineStep'
+} from '@cv/convex/model/stream/engineStep'
 import type {
   Prompt,
   PromptItem,

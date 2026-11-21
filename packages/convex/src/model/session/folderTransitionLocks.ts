@@ -3,8 +3,8 @@ import { transitionActive } from '@cv/core/workspace/transition'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import { findUserBySubject } from '../../functions'
 import type { FolderCancelArgs } from '../../types'
+import { findUserBySubject } from '../users'
 
 export function assertTransitionActive(token: string) {
   if (!transitionActive(token)) error('Folder update timed out, try again', 409)

@@ -1,18 +1,18 @@
 import {
-  ProviderStreamFailure,
-  consumeProviderStep,
-} from '@cv/convex/actions/stream/engineStep'
-import { STEP_DEADLINE_GRACE_MS } from '@cv/convex/actions/stream/engineWatchdog'
-import { _getExecution } from '@cv/convex/model/mcp'
-import {
   operationOutput,
   resumeOperations,
   settle,
   waitForOperation,
-} from '@cv/convex/model/mcpOperationActions'
-import { pending, reserve } from '@cv/convex/model/mcpOperations'
-import { connected } from '@cv/convex/model/mcpRuntime'
+} from '@cv/convex/model/mcp/operations/actions'
+import { pending, reserve } from '@cv/convex/model/mcp/operations/records'
+import { connected } from '@cv/convex/model/mcp/runtime'
+import { _getExecution } from '@cv/convex/model/mcp/servers'
 import { insertMessage } from '@cv/convex/model/messageContents'
+import {
+  ProviderStreamFailure,
+  consumeProviderStep,
+} from '@cv/convex/model/stream/engineStep'
+import { STEP_DEADLINE_GRACE_MS } from '@cv/convex/model/stream/engineWatchdog'
 import { _claim, _continue, _handoff } from '@cv/convex/model/stream/lifecycle'
 import { cleanUpOffloadedOutputs } from '@cv/convex/model/stream/lifecycleCleanup'
 import { _getProviderHistory } from '@cv/convex/model/stream/reads'

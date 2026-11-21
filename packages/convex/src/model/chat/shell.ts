@@ -22,7 +22,7 @@ import {
   setSegmentParts,
 } from '../messageContents'
 import { syncActivity } from '../messages'
-import { notifyUserMessage } from '../notifications'
+import { notifyUserMessage } from '../notifications/records'
 import { getSessionWithWorkspace } from '../session/folderContext'
 import * as Memberships from '../session/memberships'
 import * as Settings from '../settings'

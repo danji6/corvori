@@ -13,12 +13,12 @@ import { resolveSpawnableAgents } from '../agent/subagents'
 import {
   activeAttachmentMessages,
   hasLoadedAttachmentMedia,
-} from '../attachmentMedia'
-import { resolve as resolveMcpServers } from '../mcp'
+} from '../attachments/media'
+import { resolve as resolveMcpServers } from '../mcp/servers'
 import { getProcessingSegmentRow, withParts } from '../messageContents'
 import { getBySession as getPlan } from '../plans'
 import { resolveSets as resolvePromptSets } from '../prompts'
-import { resolve as resolveProviders } from '../providers'
+import { resolve as resolveProviders } from '../provider/connections'
 import { getBySessionAgent as getSessionCache } from '../session/cache'
 import { getSessionWithWorkspace } from '../session/folderContext'
 import { countParticipants, getMembership } from '../session/memberships'

@@ -8,8 +8,8 @@ import {
   pending,
   removeForMessage,
   reserve,
-} from '@cv/convex/model/mcpOperations'
-import { revoke } from '@cv/convex/model/mcpRuntime'
+} from '@cv/convex/model/mcp/operations/records'
+import { revoke } from '@cv/convex/model/mcp/runtime'
 import { _patchMessage } from '@cv/convex/model/stream/lifecycle'
 import { afterEach, expect, test } from 'bun:test'
 import { mcpBackendFixture } from '~/tests/helpers/mcp-backend'

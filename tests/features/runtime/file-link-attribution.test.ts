@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 import type { Doc } from '@cv/convex/_generated/dataModel'
-import { prefixSenderName } from '@cv/convex/actions/stream/history'
+import { prefixSenderName } from '@cv/convex/model/stream/history'
 import type { UIMessage } from 'ai'
 import { describe, expect, test } from 'bun:test'
 

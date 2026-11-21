@@ -1,5 +1,9 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
-import { confirm, getToolFile, getUrlMap } from '@cv/convex/model/attachments'
+import {
+  confirm,
+  getToolFile,
+  getUrlMap,
+} from '@cv/convex/model/attachments/files'
 import { sendMessage } from '@cv/convex/model/chat/send'
 import { previewShares } from '@cv/convex/model/chat/sharedAttachments'
 import { attachmentShareUrl } from '@cv/core/attachments'

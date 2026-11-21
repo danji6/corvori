@@ -1,10 +1,10 @@
 import type { Doc } from '@cv/convex/_generated/dataModel'
-import { withApprovalActions } from '@cv/convex/model/notificationApprovals'
-import { notifyQuestions } from '@cv/convex/model/notifications'
+import { withApprovalActions } from '@cv/convex/model/notifications/approvals'
+import { notifyQuestions } from '@cv/convex/model/notifications/records'
 import {
   notifyToolApprovals,
   respondApproval,
-} from '@cv/convex/model/notifications'
+} from '@cv/convex/model/notifications/records'
 import { approvalSummary } from '@cv/core/approval-presentation'
 import { ASK_TOOL_NAME } from '@cv/core/const'
 import { describe, expect, test } from 'bun:test'

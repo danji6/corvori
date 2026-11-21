@@ -1,5 +1,10 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
 import {
+  cleanUpGeneratedAttachments,
+  getToolFile,
+  getUrlMap,
+} from '@cv/convex/model/attachments/files'
+import {
   type TransferResult,
   advanceCopyPath,
   begin,
@@ -7,12 +12,7 @@ import {
   finishPublish,
   mergePublishedAttachments,
   requireActive,
-} from '@cv/convex/model/attachmentTransfers'
-import {
-  cleanUpGeneratedAttachments,
-  getToolFile,
-  getUrlMap,
-} from '@cv/convex/model/attachments'
+} from '@cv/convex/model/attachments/transfers'
 import { createAttachmentTransferTool } from '@cv/convex/model/tool/attachmentTransfers'
 import { expect, spyOn, test } from 'bun:test'
 import { type FunctionReference, getFunctionName } from 'convex/server'

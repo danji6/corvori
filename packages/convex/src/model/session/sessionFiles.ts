@@ -4,7 +4,8 @@ import { transitionActive } from '@cv/core/workspace/transition'
 import { internal } from '../../_generated/api'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
-import { findUserBySubject } from '../../functions'
+import { sweep as sweepAttachmentTransfers } from '../attachments/transfers'
+import { findUserBySubject } from '../users'
 import { getMembership } from './memberships'
 import { duplicate } from './sessionDuplicate'
 import { remove } from './sessionTeardown'
@@ -145,6 +146,7 @@ export async function sweep(ctx: MutationCtx) {
       },
     )
   }
+  await sweepAttachmentTransfers(ctx)
 }
 
 export async function beginDuplicate(

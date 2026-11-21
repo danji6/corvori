@@ -1,5 +1,5 @@
 import { internalMutation, internalQuery } from './_generated/server'
-import * as Access from './model/mcpBrokerAccess'
+import * as Access from './model/mcp/brokerAccess'
 import * as V from './validators/mcpBroker'
 import { streamExecutionArgsValidator } from './validators/streams'
 

@@ -1,7 +1,6 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
 import type { ActionCtx } from '@cv/convex/_generated/server'
-import { prepare } from '@cv/convex/actions/stream/engineSetup'
-import { prepareChanges } from '@cv/convex/model/changes'
+import { prepareChanges } from '@cv/convex/model/changes/sets'
 import { reserveStream } from '@cv/convex/model/chat/reserve'
 import { _save, removeForSession } from '@cv/convex/model/session/cache'
 import {
@@ -12,6 +11,7 @@ import {
 import { assignments } from '@cv/convex/model/skills/endpoints'
 import { prepareCapabilities } from '@cv/convex/model/stream/capabilities'
 import { prepareWorkspaceContext } from '@cv/convex/model/stream/contextNotes'
+import { prepare } from '@cv/convex/model/stream/engineSetup'
 import { _getContext, _getProviderHistory } from '@cv/convex/model/stream/reads'
 import { filesystemToolContext } from '@cv/convex/model/tool/filesystemContext'
 import { assertToolAccess } from '@cv/convex/model/tool/liveAccess'

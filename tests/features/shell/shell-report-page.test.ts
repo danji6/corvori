@@ -1,5 +1,5 @@
 import type { ActionCtx } from '@cv/convex/_generated/server'
-import { _watch } from '@cv/convex/actions/tool/shellJobs'
+import { _watch } from '@cv/convex/model/shell/jobActions'
 import { describe, expect, test } from 'bun:test'
 import { getFunctionName } from 'convex/server'
 import { context } from '~/tests/helpers/shell-job'

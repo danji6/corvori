@@ -1,7 +1,7 @@
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
 import type { MutationCtx } from '@cv/convex/_generated/server'
-import { insertUnreadNotification } from '@cv/convex/model/notificationRetention'
-import { notificationPreview } from '@cv/convex/model/notifications'
+import { notificationPreview } from '@cv/convex/model/notifications/records'
+import { insertUnreadNotification } from '@cv/convex/model/notifications/retention'
 import {
   type GenericDatabaseWriter,
   type GenericMutationCtx,

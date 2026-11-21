@@ -1,5 +1,5 @@
 import { internalMutation, internalQuery } from './_generated/server'
-import * as Operations from './model/mcpOperations'
+import * as Operations from './model/mcp/operations/records'
 import * as V from './validators/mcpOperations'
 import { streamExecutionArgsValidator } from './validators/streams'
 

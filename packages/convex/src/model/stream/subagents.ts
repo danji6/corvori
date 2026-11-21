@@ -24,7 +24,7 @@ import {
   patchSegmentParts,
 } from '../messageContents'
 import { syncActivity } from '../messages'
-import { notifyQuestions, notifyToolApprovals } from '../notifications'
+import { notifyQuestions, notifyToolApprovals } from '../notifications/records'
 import { createPlanLinkPart, getBySession as getPlan } from '../plans'
 import { getSessionWithWorkspace } from '../session/folderContext'
 import { getActiveStream } from '../session/memberships'

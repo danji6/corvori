@@ -8,10 +8,10 @@ import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import type { AuthMutationCtx } from '../../functions'
 import type { SendMessageArgs } from '../../types'
-import * as Attachments from '../attachments'
+import * as Attachments from '../attachments/files'
 import { insertMessage } from '../messageContents'
 import { scheduleMessageEval, syncActivity } from '../messages'
-import { notifyUserMessage } from '../notifications'
+import { notifyUserMessage } from '../notifications/records'
 import {
   type PlanLinkPart,
   createPlanLinkPart,

@@ -1,10 +1,46 @@
-import type { QueryCtx } from '../_generated/server'
-import {
-  type AuthMutationCtx,
-  type AuthQueryCtx,
-  findUserBySubject,
-} from '../functions'
+import type { UserIdentity } from 'convex/server'
+
+import type { Id } from '../_generated/dataModel'
+import type { MutationCtx, QueryCtx } from '../_generated/server'
+import type { AuthMutationCtx, AuthQueryCtx } from '../functions'
+import type { Role } from '../lib/roles'
 import * as Settings from './settings'
+
+export async function findUserBySubject(
+  ctx: QueryCtx | MutationCtx,
+  subject: string,
+) {
+  return ctx.db
+    .query('users')
+    .withIndex('by_subject', (q) => q.eq('subject', subject))
+    .unique()
+}
+
+export async function getNewUserRole(ctx: QueryCtx | MutationCtx) {
+  const firstUser = await ctx.db.query('users').first()
+  return firstUser ? 'user' : 'admin'
+}
+
+/** Creates a profile and its initial settings on the first authenticated mutation. */
+export async function provisionUser(
+  ctx: MutationCtx,
+  identity: UserIdentity,
+): Promise<{ userId: Id<'users'>; role: Role }> {
+  const existing = await findUserBySubject(ctx, identity.subject)
+  if (existing) return { userId: existing._id, role: existing.role }
+
+  const role = await getNewUserRole(ctx)
+  const userId = await ctx.db.insert('users', {
+    subject: identity.subject,
+    role,
+  })
+
+  if (identity.name) {
+    await Settings.ensureForUser(ctx, userId, { displayName: identity.name })
+  }
+
+  return { userId, role }
+}
 
 export async function getProfile(ctx: AuthQueryCtx) {
   return ctx.db.get(ctx.userId)

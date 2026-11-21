@@ -10,41 +10,47 @@ import {
   terminalSessionArgsValidator,
   terminalWriteArgsValidator,
 } from '../validators/shell'
-import * as Terminal from './tool/terminal'
 
 export const write = action({
   args: terminalWriteArgsValidator.fields,
-  handler: Terminal.write,
+  handler: async (ctx, args) =>
+    (await import('../model/shell/terminalActions')).write(ctx, args),
 })
 
 export const kill = action({
   args: terminalKillArgsValidator.fields,
-  handler: Terminal.kill,
+  handler: async (ctx, args) =>
+    (await import('../model/shell/terminalActions')).kill(ctx, args),
 })
 
 export const resize = action({
   args: terminalResizeArgsValidator.fields,
-  handler: Terminal.resize,
+  handler: async (ctx, args) =>
+    (await import('../model/shell/terminalActions')).resize(ctx, args),
 })
 
 export const background = action({
   args: terminalKillArgsValidator.fields,
-  handler: Terminal.background,
+  handler: async (ctx, args) =>
+    (await import('../model/shell/terminalActions')).background(ctx, args),
 })
 
 export const list = action({
   args: terminalSessionArgsValidator.fields,
-  handler: Terminal.list,
+  handler: async (ctx, args) =>
+    (await import('../model/shell/terminalActions')).list(ctx, args),
 })
 
 export const poll = action({
   args: terminalPollArgsValidator.fields,
-  handler: Terminal.poll,
+  handler: async (ctx, args) =>
+    (await import('../model/shell/terminalActions')).poll(ctx, args),
 })
 
 export const killAll = action({
   args: terminalSessionArgsValidator.fields,
-  handler: Terminal.killAll,
+  handler: async (ctx, args) =>
+    (await import('../model/shell/terminalActions')).killAll(ctx, args),
 })
 
 export const _killSessionJobs = internalAction({
@@ -53,5 +59,9 @@ export const _killSessionJobs = internalAction({
     owner: v.string(),
     includeBackground: v.optional(v.boolean()),
   },
-  handler: Terminal._killSessionJobs,
+  handler: async (ctx, args) =>
+    (await import('../model/shell/terminalActions'))._killSessionJobs(
+      ctx,
+      args,
+    ),
 })

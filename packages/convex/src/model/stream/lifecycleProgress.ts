@@ -8,11 +8,11 @@ import type {
   RecordStreamStepArgs,
   StreamExecutionArgs,
 } from '../../types'
-import { mergePublishedAttachments } from '../attachmentTransfers'
+import { mergePublishedAttachments } from '../attachments/transfers'
 import { senderIdentity } from '../chat/identities'
 import { injectModeNote } from '../chat/notes'
 import { injectDueReminders } from '../chat/reminders'
-import { mergeOperationParts } from '../mcpOperationParts'
+import { mergeOperationParts } from '../mcp/operations/parts'
 import {
   appendSegment,
   finalizeTurn,
@@ -31,8 +31,8 @@ import { advanceStepCount } from '../session/state'
 import {
   newShellReadResults,
   recordToolDeliveries,
-} from '../shellOutputDeliveries'
-import { hasPendingShellWait } from '../shellWaits'
+} from '../shell/outputDeliveries'
+import { hasPendingShellWait } from '../shell/waits'
 import { ownsExecution } from './execution'
 import { isHistoricalTurn } from './historyBoundary'
 import { STREAM_LEASE_MS, renewStreamLease } from './lease'

@@ -6,7 +6,7 @@ import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import type { AuthQueryCtx } from '../../functions'
 import type { DetailTargetsArgs, DiscoveryRun } from '../../types'
-import { requireOwned } from '../providers'
+import { requireOwned } from './connections'
 import {
   canBeginDiscovery,
   cancelDiscovery,

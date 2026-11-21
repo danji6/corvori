@@ -1,7 +1,7 @@
 import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import { modelOverrideView } from '../agent/modelOverride'
-import { resolve as resolveMcpServers } from '../mcp'
+import { resolve as resolveMcpServers } from '../mcp/servers'
 import { getSegmentRow, setSegmentParts } from '../messageContents'
 import { getSessionWithWorkspace } from '../session/folderContext'
 import { countParticipants } from '../session/memberships'

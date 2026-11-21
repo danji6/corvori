@@ -1,7 +1,7 @@
 import {
   guidanceSnapshot,
   mcpContextInstructions,
-} from '@cv/convex/model/mcpCatalogContext'
+} from '@cv/convex/model/mcp/catalogs/context'
 import { catalogNote } from '@cv/convex/model/skills/runtime'
 import { mcpToModelOutput } from '@cv/convex/model/tool/mcpOutput'
 import { publish } from '@cv/convex/model/toolkits/publication'

@@ -1,11 +1,5 @@
 /// <reference types="bun-types" />
 import {
-  type PromptEvalResult,
-  buildOperationMessages,
-  buildProviderPrefix,
-  createOperationPlan,
-} from '@cv/convex/actions/stream/operations'
-import {
   createDefaultCompactionPrompts,
   createDefaultImpersonationPrompts,
 } from '@cv/convex/model/defaults'
@@ -15,6 +9,12 @@ import {
   resolveCompactionPrompts,
   resolveImpersonationPrompts,
 } from '@cv/convex/model/prompt/prompts'
+import {
+  type PromptEvalResult,
+  buildOperationMessages,
+  buildProviderPrefix,
+  createOperationPlan,
+} from '@cv/convex/model/stream/operations'
 import type { Prompt, PromptItem, StreamContext } from '@cv/convex/types'
 import { evaluate } from '@cv/core/interpreter/evaluate'
 import { createVariableStore } from '@cv/core/interpreter/store'

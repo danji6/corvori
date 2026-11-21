@@ -8,7 +8,7 @@ import {
 } from '@cv/core/model-reasoning'
 import { normalizeSubagentOverrides } from '@cv/core/subagent-settings'
 import type { AgentSubagentOverride } from '@cv/core/types'
-import { Settings2Icon, XIcon } from 'lucide-react'
+import { Settings2Icon } from 'lucide-react'
 import { type Control, useController } from 'react-hook-form'
 
 import { ModelPicker } from '../../models/model-picker'

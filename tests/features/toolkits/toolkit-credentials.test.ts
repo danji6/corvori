@@ -1,12 +1,15 @@
 /// <reference types="bun-types" />
-import { list as listMcp, replaceAll as replaceMcp } from '@cv/convex/model/mcp'
+import {
+  list as listMcp,
+  replaceAll as replaceMcp,
+} from '@cv/convex/model/mcp/servers'
 import {
   create as createProvider,
   list as listProviders,
   remove as removeProvider,
   setModelInference,
   update as updateProvider,
-} from '@cv/convex/model/providers'
+} from '@cv/convex/model/provider/connections'
 import { describe, expect, test } from 'bun:test'
 
 const OWNER = 'user_1'

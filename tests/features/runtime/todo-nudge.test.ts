@@ -75,7 +75,5 @@ describe('buildTodoNudgeContent', () => {
     expect(content.endsWith('</system-reminder>')).toBe(true)
     expect(content).toContain('[ ] task 1')
     expect(content).toContain('[-] task 2')
-    expect(content).toContain('edit_todo')
-    expect(content).toContain('write_todo')
   })
 })

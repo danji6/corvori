@@ -1,9 +1,5 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
 import type { ActionCtx, QueryCtx } from '@cv/convex/_generated/server'
-import {
-  generateTitle,
-  regenerateTitle,
-} from '@cv/convex/actions/session/title'
 import { update } from '@cv/convex/model/session/sessionSettings'
 import {
   _getRegenerateTitleContext,
@@ -11,6 +7,10 @@ import {
   _patchTitle,
   sanitizeTitle,
 } from '@cv/convex/model/session/title'
+import {
+  generateTitle,
+  regenerateTitle,
+} from '@cv/convex/model/session/titleActions'
 import { DEFAULT_TITLE_SYSTEM_PROMPT } from '@cv/core/title-generation'
 import { expect, test } from 'bun:test'
 import { getFunctionName } from 'convex/server'

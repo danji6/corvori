@@ -1,11 +1,4 @@
 import {
-  acknowledge,
-  pendingPage,
-  settleRequest,
-  settleStream,
-  summary,
-} from '@cv/convex/model/notificationRequests'
-import {
   clearRead,
   discardSession,
   list,
@@ -13,7 +6,14 @@ import {
   markRead,
   markSessionRead,
   notifyUserMessage,
-} from '@cv/convex/model/notifications'
+} from '@cv/convex/model/notifications/records'
+import {
+  acknowledge,
+  pendingPage,
+  settleRequest,
+  settleStream,
+  summary,
+} from '@cv/convex/model/notifications/requests'
 import { describe, expect, test } from 'bun:test'
 import { type Row, fakeCtx } from '~/tests/setup/notifications'
 

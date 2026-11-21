@@ -3,7 +3,7 @@ import { transitionActive } from '@cv/core/workspace/transition'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import { revoke as revokeMcp } from '../mcpRuntime'
+import { revoke as revokeMcp } from '../mcp/runtime'
 import { sessionGroup } from './folderContext'
 import { getState, patchState } from './state'
 

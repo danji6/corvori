@@ -1,6 +1,6 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
-import { _getExecution } from '@cv/convex/model/mcp'
-import { connected } from '@cv/convex/model/mcpRuntime'
+import { connected } from '@cv/convex/model/mcp/runtime'
+import { _getExecution } from '@cv/convex/model/mcp/servers'
 import { createMcpBrokerTools } from '@cv/convex/model/tool/mcpBroker'
 import type { McpBrokerContext } from '@cv/convex/model/tool/mcpBroker'
 import { createMcpProtocolTools } from '@cv/convex/model/tool/mcpProtocol'

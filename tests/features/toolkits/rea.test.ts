@@ -1,7 +1,10 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
-import { resumeOperations, settle } from '@cv/convex/model/mcpOperationActions'
-import { cancelForStream } from '@cv/convex/model/mcpOperations'
-import { control, runtimeScope } from '@cv/convex/model/mcpRuntime'
+import {
+  resumeOperations,
+  settle,
+} from '@cv/convex/model/mcp/operations/actions'
+import { cancelForStream } from '@cv/convex/model/mcp/operations/records'
+import { control, runtimeScope } from '@cv/convex/model/mcp/runtime'
 import { _claim, _handoff } from '@cv/convex/model/stream/lifecycle'
 import { select } from '@cv/convex/model/toolkits/selection'
 import { remove } from '@cv/convex/model/toolkits/settings'

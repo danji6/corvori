@@ -11,13 +11,13 @@ import {
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import { findUserBySubject } from '../../functions'
 import { queryMessageSegments } from '../messageContents'
 import { hasSavedTitle, isTextPart } from '../messages'
+import { resolve as resolveProviders } from '../provider/connections'
 import { findCredentialsForModel } from '../provider/providers'
-import { resolve as resolveProviders } from '../providers'
 import { getByOwnerId as getSettings } from '../settings'
 import { syncTitle } from '../userSessions'
+import { findUserBySubject } from '../users'
 import { getMembership } from './memberships'
 
 export async function _getTitleContext(

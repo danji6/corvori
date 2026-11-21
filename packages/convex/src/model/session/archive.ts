@@ -4,7 +4,6 @@ import type { Infer } from 'convex/values'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import { findUserBySubject } from '../../functions'
 import type { sessionArchiveValidator } from '../../validators/sessionArchives'
 import type { importSessionArgsValidator } from '../../validators/sessions'
 import type { SenderIdentity } from '../chat/identities'
@@ -19,6 +18,7 @@ import {
   notACommandChip,
 } from '../messages'
 import { portableContextExtra } from '../stream/contextNotes'
+import { findUserBySubject } from '../users'
 import { getMember } from './memberships'
 import { resolveTitle } from './title'
 

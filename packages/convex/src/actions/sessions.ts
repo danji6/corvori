@@ -5,15 +5,14 @@ import { v } from 'convex/values'
 import { action, internalAction } from '../_generated/server'
 import { sessionArchiveValidator } from '../validators/sessionArchives'
 import { createSessionArgsValidator } from '../validators/sessions'
-import * as Archive from './session/archive'
-import { cleanAttachmentTransfer } from './session/attachmentTransfers'
-import * as SessionFiles from './session/sessionFiles'
-import * as SessionTitles from './session/title'
-import * as Workspace from './session/workspace'
 
 export const createWithWorkspace = action({
   args: createSessionArgsValidator.fields,
-  handler: Workspace.createSession,
+  handler: async (ctx, args) =>
+    (await import('../model/session/workspaceActions')).createSession(
+      ctx,
+      args,
+    ),
 })
 
 export const duplicate = action({
@@ -21,22 +20,26 @@ export const duplicate = action({
     sessionId: v.id('sessions'),
     title: v.optional(v.string()),
   },
-  handler: SessionFiles.duplicateSession,
+  handler: async (ctx, args) =>
+    (await import('../model/session/fileActions')).duplicateSession(ctx, args),
 })
 
 export const regenerateTitle = action({
   args: { sessionId: v.id('sessions') },
-  handler: SessionTitles.regenerateTitle,
+  handler: async (ctx, args) =>
+    (await import('../model/session/titleActions')).regenerateTitle(ctx, args),
 })
 
 export const exportOne = action({
   args: { sessionId: v.id('sessions') },
-  handler: Archive.exportOne,
+  handler: async (ctx, args) =>
+    (await import('../model/session/archiveActions')).exportOne(ctx, args),
 })
 
 export const importOne = action({
   args: { payload: sessionArchiveValidator },
-  handler: Archive.importOne,
+  handler: async (ctx, args) =>
+    (await import('../model/session/archiveActions')).importOne(ctx, args),
 })
 
 export const _generateTitle = internalAction({
@@ -44,15 +47,22 @@ export const _generateTitle = internalAction({
     sessionId: v.id('sessions'),
     assistantText: v.optional(v.string()),
   },
-  handler: SessionTitles.generateTitle,
+  handler: async (ctx, args) =>
+    (await import('../model/session/titleActions')).generateTitle(ctx, args),
 })
 
 export const _runSessionFileOperation = internalAction({
   args: { operationId: v.id('sessionFileOperations') },
-  handler: SessionFiles.runSessionFileOperation,
+  handler: async (ctx, args) => {
+    const { runSessionFileOperation } = await import('../model/session/fileActions') // prettier-ignore
+    return runSessionFileOperation(ctx, args)
+  },
 })
 
 export const _cleanAttachmentTransfer = internalAction({
   args: { id: v.id('attachmentTransfers') },
-  handler: cleanAttachmentTransfer,
+  handler: async (ctx, args) => {
+    const { cleanAttachmentTransfer } = await import('../model/attachments/actions') // prettier-ignore
+    await cleanAttachmentTransfer(ctx, args)
+  },
 })

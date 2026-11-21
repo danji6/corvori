@@ -4,7 +4,7 @@ import {
   expire,
   publish,
   settingsLaunch,
-} from '@cv/convex/model/mcpProtocol'
+} from '@cv/convex/model/mcp/protocol'
 import { expect, test } from 'bun:test'
 import { skillsDatabase } from '~/tests/helpers/skills-db'
 

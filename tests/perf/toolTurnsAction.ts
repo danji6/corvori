@@ -1,8 +1,8 @@
 'use node'
 
 import { internalAction } from '@cv/convex/_generated/server'
-import type { prepare as prepareProvider } from '@cv/convex/actions/stream/engineSetup'
-import type { ProviderHistorySnapshot } from '@cv/convex/actions/stream/historySnapshot'
+import type { prepare as prepareProvider } from '@cv/convex/model/stream/engineSetup'
+import type { ProviderHistorySnapshot } from '@cv/convex/model/stream/historySnapshot'
 import {
   type ApiFromModules,
   type FunctionArgs,
@@ -29,7 +29,7 @@ export const _measure = internalAction({
     verify: v.optional(v.boolean()),
   },
   handler: async (ctx, { toolSteps, verify, ...execution }) => {
-    const { prepare } = await import('@cv/convex/actions/stream/engineSetup')
+    const { prepare } = await import('@cv/convex/model/stream/engineSetup')
     const snapshot: ProviderHistorySnapshot = {}
     const samples = []
     for (let step = 0; step <= toolSteps; step++) {

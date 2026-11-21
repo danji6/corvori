@@ -3,7 +3,7 @@ import { error } from '../../errors'
 import type { AuthMutationCtx } from '../../functions'
 import { minRole } from '../../lib/roles'
 import type { DeleteMessagePartsArgs, EditMessagePartArgs } from '../../types'
-import * as Attachments from '../attachments'
+import * as Attachments from '../attachments/files'
 import * as Avatars from '../avatars'
 import {
   allVersionParts,
@@ -17,7 +17,7 @@ import {
 import { scheduleMessageEval } from '../messages'
 import { cancelByMessage } from '../scheduledEvents'
 import * as Memberships from '../session/memberships'
-import { removeDeliveriesForParts } from '../shellOutputDeliveries'
+import { removeDeliveriesForParts } from '../shell/outputDeliveries'
 import { collectToolOutputStorageIds } from '../stream/toolOutput'
 import { clearAnnouncedMode } from './notes'
 import { forgetQuotedMessage } from './replies'

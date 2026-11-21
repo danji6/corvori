@@ -2,7 +2,7 @@ import { v } from 'convex/values'
 
 import { internalMutation, internalQuery } from './_generated/server'
 import { authQuery } from './functions'
-import * as Protocol from './model/mcpProtocol'
+import * as Protocol from './model/mcp/protocol'
 import * as V from './validators/mcpProtocol'
 
 export const _launch = internalQuery({
