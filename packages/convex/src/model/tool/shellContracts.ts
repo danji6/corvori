@@ -23,8 +23,7 @@ export type ShellJobInput = {
   command: string
   /** Display-only summary of what the command does. */
   description?: string
-  timeout?: number
-  run_in_background?: boolean
+  wait_seconds?: number
 }
 
 export type ShellOutputInput = {
@@ -60,11 +59,13 @@ export type ShellJobOptions = {
   pollIntervalMs?: number
   heartbeatMs?: number
   readPosition?: ShellReadPosition
+  onStarted?: (jobId: string) => Promise<number | null | undefined>
 }
 
 /** Picks up a job another watcher left running, continuing its scrollback. */
 export type ShellJobResume = {
   jobId: string
+  jobNumber?: number
   term: string
   termOffset: number
 }

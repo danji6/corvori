@@ -13,7 +13,7 @@ import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
 import { needsEmulator } from '@cv/core/shell/ansi'
 import type { ToolUIPart } from 'ai'
-import { useAction } from 'convex/react'
+import { useAction, useQuery } from 'convex/react'
 import { ArrowDownFromLineIcon, BanIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
@@ -22,6 +22,7 @@ import { HighlightedCommand } from './highlighted-command'
 import { LoadFullOutput } from './load-full-output'
 import { ShellExitFocus } from './shell-exit-focus'
 import { useShellGroup } from './shell-group-block'
+import { ShellReadBlock } from './shell-read-block'
 import { ShellTerminal } from './shell-terminal'
 import { ToolShell } from './tool-shell'
 
@@ -34,21 +35,26 @@ type ShellBlockProps = {
   alwaysExpand?: boolean
 }
 
-export function ShellBlock({
+export function ShellBlock(props: ShellBlockProps) {
+  return props.part.type === 'tool-shell_output' ? (
+    <ShellReadBlock {...props} />
+  ) : (
+    <ShellCommandBlock {...props} />
+  )
+}
+
+function ShellCommandBlock({
   part,
   messageId,
   forceError,
   dense = true,
   alwaysExpand,
 }: ShellBlockProps) {
-  const outputRead = part.type === 'tool-shell_output'
   const input = part.input as
     | {
         command?: string
         cwd?: string
         description?: string
-        jobId?: string
-        run_in_background?: boolean
       }
     | undefined
 
@@ -91,6 +97,18 @@ export function ShellBlock({
   )
   const jobId = output?.jobId ?? liveJob?.jobId
 
+  const mayHaveSavedTerminal =
+    output?.status === 'background' || output?.status === 'running'
+  const reference = useQuery(
+    api.shellJobs.reference,
+    sessionId &&
+      jobId &&
+      (mayHaveSavedTerminal || output?.jobNumber === undefined)
+      ? { sessionId, jobId }
+      : 'skip',
+  )
+  const saved = mayHaveSavedTerminal ? reference?.terminal : undefined
+
   const canTail =
     Boolean(jobId) &&
     isAdmin &&
@@ -107,7 +125,7 @@ export function ShellBlock({
 
   // Effective status, which may be different than the persisted one
   const attestedStatus = (tailing ? tail.status : undefined) ?? liveJob?.status
-  const liveStatus = attestedStatus ?? output?.status
+  const liveStatus = attestedStatus ?? saved?.status ?? output?.status
   const isLive = liveStatus === 'running' || liveStatus === 'background'
   const endedAbnormally =
     liveStatus === 'killed' || liveStatus === 'timeout' || liveStatus === 'lost'
@@ -135,11 +153,14 @@ export function ShellBlock({
     Boolean(waiting) && isLive && !isBackground && isAdmin && sessionId !== null
   const confirmedWaiting = confirmedLive && attestedWaiting === true
   const focusWhenReady =
-    interactive && confirmedWaiting && inputAllowed && !detached && !outputRead
+    interactive && confirmedWaiting && inputAllowed && !detached
   const sourceMessageId =
     (part as SourceMessagePart).sourceMessageId ?? messageId
   const displayTerm =
-    fullOutput?.term ?? (tailing ? tail.term : undefined) ?? output?.term
+    (tailing ? tail.term : undefined) ??
+    saved?.term ??
+    fullOutput?.term ??
+    output?.term
   const hasTerminalText =
     typeof displayTerm === 'string' && displayTerm.trim() !== ''
   // A live job always gets a terminal, even before any output was persisted
@@ -199,31 +220,23 @@ export function ShellBlock({
       forceError={forceError}
       autoExpand={interactive || Boolean(alwaysExpand)}
       reveal={revealTerminal}
-      revealComposerMessageId={
-        alwaysExpand && !outputRead ? sourceMessageId : undefined
-      }
+      revealComposerMessageId={alwaysExpand ? sourceMessageId : undefined}
       revealOnOpen="manual"
       fullWidth
-      surface={outputRead ? 'inset-row' : 'inset'}
-      headerClassName={outputRead ? undefined : 'in-data-[open=false]:p-2'}
-      triggerClassName={outputRead ? undefined : 'px-2 py-1'}
+      surface="inset"
+      headerClassName="in-data-[open=false]:p-2"
+      triggerClassName="px-2 py-1"
       noErrorText={hasTerminal || Boolean(fallbackText)}
       dense={dense}
-      leadingIcon={outputRead ? undefined : null}
+      leadingIcon={null}
       label={
-        outputRead ? (
-          <>
-            Read output of job{' '}
-            <span className="font-mono">{input?.jobId ?? '…'}</span>
-          </>
-        ) : (
-          <ShellLabel
-            input={input}
-            output={output}
-            background={optimisticBackground}
-            terminated={terminated}
-          />
-        )
+        <ShellLabel
+          input={input}
+          output={output}
+          jobNumber={output?.jobNumber ?? reference?.number}
+          background={optimisticBackground}
+          terminated={terminated}
+        />
       }
     >
       {hasContent && (
@@ -236,8 +249,9 @@ export function ShellBlock({
               focusWhenReady={focusWhenReady}
               term={displayTerm ?? ''}
               termOffset={
-                fullOutput?.termOffset ??
                 (tailing ? tail.termOffset : undefined) ??
+                saved?.termOffset ??
+                fullOutput?.termOffset ??
                 output?.termOffset ??
                 0
               }
@@ -292,7 +306,7 @@ export function ShellBlock({
       exited={exited}
       wasInteractive={wasInteractive}
       terminalRef={terminalRef}
-      onExitWithFocus={outputRead ? undefined : restoreComposerFocus}
+      onExitWithFocus={restoreComposerFocus}
     >
       {block}
     </ShellExitFocus>
@@ -304,6 +318,7 @@ type ShellLabelProps = {
     | { command?: string; cwd?: string; description?: string; jobId?: string }
     | undefined
   output: ShellToolOutput | undefined
+  jobNumber?: number
   background?: boolean
   terminated?: boolean
 }
@@ -311,6 +326,7 @@ type ShellLabelProps = {
 function ShellLabel({
   input,
   output,
+  jobNumber,
   background,
   terminated,
 }: ShellLabelProps) {
@@ -329,6 +345,11 @@ function ShellLabel({
           <HighlightedCommand command={input.command} />
         ) : (
           <span className="text-foreground/70">…</span>
+        )}
+        {jobNumber !== undefined && (
+          <span className="text-muted-foreground ml-2 text-[10px]">
+            #{jobNumber}
+          </span>
         )}
         {status && (
           <span className="text-muted-foreground ml-2 text-[10px] uppercase">

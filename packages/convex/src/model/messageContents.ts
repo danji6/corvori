@@ -16,6 +16,7 @@ import { removeForMessage as removeMcpOperations } from './mcpOperations'
 import { isContextEligible, searchTextFromParts } from './messages'
 import { advanceCompletedHistoryRevision } from './session/state'
 import { removeDeliveriesForMessage } from './shellOutputDeliveries'
+import { removeShellReferences } from './shellReferences'
 import { collectToolOutputStorageIds } from './stream/toolOutput'
 
 /** A message doc joined with its selected version's parts (concatenated segments). */
@@ -472,6 +473,7 @@ export async function deleteVersions(
   messageId: Id<'messages'>,
 ) {
   await removeDeliveriesForMessage(ctx, messageId)
+  await removeShellReferences(ctx, messageId)
   await removeMcpOperations(ctx, messageId)
   const rows = await listAllRows(ctx, messageId)
   for (const row of rows) {

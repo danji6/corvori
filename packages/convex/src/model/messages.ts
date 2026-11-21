@@ -166,6 +166,28 @@ export function finalizeMessageParts(parts: unknown[]) {
     const settled = settleUnansweredToolPart(part)
     if (settled !== part) return settled
 
+    if (part.state === 'output-available' && isMessagePartRecord(part.output)) {
+      const waiting =
+        part.output.status === 'running' &&
+        typeof part.output.waitUntil === 'number'
+      if (waiting && part.type === 'tool-shell_output') {
+        const { output: _output, preliminary: _preliminary, ...base } = part
+        return {
+          ...base,
+          state: 'output-error',
+          errorText: 'Shell output wait was cancelled.',
+        }
+      }
+      if (waiting && part.type === 'tool-shell') {
+        const { waitUntil: _deadline, ...output } = part.output
+        return {
+          ...part,
+          preliminary: undefined,
+          output: finalizeRunningToolOutput(output),
+        }
+      }
+    }
+
     if (
       typeof part.type === 'string' &&
       part.type.startsWith('tool-') &&

@@ -39,8 +39,16 @@ export function isOffloadableToolPart(part: unknown): part is ToolPartRecord {
     record.output !== undefined &&
     record.preliminary !== true &&
     typeof record.toolCallId === 'string' &&
-    !record.outputRef,
+    !record.outputRef &&
+    !isPendingShellOutput(record),
   )
+}
+
+function isPendingShellOutput(record: ToolPartRecord) {
+  if (record.type !== 'tool-shell' && record.type !== 'tool-shell_output')
+    return false
+  const output = record.output as { waitUntil?: unknown } | null
+  return typeof output?.waitUntil === 'number'
 }
 
 export function hasOutputRef(

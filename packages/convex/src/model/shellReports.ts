@@ -14,6 +14,7 @@ import { insertMessage } from './messageContents'
 import { getSessionWithWorkspace } from './session/folderContext'
 import { getActiveStream } from './session/memberships'
 import { recordDelivery } from './shellOutputDeliveries'
+import { findReference, saveTerminal } from './shellReferences'
 import { reserveInvokeTurn } from './stream/lifecycle'
 
 /** Outcome delivered by a completed watcher window. */
@@ -34,6 +35,12 @@ export async function deliverShellReport(
   const session = await getSessionWithWorkspace(ctx, row.sessionId)
   if (!session) return
 
+  if (output) {
+    const sessionId = sharedSessionId(session)
+    const origin = await findReference(ctx, { sessionId, jobId: row.jobId })
+    if (origin) output = { ...output, jobNumber: origin.number }
+    await saveTerminal(ctx, sessionId, output)
+  }
   const { messageId } = await insertShellReport(ctx, row, { output, errorText })
   const reportedOutput = errorText ? undefined : output
   if (reportedOutput?.range && !row.userKilled) {

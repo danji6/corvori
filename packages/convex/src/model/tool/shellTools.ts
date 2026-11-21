@@ -2,6 +2,7 @@ import { TOOL_DESCRIPTIONS, shellToolDescription } from '@cv/core/types'
 import { defaultShellDirectory } from '@cv/core/workspace/personal'
 import { parseScopedPath } from '@cv/core/workspace/scoped-path'
 
+import { ToolError } from '../../errors'
 import {
   analyzeShellPathCandidates,
   isReadOnlyShellCommand,
@@ -23,6 +24,9 @@ import {
   killShell,
   shellToModelOutput,
 } from './shell'
+import { shellWaitSeconds, waitForShell } from './shellTimedWait'
+
+const JOB_NUMBER = /^[1-9][0-9]*$/
 
 export async function createShellTool(context: WorkspaceToolContext) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
@@ -42,12 +46,13 @@ export async function createShellTool(context: WorkspaceToolContext) {
       description: z
         .string()
         .optional()
-        .describe('Short one-line summary of what the command does'),
-      timeout: z.number().min(1).optional().describe('Timeout in seconds'),
-      run_in_background: z
-        .boolean()
+        .describe('Short one-line summary of what the command does.'),
+      wait_seconds: z
+        .number()
         .optional()
-        .describe('Run in the background and return the job id immediately'),
+        .describe(
+          'Maximum seconds to wait for exit (default 60, maximum 600). Set to 0 to start in the background and return the job ID immediately.',
+        ),
     }),
     needsApproval: (input) =>
       shellNeedsApproval(input.command, context, input.cwd),
@@ -65,8 +70,17 @@ export async function createShellTool(context: WorkspaceToolContext) {
             ...jobRef(context, toolCallId),
             allowedPaths,
           },
-          input,
-          { abortSignal },
+          {
+            ...input,
+            wait_seconds: shellWaitSeconds(input.wait_seconds),
+          },
+          {
+            abortSignal,
+            windowDeadline: context.shellWindowDeadline,
+            onStarted:
+              context.bindShell &&
+              ((jobId) => context.bindShell!(jobId, toolCallId, input.command)),
+          },
         ),
         context,
         { command: input.command, toolCallId },
@@ -80,33 +94,62 @@ export async function createShellOutputTool(context: WorkspaceToolContext) {
   return tool<ShellOutputInput, ShellToolOutput, never>({
     description: TOOL_DESCRIPTIONS.shell_output,
     inputSchema: z.object({
-      jobId: z.string().describe('Job id returned by shell'),
-      wait_seconds: z.number().optional(),
+      jobId: z
+        .string()
+        .regex(JOB_NUMBER)
+        .describe('Job ID returned by shell, as a string.'),
+      wait_seconds: z
+        .number()
+        .optional()
+        .describe(
+          'Maximum seconds to wait for exit (default 60, maximum 600). Use 0 for the next unread page immediately. An explicit offset also replays immediately.',
+        ),
       offset: z
         .number()
         .int()
         .nonnegative()
         .optional()
-        .describe('Omit for automatic reads. Set only to replay output.'),
+        .describe(
+          'Omit for automatic reads. Set it to 0 to replay from the oldest retained output, then use the returned next offset to continue replay. An explicit offset leaves the automatic read position unchanged.',
+        ),
     }),
     toModelOutput: shellToModelOutput,
-    execute: async function* (input, { abortSignal, toolCallId }) {
+    execute: async function* (input, { abortSignal }) {
+      const ref = await requireShellReference(context, input.jobId)
+      const { jobId } = ref
+      const wait =
+        input.offset === undefined ? shellWaitSeconds(input.wait_seconds) : 0
+      const jobContext = workspaceArgs(context)
+      if (wait > 0) await context.releaseJob?.(jobId)
       const readPosition = await context.readShellPosition?.(
-        input.jobId,
+        jobId,
         input.offset,
       )
-      yield* trackJob(
-        executeShellOutput(workspaceArgs(context), input, {
-          abortSignal,
-          readPosition,
-        }),
-        context,
-        {
-          command: `shell_output ${input.jobId}`,
-          toolCallId,
-          deferRelease: !!context.readShellPosition,
-        },
-      )
+      const options = {
+        abortSignal,
+        readPosition,
+        windowDeadline: context.shellWindowDeadline,
+      }
+      const outputs =
+        wait > 0
+          ? waitForShell(
+              jobContext,
+              jobId,
+              Date.now() + wait * 1000,
+              options,
+              false,
+            )
+          : executeShellOutput(
+              jobContext,
+              { ...input, jobId, wait_seconds: 0 },
+              options,
+            )
+
+      yield* trackJob(withJobNumber(outputs, ref.number), context, {
+        command: ref.command,
+        toolCallId: ref.toolCallId,
+        deferRelease: !!context.readShellPosition,
+      })
     },
   })
 }
@@ -116,14 +159,28 @@ export async function createKillShellTool(context: WorkspaceToolContext) {
   return tool({
     description: TOOL_DESCRIPTIONS.kill_shell,
     inputSchema: z.object({
-      jobId: z.string().describe('Job id returned by shell'),
+      jobId: z
+        .string()
+        .regex(JOB_NUMBER)
+        .describe('Job ID returned by shell, as a string.'),
     }),
-    execute: async ({ jobId }) => {
+    execute: async ({ jobId: handle }) => {
+      const { jobId } = await requireShellReference(context, handle)
       // Killing it is the agent saying it no longer wants the result
       await context.releaseJob?.(jobId)
-      return killShell(workspaceArgs(context), jobId)
+      await killShell(workspaceArgs(context), jobId)
+      return `Killed job ${handle}`
     },
   })
+}
+
+async function requireShellReference(
+  context: WorkspaceToolContext,
+  handle: string,
+) {
+  const ref = await context.findShell?.(handle)
+  if (!ref) throw new ToolError(`Job ${handle} was not found in this chat.`)
+  return ref
 }
 
 /**
@@ -138,10 +195,13 @@ export async function* trackJob(
   let last: ShellToolOutput | undefined
   for await (const output of outputs) {
     last = output
+    if (ref.deferRelease && output.status !== 'running') {
+      await context.saveShellTerminal?.(output)
+    }
     yield output
   }
 
-  if (!last?.jobId) return
+  if (!last?.jobId || last.status === 'running') return
   if (last.status === 'background') {
     await context.watchJob?.({
       command: ref.command,
@@ -205,4 +265,13 @@ export async function getFlaggedPaths(
     cwd ?? defaultShellDirectory(context.workspace),
   )
   return result?.complete ? result.flagged : null
+}
+
+async function* withJobNumber(
+  outputs: AsyncGenerator<ShellToolOutput>,
+  jobNumber: number,
+) {
+  for await (const output of outputs) {
+    yield { ...output, jobNumber }
+  }
 }

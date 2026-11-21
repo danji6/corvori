@@ -32,6 +32,7 @@ import {
   newShellReadResults,
   recordToolDeliveries,
 } from '../shellOutputDeliveries'
+import { hasPendingShellWait } from '../shellWaits'
 import { ownsExecution } from './execution'
 import { isHistoricalTurn } from './historyBoundary'
 import { STREAM_LEASE_MS, renewStreamLease } from './lease'
@@ -78,6 +79,7 @@ export async function consumeInterjections(
   // An approved call must execute in the turn that issued it. Rolling over
   // here would finalize it as unanswered before the resumed SDK stream gets a
   // chance to run the tool.
+  if (hasPendingShellWait(row)) return false
   if (row?.parts.some(isApprovedToolAwaitingExecution)) return false
   const pendingMcp = await ctx.db
     .query('mcpOperations')

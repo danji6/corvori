@@ -18,7 +18,7 @@ export type ShellJob = {
   proc: ShellJobProcess
   ring: OutputRing
   status: ShellJobStatus
-  endReason?: 'killed' | 'timeout'
+  endReason?: 'killed'
   exitCode: number | null
   background: boolean
   allowInteractiveShells: boolean
@@ -30,7 +30,5 @@ export type ShellJob = {
   waitProbe?: ReturnType<typeof setInterval>
   startedAt: number
   exitedAt?: number
-  /** Absent when the job runs without a timeout. */
-  timeoutTimer?: ReturnType<typeof setTimeout>
   subscribers: Set<ShellJobSubscriber>
 }

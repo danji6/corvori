@@ -51,18 +51,16 @@ export function shellToolDescription(
     : 'The WORKSPACE_DIR environment variable provides the absolute root'
   return inline`
     Run a shell command${where} in cwd (default: primary project source).${personal}.
-    Set run_in_background for long-running commands and read them later with
-    shell_output. Pass a description whenever the command isn't self-explanatory,
-    so the user can review it at a glance.`
+    Waits up to wait_seconds for exit and returns recent output. A job still
+    running at the deadline continues in the background and reports when it
+    exits. Pass a description whenever the command isn't self-explanatory, so
+    the user can review it at a glance.`
 }
 
 const shell_output = inline`
-  Omit offset to automatically read the next unread page of shell output.
-  If more output is available, call again without offset, even after the job
-  exits. Waits up to wait_seconds (default 30, maximum 600), returning early
-  when a page fills. Use offset only for deliberate replay. Set it to 0 to
-  replay from the oldest retained output, then use the returned next offset
-  to continue replay. Replay leaves the automatic read position unchanged.`
+  Wait for a running job to exit or until wait_seconds elapses. Returns the
+  latest unread output and current status. Background jobs report automatically
+  on exit. Use offset only for immediate replay.`
 
 const kill_shell = 'Kill a running shell job.'
 

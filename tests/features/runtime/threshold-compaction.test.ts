@@ -259,6 +259,7 @@ test('preempts normal dispatch, consumes the one-shot, and resumes with unread m
     ) => {
       if (getFunctionName(ref) === 'streams:_getStopState')
         return _getStopState(f.ctx, args)
+      if (getFunctionName(ref) === 'shellJobs:_pendingWaits') return null
       return []
     },
     runMutation: (

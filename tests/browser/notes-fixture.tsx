@@ -5,6 +5,7 @@ import type { ScrollDeps } from '@/components/chat/messages/message-list/deps'
 import { MessageListContent } from '@/components/chat/messages/message-list/message-list-content'
 import { MessageListContext } from '@/components/chat/messages/message-list/message-list-context'
 import { MessageRowView } from '@/components/chat/messages/message-row-view'
+import { MessageSeekContext } from '@/components/chat/messages/message-seek-context'
 import { NoteGroupBlock } from '@/components/chat/messages/note-group-block'
 import { WorkBlock } from '@/components/chat/messages/work-block'
 import { ChatSearchProvider } from '@/components/chat/search/chat-search-context'
@@ -113,7 +114,7 @@ function Transcript() {
     restore()
   }, [restore])
 
-  return (
+  const transcript = (
     <MessageListContext
       value={{
         scrollRef: docScrollRef,
@@ -203,6 +204,16 @@ function Transcript() {
         <div ref={sentinelRef} />
       </main>
     </MessageListContext>
+  )
+
+  return (
+    <MessageSeekContext
+      value={({ messageId, creationTime, segmentIndex, ...options }) =>
+        requestScrollToMessage(messageId, creationTime, segmentIndex, options)
+      }
+    >
+      {transcript}
+    </MessageSeekContext>
   )
 }
 

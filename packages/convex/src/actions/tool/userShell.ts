@@ -35,13 +35,20 @@ export async function _run(
   const { toolCallId, command, startedAt, resume, ...rest } = context
   const job = { ...rest, toolCallId, messageCreatedAt: startedAt }
 
-  const { USER_SHELL_WINDOW_MS, USER_SHELL_TIMEOUT_S } =
-    await import('../../model/chat/shell')
+  const { USER_SHELL_WINDOW_MS } = await import('../../model/chat/shell')
   const { executeShellJob, resumeShellJob } =
     await import('../../model/tool/shell')
 
   const watch: ShellJobOptions = {
     windowDeadline: Date.now() + USER_SHELL_WINDOW_MS,
+    onStarted: (jobId) =>
+      ctx.runMutation(internal.shellJobs._bindReference, {
+        sessionId: job.sessionId,
+        jobId,
+        messageId,
+        toolCallId,
+        command,
+      }),
     ...options,
   }
   let output: ShellToolOutput | undefined
@@ -50,7 +57,7 @@ export async function _run(
   try {
     const outputs = resume
       ? resumeShellJob(job, resume, watch)
-      : executeShellJob(job, { command, timeout: USER_SHELL_TIMEOUT_S }, watch)
+      : executeShellJob(job, { command }, watch)
 
     let lastPatch = 0
     let lastWaiting = false

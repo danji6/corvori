@@ -13,6 +13,12 @@ export async function raceNextEvent(
   deadline: number | undefined,
   heartbeatMs: number,
 ): Promise<RaceResult> {
+  if (deadline !== undefined && Date.now() >= deadline) {
+    // A continuously ready stream can otherwise win against a zero delay timer.
+    void pending.catch(() => {})
+    return 'deadline'
+  }
+
   const timers: ReturnType<typeof setTimeout>[] = []
   const contenders: Promise<RaceResult>[] = [
     pending.then((result) => ({ result }) as RaceResult),

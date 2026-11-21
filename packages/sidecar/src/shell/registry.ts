@@ -24,10 +24,6 @@ export { ShellJobSubscriber } from './subscriber'
 
 const MAX_RUNNING_PER_SESSION = 8
 
-const DEFAULT_FOREGROUND_TIMEOUT_S = 120
-
-const MAX_TIMEOUT_S = 1800
-
 const FINISHED_JOB_TTL_MS = 30 * 60 * 1000
 
 const SWEEP_INTERVAL_MS = 60 * 1000
@@ -80,8 +76,6 @@ export async function startShellJob(
     shell: input.shell,
   })
 
-  const timeoutMs = resolveTimeoutMs(input)
-
   const job: ShellJob = {
     jobId: nextJobId(),
     agentId: input.agentId,
@@ -106,14 +100,6 @@ export async function startShellJob(
     altCarry: '',
     startedAt: Date.now(),
     subscribers: new Set(),
-    timeoutTimer:
-      timeoutMs === null
-        ? undefined
-        : setTimeout(() => {
-            if (job.status !== 'running') return
-            job.endReason = 'timeout'
-            proc.kill()
-          }, timeoutMs),
   }
 
   proc.onData((chunk) => {
@@ -127,7 +113,6 @@ export async function startShellJob(
     // Grace period after exit for the final output
     setTimeout(() => {
       clearInterval(job.waitProbe)
-      clearTimeout(job.timeoutTimer)
       job.exitCode = exitCode
       job.exitedAt = Date.now()
       job.waiting = false
@@ -143,17 +128,6 @@ export async function startShellJob(
   jobs.set(job.jobId, job)
   ensureSweeper()
   return { jobId: job.jobId, mode: proc.mode }
-}
-
-/** `timeoutSeconds: 0` runs the job until it exits or is killed. */
-function resolveTimeoutMs(input: StartShellJobInput): number | null {
-  if (input.timeoutSeconds === 0) return null
-  const seconds = Math.min(
-    input.timeoutSeconds ??
-      (input.background ? MAX_TIMEOUT_S : DEFAULT_FOREGROUND_TIMEOUT_S),
-    MAX_TIMEOUT_S,
-  )
-  return seconds * 1000
 }
 
 function requireJob(jobId: string, sessionId: string): ShellJob {

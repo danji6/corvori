@@ -259,6 +259,11 @@ export default defineSchema({
   offloadedOutputs: defineTable(V.offloadedOutputSchema)
     .index('by_streamId', ['streamId']),
 
+  shellReferences: defineTable(V.shellReferenceSchema)
+    .index('by_messageId_version', ['messageId', 'version'])
+    .index('by_sessionId_number', ['sessionId', 'number'])
+    .index('by_sessionId_jobId', ['sessionId', 'jobId']),
+
   shellJobs: defineTable(V.shellJobSchema)
     .index('by_agentId', ['agentId'])
     .index('by_sessionId', ['sessionId'])

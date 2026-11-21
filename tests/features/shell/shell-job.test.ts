@@ -13,6 +13,7 @@ import { stripTerminalCodes } from '@cv/core/shell/ansi'
 import { describe, expect, test } from 'bun:test'
 import { collect, context, fast, mockSidecar } from '~/tests/helpers/shell-job'
 import type { SseEvent } from '~/tests/helpers/shell-job'
+import { pageSidecar } from '~/tests/helpers/shell-page'
 
 describe('executeShellJob', () => {
   test('passes the interactive-shell opt-in to the sidecar', async () => {
@@ -53,8 +54,7 @@ describe('executeShellJob', () => {
         sessionId: 'session-1',
         workspaceId: 'ws-1',
         command: 'echo hi',
-        timeoutSeconds: undefined,
-        background: undefined,
+        background: false,
         allowInteractiveShells: false,
       },
     })
@@ -88,20 +88,23 @@ describe('executeShellJob', () => {
     expect(outputs.at(-1)?.exitCode).toBe(3)
   })
 
-  test('background jobs yield once and return immediately', async () => {
-    const { post, openStream, streams } = mockSidecar([])
+  test('zero wait starts a background job and returns its number immediately', async () => {
+    const { calls, post, openStream, streams } = mockSidecar([])
 
     const outputs = await collect(
       executeShellJob(
         context,
-        { command: 'sleep 100', run_in_background: true },
-        { ...fast, post, openStream },
+        { command: 'sleep 100', wait_seconds: 0 },
+        { ...fast, post, openStream, onStarted: async () => 3 },
       ),
     )
 
     expect(outputs).toHaveLength(1)
-    expect(outputs[0].status).toBe('background')
-    expect(outputs[0].text).toContain('job-1')
+    expect(outputs[0]).toMatchObject({ status: 'background', jobNumber: 3 })
+    expect(outputs[0].text).toContain('Started background job 3')
+    expect(calls).toMatchObject([
+      { path: '/shell/start', body: { background: true } },
+    ])
     expect(streams()).toBe(0)
   })
 
@@ -318,38 +321,28 @@ describe('windows', () => {
 
 describe('executeShellOutput', () => {
   test('returns current output when the job is still running', async () => {
-    const { post, openStream } = mockSidecar([{ chunk: 'working...\n' }])
+    const sidecar = pageSidecar('working...\n', 'running')
 
     const outputs = await collect(
-      executeShellOutput(
-        context,
-        { jobId: 'job-1', wait_seconds: 0 },
-        { ...fast, post, openStream },
-      ),
+      executeShellOutput(context, { jobId: 'job-1', wait_seconds: 0 }, sidecar),
     )
 
     const final = outputs.at(-1)
     expect(final?.status).toBe('background')
-    expect(final?.text).toContain('working...')
-    expect(final?.text).toContain('still running')
+    expect(final?.text).toBe('working...\n')
+    expect(sidecar.offsets).toEqual([])
   })
 
   test('waits for completion within the deadline', async () => {
-    const { post, openStream } = mockSidecar([
-      { chunk: 'step 1\n' },
-      { chunk: 'done\n', status: 'done', exitCode: 0 },
-    ])
+    const sidecar = pageSidecar('step 1\n', 'running')
+    sidecar.frames.push({ text: 'done\n', status: 'done', exitCode: 0 })
 
     const outputs = await collect(
-      executeShellOutput(
-        context,
-        { jobId: 'job-1', wait_seconds: 5 },
-        { ...fast, post, openStream },
-      ),
+      executeShellOutput(context, { jobId: 'job-1', wait_seconds: 5 }, sidecar),
     )
 
     expect(outputs.at(-1)?.status).toBe('done')
-    expect(outputs.at(-1)?.text).toBe('step 1\ndone')
+    expect(outputs.at(-1)?.text).toBe('step 1\ndone\n')
   })
 })
 

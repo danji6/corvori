@@ -98,6 +98,7 @@ export const sessionSchema = v.object({
   sessionFilesPending: v.optional(v.boolean()),
   taskDirectory: v.optional(v.string()),
   parent: v.optional(sessionParentValidator),
+  lastShellJobNumber: v.optional(v.number()),
   lastMessageAt: v.optional(v.number()),
   lastMessagePreview: v.optional(v.string()),
   /** Title fallback. */

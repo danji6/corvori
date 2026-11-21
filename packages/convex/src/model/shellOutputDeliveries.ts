@@ -45,7 +45,9 @@ function isFinalShellRead(part: unknown): part is FinalShellReadPart {
 
   const result = part as ShellReadPart
   const completed =
-    result.type === 'tool-shell_output' && result.state === 'output-available'
+    (result.type === 'tool-shell_output' || result.type === 'tool-shell') &&
+    result.state === 'output-available' &&
+    result.output?.status !== 'running'
 
   return (
     completed &&

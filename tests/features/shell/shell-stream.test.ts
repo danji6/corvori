@@ -1,8 +1,13 @@
 /// <reference types="bun-types" />
+import { safeValidateTypes } from '@ai-sdk/provider-utils'
 import type * as ShellToolModule from '@cv/convex/model/tool/shell'
 import type { ShellToolOutput } from '@cv/convex/types'
 import type * as RegistryModule from '@cv/sidecar/shell/registry'
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { mkdtemp, realpath, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { waitForExit } from '~/tests/helpers/shell-registry'
 
 process.env.CHAT_JOB_MODE = 'script'
 process.env.CHAT_SIDECAR_DATA_DIR ??= process.cwd()
@@ -41,7 +46,7 @@ async function startedJob(command: string, allowInteractiveShells = false) {
 
 /** Collects parts until `done` says stop, or the deadline passes. */
 async function collect(
-  parts: AsyncGenerator<ShellToolOutput>,
+  parts: AsyncIterable<ShellToolOutput>,
   done: (part: ShellToolOutput) => boolean,
   timeoutMs = 8_000,
 ) {
@@ -97,6 +102,87 @@ describe('shell job streaming over http', () => {
     expect(final?.status).toBe('done')
     expect(final?.exitCode).toBe(0)
     expect(final?.text).toContain('all-done')
+  })
+
+  test('reads and kills an unfinished job by its chat number', async () => {
+    const path = await realpath(await mkdtemp(join(tmpdir(), 'shell-wait-')))
+    const workspace = {
+      workspaceId: context.workspaceId,
+      path,
+      label: 'Test workspace',
+      sources: [{ id: 'test', path, label: 'Test workspace' }],
+    }
+    let jobId: string | undefined
+    try {
+      const outputs = await collect(
+        shellTool.executeShellJob(
+          { ...context, workspace },
+          { command: 'sleep 30', wait_seconds: 0.1 },
+          {
+            onStarted: async (id) => {
+              jobId = id
+              return 3
+            },
+          },
+        ),
+        (part) => part.status !== 'running',
+      )
+      expect(outputs.at(-1)).toMatchObject({
+        jobNumber: 3,
+        status: 'background',
+      })
+      expect(registry.pollShellJob(jobId!, context.sessionId, 0)).toMatchObject(
+        {
+          status: 'running',
+          background: true,
+        },
+      )
+      const { createShellOutputTool, createKillShellTool } =
+        await import('@cv/convex/model/tool/shellTools')
+      const toolContext = {
+        ...context,
+        sessionId: context.sessionId as never,
+        ownerId: context.sessionId as never,
+        workspace,
+        findShell: async (handle: string) =>
+          handle === '3'
+            ? {
+                jobId: jobId!,
+                number: 3,
+                command: 'sleep 30',
+                toolCallId: 'start',
+              }
+            : null,
+      }
+      const read = await createShellOutputTool(toolContext)
+      const kill = await createKillShellTool(toolContext)
+      for (const { inputSchema } of [read, kill]) {
+        const result = await safeValidateTypes({
+          value: { jobId },
+          schema: inputSchema as never,
+        })
+        expect(result.success).toBe(false)
+      }
+
+      const options = {
+        toolCallId: 'next',
+        messages: [],
+        context: undefined as never,
+      }
+      const readResult = read.execute!({ jobId: '3', wait_seconds: 0 }, options)
+      if (!(Symbol.asyncIterator in readResult))
+        throw new Error('Expected a streaming read')
+      const reads = await collect(readResult, () => false)
+      expect(reads.at(-1)).toMatchObject({ jobNumber: 3, status: 'background' })
+      expect(await kill.execute!({ jobId: '3' }, options)).toBe('Killed job 3')
+      expect((await waitForExit(jobId!)).status).toBe('killed')
+    } finally {
+      if (jobId) {
+        registry.killShellJob(jobId, context.sessionId)
+        await waitForExit(jobId)
+      }
+      await rm(path, { recursive: true, force: true })
+    }
   })
 
   test('reports a job waiting on terminal input', async () => {

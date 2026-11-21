@@ -2016,12 +2016,11 @@ Shell execution has four consumers over one PTY-backed job registry
 - the background-job watcher, which follows a job whose tool call already
   settled and wakes its agent when it exits
 
-A job outlives its tool call in three ways: a `run_in_background: true` start,
-a foreground job the user detaches, and a `shell_output` call that hits its
-wait deadline. All three settle the tool part with status `background`, which
-is the single rule `trackJob` (`model/tool/shellTools.ts`) registers on — and
-the agent reading the job to a terminal status itself, or killing it with
-`kill_shell`, drops the registration again.
+A job can outlive its tool call when `shell` starts with `wait_seconds: 0`, a
+user detaches a foreground job, or a `shell` or `shell_output` wait reaches
+its deadline. The tool part settles with status `background`, which prompts
+`trackJob` (`model/tool/shellTools.ts`) to register the job. The registration
+is released when the agent reads the job's final status or uses `kill_shell`.
 
 A registration is a `shellJobs` row, watched by a self-rescheduling internal
 action (`actions/tool/shellJobs.ts`) built on the same windowing as the

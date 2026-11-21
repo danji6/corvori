@@ -2,7 +2,7 @@ import type { FolderWorkspace } from '@cv/core/types/workspace'
 
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
-import type { ToolApprovals } from '../../types'
+import type { ShellToolOutput, ToolApprovals } from '../../types'
 import type { ShellReadPosition } from './shellContracts'
 
 export type WorkspaceToolContext = {
@@ -27,6 +27,19 @@ export type WorkspaceToolContext = {
   watchJob?: (job: WatchedJobRef) => Promise<void>
   /** Drops the watch once the agent has read or killed the job itself. */
   releaseJob?: (jobId: string) => Promise<void>
+  saveShellTerminal?: (output: ShellToolOutput) => Promise<null | void>
+  shellWindowDeadline?: number
+  bindShell?: (
+    jobId: string,
+    toolCallId: string,
+    command: string,
+  ) => Promise<number | null | undefined>
+  findShell?: (jobId: string) => Promise<{
+    jobId: string
+    number: number
+    command: string
+    toolCallId: string
+  } | null>
   readShellPosition?: (jobId: string, offset?: number) => Promise<ShellReadPosition> // prettier-ignore
 }
 

@@ -54,6 +54,7 @@ import { useMessageEdit } from './messages/editor'
 import { MessageHighlightProvider } from './messages/message-highlight-context'
 import { MessageList, type MessageListHandle } from './messages/message-list'
 import { MessageSeekProvider } from './messages/message-seek-context'
+import { ShellSeekFromUrl } from './messages/shell-seek'
 import { HistorySearchDialog, useChatSearch, useChatSearchHost } from './search'
 import type { AgentItem } from './sessions/agent-combobox'
 import { ChatShortcutsProvider } from './shortcuts'
@@ -335,6 +336,7 @@ export function ChatSessionView({
     >
       <MessageSeekProvider messageListRef={messageListRef}>
         <MessageHighlightProvider>
+          <ShellSeekFromUrl />
           <ChatLayout
             scrollbar
             onScrollbarNavigate={clearComposerReveal}

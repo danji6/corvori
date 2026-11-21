@@ -12,6 +12,7 @@ import {
 import type { StreamExecutionArgs } from '../../types'
 import { compactBeforeDispatch } from './engineCompaction'
 import { prepare } from './engineSetup'
+import { resumeShellWaits } from './engineShellWait'
 import { consumeProviderStep } from './engineStep'
 import { ProviderStreamFailure } from './engineStep'
 import type { ProviderHistorySnapshot } from './historySnapshot'
@@ -47,12 +48,30 @@ export async function _stream(ctx: ActionCtx, execution: StreamExecutionArgs) {
       }
 
       const settled = await resumeOperations(ctx, execution, windowDeadline)
-      if (!settled) {
-        await ctx.runMutation(internal.streams._handoff, { ...execution })
+      const shell = settled
+        ? await resumeShellWaits(ctx, execution, windowDeadline)
+        : 'pending'
+      if (shell === 'pending') {
+        await ctx.runMutation(internal.streams._handoff, execution)
         return
       }
+      if (shell === 'settled') {
+        const suspension = await ctx.runMutation(
+          internal.streams._suspendStep,
+          execution,
+        )
+        if (suspension !== 'continue') return
+        await recordStep(ctx, execution, true)
+        if (!(await ctx.runMutation(internal.streams._continue, execution)))
+          return
+      }
 
-      const setup = await prepare(ctx, execution, historySnapshot)
+      const setup = await prepare(
+        ctx,
+        execution,
+        historySnapshot,
+        windowDeadline,
+      )
       if (!setup) return
       lastSetup = setup
       if (await compactBeforeDispatch(ctx, execution, setup)) return
@@ -99,7 +118,10 @@ export async function _stream(ctx: ActionCtx, execution: StreamExecutionArgs) {
         internal.mcpOperations._pending,
         execution,
       )
-      if (pendingMcp.length) {
+      if (
+        pendingMcp.length ||
+        (await ctx.runQuery(internal.shellJobs._pendingWaits, execution))
+      ) {
         await ctx.runMutation(internal.streams._handoff, execution)
         return
       }

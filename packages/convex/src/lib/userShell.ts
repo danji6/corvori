@@ -44,7 +44,7 @@ export function toUserShellBlock(part: ShellToolPart): string {
   return block(USER_SHELL_TAG, `$ ${command}\n\n${body}`, {
     status: shellPartStatus(part),
     ...(output?.exitCode != null && { 'exit-code': String(output.exitCode) }),
-    ...(output?.jobId && { job: output.jobId }),
+    ...(output?.jobId && { job: String(output.jobNumber ?? output.jobId) }),
   })
 }
 

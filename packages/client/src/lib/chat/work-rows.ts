@@ -78,8 +78,7 @@ function waitingTools(
 
   return toolsInGroup(group)
     .filter((part) => {
-      if (part.type !== 'tool-shell' && part.type !== 'tool-shell_output')
-        return false
+      if (part.type !== 'tool-shell') return false
 
       const output = parseOutputValue<ShellToolOutput>(part.output)
       // Settled historical tools must not attach to a reused call id

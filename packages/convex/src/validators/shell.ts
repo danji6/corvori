@@ -51,6 +51,7 @@ export const shellOutputRangeValidator = v.object({
   hasMore: v.boolean(),
   replay: v.boolean(),
   unavailable: v.array(shellOutputSpanValidator),
+  skipped: v.optional(shellOutputSpanValidator),
   ansiState: v.union(
     v.literal('text'),
     v.literal('escape'),
@@ -64,6 +65,8 @@ export const shellOutputRangeValidator = v.object({
 /** Mirrors `ShellToolOutput` from `@cv/core/types/tools`. */
 export const shellToolOutputValidator = v.object({
   jobId: v.string(),
+  jobNumber: v.optional(v.number()),
+  waitUntil: v.optional(v.number()),
   status: shellJobStatusValidator,
   exitCode: v.union(v.number(), v.null()),
   text: v.string(),
@@ -140,6 +143,25 @@ export const shellJobReportArgsValidator = v.object({
   ...shellJobExecutionArgsValidator.fields,
   output: v.optional(shellToolOutputValidator),
   errorText: v.optional(v.string()),
+})
+
+export const shellReferenceArgsValidator = v.object({
+  sessionId: v.id('sessions'),
+  jobId: v.string(),
+})
+
+export const shellOriginArgsValidator = v.object({
+  messageId: v.id('messages'),
+  toolCallId: v.string(),
+  command: v.string(),
+})
+
+export const shellReferenceSchema = v.object({
+  ...shellOriginArgsValidator.fields,
+  ...shellReferenceArgsValidator.fields,
+  number: v.number(),
+  version: v.number(),
+  terminal: v.optional(shellToolOutputValidator),
 })
 
 /**

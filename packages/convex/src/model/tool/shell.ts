@@ -8,6 +8,7 @@ import { type ShellJobOptions } from './shellContracts'
 import { type ShellJobResume } from './shellContracts'
 import { TermOutputAccumulator, lostOutput } from './shellOutput'
 import { readShellPage } from './shellPage'
+import { shellWaitSeconds, waitForShell } from './shellTimedWait'
 import { isJobNotFound, watchJob } from './shellWatch'
 
 export type { ShellJobContext } from './shellContracts'
@@ -32,6 +33,12 @@ export async function* executeShellJob(
   options: ShellJobOptions = {},
 ): AsyncGenerator<ShellToolOutput> {
   const post = options.post ?? postSidecar
+  const wait =
+    input.wait_seconds === undefined
+      ? undefined
+      : shellWaitSeconds(input.wait_seconds)
+  const background = wait === 0
+
   const { jobId } = await post<StartResponse>('/shell/start', {
     sessionId: context.sessionId,
     owner: context.owner,
@@ -43,29 +50,34 @@ export async function* executeShellJob(
     command: input.command,
     cwd: input.cwd,
     allowedPaths: context.allowedPaths,
-    timeoutSeconds: input.timeout,
-    background: input.run_in_background,
+    background,
     shell: context.shell,
     allowInteractiveShells: context.allowInteractiveShells ?? false,
   })
 
-  if (input.run_in_background) {
+  const jobNumber = await options.onStarted?.(jobId)
+
+  if (background) {
     yield {
       jobId,
+      ...(jobNumber != null && { jobNumber }),
       status: 'background',
       exitCode: null,
-      text: `Started background job ${jobId}. Use shell_output to read its output and kill_shell to stop it.`,
+      text: `Started background job ${jobNumber ?? jobId}. The job reports back on exit. Use shell_output to inspect progress or kill_shell to stop it.`,
       term: '',
       termOffset: 0,
     }
     return
   }
 
-  yield* watchJob(context, jobId, {
-    ...options,
-    post,
-    detachOnBackground: true,
-  })
+  const outputs =
+    wait !== undefined
+      ? waitForShell(context, jobId, Date.now() + wait * 1000, options, true)
+      : watchJob(context, jobId, { ...options, post, detachOnBackground: true })
+
+  for await (const output of outputs) {
+    yield jobNumber == null ? output : { ...output, jobNumber }
+  }
 }
 
 /**
@@ -77,12 +89,17 @@ export async function* resumeShellJob(
   resume: ShellJobResume,
   options: ShellJobOptions = {},
 ): AsyncGenerator<ShellToolOutput> {
-  yield* watchJob(context, resume.jobId, {
+  const outputs = watchJob(context, resume.jobId, {
     ...options,
     post: options.post ?? postSidecar,
     detachOnBackground: true,
     seed: resume,
   })
+  for await (const output of outputs) {
+    yield resume.jobNumber === undefined
+      ? output
+      : { ...output, jobNumber: resume.jobNumber }
+  }
 }
 
 /** Watches a background job until it exits or the window runs out. */

@@ -289,6 +289,8 @@ function groupedWorkMessages() {
 }
 
 function shellMessages() {
+  const migrated = params.has('migratedShell')
+  const jobId = 'shell-agent-job'
   const shell = (id: string) => ({
     type: 'tool-shell',
     toolCallId: id,
@@ -306,7 +308,8 @@ function shellMessages() {
           }
         : id === 'agent2'
           ? {
-              jobId: 'job',
+              jobId,
+              ...(!migrated && { jobNumber: 3 }),
               status: 'background',
               exitCode: null,
               text: '',
@@ -326,7 +329,7 @@ function shellMessages() {
     [
       {
         type: 'shell-report',
-        jobId: 'job',
+        jobId,
         command: 'bun lint',
         status: 'done',
         exitCode: 0,
@@ -338,15 +341,22 @@ function shellMessages() {
         type: 'tool-shell_output',
         toolCallId: 'poll',
         state: 'output-available',
-        input: { jobId: 'job' },
-        output: 'Command output',
+        input: { jobId: migrated ? jobId : '3' },
+        output: migrated
+          ? 'Command output'
+          : { jobId, jobNumber: 3, status: 'done', text: 'Command output' },
       },
       {
         type: 'tool-shell_output',
         toolCallId: 'poll-next',
         state: 'output-available',
-        input: { jobId: 'next-job' },
-        output: 'Next command output',
+        input: { jobId: '4' },
+        output: {
+          jobId: 'shell-deleted-command',
+          jobNumber: 4,
+          status: 'done',
+          text: 'Next command output',
+        },
       },
       { type: 'text', text: 'Finished' },
     ],
@@ -410,7 +420,38 @@ function query(name: string, args: Record<string, unknown>) {
       params.has('shellComposer'))
   )
     return [{ name: 'shell' }]
+  if (
+    name === 'shellJobs:reference' &&
+    (args.jobId === '3' || args.jobId === 'shell-agent-job')
+  ) {
+    const source = messages.find((message) => message._id === 'shell1')
+    if (!source) return null
+    return {
+      sessionId: 'notes',
+      messageId: source._id,
+      messageCreatedAt: source._creationTime,
+      segmentIndex: 0,
+      toolCallId: 'agent2',
+      number: 3,
+      terminal: {
+        jobId: 'shell-agent-job',
+        status: 'done',
+        exitCode: 0,
+        text: '',
+        term: 'Saved terminal output\n',
+        termOffset: 0,
+      },
+    }
+  }
   if (name === 'chat:messagesWindow') {
+    if (params.has('unloadedShell') && !args.anchor) {
+      return {
+        page: messages.filter((message) => message._id === 'shell3'),
+        hasOlder: true,
+        hasNewer: false,
+        atTail: true,
+      }
+    }
     const unloaded =
       new URLSearchParams(location.search).has('unloaded') && !args.anchor
     return {

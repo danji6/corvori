@@ -1,15 +1,12 @@
 import { stripTerminalCodes } from '@cv/core/shell/ansi'
+import type { ShellJobStatus } from '@cv/core/shell/job-protocol'
 import {
   SHELL_TERM_TAIL_CHARS,
   formatOutputPage,
 } from '@cv/core/shell/output-page'
 import type { Tool, ToolSet } from 'ai'
 
-import type {
-  ShellJobStatus,
-  ShellModelToolOutput,
-  ShellToolOutput,
-} from '../../types'
+import type { ShellModelToolOutput, ShellToolOutput } from '../../types'
 import { type ShellJobResume } from './shellContracts'
 import { type WatchState } from './shellWatch'
 
@@ -32,7 +29,7 @@ export function shellToModelOutput({
 
   const value =
     output.status === 'running'
-      ? `(command is still running, job ${output.jobId})`
+      ? `(command is still running, job ${output.jobNumber ?? output.jobId})`
       : formatOutputPage(output)
 
   return { type: 'text', value }
@@ -114,7 +111,6 @@ export function finalOutput(
 ): ShellToolOutput {
   const lines = [output.toText().trimEnd()]
 
-  if (status === 'timeout') lines.push('(command timed out)')
   if (status === 'killed') lines.push('(command was killed)')
   if (exitCode !== null && exitCode !== 0) lines.push(`(exit code ${exitCode})`)
 

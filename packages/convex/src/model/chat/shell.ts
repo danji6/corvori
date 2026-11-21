@@ -29,9 +29,6 @@ import * as Settings from '../settings'
 import { resolveSender } from './identities'
 import { reserveOrDebounceTurn } from './reserve'
 
-/** How long a user command can run. Currently forever. */
-export const USER_SHELL_TIMEOUT_S = 0
-
 /**
  * How long one runner action watches the job before handing it to a freshly
  * scheduled one and thus outlive the Convex action time limit.
@@ -180,6 +177,7 @@ export async function _beginUserShellWindow(
     ...(output?.jobId && {
       resume: {
         jobId: output.jobId,
+        ...(output.jobNumber !== undefined && { jobNumber: output.jobNumber }),
         term: output.term,
         termOffset: output.termOffset,
       },

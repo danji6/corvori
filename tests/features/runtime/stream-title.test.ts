@@ -123,6 +123,7 @@ function streamAction(ctx: MutationCtx, baseURL?: string) {
           return true
         case 'mcpOperations:_pending':
           return []
+        case 'shellJobs:_pendingWaits':
         case 'chat:_changeSetForStream':
           return null
         case 'sessions:_getTitleContext':

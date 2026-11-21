@@ -83,6 +83,7 @@ export async function prepare(
   ctx: ActionCtx,
   execution: StreamExecutionArgs,
   historySnapshot?: ProviderHistorySnapshot,
+  windowDeadline?: number,
 ): Promise<PreparedStreamStep | null> {
   let data = await ctx.runQuery(internal.streams._getContext, execution)
   if (!data) return null
@@ -155,7 +156,7 @@ export async function prepare(
   const frozen = data.sessionCache?.tools
   const preparedTools =
     invokesTools || !frozen
-      ? await prepareSessionTools(ctx, data, current)
+      ? await prepareSessionTools(ctx, data, current, windowDeadline)
       : undefined
   const manifest = preparedTools?.frozen ?? frozen!
   const runtime = invokesTools ? preparedTools : undefined

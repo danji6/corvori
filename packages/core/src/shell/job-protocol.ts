@@ -1,6 +1,6 @@
 export type PtyMode = 'pty' | 'script' | 'pipe'
 
-export type ShellJobStatus = 'running' | 'done' | 'killed' | 'timeout'
+export type ShellJobStatus = 'running' | 'done' | 'killed'
 
 export type StartShellJobInput = {
   agentId?: string
@@ -16,7 +16,6 @@ export type StartShellJobInput = {
   command: string
   cwd: string
   environment?: { AGENT_DIR?: string; WORKSPACE_DIR?: string }
-  timeoutSeconds?: number
   background?: boolean
   cols?: number
   rows?: number
@@ -50,10 +49,15 @@ export type PollResult = {
   exitCode: number | null
   background: boolean
   waiting: boolean
-  /** Present on sidecars supporting bounded output reads. */
-  bufferEnd?: number
+  bufferEnd: number
+  /** Present when the request includes `tailChars`. */
   term?: string
   termOffset?: number
+}
+
+export type ShellOutputSnapshot = PollResult & {
+  term: string
+  termOffset: number
 }
 
 export type ShellStreamEvent =

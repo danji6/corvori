@@ -341,27 +341,22 @@ for (const grouped of [true, false]) {
     const output = page.locator('[data-tool-call-id="poll"]')
     const nextOutput = page.locator('[data-tool-call-id="poll-next"]')
     await expect(output.getByRole('button')).toHaveText(
-      'Read output of job job',
+      'Read output of job #3',
       { useInnerText: true },
     )
     await expect(nextOutput.getByRole('button')).toHaveText(
-      'Read output of job next-job',
+      'Read output of job #4',
       { useInnerText: true },
     )
-    await expect(
-      output.getByText('Command output', { exact: true }),
-    ).toBeHidden()
+    await work.first().click()
+    await expect(work.first()).toHaveAttribute('aria-expanded', 'false')
     await output.getByRole('button').focus()
     await page.keyboard.press('Enter')
+    await expect(work.first()).toHaveAttribute('aria-expanded', 'true')
     await expect(
       output.getByText('Command output', { exact: true }),
-    ).toBeVisible()
+    ).toHaveCount(0)
     await nextOutput.getByRole('button').click()
-    await expect(nextOutput.getByText('Next command output')).toBeVisible()
-    await output.getByRole('button').click()
-    await expect(
-      output.getByText('Command output', { exact: true }),
-    ).toBeHidden()
     await expect(nextOutput.getByText('Next command output')).toBeVisible()
     await expect(groups.nth(0)).toContainText('user output')
     await expect(groups.nth(2).getByText('Lint passed')).toBeHidden()
@@ -390,5 +385,37 @@ for (const grouped of [true, false]) {
         '2m26s',
       )
     }
+  })
+}
+
+for (const migrated of [false, true]) {
+  test(`an output read loads and opens its original command (migrated=${migrated})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 1200 })
+    await page.goto(
+      `/?fixture=notes&id=notes&shellReports&unloadedShell${migrated ? '&migratedShell' : ''}`,
+    )
+    await page.locator('[data-slot="work-block"]').click()
+    const original = page.locator('[data-tool-call-id="agent2"]')
+    await expect(original).toHaveCount(0)
+    await expect(
+      page.locator('[data-slot="virtualized-row-transition"][data-state]'),
+    ).toHaveCount(0)
+    const read = page.getByRole('button', {
+      name: 'Read output of job #3',
+      exact: true,
+    })
+    await read.focus()
+    await expect(read).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(original).toBeVisible()
+    const trigger = original.locator('[data-block-trigger]')
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByText('Command output', { exact: true })).toHaveCount(
+      0,
+    )
+    await expect(trigger).toContainText('#3')
+    await expect(original.getByText('Saved terminal output')).toBeVisible()
   })
 }

@@ -1,4 +1,4 @@
-import type { PollResult } from '@cv/core/shell/job-protocol'
+import type { ShellOutputSnapshot } from '@cv/core/shell/job-protocol'
 import {
   SHELL_PAGE_CHARS,
   outputPrefixLength,
@@ -21,7 +21,6 @@ import {
   isJobNotFound,
   killQuietly,
   sleep,
-  watchJob,
 } from './shellWatch'
 
 type Segment = { start: number; text: string }
@@ -84,7 +83,7 @@ async function snapshot(
   limit: number,
 ) {
   const post = options.post ?? postSidecar
-  return post<PollResult>('/shell/poll', {
+  return post<ShellOutputSnapshot>('/shell/poll', {
     sessionId: context.sessionId,
     jobId,
     offset,
@@ -253,7 +252,7 @@ function finishPage(
   input: ShellOutputInput,
   options: ShellJobOptions,
   state: PageState,
-  current: PollResult,
+  current: ShellOutputSnapshot,
 ): ShellToolOutput {
   const { text, ansiState } = pageText(state, options)
   const status = current.status === 'running' ? 'background' : current.status
@@ -262,16 +261,15 @@ function finishPage(
     status,
     exitCode: current.exitCode,
     text,
-    term: current.term ?? state.segments.at(-1)?.text ?? '',
-    termOffset:
-      current.termOffset ?? state.segments.at(-1)?.start ?? state.offset,
+    term: current.term,
+    termOffset: current.termOffset,
     waiting: current.waiting,
     range: {
       requestedOffset: state.requested,
       startOffset: state.segments[0]?.start ?? state.offset,
       nextOffset: state.offset,
-      bufferEnd: current.bufferEnd!,
-      hasMore: skipCovered(state.offset, state.covered) < current.bufferEnd!,
+      bufferEnd: current.bufferEnd,
+      hasMore: skipCovered(state.offset, state.covered) < current.bufferEnd,
       replay: input.offset !== undefined,
       unavailable: state.unavailable,
       ansiState,
@@ -287,7 +285,7 @@ type PageRead = {
   deadline: number
 }
 
-function createPage(read: PageRead, current: PollResult): PageState {
+function createPage(read: PageRead, current: ShellOutputSnapshot): PageState {
   return {
     requested: read.requested,
     offset: Math.min(read.requested, current.bufferStart),
@@ -303,19 +301,19 @@ function createPage(read: PageRead, current: PollResult): PageState {
   }
 }
 
-function trimSurrogate(state: PageState, current: PollResult) {
+function trimSurrogate(state: PageState, current: ShellOutputSnapshot) {
   const last = state.segments.at(-1)
   if (!last) return
   const length = outputPrefixLength(last.text, last.text.length)
   const trim = last.text.length - length
   // A lone high surrogate at process exit has no later half to wait for.
-  if (trim && (!state.ended || state.offset < current.bufferEnd!)) {
+  if (trim && (!state.ended || state.offset < current.bufferEnd)) {
     last.text = last.text.slice(0, length)
     state.offset -= trim
   }
 }
 
-async function* readSupportedPage(read: PageRead, current: PollResult) {
+async function* readPage(read: PageRead, current: ShellOutputSnapshot) {
   const { context, input, options, deadline } = read
   const state = createPage(read, current)
 
@@ -334,7 +332,7 @@ async function* readSupportedPage(read: PageRead, current: PollResult) {
     : finishPage(input, options, state, final)
 }
 
-/** Reads one bounded page, falling back to legacy streaming on older sidecars. */
+/** Reads one bounded page. */
 export async function* readShellPage(
   context: ShellJobContext,
   input: ShellOutputInput,
@@ -352,17 +350,5 @@ export async function* readShellPage(
     SHELL_PAGE_CHARS,
   )
 
-  if (current.bufferEnd === undefined) {
-    yield* watchJob(context, input.jobId, {
-      ...options,
-      post: options.post ?? postSidecar,
-      waitDeadline: deadline,
-    })
-    return
-  }
-
-  yield* readSupportedPage(
-    { context, input, options, requested, deadline },
-    current,
-  )
+  yield* readPage({ context, input, options, requested, deadline }, current)
 }

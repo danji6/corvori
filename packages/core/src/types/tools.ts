@@ -18,11 +18,16 @@ export type ApproveToolArgs<SessionId extends string = string> = {
   note?: string
 }
 
+/** Includes `timeout` for shell output saved before process limits were removed. */
 export type ShellJobStatus =
   'running' | 'done' | 'killed' | 'timeout' | 'background' | 'lost'
 
 export type ShellToolOutput = {
   jobId: string
+  /** Public handle within the shared chat. */
+  jobNumber?: number
+  /** Absolute deadline used to resume an in-flight wait in a new action. */
+  waitUntil?: number
   status: ShellJobStatus
   exitCode: number | null
   /** Plain text output; one page when range is present. Empty on preliminary updates. */
@@ -36,7 +41,7 @@ export type ShellToolOutput = {
    * Only meaningful while the job is running.
    */
   waiting?: boolean
-  /** Bounded output delivered by a shell_output call or completion report. */
+  /** Bounded output delivered by a shell call or completion report. */
   range?: ShellOutputRange
 }
 
@@ -53,6 +58,8 @@ export type ShellOutputRange = {
   hasMore: boolean
   replay: boolean
   unavailable: ShellOutputSpan[]
+  /** Earlier unread output skipped to report recent progress. */
+  skipped?: ShellOutputSpan
   ansiState: ShellAnsiState
 }
 

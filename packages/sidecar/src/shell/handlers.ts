@@ -47,7 +47,6 @@ const startSchema = z.strictObject({
   command: z.string().min(1),
   cwd: z.string().optional(),
   allowedPaths: z.array(z.string()).optional(),
-  timeoutSeconds: z.number().optional(),
   background: z.boolean().optional(),
   cols: z.number().int().min(20).max(500).optional(),
   rows: z.number().int().min(5).max(300).optional(),

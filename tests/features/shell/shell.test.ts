@@ -80,13 +80,6 @@ describe('job registry', () => {
     expect(result.output).toContain('got:ping')
   })
 
-  test('times out a job', async () => {
-    const { jobId } = await start('sleep 30', { timeoutSeconds: 0.3 })
-
-    const result = await waitForExit(jobId)
-    expect(result.status).toBe('timeout')
-  })
-
   test('reports non-zero exit codes without failing', async () => {
     const { jobId } = await start('exit 3')
 

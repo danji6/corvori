@@ -70,6 +70,7 @@ export type ToolBuildOptions = {
   agentId?: Id<'agents'>
   invokedBy?: Id<'users'>
   execution?: StreamExecutionArgs
+  shellWindowDeadline?: number
 }
 
 /**
@@ -109,6 +110,32 @@ export async function getEnabledTools(
           // Plan mode can be entered or approved mid-turn
           isPlanMode: ctx ? () => isPlanMode(ctx, sessionId) : undefined,
           ...jobWatch(session, options),
+          saveShellTerminal: ctx
+            ? (output) =>
+                ctx.runMutation(internal.shellJobs._saveTerminal, {
+                  sessionId,
+                  output,
+                })
+            : undefined,
+          shellWindowDeadline: options?.shellWindowDeadline,
+          bindShell:
+            ctx && options?.messageId
+              ? (jobId, toolCallId, command) =>
+                  ctx.runMutation(internal.shellJobs._bindReference, {
+                    sessionId,
+                    jobId,
+                    toolCallId,
+                    command,
+                    messageId: options.messageId!,
+                  })
+              : undefined,
+          findShell: ctx
+            ? (jobId) =>
+                ctx.runQuery(internal.shellJobs._findReference, {
+                  sessionId,
+                  jobId,
+                })
+            : undefined,
           readShellPosition:
             ctx && options?.execution
               ? async (jobId, offset) => {
@@ -218,6 +245,7 @@ function jobWatch(
         agentId,
         invokedBy,
         ...job,
+        execution: options?.execution,
       })
     },
     releaseJob: async (jobId) => {

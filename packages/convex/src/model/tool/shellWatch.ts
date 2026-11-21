@@ -1,5 +1,7 @@
+import type { ShellJobStatus } from '@cv/core/shell/job-protocol'
+
 import { extractErrorMessage } from '../../errors'
-import type { ShellJobStatus, ShellToolOutput } from '../../types'
+import type { ShellToolOutput } from '../../types'
 import { type ShellStreamEvent, openShellStream } from '../sidecar'
 import { type ShellJobContext } from './shellContracts'
 import { type PostSidecar } from './shellContracts'
@@ -22,6 +24,7 @@ export type WatchOptions = ShellJobOptions & {
   post: PostSidecar
   waitDeadline?: number
   detachOnBackground?: boolean
+  killOnAbort?: boolean
   seed?: ShellJobResume
 }
 
@@ -57,8 +60,17 @@ export async function* watchJob(
       return
     }
     if (options.abortSignal?.aborted) {
-      await killQuietly(context, jobId, options.post)
+      if (options.killOnAbort !== false)
+        await killQuietly(context, jobId, options.post)
       yield finalOutput(jobId, 'killed', null, state.output)
+      return
+    }
+
+    if (
+      options.waitDeadline !== undefined &&
+      Date.now() >= options.waitDeadline
+    ) {
+      yield stillRunningOutput(jobId, state.output)
       return
     }
 
@@ -69,7 +81,8 @@ export async function* watchJob(
       await sleep(interval)
     } catch (error) {
       if (options.abortSignal?.aborted) {
-        await killQuietly(context, jobId, options.post)
+        if (options.killOnAbort !== false)
+          await killQuietly(context, jobId, options.post)
         yield finalOutput(jobId, 'killed', null, state.output)
         return
       }
@@ -113,20 +126,10 @@ export async function* consumeConnection(
   )
 
   try {
-    // The first event is processed without a deadline race to make sure
-    // the current output is always included
     const heartbeatMs = options.heartbeatMs ?? HEARTBEAT_MS
     const deadline = earliest(options.waitDeadline, options.windowDeadline)
     let pending = events.next()
-    let step = await pending
     while (true) {
-      if (step.done) return 'reconnect'
-
-      const outcome = handleStreamEvent(step.value, jobId, state, options)
-      if (outcome.part) yield outcome.part
-      if (outcome.done) return 'ended'
-
-      pending = events.next()
       // Heartbeats keep racing the same pending event
       let raced = await raceNextEvent(
         pending,
@@ -151,7 +154,12 @@ export async function* consumeConnection(
           : stillRunningOutput(jobId, state.output)
         return 'ended'
       }
-      step = raced.result
+      const step = raced.result
+      if (step.done) return 'reconnect'
+      const outcome = handleStreamEvent(step.value, jobId, state, options)
+      if (outcome.part) yield outcome.part
+      if (outcome.done) return 'ended'
+      pending = events.next()
     }
   } finally {
     options.abortSignal?.removeEventListener('abort', onUserAbort)

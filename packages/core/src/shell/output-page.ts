@@ -47,24 +47,30 @@ export function plainOutputPage(
 /** Formats a bounded result without including terminal scrollback. */
 export function formatOutputPage(output: ShellToolOutput): string {
   const range = output.range
+  const jobId = String(output.jobNumber ?? output.jobId)
   if (!range) return output.text
 
   const status = output.status === 'background' ? 'running' : output.status
   const exit = output.exitCode === null ? '' : `; exit code ${output.exitCode}`
 
   const lines = [
-    `Job ${output.jobId}: ${status}${exit}.`,
+    `Job ${jobId}: ${status}${exit}.`,
     `Output offsets ${range.startOffset}–${range.nextOffset}; next offset ${range.nextOffset}.`,
   ]
 
   for (const gap of range.unavailable)
     lines.push(`Output offsets ${gap.start}–${gap.end} are no longer retained.`)
+  if (range.skipped) {
+    lines.push(
+      `Earlier unread output offsets ${range.skipped.start}–${range.skipped.end} were skipped for this snapshot.`,
+    )
+  }
   lines.push(output.text || '(No new output.)')
 
   if (range.hasMore) {
     const offset = range.replay ? `, offset: ${range.nextOffset}` : ''
     lines.push(
-      `More unread output is available. Continue with shell_output({jobId: "${output.jobId}"${offset}}).`,
+      `More unread output is available. Continue with shell_output({jobId: "${jobId}"${offset}, wait_seconds: 0}).`,
     )
   }
 

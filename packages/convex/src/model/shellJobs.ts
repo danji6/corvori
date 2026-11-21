@@ -4,8 +4,10 @@ import { internal } from '../_generated/api'
 import type { Doc, Id } from '../_generated/dataModel'
 import type { MutationCtx } from '../_generated/server'
 import { sharedSessionId } from '../lib/subagent'
+import type { StreamExecutionArgs } from '../types'
 import { getSessionWithWorkspace } from './session/folderContext'
 import { deliverShellReport } from './shellReports'
+import { ownsExecution } from './stream/execution'
 
 /**
  * How long one watcher action follows a job before handing it to a new one to
@@ -26,7 +28,15 @@ type RegisterArgs = {
 }
 
 /** Starts watching a background job if not already watched. */
-export async function register(ctx: MutationCtx, args: RegisterArgs) {
+export async function register(
+  ctx: MutationCtx,
+  { execution, ...args }: RegisterArgs & { execution?: StreamExecutionArgs },
+) {
+  if (execution) {
+    const stream = await ctx.db.get(execution.streamId)
+    if (!ownsExecution(stream, execution)) return
+  }
+
   const existing = await getByJobId(ctx, args.sessionId, args.jobId)
   if (existing) return
 

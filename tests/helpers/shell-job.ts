@@ -1,4 +1,5 @@
 import type { ShellToolOutput } from '@cv/convex/types'
+import type { ShellJobStatus } from '@cv/core/shell/job-protocol'
 
 export const context = { sessionId: 'session-1', workspaceId: 'ws-1' }
 
@@ -6,7 +7,7 @@ export type Call = { path: string; body: unknown }
 
 export type Frame = {
   chunk: string
-  status?: 'running' | 'done' | 'killed' | 'timeout'
+  status?: ShellJobStatus
   exitCode?: number | null
   background?: boolean
   waiting?: boolean
@@ -85,15 +86,6 @@ export function mockSidecar(frames: Frame[]) {
     calls.push({ path, body })
     if (path === '/shell/start') return { jobId: 'job-1', mode: 'pipe' } as T
     if (path === '/shell/kill') return { ok: true } as T
-    // Legacy response exercises compatibility in the existing stream tests.
-    if (path === '/shell/poll')
-      return {
-        chunk: '',
-        nextOffset: 0,
-        bufferStart: 0,
-        status: 'running',
-        exitCode: null,
-      } as T
     throw new Error(`Unexpected path ${path}`)
   }
 

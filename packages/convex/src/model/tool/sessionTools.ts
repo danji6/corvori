@@ -48,6 +48,7 @@ type ToolPreparation = {
   data: StreamContext
   manifest: ToolManifest
   wireCalls: SessionTools['wireCalls']
+  shellWindowDeadline?: number
 }
 
 /** Builds live execution policies while capturing provider definitions only once. */
@@ -55,10 +56,17 @@ export async function prepareSessionTools(
   ctx: ActionCtx,
   data: StreamContext,
   manifest: ToolManifest,
+  shellWindowDeadline?: number,
 ): Promise<SessionTools> {
   const wireCalls = new Map<string, WireToolCall>()
 
-  const tools = await currentTools({ ctx, data, manifest, wireCalls })
+  const tools = await currentTools({
+    ctx,
+    data,
+    manifest,
+    wireCalls,
+    shellWindowDeadline,
+  })
   const definitions = await toolDefinitions(tools)
 
   const current = {
@@ -103,6 +111,7 @@ async function currentTools({
   data,
   manifest,
   wireCalls,
+  shellWindowDeadline,
 }: ToolPreparation) {
   const { getEnabledTools } = await import('./build')
   return getEnabledTools(
@@ -113,6 +122,7 @@ async function currentTools({
       ctx,
       wireCalls,
       autoApprove: data.agent.autoApprove,
+      shellWindowDeadline,
       omitMcpMedia: data.stream.omitActiveMedia,
       messageId: data.output._id,
       messageCreatedAt: data.output._creationTime,

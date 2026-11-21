@@ -127,6 +127,7 @@ export function runnerCtx(
             }
           : claim
       }
+      if (name.endsWith('_bindReference')) return undefined
       if (name.endsWith('_patchUserShell')) {
         patches.push(args.output as ShellToolOutput)
         return alive
