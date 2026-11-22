@@ -99,6 +99,7 @@ function initialMessages() {
       },
     ]
   }
+  if (params.has('groupedReply')) return groupedReplyMessages()
   if (params.has('shellComposer') || params.has('composer')) {
     return Array.from({ length: 32 }, (_, index) =>
       message(`history${index}`, index),
@@ -286,6 +287,21 @@ function groupedWorkMessages() {
     _id: id,
     metadata: { duration: 8300 },
   }))
+}
+
+function groupedReplyMessages() {
+  const followup = { ...message('work', 1), _id: 'followup' }
+  followup.segments[0].parts.push({
+    type: 'reasoning',
+    text: 'Checking the implementation.',
+    state: 'done',
+  })
+  return [
+    message('work', 0),
+    followup,
+    { ...message('answer', 2), role: 'assistant' },
+    message('next', 3),
+  ]
 }
 
 function shellMessages() {

@@ -42,7 +42,10 @@ import {
   captureMessageEditSelection,
   messageEditSelectionOptions,
 } from './message-edit-selection'
-import { useMessageHighlight } from './message-highlight-context'
+import {
+  highlightTargetForRow,
+  useMessageHighlight,
+} from './message-highlight-context'
 import { useReplyAction } from './reply-action'
 
 export type MessageContextMenuProps = {
@@ -135,25 +138,31 @@ export function MessageContextMenu({
     setScope(next)
   }
 
-  // Highlight just the targeted block when one is scoped within a multi-block
-  // message, otherwise highlight the whole message
   function handleOpenChange(open: boolean) {
     if (!highlight) return
-    if (open) {
-      ownsHighlightRef.current = true
-      const multiGroup = countGroups(slices) > 1
-      const blockScoped = scopeRef.current !== null && multiGroup
+    if (!open) {
+      if (ownsHighlightRef.current) {
+        ownsHighlightRef.current = false
+        highlight.setTarget(null)
+      }
+      return
+    }
+
+    ownsHighlightRef.current = true
+    const block = scopeRef.current
+    if (block && countGroups(slices) > 1) {
       highlight.setTarget({
         messageId: message.id,
-        segmentIndex: blockScoped ? scopeRef.current!.segmentIndex : null,
-        groupIndex: blockScoped ? scopeRef.current!.groupIndex : null,
-        ...(blockScoped &&
-          row.kind === 'header' && { surface: 'header' as const }),
+        ...block,
+        ...(row.kind === 'header' && { surface: 'header' }),
       })
-    } else if (ownsHighlightRef.current) {
-      ownsHighlightRef.current = false
-      highlight.setTarget(null)
+      return
     }
+    if (row.kind === 'header' && !block) {
+      highlight.setTarget({ senderGroupId: row.messageId })
+      return
+    }
+    highlight.setTarget(highlightTargetForRow(message.id, null))
   }
 
   function startEditBlock() {

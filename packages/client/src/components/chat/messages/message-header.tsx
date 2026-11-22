@@ -12,6 +12,7 @@ export type MessageSender = { name: string; avatarId?: Id<'avatars'> }
 export type MessageHeaderProps = {
   sender: MessageSender
   role: MessageRole
+  avatarRef?: React.Ref<HTMLDivElement>
   /** Content rendered inline after the name. */
   extra?: React.ReactNode
   /** Pulls the avatar into the row's left gutter if there's space. */
@@ -30,6 +31,7 @@ const GUTTER_AVATAR = [
 export function MessageHeader({
   sender,
   role,
+  avatarRef,
   extra,
   gutter,
 }: MessageHeaderProps) {
@@ -53,6 +55,7 @@ export function MessageHeader({
       className="flex min-w-0 items-center justify-start gap-4 px-1"
     >
       <AvatarWithLightbox
+        ref={avatarRef}
         thumbnail={avatarUrls.thumbnail ?? avatarUrls.original}
         original={avatarUrls.original}
         alt={displayName}
@@ -79,6 +82,7 @@ function RoleIcon({ role }: { role: MessageRole }) {
 }
 
 function AvatarWithLightbox({
+  ref,
   thumbnail,
   original,
   alt,
@@ -86,6 +90,7 @@ function AvatarWithLightbox({
   fallbackIcon,
   className,
 }: UIAvatar & {
+  ref?: React.Ref<HTMLDivElement>
   alt?: string
   size?: 'sm' | 'md' | 'lg'
   fallbackIcon?: React.ReactNode
@@ -98,6 +103,7 @@ function AvatarWithLightbox({
 
   return (
     <Avatar
+      ref={ref}
       src={thumbnail}
       alt={alt}
       size={size}

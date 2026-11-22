@@ -44,6 +44,7 @@ import {
 const noop = () => {}
 const TOP_PADDING = 16
 const groupedWork = new URLSearchParams(location.search).has('groupedWork')
+const groupedReply = new URLSearchParams(location.search).has('groupedReply')
 const tailWork = new URLSearchParams(location.search).has('tailWork')
 const shellReports = new URLSearchParams(location.search).has('shellReports')
 const fileChanges = new URLSearchParams(location.search).has('fileChanges')
@@ -189,6 +190,7 @@ function Transcript() {
             virtuaRef,
             renderRow: (row) =>
               groupedWork ||
+              groupedReply ||
               tailWork ||
               shellReports ||
               fileChanges ||

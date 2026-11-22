@@ -50,6 +50,68 @@ test('opens a lone thought directly from the sender header', async ({
   await expect(page.getByText('First thinking block.')).toBeVisible()
 })
 
+test('the sender menu highlights the grouped reply from its gutter avatar through its final text', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1600, height: 900 })
+  await page.goto('/?fixture=notes&id=notes&groupedReply&composer')
+  const headers = page.locator('[data-slot="message-header"]')
+  const avatar = headers.first().locator('[data-slot="avatar"]')
+  const work = page.locator('[data-slot="work-block"]')
+  const highlight = page.locator('[data-slot="message-highlight"]')
+  const answer = page.getByText('Content for answer', { exact: true })
+  const next = page.getByText('Content for next', { exact: true })
+  await expect(headers).toHaveCount(2)
+  await expect(work).toHaveCount(2)
+  await expect(work.last()).toHaveAttribute('aria-expanded', 'false')
+
+  await avatar.click({ button: 'right' })
+  await expect(
+    page.getByRole('menuitem', { name: 'Delete Message' }),
+  ).toBeVisible()
+  await expect(highlight).toHaveCount(1)
+  await expect
+    .poll(() => bottomOf(highlight))
+    .toBeGreaterThanOrEqual(await bottomOf(answer))
+  const outline = (await highlight.boundingBox())!
+  const body = (await answer.boundingBox())!
+  const avatarBox = (await avatar.boundingBox())!
+  expect(avatarBox.x + avatarBox.width).toBeLessThan(body.x)
+  expect(outline.x).toBeLessThanOrEqual(avatarBox.x)
+  expect(outline.x + outline.width).toBeGreaterThanOrEqual(body.x + body.width)
+  expect(await bottomOf(highlight)).toBeLessThan(await bottomOf(next))
+})
+
+test('the avatar highlight spans the message while the thinking menu scopes its block', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=notes&id=notes&thinkingWork=single')
+  const header = page.locator('[data-slot="message-header"]')
+  const highlight = page.locator('[data-slot="message-highlight"]')
+  const footer = page.locator('[data-slow="message-footer"]')
+
+  await header.locator('[data-slot="avatar"]').click({ button: 'right' })
+  await expect(footer).toBeVisible()
+  await expect
+    .poll(() => bottomOf(highlight))
+    .toBeGreaterThanOrEqual(await bottomOf(footer))
+  await page.keyboard.press('Escape')
+  await expect(highlight).toHaveCount(0)
+
+  await header
+    .getByRole('button', { name: 'Toggle latest thinking' })
+    .click({ button: 'right' })
+  await expect(highlight).toBeVisible()
+  expect(await bottomOf(highlight)).toBeLessThan(
+    await bottomOf(page.getByText('Finished thinking.')),
+  )
+})
+
+async function bottomOf(locator: Locator) {
+  const box = await locator.boundingBox()
+  return box ? box.y + box.height : NaN
+}
+
 for (const mixed of [false, true]) {
   test(`work sums thinking durations and reveals every thinking block (mixed=${mixed})`, async ({
     page,

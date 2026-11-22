@@ -15,6 +15,7 @@ import {
   useSyncExternalStore,
 } from 'react'
 
+import { useMessageHighlightRef } from './message-highlight-context'
 import { useMessageList } from './message-list/message-list-context'
 import { getMountedTransitionRows } from './virtualized-row-transition'
 
@@ -34,7 +35,22 @@ export function WorkBlock({ row, message, record, partMeta }: WorkBlockProps) {
   const list = useMessageList()
   const isStreaming = useIsMessageStreaming(message.id)
   const blockRef = useRef<HTMLButtonElement>(null)
+  const highlightRef = useMessageHighlightRef(message.id)
   const [revealOnOpen, setRevealOnOpen] = useState(false)
+
+  const attachBlock = useCallback(
+    (element: HTMLButtonElement | null) => {
+      if (!element) return
+      blockRef.current = element
+      const unregisterHighlight = highlightRef(element)
+      return () => {
+        blockRef.current = null
+        unregisterHighlight?.()
+      }
+    },
+    [highlightRef],
+  )
+
   const getBlockBottom = useCallback(
     (trigger: HTMLElement) => getWorkBottom(trigger, workId),
     [workId],
@@ -60,7 +76,7 @@ export function WorkBlock({ row, message, record, partMeta }: WorkBlockProps) {
 
   return (
     <Button
-      ref={blockRef}
+      ref={attachBlock}
       data-slot="work-block"
       data-open={open}
       variant="plain"

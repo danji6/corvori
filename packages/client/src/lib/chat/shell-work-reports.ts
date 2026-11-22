@@ -162,6 +162,7 @@ function reportWorkRow(
     kind: 'work',
     key: `w:${id}`,
     messageId: row.messageId,
+    ...(row.senderGroupId && { senderGroupId: row.senderGroupId }),
     ...(row.grouped && { grouped: true }),
     work: {
       id,

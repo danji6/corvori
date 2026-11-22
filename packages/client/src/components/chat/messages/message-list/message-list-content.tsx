@@ -368,6 +368,7 @@ function VirtualizedItem({
       data-slot="virtualized-item"
       data-row-kind={row?.kind}
       data-message-id={row?.messageId}
+      data-sender-group-id={row?.senderGroupId ?? row?.messageId}
       data-row-key={row?.key}
       data-footer-before-reset={footerBeforeReset ? '' : undefined}
       data-note-group-id={row?.kind === 'hidden' ? row.noteGroupId : undefined}

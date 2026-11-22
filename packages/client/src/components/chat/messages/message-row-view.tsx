@@ -260,6 +260,7 @@ function HeaderRow({ row, message, messageMeta }: HeaderRowProps) {
         <ReasoningHeader
           sender={sender}
           role={role}
+          avatarRef={highlightRef}
           openKey={`${row.messageId}:v${messageMeta?.selectedVersion ?? 1}:header-reasoning`}
           part={reasoning.part}
           messageId={message.id}
@@ -267,7 +268,12 @@ function HeaderRow({ row, message, messageMeta }: HeaderRowProps) {
           groupIndex={reasoning.groupIndex}
         />
       ) : (
-        <MessageHeader sender={sender} role={role} gutter />
+        <MessageHeader
+          sender={sender}
+          role={role}
+          avatarRef={highlightRef}
+          gutter
+        />
       )}
     </div>
   )
@@ -364,6 +370,7 @@ type FooterRowProps = {
 }
 
 function FooterRow({ duration, message, messageMeta, isLast }: FooterRowProps) {
+  const highlightRef = useMessageHighlightRef(message.id)
   const isStreaming = useIsMessageStreaming(message.id)
   const awaitingContinuation = useIsAwaitingVisibleContinuation(message.id)
 
@@ -384,6 +391,7 @@ function FooterRow({ duration, message, messageMeta, isLast }: FooterRowProps) {
 
   return (
     <div
+      ref={highlightRef}
       data-slow="message-footer"
       className={cn(
         'flex w-full flex-col empty:hidden',

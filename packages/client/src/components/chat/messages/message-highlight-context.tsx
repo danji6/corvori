@@ -20,9 +20,11 @@ export type HighlightTarget = {
   surface?: 'header'
 }
 
+type HighlightSelection = HighlightTarget | { senderGroupId: string }
+
 export type MessageHighlightValue = {
-  target: HighlightTarget | null
-  setTarget: React.Dispatch<React.SetStateAction<HighlightTarget | null>>
+  target: HighlightSelection | null
+  setTarget: React.Dispatch<React.SetStateAction<HighlightSelection | null>>
   registerElement: (target: HighlightTarget, element: HTMLElement) => () => void
 }
 
@@ -120,7 +122,7 @@ export function MessageHighlightProvider({
 }: {
   children: React.ReactNode
 }) {
-  const [target, setTarget] = useState<HighlightTarget | null>(null)
+  const [target, setTarget] = useState<HighlightSelection | null>(null)
   const [registryVersion, setRegistryVersion] = useState(0)
   const elementsRef = useRef(new Map<HTMLElement, HighlightTarget>())
 
@@ -185,7 +187,7 @@ export function MessageHighlightLayer(props: MessageHighlightLayerProps) {
 }
 
 function useHighlightRect(
-  target: HighlightTarget | null | undefined,
+  target: HighlightSelection | null | undefined,
   { root, rows, layoutVersion }: MessageHighlightLayerProps,
 ) {
   const registry = useHighlightRegistry()
@@ -232,7 +234,7 @@ function useHighlightRect(
 }
 
 function measureInTranscript(
-  target: HighlightTarget,
+  target: HighlightSelection,
   elements: Map<HTMLElement, HighlightTarget>,
   container: HTMLElement,
 ): HighlightRect | null {
@@ -258,9 +260,17 @@ function sameRect(a: HighlightRect | null, b: HighlightRect | null) {
 }
 
 function getTargetElements(
-  target: HighlightTarget,
+  target: HighlightSelection,
   elements: Map<HTMLElement, HighlightTarget>,
 ): HTMLElement[] {
+  if ('senderGroupId' in target) {
+    return Array.from(elements.keys()).filter(
+      (element) =>
+        element.closest<HTMLElement>('[data-sender-group-id]')?.dataset
+          .senderGroupId === target.senderGroupId,
+    )
+  }
+
   const targetKey = keyForTarget(target)
   return Array.from(elements.entries())
     .filter(([, registeredTarget]) => {
@@ -273,7 +283,7 @@ function getTargetElements(
 }
 
 function measureTarget(
-  target: HighlightTarget,
+  target: HighlightSelection,
   elements: Map<HTMLElement, HighlightTarget>,
 ): HighlightRect | null {
   const rects = getTargetElements(target, elements)

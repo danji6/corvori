@@ -28,7 +28,7 @@ import {
 
 export type HiddenChipPlacement = 'standalone' | 'inline' | 'grouped'
 
-export type MessageRow =
+type MessageRowKind =
   | {
       kind: 'header'
       key: string
@@ -90,6 +90,11 @@ export type MessageRow =
       noteGroupId?: string
       grouped?: boolean
     }
+
+export type MessageRow = MessageRowKind & {
+  /** The message ID of the shared sender header for a grouped message. */
+  senderGroupId?: string
+}
 
 /** One loaded segment's part slice with its cached part groups. */
 export type SegmentGroups = {
@@ -234,6 +239,10 @@ export function buildRows(
     )
     if (!grouped) senderHeader = undefined
     if (grouped && senderHeader && reasoning) senderHeader.reasoning = reasoning
+    const senderGroup =
+      grouped && senderHeader
+        ? { senderGroupId: senderHeader.messageId }
+        : undefined
 
     // A `:grp` suffix on the first emitted row's key lets `rowKeysEqual`
     // catch grouping toggles even when no header row appears or vanishes
@@ -256,6 +265,7 @@ export function buildRows(
         kind: 'reply',
         key: firstKey(`r:${id}`),
         messageId: id,
+        ...senderGroup,
         ...(first && grouped && { grouped }),
       })
       first = false
@@ -270,6 +280,7 @@ export function buildRows(
           key: firstKey(`w:${work.id}`),
           messageId: id,
           work,
+          ...senderGroup,
           ...(first && grouped && { grouped }),
         })
         emitted.add(work.id)
@@ -283,6 +294,7 @@ export function buildRows(
         messageId: id,
         segmentIndex: entry.segmentIndex,
         groupIndex: entry.groupIndex,
+        ...senderGroup,
         ...(meta?.type === 'summary' && { summary: true }),
         ...(work && { workId: work.id }),
         ...(first && grouped && { grouped }),
@@ -297,6 +309,7 @@ export function buildRows(
         kind: 'footer',
         key: firstKey(`f:${id}`),
         messageId: id,
+        ...senderGroup,
         ...(duration !== undefined && { duration }),
         ...(first && grouped && { grouped }),
       })

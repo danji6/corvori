@@ -393,7 +393,12 @@ describe('sender grouping', () => {
 
     const processing = rowsAt('processing')
     expect(processing.filter((row) => row.kind === 'footer')).toEqual([
-      { kind: 'footer', key: 'f:message-2', messageId: 'message-2' },
+      {
+        kind: 'footer',
+        key: 'f:message-2',
+        messageId: 'message-2',
+        senderGroupId: 'message-1',
+      },
     ])
 
     const completed = rowsAt('done')
@@ -402,6 +407,7 @@ describe('sender grouping', () => {
         kind: 'footer',
         key: 'f:message-2',
         messageId: 'message-2',
+        senderGroupId: 'message-1',
         duration: 10300,
       },
     ])
@@ -422,6 +428,7 @@ describe('sender grouping', () => {
         kind: 'footer',
         key: 'f:message-2',
         messageId: 'message-2',
+        senderGroupId: 'message-1',
         duration: 2,
       },
     ])

@@ -51,12 +51,14 @@ test.each(['processing', 'done'] as const)(
     ).toMatchObject({
       kind: 'group',
       grouped: true,
+      senderGroupId: 'before',
     })
     expect(rows.filter((row) => row.kind === 'footer')).toEqual([
       {
         kind: 'footer',
         key: 'f:after',
         messageId: 'after',
+        senderGroupId: 'before',
         ...(status === 'done' && { duration: 146000 }),
       },
     ])

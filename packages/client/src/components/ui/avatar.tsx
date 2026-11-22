@@ -3,6 +3,7 @@ import { UserIcon } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
 
 export type AvatarProps = {
+  ref?: React.Ref<HTMLDivElement>
   src?: string | null
   alt?: string
   fallbackIcon?: React.ReactNode
@@ -27,6 +28,7 @@ const iconSizeClasses = {
 } as const
 
 export function Avatar({
+  ref,
   src,
   alt,
   fallbackIcon,
@@ -46,6 +48,7 @@ export function Avatar({
 
   return (
     <div
+      ref={ref}
       data-slot="avatar"
       className={cn(
         'border-input bg-muted focus-visible:border-ring focus-visible:ring-ring relative flex shrink-0 items-center justify-center overflow-hidden rounded-full border outline-0 transition-all focus-visible:ring-1',

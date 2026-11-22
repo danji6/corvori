@@ -16,6 +16,7 @@ export type ReasoningHeaderProps = {
   openKey: string
   sender: MessageSender
   role: MessageRole
+  avatarRef?: React.Ref<HTMLDivElement>
   part: ReasoningPart
   messageId: string
   segmentIndex: number
@@ -26,6 +27,7 @@ export function ReasoningHeader({
   sender,
   openKey,
   role,
+  avatarRef,
   part,
   messageId,
   segmentIndex,
@@ -71,6 +73,7 @@ export function ReasoningHeader({
       <MessageHeader
         sender={sender}
         role={role}
+        avatarRef={avatarRef}
         gutter
         extra={
           <Button
