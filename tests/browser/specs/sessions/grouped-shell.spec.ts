@@ -147,6 +147,40 @@ async function submitShell(page: Page) {
   return { composer, editor, shell, trigger }
 }
 
+test('pastes a URL into a shell command without adding a Markdown link', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=notes&id=notes&shellComposer')
+  const composer = page.locator('[data-slot="chat-box"]')
+  const editor = composer.locator('[contenteditable="true"]')
+  const command =
+    'gpg --keyserver hkps://keys.openpgp.org --recv-keys 53E6B47B45CEA3E0D5B7457758D0EE648A48B3BB'
+
+  async function paste(text: string) {
+    await editor.evaluate((node, text) => {
+      node.focus()
+      const clipboardData = new DataTransfer()
+      clipboardData.setData('text/plain', text)
+      node.dispatchEvent(
+        new ClipboardEvent('paste', { bubbles: true, clipboardData }),
+      )
+    }, text)
+  }
+
+  const url = 'https://example.com'
+  await paste(`See ${url}`)
+  await expect(editor.getByRole('link')).toHaveAttribute('href', url)
+
+  await editor.fill('')
+  await editor.pressSequentially('$ ')
+  await paste(command)
+  await expect(editor).toHaveText(`$ ${command}`)
+  await expect(editor.getByRole('link')).toHaveCount(0)
+  await composer.getByRole('button', { name: 'Send', exact: true }).click()
+  const shell = page.locator('[data-message-id="submitted-shell"]')
+  await expect(shell.locator('[data-block-trigger] .shiki')).toHaveText(command)
+})
+
 async function publishShellOutput(
   page: Page,
   { cancel = false, waiting = false } = {},

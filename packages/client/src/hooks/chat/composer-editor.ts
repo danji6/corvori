@@ -1,12 +1,12 @@
 import type { PendingMessage } from '@/lib/chat'
+import {
+  composerShellText,
+  serializeComposerContent,
+  setComposerContent,
+} from '@/lib/chat/composer-content'
 import { useComposerDraft } from '@/lib/chat/composer-draft-store'
 import { listenForComposerInsertion } from '@/lib/chat/composer-insert'
 import { registerFocusReturn } from '@/lib/focus-return'
-import {
-  serializeBlocksToMarkdown,
-  setEditorMarkdown,
-} from '@/lib/tiptap/serialize'
-import { parseShellCommand } from '@cv/core/shell/command'
 import type { Editor } from '@tiptap/react'
 import {
   useCallback,
@@ -76,7 +76,7 @@ export function useComposerEditor({
   const [message, setMessage] = useState('')
   const [isReady, setIsReady] = useState(false)
   const [caret, setCaret] = useState(0)
-  const [shellCommand, setShellCommand] = useState<string | null>(null)
+  const [isShellMode, setIsShellMode] = useState(false)
   const suppressTypingRef = useRef(false)
 
   const draftRef = useRef(draft)
@@ -95,9 +95,9 @@ export function useComposerEditor({
     onTypingRef.current = onTyping
   }, [onTyping])
 
-  const applyMarkdown = useCallback((editor: Editor, markdown: string) => {
-    if (markdown) suppressTypingRef.current = true
-    setEditorMarkdown(editor, markdown)
+  const applyContent = useCallback((editor: Editor, content: string) => {
+    if (content) suppressTypingRef.current = true
+    setComposerContent(editor, content)
   }, [])
 
   useImperativeHandle(
@@ -108,12 +108,12 @@ export function useComposerEditor({
         const editor = editorRef.current
         if (!editor || !canInsertStarter) return
         if (editor.state.doc.textContent.trim()) return
-        applyMarkdown(editor, markdown)
+        applyContent(editor, markdown)
         editor.commands.focus('end')
       },
       openAttachments: () => onAddFiles?.(),
     }),
-    [applyMarkdown, canInsertStarter, editorRef, onAddFiles],
+    [applyContent, canInsertStarter, editorRef, onAddFiles],
   )
 
   useEffect(
@@ -125,7 +125,7 @@ export function useComposerEditor({
     const { doc, selection } = editor.state
     setMessage(doc.textBetween(0, doc.content.size, '\n'))
     setCaret(doc.textBetween(0, selection.from, '\n').length)
-    setShellCommand(editorShellCommand(editor))
+    setIsShellMode(composerShellText(doc) !== null)
   }, [])
 
   const restoredKeyRef = useRef<string>(undefined)
@@ -134,9 +134,9 @@ export function useComposerEditor({
       if (!draftKey || restoredKeyRef.current === draftKey) return
       restoredKeyRef.current = draftKey
       const saved = draftRef.current.read()
-      if (saved && editor.isEmpty) applyMarkdown(editor, saved)
+      if (saved && editor.isEmpty) applyContent(editor, saved)
     },
-    [applyMarkdown, draftKey],
+    [applyContent, draftKey],
   )
 
   useEffect(() => {
@@ -148,11 +148,11 @@ export function useComposerEditor({
     (message: PendingMessage) => {
       const editor = editorRef.current
       if (!editor || editor.isDestroyed) return false
-      applyMarkdown(editor, message.content)
+      applyContent(editor, message.content)
       onRestoreMessageRef.current(message)
       return true
     },
-    [applyMarkdown, editorRef],
+    [applyContent, editorRef],
   )
 
   const handleEditorReady = useCallback(
@@ -160,7 +160,7 @@ export function useComposerEditor({
       editorRef.current = editor
       editor.on('update', () => {
         syncFromEditor(editor)
-        draftRef.current.save(serializeBlocksToMarkdown(editor))
+        draftRef.current.save(serializeComposerContent(editor))
         if (suppressTypingRef.current) {
           suppressTypingRef.current = false
           return
@@ -195,7 +195,7 @@ export function useComposerEditor({
     editorRef.current?.commands.clearContent(true)
     setMessage('')
     setCaret(0)
-    setShellCommand(null)
+    setIsShellMode(false)
     draftRef.current.clear()
   }, [editorRef])
 
@@ -211,17 +211,10 @@ export function useComposerEditor({
     clearEditor,
     handleEditorReady,
     handleSurfaceMouseDown,
+    isShellMode,
     message,
     isReady,
     restorePendingMessage,
     setEditorText,
-    shellCommand,
   }
-}
-
-/** Returns the shell command only when it occupies the leading paragraph. */
-function editorShellCommand(editor: Editor): string | null {
-  const { doc } = editor.state
-  if (doc.firstChild?.type.name !== 'paragraph') return null
-  return parseShellCommand(doc.textBetween(0, doc.content.size, '\n'))
 }

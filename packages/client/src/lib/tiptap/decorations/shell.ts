@@ -29,7 +29,7 @@ type ShellDoc = {
 
 /** The command the document holds, with the text map the decorations need. */
 function scanShellCommand(doc: Node): ShellDoc | null {
-  // Only a leading paragraph runs, which is what `editorShellCommand` sends
+  // Only a leading paragraph runs, which is what the composer sends.
   const first = doc.firstChild
   if (first?.type.name !== 'paragraph') return null
   if (!first.textContent.startsWith(SHELL_PREFIX)) return null

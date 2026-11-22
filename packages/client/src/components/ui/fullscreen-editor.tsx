@@ -83,7 +83,7 @@ export function FullscreenEditor({
     const slot = active ? overlaySlot : inline
     if (!inline || !slot) return
 
-    // Empty spacing where the inline content was
+    // Measure the inline box before it picks up the overlay's fullscreen styles.
     inline.style.height = active ? `${hostBox(host)?.offsetHeight ?? 0}px` : ''
 
     moveHost(host, slot)
@@ -98,10 +98,7 @@ export function FullscreenEditor({
         className={active ? 'block' : 'contents'}
       />
       {createPortal(
-        <div
-          className="group/fullscreen contents"
-          data-fullscreen={active || undefined}
-        >
+        <div className="group/fullscreen contents">
           <FullscreenContext value={{ ...handle, active, disabled }}>
             {children}
           </FullscreenContext>
@@ -123,7 +120,8 @@ export function FullscreenEditor({
             <div
               ref={setOverlaySlot}
               data-slot="fullscreen-overlay"
-              className="flex min-h-0 flex-1 flex-col overflow-hidden p-3"
+              data-fullscreen=""
+              className="group/fullscreen flex min-h-0 flex-1 flex-col overflow-hidden p-3"
             />
           </Dialog.Content>
         </Dialog>

@@ -19,13 +19,15 @@ import type {
   CommandAvailabilityContext,
   CommandDefinition,
 } from '@/lib/chat/commands'
+import {
+  pasteComposerShellText,
+  serializeComposerContent,
+} from '@/lib/chat/composer-content'
 import { handleSelectAllDelete } from '@/lib/editor-clear'
 import { isCovered } from '@/lib/focus-return'
 import { pasteCollapsedText } from '@/lib/tiptap/paste'
-import { serializeBlocksToMarkdown } from '@/lib/tiptap/serialize'
 import { cn } from '@/lib/utils'
 import { shouldAttachTextPaste } from '@cv/core/attachments'
-import { parseShellCommand } from '@cv/core/shell/command'
 import { truncate } from '@cv/core/utils/strings'
 import type { Slice } from '@tiptap/pm/model'
 import type { Editor } from '@tiptap/react'
@@ -154,11 +156,11 @@ export function ChatComposer({
     clearEditor,
     handleEditorReady,
     handleSurfaceMouseDown,
+    isShellMode,
     message,
     isReady,
     restorePendingMessage,
     setEditorText,
-    shellCommand,
   } = useComposerEditor({
     draftKey,
     editorRef,
@@ -223,7 +225,6 @@ export function ChatComposer({
     : ''
 
   // Shell command runs in the workspace instead of being sent as a message
-  const isShellMode = shellCommand !== null
   const shellBlocked =
     isShellMode && (!shellAvailable || attachments.fileParts.length > 0)
   const mentions = useComposerMentions({
@@ -248,7 +249,7 @@ export function ChatComposer({
 
     const editor = editorRef.current
     const pending: PendingMessage = {
-      content: editor ? serializeBlocksToMarkdown(editor) : message,
+      content: editor ? serializeComposerContent(editor) : message,
       files: attachments.fileParts,
       originalFiles: attachments.originalFiles,
       pastedText: attachments.pastedText,
@@ -358,15 +359,16 @@ export function ChatComposer({
 
     const text = e.clipboardData?.getData('text/plain') ?? ''
     const editor = editorRef.current
-    const commandMode = isCommandMode || shellCommand !== null
+    if (editor && pasteComposerShellText(editor, text)) return true
+
+    const commandMode = isCommandMode || isShellMode
     if (shouldAttachTextPaste(text, commandMode)) {
       const position = editor?.state.selection.from ?? 0
       void attachments.addLargeTextPaste(text, position)
       return true
     }
-    const pastedCommand =
-      !message && (text.startsWith('/') || parseShellCommand(text) !== null)
-    if (editor && !commandMode && !pastedCommand) {
+    const pastedSlashCommand = !message && text.startsWith('/')
+    if (editor && !commandMode && !pastedSlashCommand) {
       if (shares.pasteShareLinks(editor, e, slice)) return true
     }
 
