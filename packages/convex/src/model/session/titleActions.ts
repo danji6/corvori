@@ -61,7 +61,7 @@ async function composeTitle(
       resolved.modelId,
       'none', // no reasoning
       resolved.credentials,
-      { resolveCacheId: () => `title:${sessionId}` },
+      { placeholderResolvers: { cacheId: () => `title:${sessionId}` } },
     )
 
     const generate =

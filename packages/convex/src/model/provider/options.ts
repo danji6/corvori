@@ -9,6 +9,7 @@ import type { ReasoningEffort } from '../../types'
 import { applyPenalties } from './inferenceOptions'
 import { resolveModelReasoning } from './known'
 import { createLanguageModel } from './modelFactory'
+import type { ProviderPlaceholderResolvers } from './placeholders'
 import type { ProviderCredentials } from './providers'
 import { type ReasoningValue } from './reasoningOptions'
 import { applyReasoning } from './reasoningOptions'
@@ -32,8 +33,8 @@ export type ProviderOptions = {
 
 export type ProviderRequestOptions = {
   observeTransport?: ProviderTransportObserver
-  /** Resolves the default cache ID on demand for transports that use one. */
-  resolveCacheId?: () => string | Promise<string>
+  /** Supplies lazy resolvers for configured templates and transport defaults. */
+  placeholderResolvers?: ProviderPlaceholderResolvers
   onRequest?: (body: string) => void | Promise<void>
   fetch?: typeof globalThis.fetch
 }
@@ -60,7 +61,7 @@ export async function getProviderOptions(
     )
   }
 
-  const transport = inferenceTransport(credentials, request)
+  const transport = inferenceTransport(credentials, request.observeTransport)
   const providerId = credentials.providerId
   const reasoning = resolveModelReasoning(providerId, credentials.model?.reasoning) // prettier-ignore
   const normalizedEffort = normalizeReasoningEffort(reasoningEffort, reasoning)
@@ -71,6 +72,7 @@ export async function getProviderOptions(
     reasoningEffort: normalizedEffort,
     extraParameters: credentials.model?.extraParameters,
     extraHeaders: credentials.extraHeaders,
+    placeholderResolvers: request.placeholderResolvers,
     onRequest: request.onRequest,
     fetch: request.fetch ?? transport?.fetch,
     transformRequest: transport?.transformRequest,

@@ -154,7 +154,7 @@ describe('ChatGPT cache routing', () => {
         'auto',
         credentials,
         {
-          resolveCacheId,
+          placeholderResolvers: { cacheId: resolveCacheId },
           onRequest: (body) => {
             logs.push(body)
           },
@@ -195,8 +195,10 @@ describe('ChatGPT cache routing', () => {
         },
       },
       {
-        resolveCacheId: async () => {
-          throw new Error('Explicit key should bypass automatic routing')
+        placeholderResolvers: {
+          cacheId: async () => {
+            throw new Error('Explicit key should bypass automatic routing')
+          },
         },
       },
     )
@@ -204,6 +206,51 @@ describe('ChatGPT cache routing', () => {
     expect(requests[0].body.prompt_cache_key).toBe('custom-cache')
     expect(requests[0].headers.get('session-id')).toBe('custom-cache')
   })
+
+  test.each([
+    ['automatic key', undefined, 'session-a'],
+    ['interpolated override', 'custom-{{cacheId}}', 'custom-session-a'],
+  ])(
+    'shares the resolved cache ID with model templates using the %s',
+    async (_mode, configuredKey, expected) => {
+      let resolutions = 0
+      const options = await getProviderOptions(
+        'fixture-model',
+        'auto',
+        {
+          ...credentials,
+          model: {
+            id: 'fixture-model',
+            inference: { temperature: 0.5 },
+            extraParameters: JSON.stringify({
+              prompt_cache_key: configuredKey,
+              metadata: { routing: '{{cacheId}}' },
+              temperature: 0.75,
+              store: true,
+            }),
+          },
+        },
+        {
+          placeholderResolvers: {
+            cacheId: async () => {
+              resolutions++
+              return 'session-a'
+            },
+          },
+        },
+      )
+
+      await runRequest(options)
+      expect(resolutions).toBe(1)
+      expect(requests[0].body).toMatchObject({
+        prompt_cache_key: expected,
+        metadata: { routing: 'session-a' },
+        temperature: 0.75,
+        store: false,
+      })
+      expect(requests[0].headers.get('session-id')).toBe(expected)
+    },
+  )
 
   test('reuses a fallback UUID for a transport and generates a new one for another transport', async () => {
     const first = await getProviderOptions('fixture-model', 'auto', credentials)
@@ -261,8 +308,10 @@ describe('ChatGPT cache routing', () => {
         apiKey: 'fixture-api-key',
       },
       {
-        resolveCacheId: () => {
-          throw new Error('API-key transport should ignore the cache ID')
+        placeholderResolvers: {
+          cacheId: () => {
+            throw new Error('API-key transport should ignore the cache ID')
+          },
         },
       },
     )
@@ -303,7 +352,7 @@ describe('ChatGPT turn routing and diagnostics', () => {
         'auto',
         credentials,
         {
-          resolveCacheId: () => 'session',
+          placeholderResolvers: { cacheId: () => 'session' },
           observeTransport: diagnostics.observeTransport,
         },
       )
@@ -413,7 +462,7 @@ describe('ChatGPT turn routing and diagnostics', () => {
       })
       await runRequest(
         await getProviderOptions('fixture-model', 'auto', credentials, {
-          resolveCacheId: () => 'session',
+          placeholderResolvers: { cacheId: () => 'session' },
           observeTransport: diagnostics.observeTransport,
         }),
       )
@@ -471,7 +520,7 @@ describe('ChatGPT turn routing and diagnostics', () => {
     })
     await runRequest(
       await getProviderOptions('fixture-model', 'auto', credentials, {
-        resolveCacheId: () => 'session',
+        placeholderResolvers: { cacheId: () => 'session' },
         observeTransport: diagnostics.observeTransport,
       }),
     )
@@ -496,7 +545,7 @@ describe('ChatGPT turn routing and diagnostics', () => {
     await expect(
       runRequest(
         await getProviderOptions('fixture-model', 'auto', credentials, {
-          resolveCacheId: () => 'session',
+          placeholderResolvers: { cacheId: () => 'session' },
           observeTransport: failed.observeTransport,
         }),
       ),

@@ -1605,6 +1605,34 @@ breakpoint, and the last two messages get trailing breakpoints. Plan mode is
 enforced inside tool closures rather than by omitting tools, so flipping modes
 never changes the frozen tool shape.
 
+### Provider Cache IDs
+
+Automatic cache routing uses the session ID until a request from a different
+agent resolves a cache ID. At that first switch, `sessionState.cacheId` preserves
+the previous prefix as the baseline. Requests with the baseline prefix keep
+the session ID. Each other prefix gets a stable SHA-256 hash of the session ID,
+the rendered system prompt, the ordered prompts before history, and the
+ordered tool definitions. Agents with identical prefixes share a key.
+Conversation history and appended compaction or impersonation instructions
+are outside the hash.
+
+Use `{{cacheId}}` in provider Extra headers (for example,
+`{"X-Cache-ID":"{{cacheId}}"}`) or model Extra parameters (for example,
+`{"prompt_cache_key":"{{cacheId}}"}`). The request adapter expands the token
+in configured string values, including nested JSON values, using one resolved
+ID per request. Model discovery and detail lookups omit headers that contain
+the token. Title generation uses `title:<sessionId>`.
+
+The supported placeholder list in `packages/core/src/provider-placeholders.ts`
+drives expansion, discovery filtering, and both settings help popovers. To add
+a placeholder, list it there and supply its resolver from the inference callers
+that have its value. Each resolver runs on demand at most once per request.
+Unrecognized tokens remain literal.
+
+The ChatGPT sign-in adapter sends the resolved ID as `prompt_cache_key` by
+default. An explicit model `prompt_cache_key`, literal or interpolated, takes
+precedence. The upstream `session-id` header uses the same value.
+
 ## Injected Notes, Reminders, and Todos
 
 Context that used to be re-injected on every request is instead persisted once,

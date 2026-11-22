@@ -272,14 +272,16 @@ export async function prepare(
     reasoningEffort,
     credentials,
     {
-      resolveCacheId: async () => {
-        const { resolveStreamCacheId } = await import('./providerCacheId')
-        return resolveStreamCacheId(ctx, execution, {
-          sessionId: data.stream.sessionId,
-          systemPrompt: prefix.systemPrompt,
-          remainingPrompts,
-          wireDefinitions,
-        })
+      placeholderResolvers: {
+        cacheId: async () => {
+          const { resolveStreamCacheId } = await import('./providerCacheId')
+          return resolveStreamCacheId(ctx, execution, {
+            sessionId: data.stream.sessionId,
+            systemPrompt: prefix.systemPrompt,
+            remainingPrompts,
+            wireDefinitions,
+          })
+        },
       },
       observeTransport: cacheDiagnostics?.observeTransport,
       onRequest: async (body) => {

@@ -27,6 +27,7 @@ import {
 import { useId, useState } from 'react'
 
 import { InferenceSettings } from '../../models'
+import { PLACEHOLDERS_GUIDE } from './provider-extra-headers'
 import type { ModelEntryFormValues } from './settings-schema'
 
 type ModelRowProps = {
@@ -193,9 +194,7 @@ function ModelTokenSettings({
           }
         />
         {invalidOutput && (
-          <p className="text-destructive text-xs">
-            Enter a positive number.
-          </p>
+          <p className="text-destructive text-xs">Enter a positive number.</p>
         )}
       </div>
       <div className="flex items-center justify-between gap-4">
@@ -444,7 +443,7 @@ function ExtraParametersField({
     <div className="border-border flex flex-col gap-1.5 border-t pt-4">
       <HelpPopoverLabel
         className="text-muted-foreground text-sm"
-        help="Extra JSON fields merged into the request body."
+        help={md`Extra JSON fields merged into the request body.${PLACEHOLDERS_GUIDE}`}
       >
         Extra parameters <span className="opacity-60">(optional)</span>
       </HelpPopoverLabel>

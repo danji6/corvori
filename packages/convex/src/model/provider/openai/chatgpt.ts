@@ -1,16 +1,15 @@
 import type { LanguageModelV4 } from '@ai-sdk/provider'
 import { prepareChatGPTRequest } from '@cv/core/chatgpt-policy'
 import { APP_ID, APP_NAME } from '@cv/core/const'
-import { parseModelExtraParameters } from '@cv/core/model-parameters'
 import type { ProviderTransportObserver } from '@cv/core/provider-continuity'
 import type { InferenceParameters } from '@cv/core/types'
 import type { LanguageModel } from 'ai'
 
 import { sidecarUrl } from '../../sidecar'
 import { sidecarRequest } from '../../sidecarTransport'
-import type { ProviderRequestOptions } from '../options'
 import type { ProviderCredentials } from '../providers'
 import { filterPromptReasoning } from '../reasoningReplay'
+import type { ProviderRequestTransform } from '../request'
 import { fetchChatGPTResponse } from './transport'
 
 export const CHATGPT_OPENAI_OPTIONS = {
@@ -114,8 +113,7 @@ export async function withChatGPTPolicy(
 /** Preserves explicit user parameters even when the SDK omits unsupported settings. */
 export function chatGPTRequest(
   credentials: ProviderCredentials,
-  resolveCacheId?: ProviderRequestOptions['resolveCacheId'],
-) {
+): ProviderRequestTransform {
   const inference = credentials.model?.inference
   const explicit: Record<string, unknown> = {}
 
@@ -132,15 +130,14 @@ export function chatGPTRequest(
     if (value !== undefined) explicit[target] = value
   }
 
-  const extras = parseModelExtraParameters(credentials.model?.extraParameters)
   let fallbackCacheId: string | undefined
 
-  return async (body: Record<string, unknown>) => {
-    const request = { ...body, ...explicit, ...extras }
+  return async (body, parameters, resolvePlaceholder) => {
+    const request = { ...body, ...explicit, ...parameters }
     if (request.prompt_cache_key === undefined) {
-      request.prompt_cache_key = resolveCacheId
-        ? await resolveCacheId()
-        : (fallbackCacheId ??= crypto.randomUUID())
+      request.prompt_cache_key =
+        (await resolvePlaceholder('cacheId')) ??
+        (fallbackCacheId ??= crypto.randomUUID())
     }
     return prepareChatGPTRequest(request)
   }

@@ -20,7 +20,15 @@ describe('provider model discovery', () => {
     const fixture = responses([{ data: [{ id: 'unknown-model' }] }])
     expect(
       await discoverModels(
-        { id: 'openai', apiKey: 'fixture-key' },
+        {
+          id: 'openai',
+          apiKey: 'fixture-key',
+          extraHeaders: JSON.stringify({
+            'X-Cache-ID': 'route/{{cacheId}}',
+            'X-Static': 'value',
+            'X-Literal': '{{otherToken}}',
+          }),
+        },
         fixture.request,
       ),
     ).toEqual([
@@ -29,9 +37,11 @@ describe('provider model discovery', () => {
     expect(fixture.requests[0].url.href).toBe(
       'https://api.openai.com/v1/models',
     )
-    expect(
-      new Headers(fixture.requests[0].init?.headers).get('Authorization'),
-    ).toBe('Bearer fixture-key')
+    const headers = new Headers(fixture.requests[0].init?.headers)
+    expect(headers.get('authorization')).toBe('Bearer fixture-key')
+    expect(headers.get('x-static')).toBe('value')
+    expect(headers.get('x-literal')).toBe('{{otherToken}}')
+    expect(headers.has('x-cache-id')).toBe(false)
     expect(fixture.requests[0].init?.redirect).toBe('error')
   })
   test('uses the subscription schema and preserves account catalog ordering', async () => {

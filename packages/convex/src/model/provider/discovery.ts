@@ -3,9 +3,9 @@ import {
   type DiscoveredModel,
   type DiscoveryConnection,
 } from '@cv/core/model-discovery'
-import { parseProviderExtraHeaders } from '@cv/core/provider-headers'
 
 import { discoveryAdapter } from './discovery/factory'
+import { discoveryExtraHeaders } from './placeholders'
 
 export class DiscoveryError extends Error {
   constructor(
@@ -26,7 +26,7 @@ export async function discoverModels(
   const adapter = discoveryAdapter(connection)
   const first = new URL(adapter.first(connection))
   const headers = {
-    ...parseProviderExtraHeaders(connection.extraHeaders),
+    ...discoveryExtraHeaders(connection.extraHeaders),
     ...adapter.headers(connection),
   }
   const deadline = AbortSignal.timeout(90_000)

@@ -1,6 +1,28 @@
+import { ollamaAdapter } from '@cv/convex/model/provider/discovery/ollama'
 import { fetchModelDetails } from '@cv/convex/model/provider/modelDetails'
 import { effectiveModel, initialContextWindow } from '@cv/core/discovered-model'
 import { expect, test } from 'bun:test'
+
+test('Ollama detail requests keep static headers and omit cache ID templates', async () => {
+  const request = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const headers = new Headers(init?.headers)
+    expect(headers.get('authorization')).toBe('Bearer fixture-key')
+    expect(headers.get('x-static')).toBe('value')
+    expect(headers.has('x-cache-id')).toBe(false)
+    return Response.json({})
+  }) as typeof fetch
+
+  const result = await ollamaAdapter.details?.(
+    {
+      id: 'ollama',
+      apiKey: 'fixture-key',
+      extraHeaders: '{"X-Cache-ID":"route/{{cacheId}}","X-Static":"value"}',
+    },
+    { id: 'fixture-model' },
+    request,
+  )
+  expect(result?.detailsLoaded).toBe(true)
+})
 
 test('optional Ollama details are deduplicated, bounded to two requests, and skipped for cached digests', async () => {
   const original = globalThis.fetch

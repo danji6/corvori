@@ -2,10 +2,10 @@ import type {
   DiscoveredModel,
   DiscoveryConnection,
 } from '@cv/core/model-discovery'
-import { parseProviderExtraHeaders } from '@cv/core/provider-headers'
 import { REASONING_TIERS } from '@cv/core/types'
 import { z } from 'zod'
 
+import { discoveryExtraHeaders } from '../placeholders'
 import { positive } from './metadata'
 import type { DiscoveryAdapter } from './types'
 
@@ -18,7 +18,7 @@ export const ollamaAdapter: DiscoveryAdapter = {
     const response = await request(`${ollamaBase(connection)}/show`, {
       method: 'POST',
       headers: {
-        ...parseProviderExtraHeaders(connection.extraHeaders),
+        ...discoveryExtraHeaders(connection.extraHeaders),
         ...ollamaAdapter.headers(connection),
         'Content-Type': 'application/json',
       },

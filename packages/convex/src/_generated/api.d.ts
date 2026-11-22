@@ -202,6 +202,7 @@ import type * as model_provider_openai_inference from "../model/provider/openai/
 import type * as model_provider_openai_transport from "../model/provider/openai/transport.js";
 import type * as model_provider_openrouter_inference from "../model/provider/openrouter/inference.js";
 import type * as model_provider_options from "../model/provider/options.js";
+import type * as model_provider_placeholders from "../model/provider/placeholders.js";
 import type * as model_provider_previews from "../model/provider/previews.js";
 import type * as model_provider_providerMiddleware from "../model/provider/providerMiddleware.js";
 import type * as model_provider_providers from "../model/provider/providers.js";
@@ -685,6 +686,7 @@ declare const fullApi: ApiFromModules<{
   "model/provider/openai/transport": typeof model_provider_openai_transport;
   "model/provider/openrouter/inference": typeof model_provider_openrouter_inference;
   "model/provider/options": typeof model_provider_options;
+  "model/provider/placeholders": typeof model_provider_placeholders;
   "model/provider/previews": typeof model_provider_previews;
   "model/provider/providerMiddleware": typeof model_provider_providerMiddleware;
   "model/provider/providers": typeof model_provider_providers;

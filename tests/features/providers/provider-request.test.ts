@@ -147,6 +147,69 @@ describe('provider request body adapter', () => {
     expect(headers.get('http-referer')).toBe('app')
     expect(logs[0]).not.toContain('configured')
   })
+
+  test('expands header and nested parameter values with one cache ID per request', async () => {
+    const requests: RequestInit[] = []
+    const cacheIds = ['cache-1', 'cache-2-{{cacheId}}']
+    let resolutions = 0
+    const fetch = createProviderFetch({
+      providerId: 'custom',
+      extraHeaders:
+        '{"X-Cache-ID":"route/{{cacheId}}/{{cacheId}}/{{otherToken}}"}',
+      extraParameters: JSON.stringify({
+        routing: {
+          '{{cacheId}}': ['{{cacheId}}', 'prefix-{{cacheId}}', 7, false, null],
+          literal: '{{ cacheId }}/{{otherToken}}/{{constructor}}',
+        },
+      }),
+      placeholderResolvers: { cacheId: async () => cacheIds[resolutions++] },
+      fetch: captureRequest(requests),
+    })
+
+    expect(resolutions).toBe(0)
+    const messages = [{ role: 'user', content: '{{cacheId}}' }]
+    for (const id of cacheIds) {
+      await fetch('https://example.com/chat/completions', {
+        method: 'POST',
+        headers: { 'X-Cache-ID': 'sdk-default' },
+        body: JSON.stringify({ messages }),
+      })
+      const request = requests.at(-1)!
+      expect(new Headers(request.headers).get('x-cache-id')).toBe(
+        `route/${id}/${id}/{{otherToken}}`,
+      )
+      expect(JSON.parse(String(request.body))).toEqual({
+        messages,
+        routing: {
+          '{{cacheId}}': [id, `prefix-${id}`, 7, false, null],
+          literal: '{{ cacheId }}/{{otherToken}}/{{constructor}}',
+        },
+      })
+    }
+    expect(resolutions).toBe(2)
+  })
+
+  test.each([
+    { extraHeaders: '{"X-Cache-ID":"{{cacheId}}"}' },
+    { extraParameters: '{"routing":{"key":"{{cacheId}}"}}' },
+  ])('rejects templates without a cache ID resolver (%j)', async (config) => {
+    const requests: RequestInit[] = []
+    const fetch = createProviderFetch({
+      providerId: 'custom',
+      ...config,
+      fetch: captureRequest(requests),
+    })
+
+    await expect(
+      fetch('https://example.com/chat/completions', {
+        method: 'POST',
+        body: '{}',
+      }),
+    ).rejects.toThrow(
+      'No resolver provided for provider placeholder {{cacheId}}',
+    )
+    expect(requests).toHaveLength(0)
+  })
 })
 
 describe('model-owned inference', () => {
