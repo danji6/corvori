@@ -22,6 +22,8 @@ export async function startSidecar(
       SIDECAR_SECRET: config.sidecarSecret,
       MCP_PORT: String(config.sidecarPort),
     },
+    // Keep the sidecar available while Convex drains in-flight actions.
+    shutdown: { order: 2, leaderOnly: true },
   })
   console.log(`Started sidecar server (pid ${sidecar.pid})`)
   return sidecar

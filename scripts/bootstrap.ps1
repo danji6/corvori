@@ -120,6 +120,8 @@ function Wait-BeforeExit([int]$Status) {
   Write-Host ''
   if ($Status -eq 0) {
     Write-Host 'Finished. Press Enter to close.'
+  } elseif ($Status -eq 130 -or $Status -eq 143) {
+    Write-Host 'Stopped. Press Enter to close.'
   } else {
     Write-Host "Exited with status $Status. Press Enter to close."
   }

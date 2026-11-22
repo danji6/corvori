@@ -127,6 +127,8 @@ export async function startBackend(
         ...convexBackendEnvironment(config),
         NODE_ACTION_USER_TIMEOUT_SECS: config.convexNodeActionTimeoutSecs,
       },
+      // The backend drains on SIGINT and manages its own executor.
+      shutdown: { order: 1, signal: 'SIGINT', leaderOnly: true },
     },
   )
 }
@@ -441,14 +443,15 @@ export async function startConvexDev(
 ) {
   const convexDev = await manager.spawn(
     'convex-dev',
-    bunx(
-      'convex',
+    [
+      config.nodeBinary,
+      join(config.projectRoot, 'node_modules/convex/bin/main.js'),
       'dev',
       '--url',
       config.convexInternalUrl,
       '--admin-key',
       config.convexSelfHostedAdminKey ?? '',
-    ),
+    ],
     { cwd: config.convexRoot },
   )
   await convexDev.waitForLine('functions ready', 120_000)

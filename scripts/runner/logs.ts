@@ -1,15 +1,17 @@
 import { type WriteStream, createWriteStream } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import { finished } from 'node:stream/promises'
 
 export type LogSink = {
-  close(): void
+  close(): Promise<void>
   handleChunk(
     chunk: Uint8Array,
     stream: NodeJS.WriteStream,
     channel: LogChannel,
   ): void
-  onLine(listener: (line: string) => void): void
+  onLine(listener: (line: string) => void): () => void
+  startShutdown(): void
 }
 
 export type LogChannel = 'stderr' | 'stdout'
@@ -35,6 +37,9 @@ const productionNoisyLinePatterns = [
   /INFO convex-cloud-http: .*"GET \/api\/[0-9.]+\/sync HTTP\/1\.1" 101 /,
 ]
 
+const convexShutdownError =
+  / ERROR common::errors: Caught operational error \([^)]*\): (?:Your request couldn't be completed\. Try again later\.: Database Shutting Down|Shutting down long poll request: Your request couldn't be completed\. Try again later\.)$/
+
 export async function createLogSink(options: {
   filterLogs: boolean
   logDir: string
@@ -47,6 +52,9 @@ export async function createLogSink(options: {
     join(options.logDir, `${timestamp()}-${safeName(options.name)}.log`),
     { flags: 'a' },
   )
+  const rawLogDone = finished(rawLog)
+  void rawLogDone.catch(() => {})
+  const filterOptions = { ...options, shuttingDown: false }
   const listeners = new Set<(line: string) => void>()
   const buffers: Record<LogChannel, string> = {
     stderr: '',
@@ -59,11 +67,24 @@ export async function createLogSink(options: {
 
   return {
     close() {
-      flushLine(buffers.stdout, process.stdout, rawLog, listeners, options)
-      flushLine(buffers.stderr, process.stderr, rawLog, listeners, options)
+      flushLine(
+        buffers.stdout,
+        process.stdout,
+        rawLog,
+        listeners,
+        filterOptions,
+      )
+      flushLine(
+        buffers.stderr,
+        process.stderr,
+        rawLog,
+        listeners,
+        filterOptions,
+      )
       buffers.stdout = ''
       buffers.stderr = ''
       rawLog.end()
+      return rawLogDone
     },
     handleChunk(chunk, stream, channel) {
       rawLog.write(chunk)
@@ -73,11 +94,15 @@ export async function createLogSink(options: {
       buffers[channel] = lines.pop() ?? ''
 
       for (const line of lines) {
-        writeLine(line, stream, listeners, options)
+        writeLine(line, stream, listeners, filterOptions)
       }
     },
     onLine(listener) {
       listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    startShutdown() {
+      filterOptions.shuttingDown = true
     },
   }
 }
@@ -112,6 +137,9 @@ export function shouldSuppressLogLine(line: string, options: LogFilterOptions) {
   if (!options.filterLogs) return false
 
   const plainLine = line.replace(ansiColorSequence, '')
+  if (options.shuttingDown && options.name === 'convex-backend') {
+    if (convexShutdownError.test(plainLine)) return true
+  }
   const patterns =
     options.mode === 'start'
       ? [...sharedNoisyLinePatterns, ...productionNoisyLinePatterns]
@@ -123,6 +151,8 @@ export function shouldSuppressLogLine(line: string, options: LogFilterOptions) {
 type LogFilterOptions = {
   filterLogs: boolean
   mode: LogFilterMode
+  name?: string
+  shuttingDown?: boolean
 }
 
 // eslint-disable-next-line no-control-regex -- matches ANSI color codes

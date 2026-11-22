@@ -1,7 +1,10 @@
+import { join } from 'node:path'
+
 import { ensureConvexBinaries } from './binaries'
 import { buildFrontendIfNeeded } from './build-cache'
 import {
   type RunnerConfig,
+  type RunnerOptions,
   browserOrigins,
   defaultEnvFile,
   getConfig,
@@ -17,7 +20,11 @@ import {
 import { ensureDependencies } from './deps'
 import { loadEnvFile } from './env-file'
 import { freePorts } from './ports'
-import { ProcessManager, bun, output } from './processes'
+import {
+  type ManagedProcess,
+  ProcessManager,
+  finishesWithin,
+} from './processes'
 import { startSidecar } from './sidecar'
 import { applyUpdateIfRequested, rollbackUpdate } from './update'
 
@@ -55,50 +62,72 @@ export async function run(args: string[]) {
     cwd: config.projectRoot,
     env: process.env,
     filterLogs: options.filterLogs,
+    isolateProcessGroups: true,
     logDir: config.logDir,
     mode: options.mode,
   })
 
-  const shutdown = async () => {
-    console.log('')
-    console.log('Stopping...')
-    await cleanupDocker(config)
-    await manager.stopAll()
-  }
+  const { promise: interrupted, resolve: stop } =
+    Promise.withResolvers<number>()
+  const onInterrupt = () => stop(130)
+  const onTerminate = () => stop(143)
+  process.on('SIGINT', onInterrupt)
+  process.on('SIGTERM', onTerminate)
 
-  process.once('SIGINT', () => {
-    void shutdown().finally(() => process.exit(130))
-  })
-  process.once('SIGTERM', () => {
-    void shutdown().finally(() => process.exit(143))
-  })
-
+  let exitCode: number | void
   try {
-    if (options.rollback) await rollbackUpdate(config)
-
-    const update = await applyUpdateIfRequested(config, {
-      enabled: options.update,
-    })
-    // Nothing has been spawned yet
-    if (update === 'relaunch') return
-
-    await ensureDependencies(manager, config, { enabled: options.install })
-    await ensureConvexBinaries(config)
-    await prepareEnvironment(config)
-
-    if (options.mode === 'start') {
-      await start(config, manager, {
-        forceBuild: options.forceBuild,
-        killPorts: options.killPorts,
-      })
-    } else {
-      await dev(config, manager, options.killPorts)
-    }
+    exitCode = await Promise.race([
+      interrupted,
+      launch(config, manager, options),
+    ])
   } catch (error) {
     console.error(error)
-    await shutdown()
-    process.exit(1)
+    exitCode = 1
   }
+
+  try {
+    if (exitCode !== undefined) await shutdown(config, manager, exitCode)
+  } finally {
+    process.off('SIGINT', onInterrupt)
+    process.off('SIGTERM', onTerminate)
+  }
+  if (exitCode !== undefined) process.exit(exitCode)
+}
+
+async function launch(
+  config: RunnerConfig,
+  manager: ProcessManager,
+  options: RunnerOptions,
+) {
+  if (options.rollback) await rollbackUpdate(config)
+
+  const update = await applyUpdateIfRequested(config, {
+    enabled: options.update,
+  })
+  if (update === 'relaunch') return
+
+  await ensureDependencies(manager, config, { enabled: options.install })
+  await ensureConvexBinaries(config)
+  await prepareEnvironment(config)
+  if (options.mode === 'start') {
+    await start(config, manager, options)
+  } else {
+    await dev(config, manager, options.killPorts)
+  }
+}
+
+async function shutdown(
+  config: RunnerConfig,
+  manager: ProcessManager,
+  exitCode: number,
+) {
+  console.log('')
+  console.log('Stopping...')
+  const hasDashboard = manager.hasProcess('convex-dashboard')
+  await Promise.all([
+    manager.stopAll(exitCode === 130),
+    hasDashboard ? cleanupDocker(config) : undefined,
+  ])
 }
 
 async function start(
@@ -126,11 +155,7 @@ async function start(
 
   await buildFrontendIfNeeded(manager, config, { force: options.forceBuild })
 
-  const preview = await manager.spawn(
-    'vite-preview',
-    bun('run', 'preview', ...frontendArgs(config)),
-    { cwd: config.clientRoot },
-  )
+  const preview = await startFrontend(config, manager)
   await manager.waitForAnyExit([sidecar, backend, preview])
 }
 
@@ -161,24 +186,26 @@ async function dev(
 
   await deployWithMigrations(manager, config)
   const convexDev = await startConvexDev(manager, config)
-  const vite = await manager.spawn(
-    'vite-dev',
-    bun('run', 'dev', ...frontendArgs(config)),
-    { cwd: config.clientRoot },
-  )
+  const vite = await startFrontend(config, manager)
 
   await manager.waitForAnyExit([sidecar, backend, convexDev, vite])
 }
 
-function frontendArgs(config: RunnerConfig) {
-  return [
-    '--',
+function startFrontend(config: RunnerConfig, manager: ProcessManager) {
+  const preview = config.mode === 'start'
+  const args = [
+    config.nodeBinary,
+    join(config.projectRoot, 'node_modules/vite/bin/vite.js'),
+    ...(preview ? ['preview'] : ['--clearScreen', 'false']),
     '--host',
     config.frontendHost,
     '--port',
     String(config.frontendPort),
     '--strictPort',
   ]
+  return manager.spawn(preview ? 'vite-preview' : 'vite-dev', args, {
+    cwd: config.clientRoot,
+  })
 }
 
 function parallel<T extends readonly Promise<unknown>[]>(...tasks: T) {
@@ -194,10 +221,11 @@ async function readySidecar(
   timeoutMs: number,
 ) {
   const sidecar = await startSidecar(manager, config)
-  await waitForHttp(
+  await waitForService(
+    manager,
+    sidecar,
     `http://localhost:${config.sidecarPort}/health`,
     timeoutMs,
-    true,
   )
   console.log('Sidecar server ready.')
   return sidecar
@@ -210,7 +238,12 @@ async function readyBackend(
 ) {
   const backend = await startBackend(manager, config)
   console.log(`Started Convex backend (pid ${backend.pid})`)
-  await waitForHttp(`${config.convexInternalUrl}/version`, timeoutMs, true)
+  await waitForService(
+    manager,
+    backend,
+    `${config.convexInternalUrl}/version`,
+    timeoutMs,
+  )
   console.log('Backend ready.')
 
   await setConvexEnvironment(config)
@@ -228,16 +261,16 @@ async function deployToBackend(
 }
 
 async function restartDashboard(manager: ProcessManager, config: RunnerConfig) {
+  if (!(await runDocker(config, ['info', '--format', '{{.ServerVersion}}']))) {
+    console.error('Docker is not running, skipping Convex dashboard.')
+    return
+  }
+
   await cleanupDocker(config)
   await startDashboard(manager, config)
 }
 
 async function startDashboard(manager: ProcessManager, config: RunnerConfig) {
-  if (!(await dockerAvailable(config.projectRoot))) {
-    console.error('Docker is not running, skipping Convex dashboard.')
-    return
-  }
-
   const dashboard = await manager.spawn('convex-dashboard', [
     'docker',
     'run',
@@ -253,57 +286,78 @@ async function startDashboard(manager: ProcessManager, config: RunnerConfig) {
   console.log(`Started Convex dashboard (pid ${dashboard.pid})`)
 
   try {
-    await Promise.race([
-      waitForHttp(
-        `http://localhost:${config.convexDashboardPort}`,
-        60_000,
-        true,
-      ),
-      dashboard.exited.then((code) => {
-        throw new Error(`docker run exited with code ${code}`)
-      }),
-    ])
+    await waitForService(
+      manager,
+      dashboard,
+      `http://localhost:${config.convexDashboardPort}`,
+      60_000,
+    )
+    if (manager.stopping) return
+
     console.log(
       `Convex dashboard ready at http://localhost:${config.convexDashboardPort}.`,
     )
   } catch {
-    console.error('Convex dashboard unavailable; continuing without it.')
+    if (!manager.stopping) {
+      console.error('Convex dashboard unavailable; continuing without it.')
+    }
   }
 }
 
-let dockerProbe: Promise<boolean> | undefined
-
-function dockerAvailable(cwd: string) {
-  dockerProbe ??= output(['docker', 'info', '--format', '{{.ServerVersion}}'], {
-    cwd,
-  }).then(
-    () => true,
-    () => false,
-  )
-  return dockerProbe
+function cleanupDocker(config: RunnerConfig) {
+  return runDocker(config, ['rm', '-f', config.convexDashboardContainer])
 }
 
-async function cleanupDocker(config: RunnerConfig) {
-  if (!(await dockerAvailable(config.projectRoot))) return
+async function runDocker(config: RunnerConfig, args: string[]) {
+  try {
+    const child = Bun.spawn({
+      cmd: ['docker', ...args],
+      cwd: config.projectRoot,
+      stderr: 'ignore',
+      stdout: 'ignore',
+    })
+    if (await finishesWithin(child.exited, 5_000)) {
+      return (await child.exited) === 0
+    }
 
-  const process = Bun.spawn({
-    cmd: ['docker', 'rm', '-f', config.convexDashboardContainer],
-    cwd: config.projectRoot,
-    stderr: 'ignore',
-    stdout: 'ignore',
-  })
-  await process.exited
+    child.kill('SIGKILL')
+    console.warn(
+      `Timed out running docker ${args[0]} for the Convex dashboard.`,
+    )
+  } catch {
+    // Docker may be unavailable.
+  }
+  return false
+}
+
+async function waitForService(
+  manager: ProcessManager,
+  child: ManagedProcess,
+  url: string,
+  timeoutMs: number,
+) {
+  const controller = new AbortController()
+  try {
+    await Promise.race([
+      waitForHttp(url, timeoutMs, true, controller.signal),
+      manager.waitForAnyExit([child]),
+    ])
+  } finally {
+    controller.abort()
+  }
 }
 
 export async function waitForHttp(
   url: string,
   timeoutMs: number,
   requireOk: boolean,
+  cancel?: AbortSignal,
 ) {
-  const startedAt = Date.now()
-  while (Date.now() - startedAt < timeoutMs) {
+  const deadline = AbortSignal.timeout(timeoutMs)
+  const signal = cancel ? AbortSignal.any([deadline, cancel]) : deadline
+  while (!signal.aborted) {
     try {
-      const response = await fetch(url)
+      const response = await fetch(url, { signal })
       if (!requireOk || response.ok) return
     } catch {
       // Retry until timeout.

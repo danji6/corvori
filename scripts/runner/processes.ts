@@ -1,7 +1,12 @@
+import { type ChildProcess, spawn } from 'node:child_process'
+import { constants } from 'node:os'
+import type { Readable } from 'node:stream'
+
 import type { RunnerMode } from './config'
 import { type LogSink, createLogSink } from './logs'
 
 export type ManagedProcess = {
+  exit: Promise<number>
   exited: Promise<number>
   kill(signal?: NodeJS.Signals): void
   name: string
@@ -9,8 +14,21 @@ export type ManagedProcess = {
   waitForLine(text: string, timeoutMs: number): Promise<void>
 }
 
+type ShutdownOptions = {
+  order?: number
+  signal?: NodeJS.Signals
+  leaderOnly?: boolean
+}
+
+type SpawnOptions = {
+  cwd?: string
+  env?: NodeJS.ProcessEnv
+  shutdown?: ShutdownOptions
+}
+
 export class ProcessManager {
-  private readonly processes = new Set<ManagedProcess>()
+  private readonly processes = new Map<ManagedProcess, ShutdownOptions>()
+  private shutdown?: Promise<void>
 
   constructor(
     private readonly options: {
@@ -19,56 +37,59 @@ export class ProcessManager {
       filterLogs: boolean
       logDir: string
       mode: RunnerMode
+      isolateProcessGroups?: boolean
     },
   ) {}
 
-  async spawn(
-    name: string,
-    cmd: string[],
-    options: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
-  ) {
+  async spawn(name: string, cmd: string[], options: SpawnOptions = {}) {
     const sink = await createLogSink({
       filterLogs: this.options.filterLogs,
       logDir: this.options.logDir,
       mode: this.options.mode,
       name,
     })
-    const env = withColorEnvironment({ ...this.options.env, ...options.env })
-    const child = Bun.spawn({
-      cmd,
-      cwd: options.cwd ?? this.options.cwd,
-      env,
-      stderr: 'pipe',
-      stdin: 'ignore',
-      stdout: 'pipe',
-    })
+    if (this.shutdown) {
+      await sink.close()
+      throw new Error('The launcher is stopping')
+    }
 
-    const outputDone = Promise.all([
+    const shutdown = options.shutdown ?? {}
+    const env = withColorEnvironment({ ...this.options.env, ...options.env })
+    const detached =
+      Boolean(this.options.isolateProcessGroups) && process.platform !== 'win32'
+    const child = spawn(cmd[0]!, cmd.slice(1), {
+      cwd: options.cwd ?? this.options.cwd,
+      detached,
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    const exit = waitForExit(child)
+
+    const outputDone = Promise.allSettled([
       routeOutput(child.stdout, process.stdout, sink, 'stdout'),
       routeOutput(child.stderr, process.stderr, sink, 'stderr'),
     ])
 
     const managed: ManagedProcess = {
-      exited: child.exited.then(async (code) => {
+      exit,
+      exited: exit.finally(async () => {
         await outputDone
-        sink.close()
-        this.processes.delete(managed)
-        return code
+        await sink.close().finally(() => this.processes.delete(managed))
       }),
-      kill(signal = 'SIGTERM') {
-        if (process.platform === 'win32' && child.pid) {
-          killWindowsTree(child.pid)
-          return
-        }
-        child.kill(signal)
+      kill(signal = shutdown.signal ?? 'SIGTERM') {
+        sink.startShutdown()
+        const signalGroup =
+          detached && (!shutdown.leaderOnly || signal === 'SIGKILL')
+        signalChild(child, signal, signalGroup)
       },
       name,
       pid: child.pid,
       waitForLine(text, timeoutMs) {
-        return waitForLine(sink, text, timeoutMs)
+        return waitForLine(sink, managed, text, timeoutMs)
       },
     }
-    this.processes.add(managed)
+    void managed.exited.catch(() => {})
+    this.processes.set(managed, shutdown)
     return managed
   }
 
@@ -78,37 +99,129 @@ export class ProcessManager {
     options: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
   ) {
     const process = await this.spawn(name, cmd, options)
-    const exitCode = await process.exited
+    const exitCode = await process.exit
     if (exitCode !== 0) {
       throw new Error(`${name} exited with code ${exitCode}`)
     }
+    await process.exited
   }
 
-  async stopAll() {
-    const processes = [...this.processes]
-    for (const process of processes) {
-      process.kill()
+  hasProcess(name: string) {
+    return [...this.processes.keys()].some((child) => child.name === name)
+  }
+
+  get stopping() {
+    return this.shutdown !== undefined
+  }
+
+  stopAll(consoleInterrupted = false) {
+    this.shutdown ??= this.stopInOrder(consoleInterrupted)
+    return this.shutdown
+  }
+
+  private async stopInOrder(consoleInterrupted: boolean) {
+    const children = [...this.processes]
+    const orders = new Set(children.map(([, options]) => options.order ?? 0))
+    for (const order of [...orders].sort((a, b) => a - b)) {
+      const group = children.filter(
+        ([, options]) => (options.order ?? 0) === order,
+      )
+      const results = await Promise.allSettled(
+        group.map(([child]) => stopProcess(child, consoleInterrupted)),
+      )
+      for (const result of results) {
+        if (result.status === 'rejected') console.warn(result.reason)
+      }
     }
-    await Promise.allSettled(processes.map((process) => process.exited))
   }
 
   async waitForAnyExit(processes: ManagedProcess[]) {
-    const result = await Promise.race(
-      processes.map(async (process) => ({
-        code: await process.exited,
-        process,
-      })),
+    await Promise.race(
+      processes.map(async (child) => {
+        const code = await child.exit
+        if (!this.shutdown)
+          throw new Error(`${child.name} exited with code ${code}`)
+      }),
     )
-    throw new Error(`${result.process.name} exited with code ${result.code}`)
   }
 }
 
-function killWindowsTree(pid: number) {
-  Bun.spawn({
-    cmd: ['taskkill', '/PID', String(pid), '/T', '/F'],
-    stderr: 'ignore',
-    stdout: 'ignore',
+function waitForExit(child: ChildProcess) {
+  return new Promise<number>((resolve, reject) => {
+    child.once('error', reject)
+    child.once('exit', (code, signal) => {
+      resolve(code ?? 128 + (signal ? constants.signals[signal] : 0))
+    })
   })
+}
+
+function signalChild(
+  child: ChildProcess,
+  signal: NodeJS.Signals,
+  signalGroup: boolean,
+) {
+  if (!child.pid) return
+  if (process.platform === 'win32') {
+    const killer = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    })
+    killer.on('error', () => child.kill())
+    killer.on('exit', (code) => {
+      if (code !== 0 && child.exitCode === null && child.signalCode === null) {
+        child.kill()
+      }
+    })
+    killer.unref()
+    return
+  }
+
+  if (signalGroup) {
+    try {
+      process.kill(-child.pid, signal)
+    } catch (error) {
+      const groupExited =
+        error instanceof Error && 'code' in error && error.code === 'ESRCH'
+      if (!groupExited) throw error
+    }
+  } else {
+    child.kill(signal)
+  }
+}
+
+async function stopProcess(child: ManagedProcess, consoleInterrupted: boolean) {
+  // Windows sends console Ctrl+C directly to the attached children.
+  if (!(consoleInterrupted && process.platform === 'win32')) child.kill()
+  if (await finishesWithin(child.exited, 10_000)) return
+
+  console.warn(`${child.name} did not stop within 10 seconds. Force stopping.`)
+  child.kill('SIGKILL')
+  if (!(await finishesWithin(child.exited, 1_000))) {
+    console.warn(
+      `Timed out waiting for ${child.name} to exit and close its logs.`,
+    )
+  }
+}
+
+export async function finishesWithin(
+  task: Promise<unknown>,
+  timeoutMs: number,
+) {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<boolean>((resolve) => {
+    timer = setTimeout(() => resolve(false), timeoutMs)
+  })
+  try {
+    return await Promise.race([
+      task.then(
+        () => true,
+        () => true,
+      ),
+      timeout,
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 export function supportsColor(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -170,7 +283,7 @@ export async function output(
 }
 
 async function routeOutput(
-  stream: ReadableStream<Uint8Array> | null,
+  stream: Readable | null,
   target: NodeJS.WriteStream,
   sink: LogSink,
   channel: 'stderr' | 'stdout',
@@ -182,17 +295,27 @@ async function routeOutput(
   }
 }
 
-function waitForLine(sink: LogSink, text: string, timeoutMs: number) {
-  return new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error(`Timed out waiting for log line: ${text}`))
-    }, timeoutMs)
-
-    sink.onLine((line) => {
-      if (!line.includes(text)) return
-
-      clearTimeout(timeout)
-      resolve()
-    })
+async function waitForLine(
+  sink: LogSink,
+  child: ManagedProcess,
+  text: string,
+  timeoutMs: number,
+) {
+  const { promise, resolve } = Promise.withResolvers<void>()
+  const unsubscribe = sink.onLine((line) => {
+    if (line.includes(text)) resolve()
   })
+  try {
+    const result = await Promise.race([
+      finishesWithin(promise, timeoutMs).then((matched) => ({ matched })),
+      child.exit.then((code) => ({ code })),
+    ])
+    if ('code' in result)
+      throw new Error(`${child.name} exited with code ${result.code}`)
+    if (!result.matched)
+      throw new Error(`Timed out waiting for log line: ${text}`)
+  } finally {
+    unsubscribe()
+    resolve()
+  }
 }

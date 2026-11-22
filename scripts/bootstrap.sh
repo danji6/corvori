@@ -16,6 +16,8 @@ pause_before_exit() {
   echo
   if [ "$status" -eq 0 ]; then
     echo 'Finished. Press Enter to close.'
+  elif [ "$status" -eq 130 ] || [ "$status" -eq 143 ]; then
+    echo 'Stopped. Press Enter to close.'
   else
     echo "Exited with status $status. Press Enter to close."
   fi
