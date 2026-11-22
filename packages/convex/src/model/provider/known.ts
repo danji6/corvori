@@ -3,7 +3,10 @@ import {
   defaultModelReasoning,
   normalizeBinaryReasoningParameter,
 } from '@cv/core/model-reasoning'
+import { OPENAI_COMPATIBLE_PROVIDER_KEY } from '@cv/core/provider-registry'
 import type { ModelReasoning } from '@cv/core/types'
+
+import { error } from '../../errors'
 
 export type ChatCompletionsTransport = {
   defaultBaseURL?: string
@@ -12,7 +15,6 @@ export type ChatCompletionsTransport = {
 }
 
 export type ProviderDefinition = {
-  value: string
   label: string
   requiresBaseURL?: boolean
   defaultReasoning: ModelReasoning
@@ -21,59 +23,50 @@ export type ProviderDefinition = {
   chatCompletions?: ChatCompletionsTransport
 }
 
-export const KNOWN_PROVIDER_TYPES: ProviderDefinition[] = [
-  {
-    value: 'anthropic',
+const definitions = {
+  anthropic: {
     label: 'Anthropic',
     defaultReasoning: defaultModelReasoning(),
   },
-  {
-    value: 'alibaba',
+  alibaba: {
     label: 'Alibaba',
     defaultReasoning: defaultModelReasoning(),
     chatCompletions: {
       defaultBaseURL: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
     },
   },
-  {
-    value: 'deepseek',
+  deepseek: {
     label: 'DeepSeek',
     defaultReasoning: defaultModelReasoning(),
     chatCompletions: { defaultBaseURL: 'https://api.deepseek.com' },
   },
-  {
-    value: 'mistral',
+  mistral: {
     label: 'Mistral',
     defaultReasoning: defaultModelReasoning(),
     chatCompletions: { defaultBaseURL: 'https://api.mistral.ai/v1' },
   },
-  {
-    value: 'moonshotai',
+  moonshotai: {
     label: 'MoonshotAI',
     defaultReasoning: defaultModelReasoning(),
   },
-  {
-    value: 'ollama',
+  ollama: {
     label: 'Ollama',
     defaultReasoning: defaultModelReasoning(),
     binaryReasoningParameter: 'think',
   },
-  {
-    value: 'openai',
+  openai: {
     label: 'OpenAI',
     defaultReasoning: defaultModelReasoning(),
     chatCompletions: { defaultBaseURL: 'https://api.openai.com/v1' },
   },
-  {
-    value: 'openrouter',
+  openrouter: {
     label: 'OpenRouter',
     defaultReasoning: defaultModelReasoning(),
     chatCompletions: {
       defaultBaseURL: 'https://openrouter.ai/api/v1',
     },
   },
-  {
-    value: 'qwen',
+  qwen: {
     label: 'QwenCloud',
     requiresBaseURL: true,
     defaultReasoning: {
@@ -83,30 +76,42 @@ export const KNOWN_PROVIDER_TYPES: ProviderDefinition[] = [
     binaryReasoningParameter: DEFAULT_BINARY_REASONING_PARAMETER,
     chatCompletions: { reasoningField: 'reasoning_content' },
   },
-]
+  [OPENAI_COMPATIBLE_PROVIDER_KEY]: {
+    label: 'Other…',
+    requiresBaseURL: true,
+    defaultReasoning: defaultModelReasoning(),
+    chatCompletions: {},
+  },
+} satisfies Record<string, ProviderDefinition>
+
+export type ProviderKey = keyof typeof definitions
+
+export function isProviderKey(key: string): key is ProviderKey {
+  return Object.hasOwn(definitions, key)
+}
+
+export function requireProviderKey(key: string): ProviderKey {
+  if (isProviderKey(key)) return key
+  error(key.trim() ? 'Unsupported provider type' : 'Provider is required')
+}
 
 export function listProviderIds() {
-  return KNOWN_PROVIDER_TYPES.map(
-    ({ value, label, defaultReasoning, binaryReasoningParameter }) => ({
-      value,
-      label,
-      requiresBaseURL: providerRequiresBaseURL(value),
-      defaultReasoning,
-      binaryReasoningParameter,
-    }),
-  ).sort((a, b) => a.label.localeCompare(b.label))
+  const { [OPENAI_COMPATIBLE_PROVIDER_KEY]: compatible, ...builtIns } =
+    definitions
+  const providers = Object.entries<ProviderDefinition>(builtIns)
+  providers.sort(([, a], [, b]) => a.label.localeCompare(b.label))
+  providers.push([OPENAI_COMPATIBLE_PROVIDER_KEY, compatible])
+  return providers.map(([value, definition]) => ({
+    value,
+    label: definition.label,
+    requiresBaseURL: definition.requiresBaseURL ?? false,
+    defaultReasoning: definition.defaultReasoning,
+    binaryReasoningParameter: definition.binaryReasoningParameter,
+  }))
 }
 
 export function getProviderDefinition(providerId: string): ProviderDefinition {
-  return (
-    KNOWN_PROVIDER_TYPES.find(({ value }) => value === providerId) ?? {
-      value: providerId,
-      label: providerId,
-      requiresBaseURL: true,
-      defaultReasoning: defaultModelReasoning(),
-      chatCompletions: {},
-    }
-  )
+  return definitions[requireProviderKey(providerId)]
 }
 
 /** Whether a provider needs a user-configured endpoint. */

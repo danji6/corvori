@@ -10,6 +10,7 @@ import {
   setModelInference,
   update as updateProvider,
 } from '@cv/convex/model/provider/connections'
+import { OPENAI_COMPATIBLE_PROVIDER_KEY } from '@cv/core/provider-registry'
 import { describe, expect, test } from 'bun:test'
 
 const OWNER = 'user_1'
@@ -255,11 +256,11 @@ describe('MCP servers', () => {
 })
 
 describe('model providers', () => {
-  test('round-trips a custom provider endpoint', async () => {
+  test('round-trips an OpenAI-compatible endpoint', async () => {
     const { ctx, tables } = makeCtx()
 
     await createProvider(ctx, {
-      key: 'custom-service',
+      key: OPENAI_COMPATIBLE_PROVIDER_KEY,
       baseURL: 'https://custom.example/v1',
       enabled: true,
       models: [],
@@ -339,7 +340,7 @@ describe('model providers', () => {
     }
 
     await createProvider(ctx, {
-      key: 'custom',
+      key: OPENAI_COMPATIBLE_PROVIDER_KEY,
       enabled: true,
       extraHeaders: '{"X-Custom":"value"}',
       models: [model],
@@ -430,7 +431,7 @@ describe('model providers', () => {
 
     expect(
       createProvider(ctx, {
-        key: 'custom',
+        key: OPENAI_COMPATIBLE_PROVIDER_KEY,
         enabled: true,
         models: [{ id: 'bad', extraParameters: '{"messages":[]}' }],
       }),
@@ -442,7 +443,7 @@ describe('model providers', () => {
 
     expect(
       createProvider(ctx, {
-        key: 'custom',
+        key: OPENAI_COMPATIBLE_PROVIDER_KEY,
         enabled: true,
         extraHeaders: '{"Host":"example.com"}',
         models: [],

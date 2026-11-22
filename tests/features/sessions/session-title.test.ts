@@ -11,6 +11,7 @@ import {
   generateTitle,
   regenerateTitle,
 } from '@cv/convex/model/session/titleActions'
+import { OPENAI_COMPATIBLE_PROVIDER_KEY } from '@cv/core/provider-registry'
 import { DEFAULT_TITLE_SYSTEM_PROMPT } from '@cv/core/title-generation'
 import { expect, test } from 'bun:test'
 import { getFunctionName } from 'convex/server'
@@ -52,7 +53,7 @@ test('sends the resolved system prompt for automatic and regenerated titles', as
       modelId: 'title-model',
       systemPrompt,
       credentials: {
-        providerId: 'custom',
+        providerId: OPENAI_COMPATIBLE_PROVIDER_KEY,
         baseURL: server.url.toString(),
         apiKey: 'fixture',
       },
@@ -120,7 +121,7 @@ function titleFixture(baseURL?: string) {
     rows('modelProviders').push({
       _id: 'provider',
       ownerId: 'owner',
-      key: 'custom',
+      key: OPENAI_COMPATIBLE_PROVIDER_KEY,
       enabled: true,
       baseURL,
       models: [{ id: 'title-model' }],

@@ -11,6 +11,7 @@ import * as Credentials from '../credentials'
 import { refreshForOwner } from '../session/models'
 import * as Providers from './connections'
 import { completeDiscovery } from './discoveryState'
+import { requireProviderKey } from './known'
 import { addModelRenames } from './modelRenames'
 import { previewModels } from './previews'
 
@@ -21,6 +22,7 @@ export async function ensureConnection(
   ctx: AuthMutationCtx,
   args: EnsureConnectionArgs,
 ) {
+  requireProviderKey(args.key)
   if (!providerFeatures(args.key, args.auth).accountSignIn)
     error('Provider does not support account sign-in', 400)
 

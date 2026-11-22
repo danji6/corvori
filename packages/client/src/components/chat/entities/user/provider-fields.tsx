@@ -11,34 +11,34 @@ import {
   type ProviderAuth,
 } from '@cv/core/provider-registry'
 import { EyeIcon, EyeOffIcon } from 'lucide-react'
+import { useId } from 'react'
 
 import type { ProviderOption } from './provider-types'
 
 type ProviderTypeFieldProps = {
   providers?: ProviderOption[]
   value: string
-  showCustomInput: boolean
-  providerId: string
   typeError?: string
   onChange: (value: string) => void
-  onCustomNameChange: (id: string) => void
 }
 
 export function ProviderTypeField({
   providers,
   value,
-  showCustomInput,
-  providerId,
   typeError,
   onChange,
-  onCustomNameChange,
 }: ProviderTypeFieldProps) {
+  const labelId = useId()
+
   return (
     <>
       <div className="flex flex-col gap-1">
-        <Label className="text-muted-foreground text-sm">Provider</Label>
+        <Label id={labelId} className="text-muted-foreground text-sm">
+          Provider type
+        </Label>
         <Combobox value={value} onValueChange={onChange} noDeselect>
           <Combobox.Trigger
+            aria-labelledby={labelId}
             variant="input"
             className="w-full max-w-64 justify-between"
             disabled={!providers}
@@ -46,9 +46,8 @@ export function ProviderTypeField({
             <Combobox.DisplayValue placeholder="Select provider…">
               {(val) => {
                 if (!val) return undefined
-                if (val === '_other') return 'Other…'
                 if (!providers) return 'Loading…'
-                return providers.find((t) => t.value === val)?.label ?? val
+                return providers.find((t) => t.value === val)?.label
               }}
             </Combobox.DisplayValue>
           </Combobox.Trigger>
@@ -60,24 +59,11 @@ export function ProviderTypeField({
                     {t.label}
                   </Combobox.Item>
                 ))}
-                <Combobox.Item value="_other">Other…</Combobox.Item>
               </Combobox.List>
             )}
           </Combobox.Content>
         </Combobox>
       </div>
-
-      {showCustomInput && (
-        <div className="flex flex-col gap-1">
-          <Label className="text-muted-foreground text-sm">Provider name</Label>
-          <Input
-            className="font-mono text-sm"
-            placeholder="e.g. SomeProvider"
-            value={providerId}
-            onChange={(e) => onCustomNameChange(e.target.value)}
-          />
-        </div>
-      )}
 
       {typeError && <p className="text-destructive text-sm">{typeError}</p>}
     </>

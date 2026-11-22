@@ -7,9 +7,14 @@ import {
   update,
 } from '@cv/convex/model/provider/connections'
 import { deletePreview, storePreview } from '@cv/convex/model/provider/previews'
+import {
+  _getProviderForModel,
+  getSavedModel,
+} from '@cv/convex/model/provider/providers'
 import { ensureConnection, saveProviders } from '@cv/convex/model/provider/save'
 import { discoveryFingerprint } from '@cv/core/discovery-fingerprint'
 import { modelReference } from '@cv/core/model-reference'
+import { OPENAI_COMPATIBLE_PROVIDER_KEY } from '@cv/core/provider-registry'
 import { expect, test } from 'bun:test'
 import { providerFixture } from '~/tests/helpers/provider-db'
 
@@ -84,12 +89,35 @@ test('global batch save preserves identities and credentials and accepts duplica
         clientId: 'existing',
         configRevision: 0,
       },
-      { key: 'openai', enabled: false, models: [], clientId: 'new' },
+      {
+        key: 'openai',
+        enabled: true,
+        apiKey: 'other-fixture-key',
+        models: [{ id: 'model' }],
+        clientId: 'new',
+      },
     ],
     removed: [],
   })
   expect(result[0].providerId).toBe(id)
-  expect((await resolve(ctx, ctx.userId))[0].apiKey).toBe('fixture-key')
+  const otherId = result[1].providerId
+  expect(otherId).not.toBe(id)
+  for (const [connectionId, apiKey] of [
+    [id, 'fixture-key'],
+    [otherId, 'other-fixture-key'],
+  ]) {
+    expect(
+      await _getProviderForModel(ctx, {
+        ownerId: ctx.userId,
+        modelId: modelReference(connectionId, 'model'),
+      }),
+    ).toMatchObject({
+      connectionId,
+      providerId: 'openai',
+      apiKey,
+      model: { id: 'model' },
+    })
+  }
   expect((await list(ctx)).map((row) => row.name)).toEqual(['OpenAI', 'OpenAI'])
   expect(result[0].configRevision).toBe(1)
   await expect(
@@ -107,6 +135,77 @@ test('global batch save preserves identities and credentials and accepts duplica
       removed: [],
     }),
   ).rejects.toThrow('Connection changed')
+})
+
+test('an unnamed OpenAI-compatible connection saves with its base URL hostname', async () => {
+  const { ctx } = providerFixture()
+  const baseURL = 'https://opencode.ai/inference/openai/v1/chat/completions'
+  const [saved] = await saveProviders(ctx, {
+    connections: [
+      {
+        clientId: 'opencode-draft',
+        key: OPENAI_COMPATIBLE_PROVIDER_KEY,
+        name: '',
+        baseURL,
+        enabled: true,
+        models: [{ id: 'model' }],
+      },
+    ],
+    removed: [],
+  })
+
+  expect((await list(ctx))[0]).toMatchObject({
+    connectionId: saved.providerId,
+    id: OPENAI_COMPATIBLE_PROVIDER_KEY,
+    name: 'opencode.ai',
+    baseURL,
+  })
+})
+
+test('saving providers rejects unregistered type keys', async () => {
+  const { ctx } = providerFixture()
+  const connection = {
+    key: 'opencode',
+    baseURL: 'https://opencode.ai/inference/openai/v1',
+    enabled: true,
+    models: [{ id: 'model' }],
+  }
+
+  await expect(
+    saveProviders(ctx, {
+      connections: [{ ...connection, clientId: 'opencode-draft' }],
+      removed: [],
+    }),
+  ).rejects.toThrow('Unsupported provider type')
+  expect(await list(ctx)).toEqual([])
+})
+
+test('renaming a compatible connection preserves its key and model reference', async () => {
+  const { ctx } = providerFixture()
+  const id = await create(ctx, {
+    key: OPENAI_COMPATIBLE_PROVIDER_KEY,
+    baseURL: 'https://example.test/v1',
+    enabled: true,
+    models: [{ id: 'model' }],
+  })
+  const draft = providerForm((await list(ctx))[0])
+  expect(draft.name).toBe('example.test')
+
+  await saveProviders(ctx, {
+    connections: [providerSaveInput({ ...draft, name: 'Work API' })],
+    removed: [],
+  })
+
+  expect((await list(ctx))[0]).toMatchObject({
+    connectionId: id,
+    id: OPENAI_COMPATIBLE_PROVIDER_KEY,
+    name: 'Work API',
+  })
+  const reference = modelReference(id, 'model')
+  expect(await getSavedModel(ctx, ctx.userId, reference)).toMatchObject({
+    id: reference,
+    providerId: OPENAI_COMPATIBLE_PROVIDER_KEY,
+  })
 })
 
 test('sign-in creates an idempotent identity independently of configuration and authentication does not change its settings revision', async () => {

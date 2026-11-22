@@ -11,6 +11,7 @@ import { _patchMessage } from '@cv/convex/model/stream/lifecycleProgress'
 import { _complete } from '@cv/convex/model/stream/lifecycleTerminal'
 import { requestImmediateStop } from '@cv/convex/model/stream/stop'
 import { _suspendStep } from '@cv/convex/model/stream/subagents'
+import { OPENAI_COMPATIBLE_PROVIDER_KEY } from '@cv/core/provider-registry'
 import { TITLE_EXCERPT_LENGTH } from '@cv/core/title-generation'
 import { tool } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
@@ -131,7 +132,11 @@ function streamAction(ctx: MutationCtx, baseURL?: string) {
             exchange: `User: Plan a weekend in Rome.\nAssistant: ${args.assistantText}`,
             systemPrompt: 'Write a title.',
             modelId: 'title-model',
-            credentials: { providerId: 'custom', baseURL, apiKey: 'fixture' },
+            credentials: {
+              providerId: OPENAI_COMPATIBLE_PROVIDER_KEY,
+              baseURL,
+              apiKey: 'fixture',
+            },
           }
         default:
           throw new Error(`Unexpected query ${getFunctionName(ref)}`)

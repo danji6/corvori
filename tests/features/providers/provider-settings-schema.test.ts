@@ -32,6 +32,25 @@ describe('provider settings schema', () => {
     ).toBe(true)
   })
 
+  test('rejects an unregistered provider type even with a base URL', () => {
+    const result = providerSchema.safeParse({
+      id: 'opencode',
+      baseURL: 'https://opencode.ai/inference/openai/v1',
+      enabled: true,
+      models: [],
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: ['id'],
+          message: 'Unsupported provider type',
+        }),
+      )
+    }
+  })
+
   test('requires a manually configured Qwen base URL', () => {
     const result = providerSchema.safeParse({
       id: 'qwen',

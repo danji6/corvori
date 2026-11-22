@@ -1,4 +1,5 @@
 /// <reference types="bun-types" />
+import { inferenceAdapter } from '@cv/convex/model/provider/inferenceFactory'
 import {
   getProviderDefinition,
   providerReasoningField,
@@ -7,9 +8,19 @@ import {
   resolveModelReasoning,
 } from '@cv/convex/model/provider/known'
 import { findModelSelection } from '@cv/convex/model/provider/providers'
+import { OPENAI_COMPATIBLE_PROVIDER_KEY } from '@cv/core/provider-registry'
 import { describe, expect, test } from 'bun:test'
 
 describe('provider definitions', () => {
+  test('unregistered types cannot resolve a definition or an inference adapter', async () => {
+    expect(() => getProviderDefinition('opencode')).toThrow(
+      'Unsupported provider type',
+    )
+    await expect(inferenceAdapter('constructor')).rejects.toThrow(
+      'Unsupported provider type',
+    )
+  })
+
   test('Qwen provides binary thinking defaults without assuming an endpoint', () => {
     const qwen = getProviderDefinition('qwen')
     expect(qwen.chatCompletions).toEqual({
@@ -24,12 +35,14 @@ describe('provider definitions', () => {
   test('Qwen declares its extended reasoning response field', () => {
     expect(providerReasoningField('qwen')).toBe('reasoning_content')
     expect(providerReasoningField('openai')).toBeUndefined()
-    expect(providerReasoningField('custom')).toBeUndefined()
+    expect(
+      providerReasoningField(OPENAI_COMPATIBLE_PROVIDER_KEY),
+    ).toBeUndefined()
   })
 
   test('Qwen requires a configured endpoint for chat completions', () => {
     expect(providerRequiresBaseURL('qwen')).toBe(true)
-    expect(providerRequiresBaseURL('custom')).toBe(true)
+    expect(providerRequiresBaseURL(OPENAI_COMPATIBLE_PROVIDER_KEY)).toBe(true)
     expect(providerRequiresBaseURL('openai')).toBe(false)
     expect(resolveChatCompletionsBaseURL('qwen')).toBeUndefined()
     expect(
@@ -37,9 +50,11 @@ describe('provider definitions', () => {
     ).toBe('https://qwen.example/v1')
   })
 
-  test('custom providers retain the legacy effort ladder', () => {
-    expect(getProviderDefinition('custom').chatCompletions).toEqual({})
-    expect(resolveModelReasoning('custom')).toEqual({
+  test('OpenAI-compatible connections use the default effort ladder', () => {
+    expect(
+      getProviderDefinition(OPENAI_COMPATIBLE_PROVIDER_KEY).chatCompletions,
+    ).toEqual({})
+    expect(resolveModelReasoning(OPENAI_COMPATIBLE_PROVIDER_KEY)).toEqual({
       type: 'effort',
       efforts: ['low', 'medium', 'high'],
     })
@@ -51,7 +66,7 @@ describe('provider definitions', () => {
     )
     expect(
       resolveChatCompletionsBaseURL(
-        'custom',
+        OPENAI_COMPATIBLE_PROVIDER_KEY,
         'https://example.com/v1/responses',
       ),
     ).toBe('https://example.com/v1')

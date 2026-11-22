@@ -3,7 +3,11 @@ import { limitError } from '@cv/core/limit-errors'
 import { MAX_PROVIDERS } from '@cv/core/limits'
 import type { DiscoveredModel } from '@cv/core/model-discovery'
 import { parseModelReference } from '@cv/core/model-reference'
-import { providerFeatures } from '@cv/core/provider-registry'
+import {
+  OPENAI_COMPATIBLE_PROVIDER_KEY,
+  openAICompatibleName,
+  providerFeatures,
+} from '@cv/core/provider-registry'
 import type { ModelEntry, ModelProviderConfig } from '@cv/core/types'
 
 import { internal } from '../../_generated/api'
@@ -22,7 +26,7 @@ import {
   validateConnection,
 } from './connectionConfig'
 import { cancelDiscovery } from './discoveryState'
-import { getProviderDefinition } from './known'
+import { getProviderDefinition, requireProviderKey } from './known'
 
 /** What the settings UI renders. */
 export type ModelProviderView = Omit<
@@ -109,6 +113,12 @@ export async function connection(
   )
 }
 
+function defaultConnectionName(key: string, baseURL?: string): string {
+  return key === OPENAI_COMPATIBLE_PROVIDER_KEY
+    ? openAICompatibleName(baseURL)
+    : getProviderDefinition(key).label
+}
+
 export async function create(
   ctx: AuthMutationCtx,
   args: CreateModelProviderArgs,
@@ -128,7 +138,8 @@ export async function create(
 
   const id = await ctx.db.insert('modelProviders', {
     ...fields,
-    name: fields.name?.trim() || getProviderDefinition(fields.key).label,
+    name:
+      fields.name?.trim() || defaultConnectionName(fields.key, fields.baseURL),
     ownerId: ctx.userId,
     order: providers.length,
     configRevision: 0,
@@ -162,7 +173,8 @@ export async function update(
     error('Connection changed. Reload before saving.', 409)
   }
 
-  validateConnection({ ...provider, ...patch })
+  const nextProvider = { ...provider, ...patch }
+  validateConnection(nextProvider)
 
   const usesAccountSignIn = providerFeatures(provider.key, provider.auth).accountSignIn // prettier-ignore
   if (usesAccountSignIn && apiKey !== undefined) {
@@ -187,7 +199,8 @@ export async function update(
     ...patch,
     name:
       'name' in patch
-        ? patch.name?.trim() || getProviderDefinition(provider.key).label
+        ? patch.name?.trim() ||
+          defaultConnectionName(provider.key, nextProvider.baseURL)
         : provider.name,
     models,
     configRevision: (provider.configRevision ?? 0) + 1,
@@ -289,7 +302,7 @@ export async function seed(
   for (const [order, provider] of providers.entries()) {
     const connectionId = await ctx.db.insert('modelProviders', {
       ownerId,
-      key: provider.id,
+      key: requireProviderKey(provider.id),
       name: provider.name,
       auth: provider.auth ?? 'apiKey',
       configRevision: 0,

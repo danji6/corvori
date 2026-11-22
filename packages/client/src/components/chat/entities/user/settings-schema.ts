@@ -1,5 +1,8 @@
 import { PROMPT_MARKERS } from '@cv/convex/model/prompt/markers'
-import { providerRequiresBaseURL } from '@cv/convex/model/provider/known'
+import {
+  isProviderKey,
+  providerRequiresBaseURL,
+} from '@cv/convex/model/provider/known'
 import { parseModelExtraParameters } from '@cv/core/model-parameters'
 import { parseProviderExtraHeaders } from '@cv/core/provider-headers'
 import type { ModelReasoning } from '@cv/core/types'
@@ -166,7 +169,18 @@ export const providerSchema = z
     _clientId: z.string().optional(),
   })
   .superRefine((provider, ctx) => {
-    if (providerRequiresBaseURL(provider.id) && !provider.baseURL?.trim()) {
+    if (!isProviderKey(provider.id)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['id'],
+        message: provider.id.trim()
+          ? 'Unsupported provider type'
+          : 'Provider is required',
+      })
+    } else if (
+      providerRequiresBaseURL(provider.id) &&
+      !provider.baseURL?.trim()
+    ) {
       ctx.addIssue({
         code: 'custom',
         path: ['baseURL'],

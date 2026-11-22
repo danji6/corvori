@@ -14,6 +14,7 @@ import '@/globals.css'
 import { useUserSettingsPersistence } from '@/hooks/chat/user-settings-persistence'
 import { providerForm } from '@/lib/provider-settings'
 import { api } from '@cv/convex/_generated/api'
+import { listProviderIds } from '@cv/convex/model/provider/known'
 import { ConvexQueryCacheProvider } from 'convex-helpers/react/cache'
 import { ConvexProvider, useQuery } from 'convex/react'
 import { useState } from 'react'
@@ -84,17 +85,7 @@ function Settings() {
           value={name}
           onChange={(event) => form.setValue('displayName', event.target.value)}
         />
-        <ModelSettings
-          form={form}
-          providers={[
-            {
-              value: 'openai',
-              label: 'OpenAI',
-              requiresBaseURL: false,
-              defaultReasoning: { type: 'effort', efforts: ['low', 'high'] },
-            },
-          ]}
-        />
+        <ModelSettings form={form} providers={listProviderIds()} />
         <RippleButton type="submit">Save global settings</RippleButton>
         <RippleButton
           type="button"

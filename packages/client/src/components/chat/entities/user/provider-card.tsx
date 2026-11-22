@@ -9,12 +9,14 @@ import {
 import { generateId } from '@/lib/utils'
 import { initialContextWindow } from '@cv/core/discovered-model'
 import {
+  OPENAI_COMPATIBLE_PROVIDER_KEY,
   type ProviderAuth,
+  openAICompatibleName,
   providerDefinition,
   providerFeatures,
 } from '@cv/core/provider-registry'
 import type { ReasoningTier } from '@cv/core/types'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 
 import { ProviderExtraHeaders } from './provider-extra-headers'
 import {
@@ -56,39 +58,20 @@ export function ProviderCard({
   const [expanded, setExpanded] = useState(defaultOpen)
   const [expandedModelIds, setExpandedModelIds] = useState<Set<string>>(() => new Set()) // prettier-ignore
   const [showKey, setShowKey] = useState(false)
+  const nameId = useId()
 
   const features = providerFeatures(provider.id, provider.auth)
   const authentication = providerDefinition(provider.id).authentication
   const knownProvider = providers?.find((t) => t.value === provider.id)
-  const isTypeCustom = !!provider.id && !knownProvider
-
-  const [userSelectedOther, setUserSelectedOther] = useState(isTypeCustom)
-  const [prevType, setPrevType] = useState(provider.id)
-  if (prevType !== provider.id) {
-    setPrevType(provider.id)
-    if (knownProvider) setUserSelectedOther(false)
-  }
-
-  const showCustomInput = isTypeCustom || userSelectedOther
-
-  const comboboxValue = knownProvider
-    ? provider.id
-    : showCustomInput
-      ? '_other'
-      : ''
-
-  const providerLabel =
-    provider.name || knownProvider?.label || provider.id || 'New connection'
+  const isOpenAICompatible = provider.id === OPENAI_COMPATIBLE_PROVIDER_KEY
+  const defaultName = isOpenAICompatible
+    ? openAICompatibleName(provider.baseURL)
+    : knownProvider?.label || provider.id
+  const providerLabel = provider.name?.trim() || defaultName || 'New connection'
   const requiresBaseURL = knownProvider?.requiresBaseURL ?? true
 
   function handleProviderChange(value: string) {
-    if (value === '_other') {
-      setUserSelectedOther(true)
-      onChange({ id: '', auth: 'apiKey' })
-    } else {
-      setUserSelectedOther(false)
-      onChange({ id: value || '', auth: 'apiKey' })
-    }
+    onChange({ id: value, auth: 'apiKey' })
   }
 
   function addModel() {
@@ -159,21 +142,21 @@ export function ProviderCard({
       contentClassName="gap-3.5"
       unmountOnClose
     >
-      <Label className="text-sm">Connection name</Label>
+      <Label htmlFor={nameId} className="text-sm">
+        Provider name
+      </Label>
       <Input
+        id={nameId}
         value={provider.name ?? ''}
-        placeholder="e.g. OpenAI"
+        placeholder={isOpenAICompatible ? defaultName : 'e.g. OpenAI'}
         onChange={(e) => onChange({ name: e.target.value })}
       />
       <fieldset disabled={saved} className="flex flex-col gap-2">
         <ProviderTypeField
           providers={providers}
-          value={comboboxValue}
-          showCustomInput={showCustomInput}
-          providerId={provider.id}
+          value={provider.id}
           typeError={typeError}
           onChange={handleProviderChange}
-          onCustomNameChange={(id) => onChange({ id })}
         />
 
         {Object.keys(authentication).length > 1 && (
@@ -204,7 +187,7 @@ export function ProviderCard({
 
           <ProviderBaseURLField
             providerId={provider.id}
-            isCustom={comboboxValue === '_other'}
+            isCustom={isOpenAICompatible}
             requiresBaseURL={requiresBaseURL}
             value={provider.baseURL}
             error={baseURLError}

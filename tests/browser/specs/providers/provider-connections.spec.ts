@@ -310,6 +310,43 @@ test('global cancel discards new providers and unsaved edits', async ({
   await expect(page.getByText('Personal API', { exact: true })).toBeVisible()
 })
 
+test('Other connections save and reopen with one editable provider name', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=provider-connections')
+  await page.getByRole('button', { name: 'Add connection' }).click()
+  const type = page.getByRole('combobox', { name: 'Provider type' })
+  await type.click()
+  await page.getByRole('option', { name: 'Other…' }).click()
+  const name = page.getByRole('textbox', { name: 'Provider name' })
+  await expect(name).toHaveAttribute('placeholder', 'OpenAI-compatible')
+  const baseURL = page.getByPlaceholder('https://api.example.com/v1')
+  const endpoint = 'https://opencode.ai/inference/openai/v1/chat/completions'
+  await baseURL.fill(endpoint)
+  await expect(name).toHaveAttribute('placeholder', 'opencode.ai')
+  await name.fill('OpenCode Work')
+  await page.getByRole('button', { name: 'Save global settings' }).click()
+  await expect(page.getByLabel('Saved connection count')).toHaveText('2')
+  await page.getByRole('button', { name: 'Cancel settings' }).click()
+
+  const card = page.getByRole('button', { name: 'OpenCode Work' })
+  await card.click()
+  await expect(name).toBeHidden()
+  await card.click()
+  await expect(page.getByText('Provider name', { exact: true })).toHaveCount(1)
+  await expect(name).toHaveValue('OpenCode Work')
+  await expect(name).toBeEditable()
+  await expect(type).toHaveText('Other…')
+  await expect(type).toBeDisabled()
+  await expect(baseURL).toHaveValue(endpoint)
+  await page
+    .locator('[data-slot="help-label"]')
+    .filter({ hasText: 'Base URL' })
+    .getByRole('button', { name: 'More information' })
+    .click()
+  await expect(page.getByText(/Add '\/responses'/)).toBeVisible()
+})
+
 test('new ChatGPT connections expose sign-in before saving and stay expanded', async ({
   page,
 }) => {

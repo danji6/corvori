@@ -3,6 +3,7 @@ import { createProviderFetch } from '@cv/convex/model/provider/request'
 import { parseModelExtraParameters } from '@cv/core/model-parameters'
 import { normalizeReasoningEffort } from '@cv/core/model-reasoning'
 import { parseProviderExtraHeaders } from '@cv/core/provider-headers'
+import { OPENAI_COMPATIBLE_PROVIDER_KEY } from '@cv/core/provider-registry'
 import { describe, expect, test } from 'bun:test'
 import {
   captureFetch,
@@ -59,7 +60,7 @@ describe('provider request body adapter', () => {
   test('sends max through the provider wire mapping', async () => {
     const bodies: Record<string, unknown>[] = []
     const fetch = createProviderFetch({
-      providerId: 'custom',
+      providerId: OPENAI_COMPATIBLE_PROVIDER_KEY,
       reasoning: { type: 'effort', efforts: ['xhigh', 'max'] },
       reasoningEffort: 'max',
       fetch: captureFetch(bodies),
@@ -105,7 +106,7 @@ describe('provider request body adapter', () => {
   test('uses nested reasoning for Responses API bodies', async () => {
     const bodies: Record<string, unknown>[] = []
     const fetch = createProviderFetch({
-      providerId: 'custom',
+      providerId: OPENAI_COMPATIBLE_PROVIDER_KEY,
       reasoning: { type: 'effort', efforts: ['max'] },
       reasoningEffort: 'max',
       fetch: captureFetch(bodies),
@@ -127,7 +128,7 @@ describe('provider request body adapter', () => {
     const requests: RequestInit[] = []
     const logs: string[] = []
     const fetch = createProviderFetch({
-      providerId: 'custom',
+      providerId: OPENAI_COMPATIBLE_PROVIDER_KEY,
       extraHeaders: '{"X-Custom":"configured","HTTP-Referer":"app"}',
       fetch: captureRequest(requests),
       onRequest: (body) => {
@@ -153,7 +154,7 @@ describe('provider request body adapter', () => {
     const cacheIds = ['cache-1', 'cache-2-{{cacheId}}']
     let resolutions = 0
     const fetch = createProviderFetch({
-      providerId: 'custom',
+      providerId: OPENAI_COMPATIBLE_PROVIDER_KEY,
       extraHeaders:
         '{"X-Cache-ID":"route/{{cacheId}}/{{cacheId}}/{{otherToken}}"}',
       extraParameters: JSON.stringify({
@@ -195,7 +196,7 @@ describe('provider request body adapter', () => {
   ])('rejects templates without a cache ID resolver (%j)', async (config) => {
     const requests: RequestInit[] = []
     const fetch = createProviderFetch({
-      providerId: 'custom',
+      providerId: OPENAI_COMPATIBLE_PROVIDER_KEY,
       ...config,
       fetch: captureRequest(requests),
     })

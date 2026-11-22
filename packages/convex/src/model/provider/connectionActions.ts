@@ -127,6 +127,8 @@ export async function preview(
     error('Connection type changed', 400)
   }
 
+  const { requireProviderKey } = await import('./known')
+  requireProviderKey(args.key)
   const { providerFeatures } = await import('@cv/core/provider-registry')
   if (providerFeatures(args.key, args.auth).accountSignIn)
     error('Use the saved account catalog', 400)
@@ -256,6 +258,8 @@ export async function previewDetails(
 ): Promise<DiscoveredModel | null> {
   const ownerId = await authenticatedOwner(ctx)
 
+  const { requireProviderKey } = await import('./known')
+  requireProviderKey(args.key)
   const saved = args.providerId
     ? await ownedConnection(ctx, args.providerId)
     : undefined

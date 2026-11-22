@@ -9,8 +9,7 @@ import { withProviderMiddleware } from './providerMiddleware'
 import type { ProviderCredentials } from './providers'
 import { getOllamaThink } from './reasoningOptions'
 
-// Providers we construct explicitly (all others fall through to the generic
-// OpenAI-compatible branch in `createLanguageModel`).
+// Providers that do not need inline reasoning tag extraction.
 export const FIRST_PARTY_PROVIDERS = new Set([
   'anthropic',
   'deepseek',

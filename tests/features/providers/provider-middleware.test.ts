@@ -3,6 +3,7 @@ import type { LanguageModelV3 } from '@ai-sdk/provider'
 import { withModelRoutes } from '@cv/convex/model/provider/modelMiddleware'
 import { getProviderOptions } from '@cv/convex/model/provider/options'
 import { withProviderMiddleware } from '@cv/convex/model/provider/providerMiddleware'
+import { OPENAI_COMPATIBLE_PROVIDER_KEY } from '@cv/core/provider-registry'
 import {
   type UIMessage,
   readUIMessageStream,
@@ -95,7 +96,7 @@ describe('provider model middleware', () => {
         'https://qwen.example/v1/chat/completions',
       ],
       [
-        'custom',
+        OPENAI_COMPATIBLE_PROVIDER_KEY,
         'https://example.com/v1/responses',
         'https://example.com/v1/chat/completions',
       ],

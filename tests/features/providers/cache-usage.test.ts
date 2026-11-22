@@ -3,6 +3,7 @@ import { getProviderOptions } from '@cv/convex/model/provider/options'
 import { accumulateSessionUsage } from '@cv/convex/model/stream/lifecycleMeta'
 import { resolveUsage } from '@cv/convex/model/stream/usage'
 import { cacheHitRate } from '@cv/core/cache-usage'
+import { OPENAI_COMPATIBLE_PROVIDER_KEY } from '@cv/core/provider-registry'
 import { requireCompletedStream } from '@cv/sidecar/providers/openai/stream'
 import { generateText, streamText } from 'ai'
 import { describe, expect, test } from 'bun:test'
@@ -147,9 +148,9 @@ describe('provider cache reporting', () => {
   test.each([400, 0, undefined])(
     'preserves compatible Chat Completions cache reads of %s',
     async (cachedTokens) => {
-      const create = await inferenceAdapter('custom')
+      const create = await inferenceAdapter(OPENAI_COMPATIBLE_PROVIDER_KEY)
       const model = await create({
-        providerId: 'custom',
+        providerId: OPENAI_COMPATIBLE_PROVIDER_KEY,
         modelId: 'fixture-model',
         baseURL: 'https://fixture.invalid/v1',
         apiKey: 'fixture',
@@ -193,9 +194,9 @@ describe('provider cache reporting', () => {
   )
 
   test('uses the same contract for compatible Responses streams', async () => {
-    const create = await inferenceAdapter('custom')
+    const create = await inferenceAdapter(OPENAI_COMPATIBLE_PROVIDER_KEY)
     const model = await create({
-      providerId: 'custom',
+      providerId: OPENAI_COMPATIBLE_PROVIDER_KEY,
       modelId: 'fixture-model',
       baseURL: 'https://fixture.invalid/v1/responses',
       apiKey: 'fixture',

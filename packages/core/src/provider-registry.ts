@@ -1,5 +1,16 @@
 export type ProviderAuth = 'apiKey' | 'chatgpt'
 
+export const OPENAI_COMPATIBLE_PROVIDER_KEY = 'openai-compatible'
+
+/** Derives a display name for an OpenAI-compatible connection. */
+export function openAICompatibleName(baseURL?: string): string {
+  try {
+    return new URL(baseURL ?? '').hostname || 'OpenAI-compatible'
+  } catch {
+    return 'OpenAI-compatible'
+  }
+}
+
 export const PROVIDER_AUTH_LABELS: Record<ProviderAuth, string> = {
   apiKey: 'API key',
   chatgpt: 'ChatGPT subscription',
@@ -46,7 +57,9 @@ const definitions: Record<string, ProviderDefinition> = {
 }
 
 export function providerDefinition(id: string): ProviderDefinition {
-  return definitions[id] ?? { name: id, authentication: { apiKey: {} } }
+  return Object.hasOwn(definitions, id)
+    ? definitions[id]
+    : { name: id, authentication: { apiKey: {} } }
 }
 
 export function providerFeatures(

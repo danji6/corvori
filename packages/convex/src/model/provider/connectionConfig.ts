@@ -13,14 +13,14 @@ import type { Doc } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import type { CreateModelProviderArgs } from '../../types'
-import { normalizeConfiguredReasoning } from './known'
+import { normalizeConfiguredReasoning, requireProviderKey } from './known'
 
 export function validateConnection(args: CreateModelProviderArgs) {
   assertModelsWithinCap(args.models)
   parseProviderExtraHeaders(args.extraHeaders)
 
   const auth = args.auth ?? 'apiKey'
-  if (!args.key.trim()) error('Provider is required', 400)
+  requireProviderKey(args.key)
   if (!providerDefinition(args.key).authentication[auth])
     error('Provider does not support this authentication method', 400)
 
