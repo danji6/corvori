@@ -1,9 +1,15 @@
 import { createOptionalContext } from '@/hooks/context'
 import type { MessageRow } from '@/lib/chat/rows'
 import { AnimatePresence, motion } from 'motion/react'
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
-
-import { useMessageList } from './message-list/message-list-context'
+import {
+  type RefObject,
+  useCallback,
+  useEffectEvent,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
 export type HighlightTarget = {
   messageId: string
@@ -22,6 +28,14 @@ export type MessageHighlightValue = {
 
 export const [MessageHighlightContext, useMessageHighlight] =
   createOptionalContext<MessageHighlightValue>()
+
+type HighlightRegistry = {
+  elementsRef: RefObject<Map<HTMLElement, HighlightTarget>>
+  version: number
+}
+
+const [HighlightRegistryContext, useHighlightRegistry] =
+  createOptionalContext<HighlightRegistry>()
 
 /** Targets the block a row renders, falling back to the whole message. */
 export function highlightTargetForRow(
@@ -93,10 +107,6 @@ type HighlightRect = {
   height: number
 }
 
-type MeasuredHighlightRect = HighlightRect & {
-  key: string
-}
-
 const HIGHLIGHT_PAD_X = 8
 const HIGHLIGHT_PAD_Y = 12
 
@@ -111,10 +121,8 @@ export function MessageHighlightProvider({
   children: React.ReactNode
 }) {
   const [target, setTarget] = useState<HighlightTarget | null>(null)
-  const [rect, setRect] = useState<MeasuredHighlightRect | null>(null)
   const [registryVersion, setRegistryVersion] = useState(0)
   const elementsRef = useRef(new Map<HTMLElement, HighlightTarget>())
-  const scrollRef = useMessageList()?.scrollRef
 
   const registerElement = useCallback(
     (target: HighlightTarget, element: HTMLElement) => {
@@ -134,11 +142,7 @@ export function MessageHighlightProvider({
     if (!target) return
 
     const dismissOnOutsidePress = (event: PointerEvent) => {
-      const bounds = measureTarget(
-        target,
-        elementsRef.current,
-        scrollRef?.current,
-      )
+      const bounds = measureTarget(target, elementsRef.current)
       if (bounds && containsPoint(bounds, event)) return
 
       setTarget((current) => (current === target ? null : current))
@@ -147,61 +151,109 @@ export function MessageHighlightProvider({
     window.addEventListener('pointerdown', dismissOnOutsidePress, true)
     return () =>
       window.removeEventListener('pointerdown', dismissOnOutsidePress, true)
-  }, [target, scrollRef])
-
-  useLayoutEffect(() => {
-    if (!target) return
-
-    const activeTarget = target
-    const activeKey = keyForTarget(activeTarget)
-    let frame: number | undefined
-
-    function measure() {
-      frame = undefined
-      const next = measureTarget(
-        activeTarget,
-        elementsRef.current,
-        scrollRef?.current,
-      )
-      setRect(next ? { ...next, key: activeKey } : null)
-    }
-
-    function scheduleMeasure() {
-      if (frame !== undefined) return
-      frame = requestAnimationFrame(measure)
-    }
-
-    scheduleMeasure()
-
-    const observer = new ResizeObserver(scheduleMeasure)
-    const elements = getTargetElements(activeTarget, elementsRef.current)
-    for (const element of elements) observer.observe(element)
-    if (scrollRef?.current) {
-      observer.observe(scrollRef.current)
-    }
-
-    window.addEventListener('resize', scheduleMeasure)
-    window.addEventListener('scroll', scheduleMeasure, true)
-
-    return () => {
-      if (frame !== undefined) cancelAnimationFrame(frame)
-      observer.disconnect()
-      window.removeEventListener('resize', scheduleMeasure)
-      window.removeEventListener('scroll', scheduleMeasure, true)
-    }
-  }, [target, registryVersion, scrollRef])
+  }, [target])
 
   const value = useMemo(
     () => ({ target, setTarget, registerElement }),
     [target, registerElement],
   )
-  const activeRect = target && rect?.key === keyForTarget(target) ? rect : null
+  const registry = useMemo(
+    () => ({ elementsRef, version: registryVersion }),
+    [registryVersion],
+  )
 
   return (
     <MessageHighlightContext.Provider value={value}>
-      <MessageHighlightOverlay rect={activeRect} />
-      {children}
+      <HighlightRegistryContext.Provider value={registry}>
+        {children}
+      </HighlightRegistryContext.Provider>
     </MessageHighlightContext.Provider>
+  )
+}
+
+type MessageHighlightLayerProps = {
+  root: RefObject<HTMLElement | null>
+  rows: readonly MessageRow[]
+  layoutVersion: number
+}
+
+/** Anchors the overlay to the same scrolling container as the virtual rows. */
+export function MessageHighlightLayer(props: MessageHighlightLayerProps) {
+  const target = useMessageHighlight()?.target
+  const rect = useHighlightRect(target, props)
+  return <MessageHighlightOverlay rect={target ? rect : null} />
+}
+
+function useHighlightRect(
+  target: HighlightTarget | null | undefined,
+  { root, rows, layoutVersion }: MessageHighlightLayerProps,
+) {
+  const registry = useHighlightRegistry()
+  const [rect, setRect] = useState<HighlightRect | null>(null)
+
+  const measure = useEffectEvent(() => {
+    const container = root.current
+    const next =
+      target && registry && container
+        ? measureInTranscript(target, registry.elementsRef.current, container)
+        : null
+    setRect((current) => (sameRect(current, next) ? current : next))
+  })
+
+  useLayoutEffect(() => {
+    if (target) return
+    const frame = requestAnimationFrame(() => measure())
+    return () => cancelAnimationFrame(frame)
+  }, [target])
+
+  useLayoutEffect(() => {
+    if (!target || !registry) return
+
+    const observer = new ResizeObserver(() => measure())
+    const frame = requestAnimationFrame(() => {
+      if (root.current) observer.observe(root.current)
+      const elements = getTargetElements(target, registry.elementsRef.current)
+      for (const element of elements) observer.observe(element)
+    })
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
+  }, [registry, root, target])
+
+  useLayoutEffect(() => {
+    if (!target) return
+    // A virtual row can change its offset without changing its size.
+    const frame = requestAnimationFrame(() => measure())
+    return () => cancelAnimationFrame(frame)
+  }, [layoutVersion, registry, root, rows, target])
+
+  return rect
+}
+
+function measureInTranscript(
+  target: HighlightTarget,
+  elements: Map<HTMLElement, HighlightTarget>,
+  container: HTMLElement,
+): HighlightRect | null {
+  const bounds = measureTarget(target, elements)
+  if (!bounds) return null
+
+  const origin = container.getBoundingClientRect()
+  return {
+    ...bounds,
+    top: bounds.top - origin.top,
+    left: bounds.left - origin.left,
+  }
+}
+
+function sameRect(a: HighlightRect | null, b: HighlightRect | null) {
+  if (!a || !b) return a === b
+  return (
+    a.top === b.top &&
+    a.left === b.left &&
+    a.width === b.width &&
+    a.height === b.height
   )
 }
 
@@ -223,11 +275,10 @@ function getTargetElements(
 function measureTarget(
   target: HighlightTarget,
   elements: Map<HTMLElement, HighlightTarget>,
-  scrollElement?: HTMLElement | null,
 ): HighlightRect | null {
   const rects = getTargetElements(target, elements)
     .filter((element) => element.isConnected)
-    .map((element) => expandRect(element.getBoundingClientRect()))
+    .map((element) => element.getBoundingClientRect())
     .filter((rect) => rect.width > 0 && rect.height > 0)
 
   if (!rects.length) return null
@@ -248,23 +299,11 @@ function measureTarget(
     },
   )
 
-  const viewport = getViewportRect(scrollElement)
-  const clipped = {
-    top: Math.max(union.top, viewport.top),
-    left: Math.max(union.left, viewport.left),
-    right: Math.min(union.right, viewport.right),
-    bottom: Math.min(union.bottom, viewport.bottom),
-  }
-
-  if (clipped.right <= clipped.left || clipped.bottom <= clipped.top) {
-    return null
-  }
-
   return {
-    top: clipped.top,
-    left: clipped.left,
-    width: clipped.right - clipped.left,
-    height: clipped.bottom - clipped.top,
+    top: union.top - HIGHLIGHT_PAD_Y,
+    left: union.left - HIGHLIGHT_PAD_X,
+    width: union.right - union.left + HIGHLIGHT_PAD_X * 2,
+    height: union.bottom - union.top + HIGHLIGHT_PAD_Y * 2,
   }
 }
 
@@ -275,32 +314,6 @@ function containsPoint(rect: HighlightRect, { clientX, clientY }: MouseEvent) {
     clientY >= rect.top &&
     clientY < rect.top + rect.height
   )
-}
-
-function expandRect(rect: DOMRect): DOMRect {
-  return new DOMRect(
-    rect.left - HIGHLIGHT_PAD_X,
-    rect.top - HIGHLIGHT_PAD_Y,
-    rect.width + HIGHLIGHT_PAD_X * 2,
-    rect.height + HIGHLIGHT_PAD_Y * 2,
-  )
-}
-
-function getViewportRect(element?: HTMLElement | null) {
-  if (
-    !element ||
-    element === document.documentElement ||
-    element === document.body
-  ) {
-    return {
-      top: 0,
-      left: 0,
-      right: window.innerWidth,
-      bottom: window.innerHeight,
-    }
-  }
-
-  return element.getBoundingClientRect()
 }
 
 function MessageHighlightOverlay({ rect }: { rect: HighlightRect | null }) {
@@ -327,7 +340,7 @@ function MessageHighlightOverlay({ rect }: { rect: HighlightRect | null }) {
           }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.12, ease: 'easeOut' }}
-          className="bg-m3-surface-container/70 ring-m3-outline-variant/40 pointer-events-none fixed z-0 rounded-xl ring-1"
+          className="bg-m3-surface-container/70 ring-m3-outline-variant/40 pointer-events-none absolute z-0 rounded-xl ring-1"
         />
       )}
     </AnimatePresence>

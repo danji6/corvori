@@ -38,4 +38,21 @@ test('reply quotes jump to their exact text block across loaded windows', async 
 
   await page.clock.runFor(2000)
   await expect(highlight).toBeVisible()
+
+  const lastBlock = page
+    .locator('article')
+    .filter({ hasText: 'Quoted text in segment 4' })
+  const scrollDeltas = await lastBlock.evaluate((block) => {
+    const overlay = document.querySelector('[data-slot="message-highlight"]')!
+    const blockTop = block.getBoundingClientRect().top
+    const overlayTop = overlay.getBoundingClientRect().top
+
+    window.scrollBy({ top: 48, behavior: 'instant' })
+
+    return {
+      block: block.getBoundingClientRect().top - blockTop,
+      highlight: overlay.getBoundingClientRect().top - overlayTop,
+    }
+  })
+  expect(scrollDeltas).toEqual({ block: -48, highlight: -48 })
 })

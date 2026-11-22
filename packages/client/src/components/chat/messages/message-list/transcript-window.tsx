@@ -20,6 +20,8 @@ import { flushSync } from 'react-dom'
 import type { CustomItemComponentProps, WindowVirtualizerHandle } from 'virtua'
 import { UPDATE_SIZE_EVENT, UPDATE_VIRTUAL_STATE } from 'virtua/unstable_core'
 
+import { MessageHighlightLayer } from '../message-highlight-context'
+
 type ItemComponent = ComponentType<CustomItemComponentProps>
 
 type TranscriptWindowProps = {
@@ -108,6 +110,7 @@ export function TranscriptWindow({
         pointerEvents: store.$isScrolling() ? 'none' : undefined,
       }}
     >
+      <MessageHighlightLayer root={root} rows={rows} layoutVersion={version} />
       {transcript.visibleIndices(entries).map((index) => (
         <TranscriptItem
           key={rows[index]!.key}
