@@ -114,7 +114,7 @@ export function MessageHighlightProvider({
   const [rect, setRect] = useState<MeasuredHighlightRect | null>(null)
   const [registryVersion, setRegistryVersion] = useState(0)
   const elementsRef = useRef(new Map<HTMLElement, HighlightTarget>())
-  const messageList = useMessageList()
+  const scrollRef = useMessageList()?.scrollRef
 
   const registerElement = useCallback(
     (target: HighlightTarget, element: HTMLElement) => {
@@ -133,6 +133,25 @@ export function MessageHighlightProvider({
   useLayoutEffect(() => {
     if (!target) return
 
+    const dismissOnOutsidePress = (event: PointerEvent) => {
+      const bounds = measureTarget(
+        target,
+        elementsRef.current,
+        scrollRef?.current,
+      )
+      if (bounds && containsPoint(bounds, event)) return
+
+      setTarget((current) => (current === target ? null : current))
+    }
+
+    window.addEventListener('pointerdown', dismissOnOutsidePress, true)
+    return () =>
+      window.removeEventListener('pointerdown', dismissOnOutsidePress, true)
+  }, [target, scrollRef])
+
+  useLayoutEffect(() => {
+    if (!target) return
+
     const activeTarget = target
     const activeKey = keyForTarget(activeTarget)
     let frame: number | undefined
@@ -142,7 +161,7 @@ export function MessageHighlightProvider({
       const next = measureTarget(
         activeTarget,
         elementsRef.current,
-        messageList?.scrollRef.current,
+        scrollRef?.current,
       )
       setRect(next ? { ...next, key: activeKey } : null)
     }
@@ -157,8 +176,8 @@ export function MessageHighlightProvider({
     const observer = new ResizeObserver(scheduleMeasure)
     const elements = getTargetElements(activeTarget, elementsRef.current)
     for (const element of elements) observer.observe(element)
-    if (messageList?.scrollRef.current) {
-      observer.observe(messageList.scrollRef.current)
+    if (scrollRef?.current) {
+      observer.observe(scrollRef.current)
     }
 
     window.addEventListener('resize', scheduleMeasure)
@@ -170,7 +189,7 @@ export function MessageHighlightProvider({
       window.removeEventListener('resize', scheduleMeasure)
       window.removeEventListener('scroll', scheduleMeasure, true)
     }
-  }, [target, registryVersion, messageList?.scrollRef])
+  }, [target, registryVersion, scrollRef])
 
   const value = useMemo(
     () => ({ target, setTarget, registerElement }),
@@ -249,6 +268,15 @@ function measureTarget(
   }
 }
 
+function containsPoint(rect: HighlightRect, { clientX, clientY }: MouseEvent) {
+  return (
+    clientX >= rect.left &&
+    clientX < rect.left + rect.width &&
+    clientY >= rect.top &&
+    clientY < rect.top + rect.height
+  )
+}
+
 function expandRect(rect: DOMRect): DOMRect {
   return new DOMRect(
     rect.left - HIGHLIGHT_PAD_X,
@@ -281,6 +309,7 @@ function MessageHighlightOverlay({ rect }: { rect: HighlightRect | null }) {
       {rect && (
         <motion.div
           key="message-highlight"
+          data-slot="message-highlight"
           aria-hidden
           initial={{
             opacity: 0,

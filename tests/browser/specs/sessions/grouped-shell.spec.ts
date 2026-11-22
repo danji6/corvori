@@ -440,9 +440,7 @@ for (const migrated of [false, true]) {
       name: 'Read output of job #3',
       exact: true,
     })
-    await read.focus()
-    await expect(read).toBeFocused()
-    await page.keyboard.press('Enter')
+    await read.click()
     await expect(original).toBeVisible()
     const trigger = original.locator('[data-block-trigger]')
     await expect(trigger).toHaveAttribute('aria-expanded', 'true')
@@ -451,5 +449,9 @@ for (const migrated of [false, true]) {
     )
     await expect(trigger).toContainText('#3')
     await expect(original.getByText('Saved terminal output')).toBeVisible()
+    const highlight = page.locator('[data-slot="message-highlight"]')
+    await expect(highlight).toBeVisible()
+    await page.mouse.click(20, 200)
+    await expect(highlight).toHaveCount(0)
   })
 }

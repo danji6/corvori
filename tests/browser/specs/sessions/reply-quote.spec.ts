@@ -8,7 +8,9 @@ test('reply quotes jump to their exact text block across loaded windows', async 
     'data-position-ready',
     'true',
   )
+  await page.clock.install()
 
+  const highlight = page.locator('[data-slot="message-highlight"]')
   for (const segmentIndex of [4, 1, 4]) {
     await page
       .locator('[data-slot="reply-quote"]')
@@ -30,5 +32,10 @@ test('reply quotes jump to their exact text block across loaded windows', async 
         ),
       )
       .toBe(64)
+    await expect(highlight).toBeVisible()
+    await block.click()
   }
+
+  await page.clock.runFor(2000)
+  await expect(highlight).toBeVisible()
 })

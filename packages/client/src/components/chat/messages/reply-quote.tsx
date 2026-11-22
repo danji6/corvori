@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 import type { ReplyQuote } from '@cv/convex/types'
 import { toDisplayName } from '@cv/core/utils/names'
 import { BotIcon, UserIcon } from 'lucide-react'
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback } from 'react'
 
 import {
   highlightTargetForRow,
@@ -11,9 +11,6 @@ import {
   useMessageHighlightRef,
 } from './message-highlight-context'
 import { useMessageSeek } from './message-seek-context'
-
-/** How long the quoted message stays highlighted after jumping to it. */
-const JUMP_HIGHLIGHT_MS = 1600
 
 const CLAMP = { 1: 'line-clamp-1', 2: 'line-clamp-2' } as const
 
@@ -127,33 +124,19 @@ export function ReplyQuoteExcerpt({ quote, lines }: ReplyQuoteExcerptProps) {
   )
 }
 
-/** Scrolls to a quoted message and highlights it briefly. */
+/** Scrolls to and highlights a quoted message. */
 function useJumpToMessage(target: ReplyQuote['target']) {
   const seek = useMessageSeek()
   const setHighlight = useMessageHighlight()?.setTarget
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
-
-  useEffect(() => () => clearTimeout(timerRef.current), [])
 
   const jump = useCallback(() => {
     if (!target || !seek) return
 
-    clearTimeout(timerRef.current)
-    setHighlight?.(null)
     seek({
       messageId: target.id,
       creationTime: target.creationTime,
       part: target.part,
-      onLocated: (row) => {
-        const highlighted = highlightTargetForRow(target.id, row)
-        setHighlight?.(highlighted)
-        timerRef.current = setTimeout(() => {
-          // Leave a highlight that something else has since taken over
-          setHighlight?.((current) =>
-            current === highlighted ? null : current,
-          )
-        }, JUMP_HIGHLIGHT_MS)
-      },
+      onLocated: (row) => setHighlight?.(highlightTargetForRow(target.id, row)),
     })
   }, [target, seek, setHighlight])
 

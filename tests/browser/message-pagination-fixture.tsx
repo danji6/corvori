@@ -1,3 +1,8 @@
+import {
+  MessageHighlightProvider,
+  highlightTargetForRow,
+  useMessageHighlightRef,
+} from '@/components/chat/messages/message-highlight-context'
 import type { ScrollDeps } from '@/components/chat/messages/message-list/deps'
 import { MessageListContent } from '@/components/chat/messages/message-list/message-list-content'
 import {
@@ -192,6 +197,9 @@ const source = messageWindowClient((args) => {
 
 function Row({ row, store }: { row: MessageRow; store: MessageStore }) {
   const message = store.getMessage(row.messageId)!
+  const highlightRef = useMessageHighlightRef(
+    highlightTargetForRow(message.id, row),
+  )
   if (row.kind === 'work')
     return (
       <button
@@ -212,6 +220,7 @@ function Row({ row, store }: { row: MessageRow; store: MessageStore }) {
   ]
   return (
     <article
+      ref={highlightRef}
       style={{
         height: clamped
           ? Number(row.messageId.slice(1)) < 8
@@ -434,7 +443,12 @@ function WindowFixture() {
       groupBySender: grouped || clamped,
     })
   }, [window, store, converted])
-  return <Transcript window={window} store={store} />
+  const transcript = <Transcript window={window} store={store} />
+  return replies ? (
+    <MessageHighlightProvider>{transcript}</MessageHighlightProvider>
+  ) : (
+    transcript
+  )
 }
 
 /** Exercises bounded queries, production row projection, pagination, and scroll restoration. */

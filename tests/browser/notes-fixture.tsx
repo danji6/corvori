@@ -1,6 +1,7 @@
 import { ChatSession } from '@/components/chat/chat-session'
 import { ChatSessionView } from '@/components/chat/chat-session-view'
 import { HiddenChip } from '@/components/chat/messages/hidden-chip'
+import { MessageHighlightProvider } from '@/components/chat/messages/message-highlight-context'
 import type { ScrollDeps } from '@/components/chat/messages/message-list/deps'
 import { MessageListContent } from '@/components/chat/messages/message-list/message-list-content'
 import { MessageListContext } from '@/components/chat/messages/message-list/message-list-context'
@@ -212,7 +213,7 @@ function Transcript() {
         requestScrollToMessage(messageId, creationTime, segmentIndex, options)
       }
     >
-      {transcript}
+      <MessageHighlightProvider>{transcript}</MessageHighlightProvider>
     </MessageSeekContext>
   )
 }
