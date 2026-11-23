@@ -96,7 +96,7 @@ export const MessageRowView = memo(function MessageRowView({
           row={row}
           message={message}
           record={messageMeta}
-          partMeta={partMeta}
+          toolErrors={partMeta?.toolErrors}
         />
       ) : row.kind === 'footer' ? (
         <FooterRow

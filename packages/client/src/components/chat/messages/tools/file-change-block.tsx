@@ -86,7 +86,9 @@ export function FileChangeBlock({
         <>
           {!grouped && `${verb} `}
           {personal && (grouped ? 'Personal folder · ' : 'personal file ')}
-          <span className="text-foreground font-mono">{path ?? '…'}</span>
+          <span className="chat-tool-list-label text-foreground font-mono">
+            {path ?? '…'}
+          </span>
         </>
       }
     >

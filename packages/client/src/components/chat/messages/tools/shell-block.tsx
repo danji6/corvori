@@ -224,8 +224,6 @@ function ShellCommandBlock({
       revealOnOpen="manual"
       fullWidth
       surface="inset"
-      headerClassName="in-data-[open=false]:p-2"
-      triggerClassName="px-2 py-1"
       noErrorText={hasTerminal || Boolean(fallbackText)}
       dense={dense}
       leadingIcon={null}
@@ -339,8 +337,7 @@ function ShellLabel({
 
   return (
     <span className="flex min-w-0 flex-col gap-0.5">
-      <span className="font-mono">
-        <span className="text-foreground/70">$</span>{' '}
+      <span className="chat-tool-list-label font-mono">
         {input?.command ? (
           <HighlightedCommand command={input.command} />
         ) : (

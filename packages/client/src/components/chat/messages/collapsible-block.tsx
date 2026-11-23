@@ -170,10 +170,9 @@ export function CollapsibleBlock({
         >
           <div
             className={cn(
-              'chat-header-focus flex items-center rounded-3xl px-(--work-body-padding)',
+              'chat-header-focus flex items-center rounded-3xl',
+              !insetSurface && 'px-(--work-body-padding)',
               rowMinH,
-              insetSurface &&
-                'p-0 in-data-[open=true]:px-2 in-data-[open=true]:py-1.5',
               open && 'chat-block-header-expanded',
               headerClassName,
             )}
@@ -317,7 +316,7 @@ function Trigger({
         <Accordion.Icon
           isExpanded={isOpen}
           className={cn(
-            'text-muted-foreground shrink-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100',
+            'text-muted-foreground shrink-0',
             floatingChevron && 'absolute right-1',
           )}
         />

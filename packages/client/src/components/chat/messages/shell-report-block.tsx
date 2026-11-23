@@ -22,13 +22,10 @@ export function ShellReportBlock({ part }: { part: ShellReportPart }) {
       open={open}
       onOpenChange={onOpenChange}
       surface="inset"
-      headerClassName="in-data-[open=false]:p-2"
-      triggerClassName="px-2 py-1"
       fullWidth
       dense
       label={
-        <span className="font-mono">
-          <span className="text-foreground/70">$</span>{' '}
+        <span className="chat-tool-list-label font-mono">
           <HighlightedCommand command={part.command} />
           <span className="text-muted-foreground ml-2 text-[10px] uppercase">
             {STATUS_LABELS[part.status]}

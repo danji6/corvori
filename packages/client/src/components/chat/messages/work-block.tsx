@@ -1,7 +1,7 @@
 import { Accordion, Button } from '@/components/ui'
 import { useScrollIntoView } from '@/hooks/chat/scroll-into-view'
 import { useIsMessageStreaming } from '@/hooks/chat/stream'
-import type { MessageRecord, PartMetadata } from '@/lib/chat'
+import type { MessageRecord } from '@/lib/chat'
 import { type MessageRow, segmentGroupsFor } from '@/lib/chat/rows'
 import { workExpansion } from '@/lib/chat/work-state'
 import { summarizeWork } from '@/lib/chat/work-summary'
@@ -23,11 +23,16 @@ type WorkBlockProps = {
   row: Extract<MessageRow, { kind: 'work' }>
   message: UIMessage
   record?: MessageRecord
-  partMeta?: PartMetadata
+  toolErrors?: string[]
 }
 
 /** Toggles virtualized work rows without mounting a second scrolling container. */
-export function WorkBlock({ row, message, record, partMeta }: WorkBlockProps) {
+export function WorkBlock({
+  row,
+  message,
+  record,
+  toolErrors,
+}: WorkBlockProps) {
   const workId = row.work.id
   const open = useSyncExternalStore(workExpansion.subscribe, () =>
     workExpansion.getSnapshot().has(workId),
@@ -59,12 +64,8 @@ export function WorkBlock({ row, message, record, partMeta }: WorkBlockProps) {
 
   const summary = useMemo(
     () =>
-      summarizeWork(
-        row.work,
-        segmentGroupsFor(message, record),
-        partMeta?.toolErrors,
-      ),
-    [row.work, message, record, partMeta?.toolErrors],
+      summarizeWork(row.work, segmentGroupsFor(message, record), toolErrors),
+    [row.work, message, record, toolErrors],
   )
 
   const toggle = () => {
@@ -94,9 +95,6 @@ export function WorkBlock({ row, message, record, partMeta }: WorkBlockProps) {
       >
         {summary.label}
         {row.work.partial && ' · loaded portion'}
-        {summary.failures > 0 && (
-          <span className="text-destructive"> · {summary.failures} failed</span>
-        )}
       </span>
       <Accordion.Icon isExpanded={open} className="shrink-0" />
     </Button>

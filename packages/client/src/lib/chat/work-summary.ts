@@ -16,7 +16,7 @@ import {
 export function summarizeWork(
   work: WorkGroup,
   slices: SegmentGroups[],
-  errors: string[] = [],
+  toolErrors?: string[],
 ) {
   const groups = work.groups.flatMap((address) => {
     const group = slices.find(
@@ -29,7 +29,11 @@ export function summarizeWork(
       groups.flatMap(toolsInGroup).map((part) => [part.toolCallId, part]),
     ).values(),
   ]
-  const { statuses, reportCommands } = workStatuses(tools, work.reports, errors)
+  const { running, reportCommands } = summarizeToolActivity(
+    tools,
+    work.reports,
+    toolErrors,
+  )
   const activity =
     tools.length || reportCommands ? activityLabel(tools, reportCommands) : ''
   const label =
@@ -38,10 +42,7 @@ export function summarizeWork(
 
   return {
     label: label[0].toUpperCase() + label.slice(1),
-    failures: statuses.filter((status) => status === 'error').length,
-    running:
-      groups.some(isThinking) ||
-      statuses.some((status) => status === 'running' || status === 'pending'),
+    running: running || groups.some(isThinking),
   }
 }
 
@@ -61,25 +62,29 @@ function thinkingLabel(groups: PartGroup[]): string {
   return duration > 0 ? `thought for ${formatDuration(duration)}` : 'thought'
 }
 
-/** Settles reported jobs without treating command outcomes as tool failures. */
-function workStatuses(
+/** Counts commands whose reports have no loaded tool call and tracks active tools. */
+function summarizeToolActivity(
   tools: ToolUIPart[],
   reports: WorkShellReport[] = [],
-  errors: string[],
+  toolErrors?: string[],
 ) {
-  const byJob = new Map(reports.map((report) => [report.jobId, report]))
-  const unmatched = new Map(byJob)
+  const reportedJobs = new Set(reports.map((report) => report.jobId))
+  const matchedJobs = new Set<string>()
+  let running = false
 
-  const statuses = tools.map((part) => {
+  for (const part of tools) {
     const jobId = shellJobId(part)
-    const report = jobId ? byJob.get(jobId) : undefined
-    if (report) unmatched.delete(report.jobId)
-    if (errors.includes(part.toolCallId)) return 'error'
-    const status = getToolStatus(part)
-    return report && status !== 'error' ? 'complete' : status
-  })
+    if (jobId && reportedJobs.has(jobId)) {
+      matchedJobs.add(jobId)
+      continue
+    }
+    if (toolErrors?.includes(part.toolCallId)) continue
 
-  return { statuses, reportCommands: unmatched.size }
+    const status = getToolStatus(part)
+    running ||= status === 'running' || status === 'pending'
+  }
+
+  return { running, reportCommands: reportedJobs.size - matchedJobs.size }
 }
 
 function isThinking(group: PartGroup): boolean {
@@ -95,7 +100,7 @@ function shellJobId(part: ToolUIPart): string | undefined {
   return parseOutputValue<ShellToolOutput>(part.output)?.jobId
 }
 
-function activityLabel(tools: ToolUIPart[], reportCommands = 0): string {
+function activityLabel(tools: ToolUIPart[], reportCommands: number): string {
   const reads = new Set<string>()
   const changes = new Set<string>()
   let attachmentCalls = 0

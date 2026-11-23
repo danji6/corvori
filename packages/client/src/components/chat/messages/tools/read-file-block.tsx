@@ -38,18 +38,15 @@ export function ReadFileBlock({
       label={label}
     >
       <ToolList>
-        {parts.map((part, index) => {
+        {parts.map((part) => {
           const error = partError(part, toolErrors)
           const running = !error && partRunning(part, toolErrors)
           return (
-            <ToolListItem
-              key={part.toolCallId}
-              last={index === parts.length - 1}
-            >
+            <ToolListItem key={part.toolCallId}>
               <div className="flex flex-wrap items-baseline gap-x-2">
                 <span
                   className={cn(
-                    'font-mono break-all',
+                    'chat-tool-list-label font-mono break-all',
                     running ? 'text-shimmer' : 'text-foreground',
                   )}
                 >

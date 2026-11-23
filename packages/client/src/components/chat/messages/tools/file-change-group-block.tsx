@@ -38,8 +38,8 @@ export function FileChangeGroupBlock({
       }
     >
       <ToolList>
-        {parts.map((part, index) => (
-          <ToolListItem key={part.toolCallId} last={index === parts.length - 1}>
+        {parts.map((part) => (
+          <ToolListItem key={part.toolCallId}>
             <FileChangeBlock
               part={part}
               messageId={messageId}

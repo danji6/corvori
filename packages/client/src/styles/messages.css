@@ -2,7 +2,7 @@
 @layer components {
   :root {
     --work-row-gap: --spacing(1);
-    --message-card-gap: --spacing(3);
+    --note-group-row-gap: --spacing(2);
     --work-header-padding-y: --spacing(1);
     --work-body-padding: --spacing(2.5);
     --work-surface-padding: --spacing(4);
@@ -81,6 +81,10 @@
     padding: var(--work-surface-padding);
   }
 
+  .chat-block-inset[data-open='true'] > .chat-header-focus {
+    padding: --spacing(1.5) --spacing(2);
+  }
+
   .chat-block-body-inset {
     padding: var(--work-surface-gap) 0 0;
   }
@@ -100,6 +104,68 @@
     );
   }
 
+  .chat-tool-list {
+    --tool-list-indent: --spacing(3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--work-row-gap);
+    margin-left: --spacing(4);
+    padding-left: var(--tool-list-indent);
+  }
+
+  .chat-tool-list .chat-block-inset[data-open='false'] > .chat-header-focus {
+    padding-inline: --spacing(2);
+  }
+
+  .chat-tool-list-item::before,
+  .chat-tool-list-item::after {
+    position: absolute;
+    top: 0;
+    left: calc(-1 * var(--tool-list-indent));
+    pointer-events: none;
+  }
+
+  /* Each stem spans its row and the gap, except where the last branch ends it. */
+  .chat-tool-list-item:not(:last-child)::before {
+    content: '';
+    bottom: calc(-1 * var(--work-row-gap));
+    width: 1px;
+    background: var(--base-border);
+  }
+
+  .chat-tool-list-item::after {
+    content: '';
+    bottom: calc(100% - 0.5lh - 0.5px);
+    width: --spacing(2.5);
+    border-bottom: 1px solid var(--base-border);
+  }
+
+  .chat-tool-list-item:last-child::after {
+    border-left: 1px solid var(--base-border);
+  }
+
+  @supports (anchor-scope: --tool-list-label) {
+    .chat-tool-list-item {
+      anchor-scope: --tool-list-label;
+    }
+
+    .chat-tool-list-item::after {
+      bottom: calc(
+        anchor(--tool-list-label center, calc(100% - 0.5lh)) - 0.5px
+      );
+    }
+
+    .chat-tool-list-item .chat-tool-list-anchor,
+    .chat-tool-list-item .chat-tool-list-label::before {
+      anchor-name: --tool-list-label;
+    }
+
+    /* Keep the anchor on the first line when a label wraps. */
+    .chat-tool-list-item .chat-tool-list-label::before {
+      content: '';
+    }
+  }
+
   .chat-work-row {
     --work-list-bottom-padding: 0px;
   }
@@ -113,6 +179,12 @@
     --chat-header-focus-inset: 0 calc(-1 * var(--message-summary-padding-y));
     min-height: var(--message-summary-height);
     padding-block: var(--message-summary-padding-y);
+  }
+
+  /* The first note's spacer supplies the gap below the expanded header. */
+  .chat-note-group-header[data-open='true'] {
+    min-height: 0;
+    padding-block-end: 0;
   }
 }
 

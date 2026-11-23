@@ -1,9 +1,9 @@
-import { cn } from '@/lib/utils'
 import type { ToolUIPart } from 'ai'
 import { NetworkIcon } from 'lucide-react'
 
 import { CollapsibleBlock } from '../collapsible-block'
 import { SubagentLabel, useSubagentInfo } from './subagent-block'
+import { ToolList, ToolListItem } from './tool-list'
 
 /** Renders one or more consecutive `task` calls as a list of sub-agents. */
 export function SubagentGroupBlock({
@@ -30,26 +30,16 @@ export function SubagentGroupBlock({
       leadingIcon={<NetworkIcon className="size-3.5 shrink-0" />}
       label={label}
     >
-      <ul className="before:bg-border relative ml-4 flex flex-col gap-1 pl-3 before:absolute before:top-0 before:left-0 before:h-2.5 before:w-px">
-        {parts.map((part, index) => (
-          <SubagentGroupItem
-            key={part.toolCallId}
-            part={part}
-            last={index === parts.length - 1}
-          />
+      <ToolList>
+        {parts.map((part) => (
+          <SubagentGroupItem key={part.toolCallId} part={part} />
         ))}
-      </ul>
+      </ToolList>
     </CollapsibleBlock>
   )
 }
 
-function SubagentGroupItem({
-  part,
-  last,
-}: {
-  part: ToolUIPart
-  last: boolean
-}) {
+function SubagentGroupItem({ part }: { part: ToolUIPart }) {
   const { input, childSessionId, live, status, openSession } =
     useSubagentInfo(part)
 
@@ -65,13 +55,7 @@ function SubagentGroupItem({
   )
 
   return (
-    <li
-      className={cn(
-        'before:bg-border relative flex text-xs before:absolute before:top-2.5 before:-left-3 before:h-px before:w-2.5',
-        !last &&
-          'after:bg-border after:absolute after:top-2.5 after:-bottom-3.5 after:-left-3 after:w-px',
-      )}
-    >
+    <ToolListItem className="flex">
       {openSession ? (
         <button
           type="button"
@@ -83,6 +67,6 @@ function SubagentGroupItem({
       ) : (
         label
       )}
-    </li>
+    </ToolListItem>
   )
 }

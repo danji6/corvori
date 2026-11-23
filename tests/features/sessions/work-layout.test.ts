@@ -242,16 +242,14 @@ describe('work summaries', () => {
     const result = summarizeWork(
       layout(msg).work[0],
       segmentGroupsFor(msg, undefined),
-      ['e2'],
     )
     expect(result).toEqual({
       label: 'Read 1 file, edited 2 files, ran 1 command, 1 other tool call',
-      failures: 1,
       running: true,
     })
   })
 
-  test('keeps failed work folded and handles unknown inputs', () => {
+  test('keeps failed work folded and stops showing it as running', () => {
     const msg = message([
       {
         ...tool('shell', 's'),
@@ -261,15 +259,23 @@ describe('work summaries', () => {
     ])
     expect(
       summarizeWork(layout(msg).work[0], segmentGroupsFor(msg, undefined)),
-    ).toEqual({ label: 'Ran 1 command', running: false, failures: 1 })
+    ).toEqual({ label: 'Ran 1 command', running: false })
     expect(project(msg).map((row) => row.kind)).toEqual(['header', 'work'])
+  })
+
+  test('uses tool error metadata to settle a pending call with unknown inputs', () => {
     const pending = message([tool('edit_file', 'e')])
-    expect(
-      summarizeWork(
-        layout(pending).work[0],
-        segmentGroupsFor(pending, undefined),
-      ).label,
-    ).toBe('1 other tool call')
+    const [work] = layout(pending).work
+    const groups = segmentGroupsFor(pending, undefined)
+
+    expect(summarizeWork(work, groups)).toEqual({
+      label: '1 other tool call',
+      running: true,
+    })
+    expect(summarizeWork(work, groups, ['e'])).toEqual({
+      label: '1 other tool call',
+      running: false,
+    })
   })
 
   test('counts attachment read operations without implying unique files', () => {

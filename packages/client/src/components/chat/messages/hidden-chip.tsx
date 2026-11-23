@@ -249,6 +249,8 @@ function HiddenChipContent({
 }: HiddenChipProps & { presentation: ChipPresentation }) {
   const [open, setOpen] = useNoteExpansion(noteContentKey(message.id))
   const { icon: Icon, label } = presentation
+  const grouped = placement === 'grouped'
+  const compact = grouped && !open
 
   return (
     <CollapsibleBlock
@@ -258,8 +260,9 @@ function HiddenChipContent({
       onOpenChange={setOpen}
       revealOnOpen={false}
       dense
-      surface={placement === 'grouped' ? 'inset-row' : 'inset'}
-      triggerClassName="py-(--work-header-padding-y)"
+      surface={grouped ? 'inset-row' : 'inset'}
+      className={grouped ? 'data-[open=false]:border-y-0' : undefined}
+      triggerClassName={compact ? 'py-0' : 'py-(--work-header-padding-y)'}
     >
       <div
         className="wrap-anywhere select-text"

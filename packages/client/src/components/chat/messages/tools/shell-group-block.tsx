@@ -69,11 +69,10 @@ export function ShellGroupBlock({
           </>
         }
       >
-        <ToolList className="[--tool-list-gap:var(--message-card-gap)]">
-          {parts.map((part, index) => (
+        <ToolList>
+          {parts.map((part) => (
             <ToolListItem
               key={isShellReportPart(part) ? part.jobId : part.toolCallId}
-              last={index === parts.length - 1}
             >
               {isShellReportPart(part) ? (
                 <ShellReportBlock part={part} />

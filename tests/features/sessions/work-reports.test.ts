@@ -71,7 +71,6 @@ test('a delayed report folds into its original work and retains its content addr
   const owner = works[0]
   expect(summarizeWork(owner.work, segmentGroupsFor(source, agent))).toEqual({
     label: 'Edited 1 file, ran 1 command',
-    failures: 0,
     running: true,
   })
   const child = rows.find((row) => row.messageId === report.id)!
@@ -94,9 +93,10 @@ test.each([
   ['failed', undefined],
   ['killed', undefined],
 ] as const)(
-  'completion settles work without tool failures (%s, exit=%s)',
+  'a shell report settles pending work (%s, exit=%s)',
   (status, exitCode) => {
-    const commandMessage = message([command], source.id)
+    const pendingCommand = { ...command, preliminary: true }
+    const commandMessage = message([pendingCommand], source.id)
     const completed = {
       ...report,
       parts: [{ ...reportPart, status, exitCode }],
@@ -107,21 +107,9 @@ test.each([
     ).toEqual({
       label: 'Ran 1 command',
       running: false,
-      failures: 0,
     })
   },
 )
-
-test('completion preserves genuine tool failures recorded in metadata', () => {
-  const commandMessage = message([command], source.id)
-  const { works } = transcript([commandMessage, report])
-
-  expect(
-    summarizeWork(works[0].work, segmentGroupsFor(commandMessage, agent), [
-      command.toolCallId,
-    ]),
-  ).toEqual({ label: 'Ran 1 command', running: false, failures: 1 })
-})
 
 test('matches job identity rather than the nearest summary or repeated command text', () => {
   const unrelated = message(
@@ -207,7 +195,7 @@ test.each([true, false])(
     const row = works[0]
     expect(
       summarizeWork(row.work, segmentGroupsFor(failedReport, agent)),
-    ).toEqual({ label: 'Ran 1 command', running: false, failures: 0 })
+    ).toEqual({ label: 'Ran 1 command', running: false })
     expect(project().filter((row) => row.kind === 'group')).toHaveLength(0)
     expect(
       project(new Set([row.work.id])).some((row) => row.kind === 'group'),

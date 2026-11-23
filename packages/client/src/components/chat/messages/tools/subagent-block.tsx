@@ -119,7 +119,7 @@ export function SubagentLabel({
       <SessionAvatar avatarId={avatarId} noHover size="xs" />
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="text-foreground truncate font-semibold">
+          <span className="chat-tool-list-anchor text-foreground truncate font-semibold">
             {name ?? 'Sub-agent'}
           </span>
           {status && (
