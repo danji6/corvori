@@ -1,12 +1,12 @@
 import { DEFAULT_TITLE_SYSTEM_PROMPT } from '@cv/core/title-generation'
+import type { MathMode } from '@cv/core/types/agents'
+import type { Prompt, PromptItem } from '@cv/core/types/prompts'
+import type { ContextOptions } from '@cv/core/types/providers'
+import type { WebSearchInstance } from '@cv/core/types/search'
 import { inline } from '@cv/core/utils/strings'
 
 import type { Doc } from '../_generated/dataModel'
 import { generateId } from '../lib/utils'
-import type { Prompt, PromptItem } from '../types'
-import type { ContextOptions } from '../types'
-import type { MathMode } from '../types'
-import type { WebSearchInstance } from '../types'
 
 // Updated with the CSS palettes by bun run gen:theme.
 export const SOURCE_COLOR = '#30275e'

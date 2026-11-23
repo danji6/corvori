@@ -2,9 +2,12 @@ import { addCacheUsage } from '@cv/core/cache-usage'
 
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
-import type { SaveStreamCacheArgs, SaveStreamLogArgs } from '../../types'
-import type { SaveStreamMetaArgs } from '../../types'
-import type { TokenUsage } from '../../types'
+import type { TokenUsage } from '../../validators/providers'
+import type {
+  SaveStreamCacheArgs,
+  SaveStreamLogArgs,
+  SaveStreamMetaArgs,
+} from '../../validators/streams'
 import { getProcessingSegmentRow, saveSegmentMeta } from '../messageContents'
 import { scheduleTitle } from '../messages'
 import { _save, findCache } from '../session/cache'

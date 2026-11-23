@@ -1,4 +1,5 @@
-import type { InferenceParameters } from '../../types'
+import type { InferenceParameters } from '@cv/core/types/providers'
+
 import { type ProviderOptions } from './options'
 
 export const NO_PENALTY_PROVIDERS = new Set(['anthropic', 'mistral'])

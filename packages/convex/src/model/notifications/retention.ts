@@ -5,7 +5,7 @@ import {
 
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
-import type { NotificationStatus } from '../../types'
+import type { NotificationStatus } from '../../validators/notifications'
 
 export function statusLimit(status: NotificationStatus) {
   return status === 'unread' ? MAX_UNREAD_NOTIFICATIONS : MAX_READ_NOTIFICATIONS

@@ -135,7 +135,9 @@ The `package.json` contains most scripts you will need, including running tests.
      instead of rewriting a separate type.
    - For handlers with more than 2 args, don't inline them; write a validator in
      the appropriate domain module under `validators/`.
-   - Write inferred validator types in `types.ts`.
+   - Export inferred types next to their validators and import them directly
+     from the defining validator module. Keep model-specific shapes in the
+     owning domain.
    - Use the `error()` utility function in `errors.ts` to throw server-side errors.
    - Prefix all internal queries, mutations and actions with an underscore (e.g. \_save).
    - Use dynamic imports in Convex actions (NOT queries/mutations) to avoid

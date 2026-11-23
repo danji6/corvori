@@ -1,6 +1,7 @@
+import type { AgentAutoApprove } from '@cv/core/types/agents'
+import type { ToolApprovals } from '@cv/core/types/tools'
 import { isPathForbidden } from '@cv/core/workspace/path-policy'
 
-import type { AgentAutoApprove, ToolApprovals } from '../../types'
 import { gitSubcommandIndex } from './gitReadOnly'
 import { hasReadOnlyArguments } from './readOnlyArgs'
 import { parseRunnerInvocation } from './runnerInvocation'

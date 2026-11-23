@@ -6,7 +6,7 @@ import {
 import { createCacheDiagnostics } from '@cv/convex/model/stream/cacheDiagnostics'
 import { accumulateSessionUsage } from '@cv/convex/model/stream/lifecycleMeta'
 import { resolveUsage } from '@cv/convex/model/stream/usage'
-import type { CacheDiagnostic } from '@cv/convex/types'
+import type { CacheDiagnostic } from '@cv/convex/validators/providerRequests'
 import { sidecarAuthentication } from '@cv/sidecar/auth'
 import { sidecarError } from '@cv/sidecar/http-errors'
 import { chatGPTResponses } from '@cv/sidecar/providers/openai/handlers'

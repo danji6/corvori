@@ -1,7 +1,7 @@
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import type { OperationAttemptArgs } from '../../types'
+import type { OperationAttemptArgs } from '../../validators/fileOperations'
 import { requireOwnedAgent, requireOwnedSkill } from './access'
 import { fail } from './completion'
 import { deletionTargets } from './libraryDeletion'

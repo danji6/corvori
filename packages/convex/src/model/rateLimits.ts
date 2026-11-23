@@ -1,6 +1,6 @@
 import type { Doc } from '../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../_generated/server'
-import type { RateLimitRuleArgs } from '../types'
+import type { RateLimitRuleArgs } from '../validators/rateLimits'
 
 const RETENTION_MS = 24 * 60 * 60 * 1000
 const PRUNE_BATCH_SIZE = 64

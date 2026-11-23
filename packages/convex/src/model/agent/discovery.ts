@@ -2,7 +2,7 @@ import { stream } from 'convex-helpers/server/stream'
 
 import type { AuthQueryCtx } from '../../functions'
 import schema from '../../schema'
-import type { AgentPageArgs } from '../../types'
+import type { AgentPageArgs } from '../../validators/agents'
 
 /** Searches all owned agents in bounded pages, ordered by explicit selection. */
 export async function page(ctx: AuthQueryCtx, args: AgentPageArgs) {

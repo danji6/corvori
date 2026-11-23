@@ -1,5 +1,5 @@
 import type { AuthMutationCtx } from '../../functions'
-import type { ToolkitSelectionArgs } from '../../types'
+import type { ToolkitSelectionArgs } from '../../validators/toolkits'
 import { ownedToolkit, requireSelectionAccess } from './access'
 import { reconcileToolkit } from './components'
 

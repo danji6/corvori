@@ -2,7 +2,7 @@ import { internal } from '../../_generated/api'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { minRole } from '../../lib/roles'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { getProcessingSegmentRow, getSegmentRow } from '../messageContents'
 import {
   isUnevaluatedTextPart,

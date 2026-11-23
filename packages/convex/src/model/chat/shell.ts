@@ -13,7 +13,6 @@ import {
   isShellToolPart,
 } from '../../lib/userShell'
 import { generateId } from '../../lib/utils'
-import type { Session } from '../../types'
 import {
   getSegmentRow,
   insertMessage,
@@ -25,6 +24,7 @@ import { syncActivity } from '../messages'
 import { notifyUserMessage } from '../notifications/records'
 import { getSessionWithWorkspace } from '../session/folderContext'
 import * as Memberships from '../session/memberships'
+import type { Session } from '../session/types'
 import * as Settings from '../settings'
 import { resolveSender } from './identities'
 import { reserveOrDebounceTurn } from './reserve'

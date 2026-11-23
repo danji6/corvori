@@ -8,7 +8,8 @@ import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
 import { ToolError } from '../../errors'
 import { generateId } from '../../lib/utils'
-import type { StreamContext, StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
+import type { StreamContext } from '../stream/types'
 import {
   compactDefinitions,
   frozenDefinitions,

@@ -5,7 +5,11 @@ import {
   createDefaultImpersonationPrompts,
 } from '@cv/convex/model/defaults'
 import { ensurePromptMarkers } from '@cv/convex/model/prompt/markers'
-import type { Prompt, PromptItem, PromptMarkerType } from '@cv/convex/types'
+import type {
+  Prompt,
+  PromptItem,
+  PromptMarkerType,
+} from '@cv/core/types/prompts'
 import { describe, expect, test } from 'bun:test'
 
 const AGENT_MARKERS: PromptMarkerType[] = ['message-history', 'system-boundary']

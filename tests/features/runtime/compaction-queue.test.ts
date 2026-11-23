@@ -4,7 +4,7 @@ import { _claim, _handoff } from '@cv/convex/model/stream/lifecycleClaims'
 import { _continue } from '@cv/convex/model/stream/lifecycleProgress'
 import { _complete } from '@cv/convex/model/stream/lifecycleTerminal'
 import { _getProviderHistory } from '@cv/convex/model/stream/reads'
-import type { StreamExecutionArgs } from '@cv/convex/types'
+import type { StreamExecutionArgs } from '@cv/convex/validators/streams'
 import { expect, test } from 'bun:test'
 import { skillsDatabase } from '~/tests/helpers/skills-db'
 

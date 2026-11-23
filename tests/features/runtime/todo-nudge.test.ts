@@ -4,7 +4,7 @@ import {
   isTodoNudgeDue,
 } from '@cv/convex/model/chat/reminders'
 import { formatTodoList, hasUnresolvedTodos } from '@cv/convex/model/todos'
-import type { TodoItem } from '@cv/convex/types'
+import type { TodoItem } from '@cv/convex/validators/todos'
 import { describe, expect, test } from 'bun:test'
 
 function items(...statuses: TodoItem['status'][]): TodoItem[] {

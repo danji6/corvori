@@ -1,5 +1,5 @@
 import { paginationOptsValidator } from 'convex/server'
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 import { folderSourceValidator } from './workspaces'
 
@@ -18,10 +18,14 @@ export const folderMoveArgs = v.object({
   confirmationKey: v.optional(v.string()),
 })
 
+export type FolderMoveArgs = Infer<typeof folderMoveArgs>
+
 export const folderPageArgs = v.object({
   paginationOpts: paginationOptsValidator,
   groupKey: v.string(),
 })
+
+export type FolderPageArgs = Infer<typeof folderPageArgs>
 
 export const folderPickerArgs = v.object({
   paginationOpts: paginationOptsValidator,
@@ -29,6 +33,8 @@ export const folderPickerArgs = v.object({
   organizationOnly: v.optional(v.boolean()),
   excludeBranchId: v.optional(v.id('sessionFolders')),
 })
+
+export type FolderPickerArgs = Infer<typeof folderPickerArgs>
 
 const moveSessionCommand = v.object({
   kind: v.literal('move-session'),
@@ -60,6 +66,8 @@ export const folderCommandValidator = v.union(
   deleteFolderCommand,
 )
 
+export type FolderCommand = Infer<typeof folderCommandValidator>
+
 export const folderChangeArgs = v.object({ command: folderCommandValidator })
 
 const workspaceSnapshot = {
@@ -80,10 +88,14 @@ export const folderCommitPlanValidator = v.union(
   v.object({ ...deleteFolderCommand.fields, ...folderSnapshot }),
 )
 
+export type FolderCommitPlan = Infer<typeof folderCommitPlanValidator>
+
 export const folderLockTargetValidator = v.union(
   v.object({ kind: v.literal('session'), id: v.id('sessions') }),
   v.object({ kind: v.literal('folder'), id: v.id('sessionFolders') }),
 )
+
+export type FolderLockTarget = Infer<typeof folderLockTargetValidator>
 
 export const folderCreateBasicArgs = v.object({
   name: v.string(),
@@ -91,16 +103,22 @@ export const folderCreateBasicArgs = v.object({
   parentId: v.optional(v.id('sessionFolders')),
 })
 
+export type FolderCreateBasicArgs = Infer<typeof folderCreateBasicArgs>
+
 export const folderTransitionArgs = v.object({
   ...folderChangeArgs.fields,
   subject: v.string(),
   token: v.string(),
 })
 
+export type FolderTransitionArgs = Infer<typeof folderTransitionArgs>
+
 export const folderCreateArgs = v.object({
   ...folderCreateBasicArgs.fields,
   sources: v.array(folderSourceValidator),
 })
+
+export type FolderCreateArgs = Infer<typeof folderCreateArgs>
 
 export const folderCommitArgs = v.object({
   subject: v.string(),
@@ -108,11 +126,15 @@ export const folderCommitArgs = v.object({
   plan: folderCommitPlanValidator,
 })
 
+export type FolderCommitArgs = Infer<typeof folderCommitArgs>
+
 export const folderCancelArgs = v.object({
   subject: v.string(),
   token: v.string(),
   target: folderLockTargetValidator,
 })
+
+export type FolderCancelArgs = Infer<typeof folderCancelArgs>
 
 export const folderCreateInternalArgs = v.object({
   ...folderCreateArgs.fields,

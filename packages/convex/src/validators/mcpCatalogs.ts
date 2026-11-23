@@ -1,5 +1,5 @@
 import { paginationOptsValidator } from 'convex/server'
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 import { streamExecutionArgsValidator } from './streams'
 
@@ -39,6 +39,8 @@ export const catalogIdValidator = v.object({
   catalogId: v.id('mcpCatalogs'),
 })
 
+export type McpCatalogIdArgs = Infer<typeof catalogIdValidator>
+
 export const catalogRefreshActiveValidator = v.object({
   ...catalogIdValidator.fields,
   runtimeId: v.id('mcpRuntimes'),
@@ -49,11 +51,15 @@ export const catalogBeginValidator = v.object({
   serverId: v.id('mcpServers'),
 })
 
+export type McpCatalogBeginArgs = Infer<typeof catalogBeginValidator>
+
 export const catalogActiveValidator = v.object({
   immediate: v.optional(v.boolean()),
   ...streamExecutionArgsValidator.fields,
   ...catalogBeginValidator.fields,
 })
+
+export type McpCatalogActiveArgs = Infer<typeof catalogActiveValidator>
 
 export const catalogAppendValidator = v.object({
   ...catalogIdValidator.fields,
@@ -70,16 +76,22 @@ export const catalogAppendValidator = v.object({
   ),
 })
 
+export type McpCatalogAppendArgs = Infer<typeof catalogAppendValidator>
+
 export const catalogPublishValidator = v.object({
   ...catalogIdValidator.fields,
   count: v.number(),
   fingerprint: v.string(),
 })
 
+export type McpCatalogPublishArgs = Infer<typeof catalogPublishValidator>
+
 export const catalogFailureValidator = v.object({
   ...catalogIdValidator.fields,
   error: v.string(),
 })
+
+export type McpCatalogFailureArgs = Infer<typeof catalogFailureValidator>
 
 export const catalogPageValidator = v.object({
   ...catalogBeginValidator.fields,
@@ -87,12 +99,16 @@ export const catalogPageValidator = v.object({
   paginationOpts: paginationOptsValidator,
 })
 
+export type McpCatalogPageArgs = Infer<typeof catalogPageValidator>
+
 export const catalogTargetValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   serverId: v.id('mcpServers'),
   toolId: v.id('mcpCatalogTools'),
   forDefinition: v.optional(v.boolean()),
 })
+
+export type McpCatalogTargetArgs = Infer<typeof catalogTargetValidator>
 
 export const catalogSearchValidator = v.object({
   ...streamExecutionArgsValidator.fields,
@@ -102,17 +118,29 @@ export const catalogSearchValidator = v.object({
   limit: v.number(),
 })
 
+export type McpCatalogSearchArgs = Infer<typeof catalogSearchValidator>
+
 export const catalogDefinitionAccessValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   definitionRef: v.id('_storage'),
 })
+
+export type McpCatalogDefinitionAccessArgs = Infer<
+  typeof catalogDefinitionAccessValidator
+>
 
 export const catalogActiveFailureValidator = v.object({
   ...catalogActiveValidator.fields,
   error: v.string(),
 })
 
+export type McpCatalogActiveFailureArgs = Infer<
+  typeof catalogActiveFailureValidator
+>
+
 export const catalogSweepValidator = v.object({
   cursor: v.optional(v.string()),
   before: v.optional(v.number()),
 })
+
+export type McpCatalogSweepArgs = Infer<typeof catalogSweepValidator>

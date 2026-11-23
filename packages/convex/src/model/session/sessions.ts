@@ -1,6 +1,7 @@
 import type { Id } from '../../_generated/dataModel'
 import { type AuthMutationCtx, requireRole } from '../../functions'
-import type { ApprovalMode, SessionMode } from '../../types'
+import type { ApprovalMode } from '../../validators/approvals'
+import type { SessionMode } from '../../validators/sessionModes'
 import { getByOwnerId as getSettings } from '../settings'
 import { requireFolder, sessionGroup } from './folderContext'
 import { resolveSessionModel } from './models'

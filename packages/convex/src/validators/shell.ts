@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 /** Mirrors `ShellJobStatus` from `@cv/core/types/tools`. */
 export const shellJobStatusValidator = v.union(
@@ -16,10 +16,14 @@ export const terminalWriteArgsValidator = v.object({
   data: v.string(),
 })
 
+export type TerminalWriteArgs = Infer<typeof terminalWriteArgsValidator>
+
 export const terminalKillArgsValidator = v.object({
   sessionId: v.id('sessions'),
   jobId: v.string(),
 })
+
+export type TerminalKillArgs = Infer<typeof terminalKillArgsValidator>
 
 export const terminalResizeArgsValidator = v.object({
   sessionId: v.id('sessions'),
@@ -28,15 +32,21 @@ export const terminalResizeArgsValidator = v.object({
   rows: v.number(),
 })
 
+export type TerminalResizeArgs = Infer<typeof terminalResizeArgsValidator>
+
 export const terminalSessionArgsValidator = v.object({
   sessionId: v.id('sessions'),
 })
+
+export type TerminalSessionArgs = Infer<typeof terminalSessionArgsValidator>
 
 export const terminalPollArgsValidator = v.object({
   sessionId: v.id('sessions'),
   jobId: v.string(),
   offset: v.number(),
 })
+
+export type TerminalPollArgs = Infer<typeof terminalPollArgsValidator>
 
 export const shellOutputSpanValidator = v.object({
   start: v.number(),
@@ -82,6 +92,10 @@ export const shellDeliveryPositionArgsValidator = v.object({
   jobId: v.string(),
   offset: v.optional(v.number()),
 })
+
+export type ShellDeliveryPositionArgs = Infer<
+  typeof shellDeliveryPositionArgsValidator
+>
 
 export const shellOutputDeliverySchema = v.object({
   sessionId: v.id('sessions'),

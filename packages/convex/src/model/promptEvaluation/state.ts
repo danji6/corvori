@@ -1,7 +1,7 @@
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import { minRole } from '../../lib/roles'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { modelOverrideView } from '../agent/modelOverride'
 import { segmentCapError } from '../caps'
 import { resolve as resolveMcpServers } from '../mcp/servers'

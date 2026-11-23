@@ -1,9 +1,11 @@
 'use node'
 
+import type { ShellToolOutput } from '@cv/core/types/tools'
+
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
 import { sanitizeChatError } from '../../errors'
-import type { ShellToolOutput, StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { watchForStop } from './engineWatchdog'
 
 /** Completes interrupted waits before issuing another model request. */

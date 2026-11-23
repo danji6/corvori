@@ -1,9 +1,11 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 export const approvalModeValidator = v.union(
   v.literal('ask'),
   v.literal('unrestricted'),
 )
+
+export type ApprovalMode = Infer<typeof approvalModeValidator>
 
 export const toolApprovalsValidator = v.object({
   /** Whether unsafe tools will require user approval. */

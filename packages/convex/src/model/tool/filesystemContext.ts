@@ -1,7 +1,7 @@
 import type { QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import { minRole } from '../../lib/roles'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { getSessionWithWorkspace } from '../session/folderContext'
 import { requireEnabled } from '../session/memberships'
 import { agentWithHome } from '../skills/homes'

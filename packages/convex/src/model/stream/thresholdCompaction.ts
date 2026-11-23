@@ -8,12 +8,11 @@ import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import { hasUnsettledTaskParts } from '../../lib/subagent'
+import type { SessionMode } from '../../validators/sessionModes'
 import type {
-  RunningStream,
-  SessionMode,
   StreamExecutionArgs,
   ThresholdCompactionArgs,
-} from '../../types'
+} from '../../validators/streams'
 import { effectiveAgentSelection } from '../agent/modelOverride'
 import { insertCommandChip } from '../chat/commandChips'
 import { senderIdentity } from '../chat/identities'
@@ -37,6 +36,7 @@ import {
 } from './historyBoundary'
 import { isApprovedToolAwaitingExecution } from './lifecycleProgress'
 import { honorSoftStop } from './stop'
+import type { RunningStream } from './types'
 
 /** Returns true when the action must exit before sending its prepared request. */
 export async function _compactAtThreshold(

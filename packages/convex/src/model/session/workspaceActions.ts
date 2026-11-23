@@ -12,8 +12,10 @@ import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import { authorizeAdmin } from '../../functions'
-import type { ApprovalMode, Session, SessionMode } from '../../types'
+import type { ApprovalMode } from '../../validators/approvals'
+import type { SessionMode } from '../../validators/sessionModes'
 import { decodeBase64 } from '../io/base64'
+import type { Session } from './types'
 
 export async function createSession(
   ctx: ActionCtx,

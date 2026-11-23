@@ -4,9 +4,12 @@ import {
   SHELL_TERM_TAIL_CHARS,
   formatOutputPage,
 } from '@cv/core/shell/output-page'
+import type {
+  ShellModelToolOutput,
+  ShellToolOutput,
+} from '@cv/core/types/tools'
 import type { Tool, ToolSet } from 'ai'
 
-import type { ShellModelToolOutput, ShellToolOutput } from '../../types'
 import { type ShellJobResume } from './shellContracts'
 import { type WatchState } from './shellWatch'
 

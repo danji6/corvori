@@ -1,4 +1,8 @@
-import type { PromptItem, PromptMarker, PromptMarkerType } from '../../types'
+import type {
+  PromptItem,
+  PromptMarker,
+  PromptMarkerType,
+} from '@cv/core/types/prompts'
 
 // Declaration order is the insertion order
 export const PROMPT_MARKER_LABELS = {

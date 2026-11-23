@@ -2,7 +2,7 @@ import type { Id } from '@cv/convex/_generated/dataModel'
 import type { AuthMutationCtx } from '@cv/convex/functions'
 import { complete } from '@cv/convex/model/skills/completion'
 import { claimExecution } from '@cv/convex/model/skills/execution'
-import type { OperationResult } from '@cv/convex/types'
+import type { OperationResult } from '@cv/convex/validators/fileOperations'
 
 type CompletionInput = {
   operationId: Id<'agentFileOperations'>

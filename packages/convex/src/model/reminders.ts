@@ -10,7 +10,7 @@ import type { Doc, Id } from '../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../_generated/server'
 import { error } from '../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../functions'
-import type { ReminderScope } from '../types'
+import type { ReminderScope } from '../validators/reminders'
 
 export async function list(
   ctx: AuthQueryCtx,

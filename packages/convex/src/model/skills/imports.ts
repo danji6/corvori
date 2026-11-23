@@ -7,7 +7,7 @@ import type {
   ContinueSkillImportArgs,
   FinishSkillImportArgs,
   PrepareSkillImportArgs,
-} from '../../types'
+} from '../../validators/skills'
 import { isExecutingOperation, scheduleOperation } from './lifecycle'
 
 type ImportOperation = Extract<Doc<'agentFileOperations'>, { kind: 'install' }>

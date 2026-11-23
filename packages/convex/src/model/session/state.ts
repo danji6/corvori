@@ -3,7 +3,7 @@ import { capApprovalPaths } from '@cv/core/workspace/path-policy'
 
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
-import type { ApprovalMode } from '../../types'
+import type { ApprovalMode } from '../../validators/approvals'
 import { assertEnvironmentCap } from '../caps'
 import { getSessionWithWorkspace, workspaceKey } from './folderContext'
 

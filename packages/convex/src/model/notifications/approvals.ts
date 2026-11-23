@@ -15,7 +15,7 @@ import {
 } from '../../functions'
 import { minRole } from '../../lib/roles'
 import { alwaysLabel, approvalHold } from '../../lib/tool/approvalPolicy'
-import type { NotificationApprovalAction } from '../../types'
+import type { NotificationApprovalAction } from '../../validators/notifications'
 import { approveTool } from '../chat/approvals'
 import { getProcessingSegmentRow } from '../messageContents'
 import { getSessionWithWorkspace } from '../session/folderContext'

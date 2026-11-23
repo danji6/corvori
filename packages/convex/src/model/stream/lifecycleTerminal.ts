@@ -9,7 +9,7 @@ import type {
   FailStreamArgs,
   StreamExecutionArgs,
   StreamState,
-} from '../../types'
+} from '../../validators/streams'
 import { cleanUpGeneratedAttachments } from '../attachments/files'
 import { expireStreamTransfers } from '../attachments/transfers'
 import { finishChanges } from '../changes/sets'

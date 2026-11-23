@@ -1,7 +1,7 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
 import { providerPrefixDigest } from '@cv/convex/model/stream/providerCacheId'
 import { resolveProviderCacheId } from '@cv/convex/model/stream/providerRequests'
-import type { Prompt, PromptItem } from '@cv/convex/types'
+import type { Prompt, PromptItem } from '@cv/core/types/prompts'
 import { expect, test } from 'bun:test'
 
 import { lifecycleDatabase } from '../../helpers/lifecycle-db'

@@ -5,8 +5,9 @@ import {
 
 import type { Id } from '../../_generated/dataModel'
 import type { AuthQueryCtx } from '../../functions'
-import type { ListSessionsArgs, SessionListItem } from '../../types'
+import type { ListSessionsArgs } from '../../validators/sessions'
 import { readFolderTrail } from './folderTree'
+import type { SessionListItem } from './types'
 
 /** Selects title relevance, global activity, or the normal folder listing. */
 export function sessionListQuery(

@@ -1,9 +1,9 @@
 import type { McpServer } from '@cv/core/types'
 import { mcpApprovalKey, parseMcpInputSchema } from '@cv/core/types/mcp-catalog'
+import type { ToolApprovals } from '@cv/core/types/tools'
 
 import { ToolError, extractErrorMessage, toolFailure } from '../../errors'
 import { isToolAutoApproved } from '../../lib/tool/approval'
-import type { ToolApprovals } from '../../types'
 import { sidecarUrl as defaultSidecarUrl } from '../sidecar'
 import { sidecarRequest } from '../sidecarTransport'
 import type { McpManifestEntry } from './manifest'

@@ -8,8 +8,8 @@ import type {
   InvalidateAgentHomeArgs,
   OperationAttemptArgs,
   ReserveHomeArgs,
-  SkillAssignmentsArgs,
-} from '../../types'
+} from '../../validators/fileOperations'
+import type { SkillAssignmentsArgs } from '../../validators/skills'
 import { assertDestinationMembersIdle, requireAdmin } from './access'
 import * as Completion from './completion'
 import { assertHomeDestination } from './destinations'

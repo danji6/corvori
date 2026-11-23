@@ -3,8 +3,11 @@
 import { api, internal } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
 import type { ActionCtx } from '@cv/convex/_generated/server'
-import type { McpCatalogAppendArgs, McpCatalogIdArgs } from '@cv/convex/types'
-import type { StreamExecutionArgs } from '@cv/convex/types'
+import type {
+  McpCatalogAppendArgs,
+  McpCatalogIdArgs,
+} from '@cv/convex/validators/mcpCatalogs'
+import type { StreamExecutionArgs } from '@cv/convex/validators/streams'
 import type { McpRuntimeScope } from '@cv/core/types'
 import {
   MCP_DEFINITION_CONTENT_TYPE,

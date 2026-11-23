@@ -5,7 +5,7 @@ import { normalizeBrowserUrl } from '@/lib/auth/site-url'
 import { extractErrorMessage } from '@/lib/errors'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
-import type { CacheDiagnostic } from '@cv/convex/types'
+import type { CacheDiagnostic } from '@cv/convex/validators/providerRequests'
 import { useQuery } from 'convex/react'
 import { useEffect, useMemo, useState } from 'react'
 

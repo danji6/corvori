@@ -1,4 +1,5 @@
 import { TOOL_DESCRIPTIONS, shellToolDescription } from '@cv/core/types'
+import type { ShellToolOutput } from '@cv/core/types/tools'
 import { defaultShellDirectory } from '@cv/core/workspace/personal'
 import { parseScopedPath } from '@cv/core/workspace/scoped-path'
 
@@ -9,7 +10,6 @@ import {
   isToolAutoApproved,
   isUnrestrictedAccess,
 } from '../../lib/tool/approval'
-import type { ShellToolOutput } from '../../types'
 import {
   type WatchedJobRef,
   type WorkspaceToolContext,

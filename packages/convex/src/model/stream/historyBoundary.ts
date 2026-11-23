@@ -1,6 +1,6 @@
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { QueryCtx } from '../../_generated/server'
-import type { StreamCommand } from '../../types'
+import type { StreamCommand } from '../../validators/streams'
 
 type HistoryStream = Pick<
   Doc<'streams'>,

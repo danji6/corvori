@@ -2,7 +2,7 @@ import type { AgentPromptSets } from '@/components/chat/entities/agent/agent-for
 import { EMPTY_AGENT_PROMPT_SETS } from '@/components/chat/entities/agent/agent-form'
 import { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
-import type { PromptScope } from '@cv/convex/types'
+import type { PromptScope } from '@cv/convex/validators/prompts'
 import { isPrompt } from '@cv/core/prompts'
 import type { Prompt, PromptItem, ReminderPrompt } from '@cv/core/types'
 import { useQuery } from 'convex-helpers/react/cache/hooks'

@@ -1,16 +1,16 @@
 import type { DiscoveredModel } from '@cv/core/model-discovery'
+import type { ModelProviderConfig } from '@cv/core/types/providers'
 
 import { api, internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { error } from '../../errors'
+import type { DetailTargetsArgs } from '../../validators/discovery'
 import type {
-  DetailTargetsArgs,
-  ModelProviderConfig,
   PreviewDiscoveryArgs,
   PreviewModelDetailsArgs,
   RemovedConnectionArgs,
-} from '../../types'
+} from '../../validators/providers'
 import type { AccountStatus } from './openai/account'
 
 export type DiscoveryResult = { attemptId?: string; error?: string }

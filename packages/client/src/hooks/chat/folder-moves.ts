@@ -1,11 +1,12 @@
 import {
+  type FolderMoveArgs,
   folderMoveConfirmed,
   folderMoveNeedsConfirmation,
   projectLoadedFolderMove,
 } from '@/lib/chat/folder-moves'
 import { toastError } from '@/lib/notifications'
 import { api } from '@cv/convex/_generated/api'
-import type { FolderMoveArgs, FolderView } from '@cv/convex/types'
+import type { FolderView } from '@cv/convex/model/session/types'
 import { useAction, useQuery } from 'convex/react'
 import { useCallback, useMemo, useRef, useState } from 'react'
 

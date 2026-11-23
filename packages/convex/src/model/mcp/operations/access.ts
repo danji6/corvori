@@ -5,8 +5,8 @@ import { sharedSessionId } from '@cv/convex/lib/subagent'
 import type {
   McpOperationExecutionArgs,
   McpOperationFindArgs,
-  StreamExecutionArgs,
-} from '@cv/convex/types'
+} from '@cv/convex/validators/mcpOperations'
+import type { StreamExecutionArgs } from '@cv/convex/validators/streams'
 
 import { getProcessingSegmentRow } from '../../messageContents'
 import { getMode } from '../../session/sessions'

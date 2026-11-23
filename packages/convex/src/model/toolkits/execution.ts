@@ -1,7 +1,7 @@
 import type { QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import { requireRole } from '../../functions'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { requireExecution } from '../mcp/operations/access'
 import { hasInvocationAccess } from '../mcp/runtime'
 import { availableToolkits } from './access'

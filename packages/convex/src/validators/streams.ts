@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 import {
   cacheDiagnosticValidator,
@@ -31,6 +31,8 @@ export const yieldRequestValidator = v.object({
   jobId: v.optional(v.id('_scheduled_functions')),
 })
 
+export type YieldRequest = Infer<typeof yieldRequestValidator>
+
 export const yieldRequestViewValidator = v.object({
   toolCallId: v.string(),
   targetAgentId: v.id('agents'),
@@ -44,10 +46,14 @@ export const resolveYieldArgsValidator = v.object({
   agentId: v.optional(v.id('agents')),
 })
 
+export type ResolveYieldArgs = Infer<typeof resolveYieldArgsValidator>
+
 export const yieldRequestArgsValidator = v.object({
   sessionId: v.id('sessions'),
   toolCallId: v.string(),
 })
+
+export type YieldRequestArgs = Infer<typeof yieldRequestArgsValidator>
 
 /** Exposes chat controls without coupling clients to persisted execution data. */
 export const activeStreamValidator = v.object({
@@ -62,6 +68,8 @@ export const activeStreamValidator = v.object({
   retryError: v.optional(v.string()),
   yield: v.optional(yieldRequestViewValidator),
 })
+
+export type ActiveStream = Infer<typeof activeStreamValidator>
 
 export const streamCommandValidator = v.union(
   v.object({
@@ -93,6 +101,8 @@ export const streamCommandValidator = v.union(
     mode: v.optional(sessionModeValidator),
   }),
 )
+
+export type StreamCommand = Infer<typeof streamCommandValidator>
 
 const optionalOutput = {
   processingMessageId: v.optional(v.id('messages')),
@@ -133,41 +143,61 @@ export const streamStateValidator = v.union(
   }),
 )
 
+export type StreamState = Infer<typeof streamStateValidator>
+
 export const streamExecutionArgsValidator = v.object({
   streamId: v.id('streams'),
   generation: v.number(),
 })
+
+export type StreamExecutionArgs = Infer<typeof streamExecutionArgsValidator>
 
 export const stopStreamArgsValidator = v.object({
   sessionId: v.id('sessions'),
   execution: v.optional(streamExecutionArgsValidator),
 })
 
+export type StopStreamArgs = Infer<typeof stopStreamArgsValidator>
+
 export const providerHistorySnapshotArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   knownHistory: v.optional(v.string()),
 })
+
+export type ProviderHistorySnapshotArgs = Infer<
+  typeof providerHistorySnapshotArgsValidator
+>
 
 export const patchStreamMessageArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   parts: v.array(v.any()),
 })
 
+export type PatchStreamMessageArgs = Infer<
+  typeof patchStreamMessageArgsValidator
+>
+
 export const recordStreamStepArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   interruptible: v.boolean(),
 })
+
+export type RecordStreamStepArgs = Infer<typeof recordStreamStepArgsValidator>
 
 export const failStreamArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   message: v.string(),
 })
 
+export type FailStreamArgs = Infer<typeof failStreamArgsValidator>
+
 export const trackStreamOutputArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   messageId: v.id('messages'),
   storageId: v.id('_storage'),
 })
+
+export type TrackStreamOutputArgs = Infer<typeof trackStreamOutputArgsValidator>
 
 export const saveStreamMetaArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
@@ -179,11 +209,17 @@ export const saveStreamMetaArgsValidator = v.object({
   titleText: v.optional(v.string()),
 })
 
+export type SaveStreamMetaArgs = Infer<typeof saveStreamMetaArgsValidator>
+
 export const scheduleStreamRetryArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   retryAt: v.number(),
   retryError: v.string(),
 })
+
+export type ScheduleStreamRetryArgs = Infer<
+  typeof scheduleStreamRetryArgsValidator
+>
 
 /** A leased background turn, including retries and deferred work. */
 export const streamSchema = v.object({
@@ -223,6 +259,8 @@ export const saveStreamCacheArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
 })
 
+export type SaveStreamCacheArgs = Infer<typeof saveStreamCacheArgsValidator>
+
 export const compactAtThresholdArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   modelId: v.string(),
@@ -230,10 +268,16 @@ export const compactAtThresholdArgsValidator = v.object({
   environment: v.optional(v.record(v.string(), v.any())),
 })
 
+export type ThresholdCompactionArgs = Infer<
+  typeof compactAtThresholdArgsValidator
+>
+
 export const saveStreamLogArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   storageId: v.id('_storage'),
 })
+
+export type SaveStreamLogArgs = Infer<typeof saveStreamLogArgsValidator>
 
 export const prepareCapabilitiesArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
@@ -244,11 +288,17 @@ export const prepareCapabilitiesArgsValidator = v.object({
   skillAvailability: v.optional(skillAvailabilityValidator),
 })
 
+export type PrepareCapabilitiesArgs = Infer<
+  typeof prepareCapabilitiesArgsValidator
+>
+
 export const assertToolAccessArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   name: v.string(),
   manifest: toolManifestValidator,
 })
+
+export type AssertToolAccessArgs = Infer<typeof assertToolAccessArgsValidator>
 
 export const prepareContextNoteArgsValidator = v.object({
   sessionFiles: v.optional(v.boolean()),
@@ -261,15 +311,27 @@ export const prepareContextNoteArgsValidator = v.object({
   toolkitFingerprint: v.optional(v.string()),
 })
 
+export type PrepareContextNoteArgs = Infer<
+  typeof prepareContextNoteArgsValidator
+>
+
 export const resolveProviderCacheIdArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   prefixDigest: v.string(),
 })
 
+export type ResolveProviderCacheIdArgs = Infer<
+  typeof resolveProviderCacheIdArgsValidator
+>
+
 export const prepareProviderRequestArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   scope: providerContinuityScopeValidator,
 })
+
+export type PrepareProviderRequestArgs = Infer<
+  typeof prepareProviderRequestArgsValidator
+>
 
 export const saveProviderContinuityArgsValidator = v.object({
   ...prepareProviderRequestArgsValidator.fields,
@@ -277,7 +339,15 @@ export const saveProviderContinuityArgsValidator = v.object({
   reset: v.boolean(),
 })
 
+export type SaveProviderContinuityArgs = Infer<
+  typeof saveProviderContinuityArgsValidator
+>
+
 export const recordCacheDiagnosticArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   diagnostic: cacheDiagnosticValidator,
 })
+
+export type RecordCacheDiagnosticArgs = Infer<
+  typeof recordCacheDiagnosticArgsValidator
+>

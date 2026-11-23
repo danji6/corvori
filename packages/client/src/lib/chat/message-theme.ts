@@ -1,4 +1,4 @@
-import type { ThemeSnapshot } from '@cv/convex/types'
+import type { ThemeSnapshot } from '@cv/core/types/theme'
 
 type MessageThemeOptions = {
   fromAgent: boolean

@@ -8,13 +8,11 @@ import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import { sharedSessionId } from '../../lib/subagent'
 import type {
-  AttachmentImageDimensions,
-  StreamExecutionArgs,
-} from '../../types'
-import type {
   attachmentTransferCall,
   attachmentTransferResult,
 } from '../../validators/attachmentTransfers'
+import type { AttachmentImageDimensions } from '../../validators/attachments'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { getProcessingSegmentRow, patchSegmentParts } from '../messageContents'
 import { requireEnabled, requireMember } from '../session/memberships'
 import { ownsExecution } from '../stream/execution'

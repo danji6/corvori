@@ -1,6 +1,6 @@
 import { MCP_TRANSPORTS } from '@cv/core/types'
 import { paginationOptsValidator } from 'convex/server'
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 export const mcpTransportValidator = v.union(
   ...MCP_TRANSPORTS.map((id) => v.literal(id)),
@@ -65,14 +65,20 @@ export const mcpRuntimeArgsValidator = v.object({
   runtimeId: v.id('mcpRuntimes'),
 })
 
+export type McpRuntimeArgs = Infer<typeof mcpRuntimeArgsValidator>
+
 export const mcpCleanupArgsValidator = v.object({
   cleanupId: v.id('mcpCleanups'),
 })
+
+export type McpCleanupArgs = Infer<typeof mcpCleanupArgsValidator>
 
 export const mcpRuntimeControlArgsValidator = v.object({
   ...mcpRuntimeArgsValidator.fields,
   reconnect: v.boolean(),
 })
+
+export type McpRuntimeControlArgs = Infer<typeof mcpRuntimeControlArgsValidator>
 
 export const mcpRuntimeConnectedArgsValidator = v.object({
   ...mcpRuntimeArgsValidator.fields,
@@ -82,6 +88,10 @@ export const mcpRuntimeConnectedArgsValidator = v.object({
   initialization: v.optional(v.string()),
 })
 
+export type McpRuntimeConnectedArgs = Infer<
+  typeof mcpRuntimeConnectedArgsValidator
+>
+
 export const mcpRuntimeStatusArgsValidator = v.object({
   ...mcpRuntimeArgsValidator.fields,
   key: v.string(),
@@ -89,11 +99,15 @@ export const mcpRuntimeStatusArgsValidator = v.object({
   reason: v.optional(v.string()),
 })
 
+export type McpRuntimeStatusArgs = Infer<typeof mcpRuntimeStatusArgsValidator>
+
 export const mcpRuntimeRetireArgsValidator = v.object({
   ...mcpRuntimeArgsValidator.fields,
   key: v.string(),
   reason: v.string(),
 })
+
+export type McpRuntimeRetireArgs = Infer<typeof mcpRuntimeRetireArgsValidator>
 
 export const mcpRuntimeInspectArgsValidator = v.object({
   scope: mcpScopeValidator,
@@ -104,10 +118,14 @@ export const mcpRuntimeListArgsValidator = v.object({
   paginationOpts: paginationOptsValidator,
 })
 
+export type McpRuntimeListArgs = Infer<typeof mcpRuntimeListArgsValidator>
+
 export const mcpRuntimePageArgsValidator = v.object({
   state: v.string(),
   paginationOpts: paginationOptsValidator,
 })
+
+export type McpRuntimePageArgs = Infer<typeof mcpRuntimePageArgsValidator>
 
 /** An MCP server joined with its tools and credential. */
 export const mcpServerValidator = v.object({
@@ -159,6 +177,10 @@ export const replaceMcpServersArgsValidator = v.object({
   ),
 })
 
+export type McpServerInput = Infer<
+  typeof replaceMcpServersArgsValidator
+>['servers'][number]
+
 export const mcpExecutionArgsValidator = v.object({
   agentId: v.id('agents'),
   sessionId: v.id('sessions'),
@@ -168,6 +190,8 @@ export const mcpExecutionArgsValidator = v.object({
   generation: v.optional(v.number()),
 })
 
+export type McpExecutionArgs = Infer<typeof mcpExecutionArgsValidator>
+
 export const discoverMcpToolsArgsValidator = v.object({
   url: v.string(),
   ...mcpLaunchFields,
@@ -175,6 +199,8 @@ export const discoverMcpToolsArgsValidator = v.object({
   apiKey: v.optional(v.string()),
   serverId: v.optional(v.id('mcpServers')),
 })
+
+export type DiscoverMcpToolsArgs = Infer<typeof discoverMcpToolsArgsValidator>
 
 /** An external MCP server, without its credential or discovered tools. */
 export const mcpServerSchema = v.object({

@@ -2,7 +2,10 @@ import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error, sanitizeChatError } from '../../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../../functions'
-import type { DeferredCommandName, QueuedCommand } from '../../types'
+import type {
+  DeferredCommandName,
+  QueuedCommand,
+} from '../../validators/commands'
 import { deleteVersions, insertMessage } from '../messageContents'
 import * as Memberships from '../session/memberships'
 import { getState, patchState } from '../session/state'

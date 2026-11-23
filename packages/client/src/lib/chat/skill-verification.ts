@@ -1,14 +1,20 @@
+import type { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
-import type {
-  SkillVerificationPage,
-  VerifySkillIdsArgs,
-} from '@cv/convex/types'
-import type { PaginationOptions } from 'convex/server'
+import type { FunctionArgs, FunctionReturnType } from 'convex/server'
 
-type CheckPage = (args: {
-  paginationOpts: PaginationOptions
-}) => Promise<SkillVerificationPage>
-type RemovePage = (args: VerifySkillIdsArgs) => Promise<{ removed: number }>
+type CheckLibraryPage = typeof api.actions.skills.checkLibraryPage
+
+type RemoveMissingSkills = typeof api.actions.skills.removeMissingSkills
+
+type SkillVerificationPage = FunctionReturnType<CheckLibraryPage>
+
+type CheckPage = (
+  args: FunctionArgs<CheckLibraryPage>,
+) => Promise<SkillVerificationPage>
+
+type RemovePage = (
+  args: FunctionArgs<RemoveMissingSkills>,
+) => Promise<FunctionReturnType<RemoveMissingSkills>>
 
 /** Visits every library page before returning any cleanup candidates. */
 export async function checkInstalledSkills(

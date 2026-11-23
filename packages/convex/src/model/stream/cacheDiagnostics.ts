@@ -14,9 +14,9 @@ import type { ActionCtx } from '../../_generated/server'
 import type {
   CacheDiagnostic,
   ProviderContinuityScope,
-  StreamExecutionArgs,
-  TokenUsage,
-} from '../../types'
+} from '../../validators/providerRequests'
+import type { TokenUsage } from '../../validators/providers'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import type { ProviderCredentials } from '../provider/providers'
 
 /** Hashes the complete serialized value before request-log truncation. */

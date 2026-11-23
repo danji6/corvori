@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 import { modelMetadataValidator } from './providers'
 
@@ -22,6 +22,8 @@ export const discoveryRunValidator = v.object({
   revision: v.number(),
   generation: v.string(),
 })
+
+export type DiscoveryRun = Infer<typeof discoveryRunValidator>
 
 export const beginDiscoveryArgsValidator = v.object({
   ...discoveryRunValidator.fields,
@@ -52,6 +54,8 @@ export const storePreviewArgsValidator = v.object({
   models: v.array(discoveredModelValidator),
 })
 
+export type StorePreviewArgs = Infer<typeof storePreviewArgsValidator>
+
 export const enrichModelArgsValidator = v.object({
   ...discoveryRunValidator.fields,
   model: discoveredModelValidator,
@@ -64,7 +68,11 @@ export const previewDetailArgsValidator = v.object({
   model: discoveredModelValidator,
 })
 
+export type PreviewDetailArgs = Infer<typeof previewDetailArgsValidator>
+
 export const detailTargetsArgsValidator = v.object({
   ...discoveryRunValidator.fields,
   modelIds: v.array(v.string()),
 })
+
+export type DetailTargetsArgs = Infer<typeof detailTargetsArgsValidator>

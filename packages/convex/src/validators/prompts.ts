@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 import { roleValidator } from './messages'
 
@@ -9,6 +9,8 @@ export const promptScopeValidator = v.union(
   v.literal('compaction'),
   v.literal('impersonation'),
 )
+
+export type PromptScope = Infer<typeof promptScopeValidator>
 
 export const promptMessageValidator = v.object({
   role: roleValidator,

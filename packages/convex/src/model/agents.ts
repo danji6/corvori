@@ -1,8 +1,10 @@
+import type { Prompt } from '@cv/core/types/prompts'
+
 import type { Doc, Id } from '../_generated/dataModel'
 import { error } from '../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../functions'
 import { minRole } from '../lib/roles'
-import type { CreateAgentArgs, Prompt, UpdateAgentArgs } from '../types'
+import type { CreateAgentArgs, UpdateAgentArgs } from '../validators/agents'
 import { validateModelOverride } from './agent/modelOverride'
 import { sanitizeSubAgents } from './agent/subagents'
 import * as Avatars from './avatars'

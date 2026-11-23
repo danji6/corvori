@@ -1,5 +1,5 @@
 import { sharedSessionId } from '../../lib/subagent'
-import type { Session } from '../../types'
+import type { Session } from '../session/types'
 
 export function filesystemWorkspace(
   session: Pick<Session, '_id' | 'workspace' | 'parent'>,

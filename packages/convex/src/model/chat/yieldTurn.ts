@@ -16,7 +16,7 @@ import type {
   StreamState,
   YieldRequest,
   YieldRequestArgs,
-} from '../../types'
+} from '../../validators/streams'
 import { getProcessingSegmentRow, patchSegmentParts } from '../messageContents'
 import * as Memberships from '../session/memberships'
 import { getByOwnerId as getSettingsByOwnerId } from '../settings'

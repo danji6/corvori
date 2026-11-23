@@ -2,7 +2,7 @@ import { sha256 } from '@cv/core/sha256'
 import { stableStringify } from '@cv/core/stable-json'
 
 import type { MutationCtx } from '../../_generated/server'
-import type { PrepareCapabilitiesArgs } from '../../types'
+import type { PrepareCapabilitiesArgs } from '../../validators/streams'
 import { capabilitySource } from '../tool/capabilitySource'
 import { sameDefinition } from '../tool/manifest'
 import type {

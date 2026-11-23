@@ -2,7 +2,10 @@ import { internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { sharedSessionId } from '../../lib/subagent'
-import type { ScheduleStreamRetryArgs, StreamExecutionArgs } from '../../types'
+import type {
+  ScheduleStreamRetryArgs,
+  StreamExecutionArgs,
+} from '../../validators/streams'
 import { releaseForSession } from '../shell/jobs'
 import { scheduleStream } from './execution'
 import { ownsExecution } from './execution'

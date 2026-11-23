@@ -1,5 +1,5 @@
 import { paginationOptsValidator } from 'convex/server'
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 import { approvalModeValidator, toolApprovalsValidator } from './approvals'
 import { queuedCommandValidator } from './commands'
@@ -15,6 +15,8 @@ export const listSessionsArgsValidator = v.object({
   search: v.optional(v.string()),
   showHidden: v.optional(v.boolean()),
 })
+
+export type ListSessionsArgs = Infer<typeof listSessionsArgsValidator>
 
 export const sessionSettingsValidator = v.object({
   disabled: v.optional(v.boolean()),
@@ -57,6 +59,8 @@ export const saveSessionCacheArgsValidator = v.object({
   historyPresentation: v.optional(historyPresentationValidator),
 })
 
+export type SaveSessionCacheArgs = Infer<typeof saveSessionCacheArgsValidator>
+
 export const createSessionArgsValidator = v.object({
   activeAgentId: v.optional(v.id('agents')),
   folderId: v.optional(v.id('sessionFolders')),
@@ -73,11 +77,15 @@ export const updateSessionArgsValidator = v.object({
   settings: v.optional(sessionSettingsValidator),
 })
 
+export type UpdateSessionArgs = Infer<typeof updateSessionArgsValidator>
+
 export const importSessionArgsValidator = v.object({
   payload: sessionArchiveValidator,
   subject: v.string(),
   avatars: v.record(v.string(), v.id('_storage')),
 })
+
+export type ImportSessionArgs = Infer<typeof importSessionArgsValidator>
 
 /** A conversation and its settings. */
 export const sessionSchema = v.object({

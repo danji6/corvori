@@ -1,8 +1,10 @@
 import { validate } from 'convex-helpers/validators'
 
 import { error } from '../../errors'
-import type { FileOperationArgs } from '../../types'
-import { fileOperationArgsValidator } from '../../validators/fileOperations'
+import {
+  type FileOperationArgs,
+  fileOperationArgsValidator,
+} from '../../validators/fileOperations'
 
 /** Validates internal callers with the same command contract as the public mutation. */
 export function validateOperationArgs(args: FileOperationArgs) {

@@ -1,8 +1,14 @@
-import type { ToolkitSettingsArgs } from '@cv/convex/types'
+import type { api } from '@cv/convex/_generated/api'
 import { updateDisabledSkills } from '@cv/core/skills/names'
 import type { OptimisticLocalStore, OptimisticUpdate } from 'convex/browser'
 import type { ConvexReactClient } from 'convex/react'
-import { type FunctionReference, getFunctionName } from 'convex/server'
+import {
+  type FunctionArgs,
+  type FunctionReference,
+  getFunctionName,
+} from 'convex/server'
+
+type ToolkitSettingsArgs = FunctionArgs<typeof api.toolkits.settings>
 
 const listeners = new Set<() => void>()
 const cache = new Map<string, unknown>()

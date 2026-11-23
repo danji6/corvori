@@ -1,7 +1,7 @@
 import { sha256 } from '@cv/core/sha256'
 import { stableStringify } from '@cv/core/stable-json'
 
-import type { StreamContext } from '../../types'
+import type { StreamContext } from '../stream/types'
 
 /** Captures configuration identity without copying credentials into cached state. */
 export async function capabilitySource(data: StreamContext): Promise<string> {

@@ -1,8 +1,8 @@
 import { formatAlwaysAllowLabel } from '@cv/core/approval-label'
 import { type ApprovalHold, getCommand } from '@cv/core/approval-presentation'
+import type { ToolApprovals } from '@cv/core/types/tools'
 import type { PathApprovalStatus } from '@cv/core/workspace/path-policy'
 
-import type { ToolApprovals } from '../../types'
 import {
   analyzeShellCommand,
   isFileTool,

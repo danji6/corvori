@@ -1,6 +1,7 @@
+import type { ModelSelection } from '@cv/core/types/providers'
+
 import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
-import type { ModelSelection } from '../../types'
 import { resolve as resolveProviders } from '../provider/connections'
 import { findModelSelection } from '../provider/providers'
 import { getByOwnerId } from '../settings'

@@ -44,8 +44,14 @@ export function homeMembers(ctx: QueryCtx, homeId: Id<'agentHomes'>) {
     .collect()
 }
 
+/** An agent with its authoritative shared personal folder state resolved. */
+export type AgentWithHome = Doc<'agents'> & { home: Doc<'agentHomes'> | null }
+
 /** Resolves personal-folder state from its shared authoritative record. */
-export async function agentWithHome(ctx: QueryCtx, agentId: Id<'agents'>) {
+export async function agentWithHome(
+  ctx: QueryCtx,
+  agentId: Id<'agents'>,
+): Promise<AgentWithHome | null> {
   const agent = await ctx.db.get(agentId)
   return agent
     ? { ...agent, home: agent.homeId ? await ctx.db.get(agent.homeId) : null }

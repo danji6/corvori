@@ -3,7 +3,7 @@ import { systemNote, systemReminder } from '@cv/core/utils/blocks'
 
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
-import type { PrepareContextNoteArgs, RunningStream } from '../../types'
+import type { PrepareContextNoteArgs } from '../../validators/streams'
 import { agentIdentity } from '../chat/identities'
 import { WORKSPACE_CHANGE_GUIDANCE } from '../chat/notes'
 import { insertMessage, withParts } from '../messageContents'
@@ -13,6 +13,7 @@ import {
   latestContextReset,
   resolveHistoryBoundary,
 } from './historyBoundary'
+import type { RunningStream } from './types'
 
 type ContextType = 'skills' | 'workspace' | 'mcp' | 'capabilities'
 

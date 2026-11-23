@@ -6,7 +6,7 @@ import {
   sessionDropConfirmed,
 } from '@/lib/chat/session-drops'
 import { api } from '@cv/convex/_generated/api'
-import type { FolderView } from '@cv/convex/types'
+import type { FolderView } from '@cv/convex/model/session/types'
 import { useAction, useMutation } from 'convex/react'
 import { useRef, useState } from 'react'
 

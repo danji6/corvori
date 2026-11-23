@@ -5,7 +5,7 @@ import { isMcpResult, publicMcpOutput } from '@cv/core/types/mcp-result'
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
 import { ToolError } from '../../errors'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { operationOutput } from './operations/actions'
 
 type ReadInput = { output: string; offset: number; length: number }

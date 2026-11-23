@@ -1,8 +1,8 @@
 import { normalizeSubagentOverrides } from '@cv/core/subagent-settings'
+import type { AgentSubAgents } from '@cv/core/types/agents'
 
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { QueryCtx } from '../../_generated/server'
-import type { AgentSubAgents } from '../../types'
 
 export type SpawnableAgent = {
   _id: Id<'agents'>

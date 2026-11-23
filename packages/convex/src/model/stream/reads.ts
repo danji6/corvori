@@ -8,7 +8,7 @@ import { error } from '../../errors'
 import type { AuthQueryCtx } from '../../functions'
 import { minRole } from '../../lib/roles'
 import { sharedSessionId } from '../../lib/subagent'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { resolveSpawnableAgents } from '../agent/subagents'
 import {
   activeAttachmentMessages,

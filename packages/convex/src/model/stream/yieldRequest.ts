@@ -10,11 +10,12 @@ import {
 import { internal } from '../../_generated/api'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
-import type { RunningStream, Session } from '../../types'
 import { patchSegmentParts } from '../messageContents'
+import type { Session } from '../session/types'
 import { sessionToolNames } from '../tool/selection'
 import { APPROVAL_LEASE_MS } from './lifecycleClaims'
 import { _recordStep } from './lifecycleProgress'
+import type { RunningStream } from './types'
 
 type YieldStep = {
   stream: RunningStream

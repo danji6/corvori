@@ -1,4 +1,5 @@
-import type { ShellToolOutput } from '../../types'
+import type { ShellToolOutput } from '@cv/core/types/tools'
+
 import { postSidecar } from '../sidecar'
 import { type ShellJobContext } from './shellContracts'
 import { type ShellJobInput } from './shellContracts'

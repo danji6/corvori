@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 import { rememberScopeValidator } from './approvals'
 import { commandExtraValidator } from './commands'
@@ -105,6 +105,8 @@ export const partAddressValidator = v.object({
   partIndex: v.number(),
 })
 
+export type PartAddress = Infer<typeof partAddressValidator>
+
 /** A snapshot of the message a reply quotes, taken at send time. */
 export const replyQuoteValidator = v.object({
   /** Absent once the quoted message is deleted or was not copied along. */
@@ -122,6 +124,8 @@ export const replyQuoteValidator = v.object({
   text: v.string(),
   rendered: v.optional(v.literal(true)),
 })
+
+export type ReplyQuote = Infer<typeof replyQuoteValidator>
 
 export const messageExtraValidator = v.union(
   reminderExtraValidator,
@@ -198,6 +202,8 @@ export const sendMessageArgsValidator = v.object({
   ),
 })
 
+export type SendMessageArgs = Infer<typeof sendMessageArgsValidator>
+
 export const messagesWindowArgsValidator = v.object({
   sessionId: v.id('sessions'),
   /** A page boundary, a message to locate, or the session edge. */
@@ -219,6 +225,8 @@ export const messagesWindowArgsValidator = v.object({
   anchorSegment: v.optional(v.number()),
 })
 
+export type MessageWindowArgs = Infer<typeof messagesWindowArgsValidator>
+
 export const editMessagePartArgsValidator = v.object({
   messageId: v.id('messages'),
   segmentIndex: v.number(),
@@ -226,11 +234,17 @@ export const editMessagePartArgsValidator = v.object({
   text: v.string(),
 })
 
+export type EditMessagePartArgs = Infer<typeof editMessagePartArgsValidator>
+
 export const deleteMessagePartsArgsValidator = v.object({
   messageId: v.id('messages'),
   addresses: v.array(partAddressValidator),
   from: v.optional(partAddressValidator),
 })
+
+export type DeleteMessagePartsArgs = Infer<
+  typeof deleteMessagePartsArgsValidator
+>
 
 export const approveToolArgsValidator = v.object({
   sessionId: v.id('sessions'),
@@ -242,6 +256,8 @@ export const approveToolArgsValidator = v.object({
   /** Note from the user, delivered to the agent alongside the response. */
   note: v.optional(v.string()),
 })
+
+export type ApproveToolArgs = Infer<typeof approveToolArgsValidator>
 
 export const userAnswerDraftValidator = v.object({
   questionIndex: v.number(),
@@ -256,6 +272,8 @@ export const answerQuestionsArgsValidator = v.object({
   toolCallId: v.string(),
   answers: v.array(userAnswerDraftValidator),
 })
+
+export type AnswerQuestionsArgs = Infer<typeof answerQuestionsArgsValidator>
 
 /** A session message and metadata for its selected content version. */
 export const messageSchema = v.object({

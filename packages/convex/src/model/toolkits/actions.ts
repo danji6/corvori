@@ -7,7 +7,8 @@ import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { extractErrorMessage } from '../../errors'
 import { authorizeAdmin } from '../../functions'
-import type { StreamExecutionArgs, ToolkitPublishArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
+import type { ToolkitPublishArgs } from '../../validators/toolkits'
 import { toolkitRequest } from './transport'
 
 export type ProjectToolkitDiscovery = {

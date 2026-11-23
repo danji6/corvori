@@ -1,7 +1,7 @@
 import type { Id } from '../../_generated/dataModel'
 import { error } from '../../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../../functions'
-import type { ActiveStream } from '../../types'
+import type { ActiveStream } from '../../validators/streams'
 import { getActiveStream, requireMember } from '../session/memberships'
 import { stopForSession } from '../stream/lifecycle'
 import { activeStreamView } from '../stream/view'

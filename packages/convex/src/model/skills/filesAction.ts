@@ -8,7 +8,10 @@ import { errorMessage } from '@cv/core/utils/errors'
 import { internal } from '../../_generated/api'
 import type { Doc } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
-import type { OperationAttemptArgs, OperationResult } from '../../types'
+import type {
+  OperationAttemptArgs,
+  OperationResult,
+} from '../../validators/fileOperations'
 import { postSidecar } from '../sidecar'
 import type { ExecutionContext } from './execution'
 import { importSkills } from './importAction'

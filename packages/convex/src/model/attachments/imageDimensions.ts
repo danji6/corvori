@@ -2,7 +2,7 @@
 
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
-import type { AttachmentImageDimensions } from '../../types'
+import type { AttachmentImageDimensions } from '../../validators/attachments'
 
 export async function readStoredAttachmentImageDimensions(
   storage: ActionCtx['storage'],

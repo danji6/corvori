@@ -5,10 +5,8 @@ import {
   saveProviderContinuity,
 } from '@cv/convex/model/stream/providerRequests'
 import { _getProviderHistory } from '@cv/convex/model/stream/reads'
-import type {
-  ProviderContinuityScope,
-  StreamExecutionArgs,
-} from '@cv/convex/types'
+import type { ProviderContinuityScope } from '@cv/convex/validators/providerRequests'
+import type { StreamExecutionArgs } from '@cv/convex/validators/streams'
 import { expect, test } from 'bun:test'
 import { skillsDatabase } from '~/tests/helpers/skills-db'
 

@@ -1,6 +1,8 @@
 import type { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
-import type { ReplyQuote, SessionSummary, TokenUsage } from '@cv/convex/types'
+import type { SessionSummary } from '@cv/convex/model/session/types'
+import type { ReplyQuote } from '@cv/convex/validators/messages'
+import type { TokenUsage } from '@cv/convex/validators/providers'
 import type {
   ApproveToolArgs as CoreApproveToolArgs,
   CreateAgentArgs as CoreCreateAgentArgs,

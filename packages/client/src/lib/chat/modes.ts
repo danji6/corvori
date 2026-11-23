@@ -1,4 +1,4 @@
-import type { SessionMode } from '@cv/convex/types'
+import type { SessionMode } from '@cv/convex/validators/sessionModes'
 
 export type { SessionMode }
 

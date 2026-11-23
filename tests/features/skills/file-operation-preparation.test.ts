@@ -12,7 +12,7 @@ import {
 } from '@cv/convex/model/skills/imports'
 import { releaseOperation } from '@cv/convex/model/skills/lifecycle'
 import { retry, start } from '@cv/convex/model/skills/operations'
-import type { FileOperationArgs } from '@cv/convex/types'
+import type { FileOperationArgs } from '@cv/convex/validators/fileOperations'
 import { expect, test } from 'bun:test'
 import { skillsDatabase } from '~/tests/helpers/skills-db'
 

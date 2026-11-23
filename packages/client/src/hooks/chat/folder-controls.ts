@@ -7,7 +7,7 @@ import {
   saveCollapsed,
   setFolderCollapsed,
 } from '@/lib/chat/session-folder-state'
-import type { FolderView } from '@cv/convex/types'
+import type { FolderView } from '@cv/convex/model/session/types'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 type FolderHeaderActions = FolderMenuActions & {

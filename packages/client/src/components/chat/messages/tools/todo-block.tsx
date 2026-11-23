@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import type { TodoItem, TodoStatus } from '@cv/convex/types'
+import type { TodoItem, TodoStatus } from '@cv/convex/validators/todos'
 import { TODO_EDIT_STATUSES, type TodoEditStatus } from '@cv/core/const'
 import type { ToolUIPart } from 'ai'
 import type { LucideIcon } from 'lucide-react'

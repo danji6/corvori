@@ -5,18 +5,16 @@ import { error } from '@cv/convex/errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '@cv/convex/functions'
 import { minRole } from '@cv/convex/lib/roles'
 import type {
+  McpCatalogActiveArgs,
+  McpCatalogActiveFailureArgs,
   McpCatalogAppendArgs,
   McpCatalogBeginArgs,
   McpCatalogFailureArgs,
   McpCatalogIdArgs,
   McpCatalogPageArgs,
   McpCatalogPublishArgs,
-} from '@cv/convex/types'
-import type {
-  McpCatalogActiveArgs,
-  StreamExecutionArgs,
-} from '@cv/convex/types'
-import type { McpCatalogActiveFailureArgs } from '@cv/convex/types'
+} from '@cv/convex/validators/mcpCatalogs'
+import type { StreamExecutionArgs } from '@cv/convex/validators/streams'
 import {
   MAX_MCP_CATALOG_BYTES,
   MAX_MCP_CATALOG_TOOLS,

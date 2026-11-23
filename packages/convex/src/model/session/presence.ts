@@ -4,7 +4,7 @@ import { toDisplayName } from '@cv/core/utils/names'
 
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
-import type { MessageExtra } from '../../types'
+import type { MessageExtra } from '../chat/types'
 import { insertMessage } from '../messageContents'
 import { getByOwnerId as getSettings } from '../settings'
 

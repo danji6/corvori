@@ -1,9 +1,9 @@
 import type { SharedV3ProviderOptions } from '@ai-sdk/provider'
 import type { LanguageModelV3 } from '@ai-sdk/provider'
 import type { ModelReasoning, ReasoningTier } from '@cv/core/types'
+import type { ReasoningEffort } from '@cv/core/types/providers'
 import type { LanguageModelMiddleware } from 'ai'
 
-import type { ReasoningEffort } from '../../types'
 import { providerReasoningField } from './known'
 import { FIRST_PARTY_PROVIDERS } from './modelFactory'
 import { type ProviderOptions } from './options'

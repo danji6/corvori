@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 export const createScriptArgsValidator = v.object({
   name: v.string(),
@@ -8,6 +8,8 @@ export const createScriptArgsValidator = v.object({
   order: v.optional(v.number()),
 })
 
+export type CreateScriptArgs = Infer<typeof createScriptArgsValidator>
+
 export const updateScriptArgsValidator = v.object({
   scriptId: v.id('editorScripts'),
   name: v.optional(v.string()),
@@ -16,6 +18,8 @@ export const updateScriptArgsValidator = v.object({
   pinned: v.optional(v.boolean()),
   order: v.optional(v.number()),
 })
+
+export type UpdateScriptArgs = Infer<typeof updateScriptArgsValidator>
 
 /** A message editor script. */
 export const editorScriptSchema = v.object({

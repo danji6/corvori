@@ -4,7 +4,7 @@ import { hasFilesystemTools } from '@cv/core/tool-capabilities'
 
 import type { ActionCtx } from '../../_generated/server'
 import { sharedSessionId } from '../../lib/subagent'
-import type { StreamContext, StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { hasSavedTitle } from '../messages'
 import type { CacheableRequest } from '../provider/cache'
 import type { ProviderOptions } from '../provider/options'
@@ -27,6 +27,7 @@ import {
   readStepContext,
 } from './engineTools'
 import type { ProviderHistorySnapshot } from './historySnapshot'
+import type { StreamContext } from './types'
 
 // Keep the action's input type independent of Convex's generated API.
 export type PreparedStreamStep = CacheableRequest &

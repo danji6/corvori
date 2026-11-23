@@ -5,7 +5,7 @@ import { sha256 } from '@cv/core/sha256'
 import { internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import {
   type PromptItem,
   buildPromptMessages,

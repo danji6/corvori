@@ -4,7 +4,10 @@ import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import type { AuthMutationCtx } from '../../functions'
-import type { ToolkitMissingArgs, ToolkitSettingsArgs } from '../../types'
+import type {
+  ToolkitMissingArgs,
+  ToolkitSettingsArgs,
+} from '../../validators/toolkits'
 import { removeServer } from '../mcp/servers'
 import { ownedToolkit, toolkitActor } from './access'
 import { assertConfigurationCapacity } from './capacity'

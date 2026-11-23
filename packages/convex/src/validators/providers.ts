@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 export const reasoningTierValidator = v.union(
   v.literal('low'),
@@ -68,6 +68,8 @@ export const providerDiscoveryValidator = v.object({
   blocked: v.optional(v.boolean()),
 })
 
+export type ProviderDiscovery = Infer<typeof providerDiscoveryValidator>
+
 export const modelEntryValidator = v.object({
   ...modelSelectionFields,
   outputTokens: v.optional(v.number()),
@@ -104,6 +106,8 @@ export const tokenUsageValidator = v.object({
   ),
 })
 
+export type TokenUsage = Infer<typeof tokenUsageValidator>
+
 export const reasoningEffortValidator = v.union(
   reasoningTierValidator,
   v.literal('auto'),
@@ -120,6 +124,10 @@ export const createModelProviderArgsValidator = v.object({
   models: v.array(modelEntryValidator),
 })
 
+export type CreateModelProviderArgs = Infer<
+  typeof createModelProviderArgsValidator
+>
+
 export const updateModelProviderArgsValidator = v.object({
   providerId: v.id('modelProviders'),
   name: v.optional(v.string()),
@@ -130,6 +138,10 @@ export const updateModelProviderArgsValidator = v.object({
   enabled: v.optional(v.boolean()),
   models: v.optional(v.array(modelEntryValidator)),
 })
+
+export type UpdateModelProviderArgs = Infer<
+  typeof updateModelProviderArgsValidator
+>
 
 export const setModelInferenceArgsValidator = v.object({
   modelId: v.string(),
@@ -173,24 +185,36 @@ export const saveProvidersArgsValidator = v.object({
     }),
   ),
 })
+
+export type SaveProvidersArgs = Infer<typeof saveProvidersArgsValidator>
 export const ensureConnectionArgsValidator = v.object({
   key: v.string(),
   auth: providerAuthValidator,
   clientId: v.string(),
 })
+
+export type EnsureConnectionArgs = Infer<typeof ensureConnectionArgsValidator>
 export const previewDiscoveryArgsValidator = v.object({
   ...createModelProviderArgsValidator.fields,
   providerId: v.optional(v.id('modelProviders')),
 })
+
+export type PreviewDiscoveryArgs = Infer<typeof previewDiscoveryArgsValidator>
 
 export const previewModelDetailsArgsValidator = v.object({
   ...previewDiscoveryArgsValidator.fields,
   previewId: v.id('discoveryPreviews'),
   modelId: v.string(),
 })
+
+export type PreviewModelDetailsArgs = Infer<
+  typeof previewModelDetailsArgsValidator
+>
 export const removedConnectionArgsValidator = v.object({
   ownerId: v.id('users'),
   connectionId: v.id('modelProviders'),
   key: v.string(),
   auth: v.optional(providerAuthValidator),
 })
+
+export type RemovedConnectionArgs = Infer<typeof removedConnectionArgsValidator>

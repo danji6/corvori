@@ -4,8 +4,8 @@ import { start as startPublicOperation } from '@cv/convex/model/skills/endpoints
 import { validateOperationArgs } from '@cv/convex/model/skills/operationArgs'
 import { start } from '@cv/convex/model/skills/operations'
 import { start as startMutation } from '@cv/convex/skills'
-import type { FileOperationArgs } from '@cv/convex/types'
 import {
+  type FileOperationArgs,
   fileOperationArgsValidator,
   startFileOperationArgsValidator,
 } from '@cv/convex/validators/fileOperations'

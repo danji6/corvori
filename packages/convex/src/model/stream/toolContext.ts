@@ -9,11 +9,12 @@ import { contextDependencies, contextEnabled } from '@cv/core/tool-context'
 
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
-import type { StreamContext, StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { buildWorkspaceNoteContent } from '../chat/notes'
 import { prepareMcpCatalogContext } from '../mcp/catalogs/context'
 import { catalogNote } from '../skills/runtime'
 import type { PreparedAvailability } from '../tool/availability'
+import type { StreamContext } from './types'
 
 /** Appends current context without changing earlier notes or the frozen prefix. */
 export async function prepareToolContext(

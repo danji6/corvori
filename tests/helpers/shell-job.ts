@@ -1,5 +1,5 @@
-import type { ShellToolOutput } from '@cv/convex/types'
 import type { ShellJobStatus } from '@cv/core/shell/job-protocol'
+import type { ShellToolOutput } from '@cv/core/types/tools'
 
 export const context = { sessionId: 'session-1', workspaceId: 'ws-1' }
 

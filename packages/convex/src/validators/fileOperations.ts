@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 export const ensureHomeArgsValidator = v.object({
   kind: v.literal('ensure'),
@@ -69,6 +69,8 @@ export const fileOperationArgsValidator = v.union(
   duplicateHomeArgsValidator,
 )
 
+export type FileOperationArgs = Infer<typeof fileOperationArgsValidator>
+
 /** Keeps the command union inside the object required by Convex function arguments. */
 export const startFileOperationArgsValidator = v.object({
   operation: fileOperationArgsValidator,
@@ -79,6 +81,8 @@ export const operationAttemptArgsValidator = v.object({
   operationId: v.id('agentFileOperations'),
   attempt: v.number(),
 })
+
+export type OperationAttemptArgs = Infer<typeof operationAttemptArgsValidator>
 
 const attemptFields = operationAttemptArgsValidator.fields
 
@@ -94,21 +98,31 @@ export const operationResultValidator = v.union(
   v.object({ kind: v.literal('install') }),
 )
 
+export type OperationResult = Infer<typeof operationResultValidator>
+
 export const completeAgentFileArgsValidator = v.object({
   ...attemptFields,
   result: operationResultValidator,
   previousPath: v.optional(v.string()),
 })
 
+export type CompleteAgentFileArgs = Infer<typeof completeAgentFileArgsValidator>
+
 export const invalidateAgentHomeArgsValidator = v.object({
   ...attemptFields,
   cursor: v.union(v.string(), v.null()),
 })
 
+export type InvalidateAgentHomeArgs = Infer<
+  typeof invalidateAgentHomeArgsValidator
+>
+
 export const failAgentFileArgsValidator = v.object({
   ...attemptFields,
   message: v.string(),
 })
+
+export type FailAgentFileArgs = Infer<typeof failAgentFileArgsValidator>
 
 export const reserveHomeArgsValidator = v.object({
   ...attemptFields,
@@ -116,15 +130,25 @@ export const reserveHomeArgsValidator = v.object({
   insideData: v.boolean(),
 })
 
+export type ReserveHomeArgs = Infer<typeof reserveHomeArgsValidator>
+
 export const removeDeletedAssignmentArgsValidator = v.object({
   ...attemptFields,
   assignmentId: v.id('agentSkills'),
 })
 
+export type RemoveDeletedAssignmentArgs = Infer<
+  typeof removeDeletedAssignmentArgsValidator
+>
+
 export const copySkillAssignmentsArgsValidator = v.object({
   ...attemptFields,
   ids: v.array(v.id('agentSkills')),
 })
+
+export type CopySkillAssignmentsArgs = Infer<
+  typeof copySkillAssignmentsArgsValidator
+>
 
 const queuedState = v.object({ phase: v.literal('queued') })
 

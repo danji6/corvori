@@ -16,7 +16,7 @@ import {
 import type {
   AttachmentCursorCall,
   SaveAttachmentCursorArgs,
-} from '@cv/convex/types'
+} from '@cv/convex/validators/attachments'
 import type { ReadAttachmentInput } from '@cv/core/types'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { type FunctionReference, getFunctionName } from 'convex/server'

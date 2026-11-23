@@ -6,7 +6,7 @@ import {
 } from '@/lib/chat/modes'
 import { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
-import type { ApprovalMode } from '@cv/convex/types'
+import type { ApprovalMode } from '@cv/convex/validators/approvals'
 import type { OptimisticLocalStore } from 'convex/browser'
 import { useMutation, useQuery } from 'convex/react'
 import { useCallback, useEffect } from 'react'

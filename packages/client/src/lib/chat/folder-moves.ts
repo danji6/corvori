@@ -1,7 +1,11 @@
-import type { FolderMoveArgs, FolderView } from '@cv/convex/types'
+import type { api } from '@cv/convex/_generated/api'
+import type { FolderView } from '@cv/convex/model/session/types'
 import { folderSiblings } from '@cv/core/utils/folder-tree'
+import type { FunctionArgs } from 'convex/server'
 
 import type { GroupRow } from './session-groups'
+
+export type FolderMoveArgs = FunctionArgs<typeof api.actions.folders.move>
 
 export type FolderDropPlacement = 'before' | 'inside' | 'after'
 

@@ -10,7 +10,7 @@ import { contextEnabled } from '@cv/core/tool-context'
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
 import { minRole } from '../../lib/roles'
-import type { StreamContext, StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { sidecarDefaultShell } from '../sidecar'
 import { resolvePersonalWorkspace } from '../skills/runtime'
 import {
@@ -25,6 +25,7 @@ import {
   prepareToolReplay,
 } from '../tool/sessionTools'
 import { prepareToolContext } from './toolContext'
+import type { StreamContext } from './types'
 
 export type StepContext = {
   ctx: ActionCtx

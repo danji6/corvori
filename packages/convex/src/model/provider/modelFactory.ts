@@ -1,9 +1,9 @@
 import { providerFeatures } from '@cv/core/provider-registry'
 import type { ModelReasoning } from '@cv/core/types'
+import type { ReasoningEffort } from '@cv/core/types/providers'
 import type { LanguageModel, LanguageModelMiddleware } from 'ai'
 
 import { error } from '../../errors'
-import type { ReasoningEffort } from '../../types'
 import { providerRequiresBaseURL, resolveChatCompletionsBaseURL } from './known'
 import { withProviderMiddleware } from './providerMiddleware'
 import type { ProviderCredentials } from './providers'

@@ -1,6 +1,6 @@
 import type { LocalFilePreview } from '@/hooks/file-previews'
 import type { Id } from '@cv/convex/_generated/dataModel'
-import type { AttachmentImageDimensions } from '@cv/convex/types'
+import type { AttachmentImageDimensions } from '@cv/convex/validators/attachments'
 
 export type StagedAttachment = {
   id: Id<'attachments'>

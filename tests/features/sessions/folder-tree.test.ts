@@ -1,5 +1,5 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
-import type { FolderView } from '@cv/convex/types'
+import type { FolderView } from '@cv/convex/model/session/types'
 import {
   folderBranch,
   folderTrail,

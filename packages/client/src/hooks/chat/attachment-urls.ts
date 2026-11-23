@@ -1,6 +1,6 @@
 import { normalizeBrowserUrl } from '@/lib/auth/site-url'
 import { api } from '@cv/convex/_generated/api'
-import type { AttachmentImageDimensions } from '@cv/convex/types'
+import type { AttachmentImageDimensions } from '@cv/convex/validators/attachments'
 import { useEffect, useMemo } from 'react'
 
 import { createMediaUrlStore } from './media-urls'

@@ -4,10 +4,10 @@ import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import { minRole } from '../../lib/roles'
 import type {
-  PrepareContextNoteArgs,
   ProjectSkillReadArgs,
   SkillReadArgs,
-} from '../../types'
+} from '../../validators/skills'
+import type { PrepareContextNoteArgs } from '../../validators/streams'
 import { prepareContextNote } from '../stream/contextNotes'
 import { ownsExecution } from '../stream/execution'
 import { skillContext } from '../toolkits/skills'

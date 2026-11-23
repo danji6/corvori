@@ -1,6 +1,6 @@
 import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
-import type { TrackStreamOutputArgs } from '../../types'
+import type { TrackStreamOutputArgs } from '../../validators/streams'
 import { allVersionParts } from '../messageContents'
 import { cancelScheduledExecution, ownsExecution } from './execution'
 import { expireStream } from './expiry'

@@ -6,15 +6,14 @@ import {
   consumeProviderStep,
 } from '@cv/convex/model/stream/engineStep'
 import type {
-  Prompt,
-  PromptItem,
   StreamCommand,
   StreamExecutionArgs,
-} from '@cv/convex/types'
+} from '@cv/convex/validators/streams'
 import { evaluate } from '@cv/core/interpreter/evaluate'
 import { createVariableStore } from '@cv/core/interpreter/store'
 import type { EvalContext, JsonValue } from '@cv/core/interpreter/types'
 import { modelReference } from '@cv/core/model-reference'
+import type { Prompt, PromptItem } from '@cv/core/types/prompts'
 import { simulateReadableStream, tool } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { expect, mock, spyOn, test } from 'bun:test'

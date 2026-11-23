@@ -1,5 +1,5 @@
 import type { SessionListItem } from '@/lib/chat'
-import type { FolderView } from '@cv/convex/types'
+import type { FolderView } from '@cv/convex/model/session/types'
 import {
   type FolderNode,
   folderSiblings,

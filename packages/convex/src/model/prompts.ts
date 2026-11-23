@@ -5,12 +5,13 @@ import {
   MAX_SCOPE_PROMPTS,
 } from '@cv/core/limits'
 import { isPrompt, normalizeOperationPrompt } from '@cv/core/prompts'
+import type { Prompt, PromptItem } from '@cv/core/types/prompts'
 
 import type { Doc, Id } from '../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../_generated/server'
 import { error } from '../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../functions'
-import type { Prompt, PromptItem, PromptScope } from '../types'
+import type { PromptScope } from '../validators/prompts'
 import { promptItemKey } from './prompt/markers'
 
 /** The scopes an agent owns, as opposed to the user-level ones. */

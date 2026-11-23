@@ -1,9 +1,9 @@
 import { extractErrorMessage } from '@/lib/errors'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
-import type { ToolkitComponentArgs } from '@cv/convex/types'
 import { useQuery } from 'convex-helpers/react/cache/hooks'
 import { useMutation } from 'convex/react'
+import type { FunctionArgs } from 'convex/server'
 import { useState } from 'react'
 
 type Feedback = {
@@ -18,7 +18,7 @@ export function useToolkitBindings(toolkitId: Id<'toolkits'>) {
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<Feedback>()
 
-  async function save(args: ToolkitComponentArgs) {
+  async function save(args: FunctionArgs<typeof api.toolkits.component>) {
     setBusy(true)
     setFeedback(undefined)
     try {

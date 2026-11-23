@@ -1,7 +1,7 @@
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import type { StreamCommand } from '../../types'
+import type { StreamCommand } from '../../validators/streams'
 import { addVersion, getActiveSegmentRow } from '../messageContents'
 import { scheduleTitle, stripMessageError } from '../messages'
 import { getSessionWithWorkspace } from '../session/folderContext'

@@ -10,11 +10,13 @@ import { internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import type { AgentWithHome, Session, SkillReadArgs } from '../../types'
+import type { SkillReadArgs } from '../../validators/skills'
+import type { Session } from '../session/types'
 import { postSidecar } from '../sidecar'
 import { toolkitSkillFingerprint } from '../toolkits/skillContext'
 import { combinedSkillCatalog } from './catalog'
 import type { CatalogRequest } from './catalogWindow'
+import type { AgentWithHome } from './homes'
 
 export type PreparedSkillCatalog = SkillCatalogPage & {
   toolkitFingerprint: string

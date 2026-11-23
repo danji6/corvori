@@ -2,12 +2,9 @@ import { internal } from '../../_generated/api'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import type {
-  RunningStream,
-  StreamExecutionArgs,
-  StreamState,
-} from '../../types'
+import type { StreamExecutionArgs, StreamState } from '../../validators/streams'
 import { STREAM_LEASE_MS } from './lease'
+import type { RunningStream } from './types'
 
 /** Identifies the action that owns this stream execution. */
 export function matchesExecution(

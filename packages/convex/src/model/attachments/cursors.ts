@@ -5,7 +5,7 @@ import { error } from '../../errors'
 import type {
   AttachmentCursorCall,
   SaveAttachmentCursorArgs,
-} from '../../types'
+} from '../../validators/attachments'
 import { getMember, requireEnabled } from '../session/memberships'
 import { ownsExecution } from '../stream/execution'
 

@@ -4,8 +4,7 @@ import { inline } from '@cv/core/utils/strings'
 
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
-import type { Session } from '../../types'
-import type { MessageExtra, SessionMode } from '../../types'
+import type { SessionMode } from '../../validators/sessionModes'
 import {
   deleteVersions,
   insertMessage,
@@ -16,9 +15,11 @@ import {
   reserveSegmentEvaluation,
 } from '../promptEvaluation/reserve'
 import { removeForSession as removeSessionCache } from '../session/cache'
+import type { Session } from '../session/types'
 import { sessionToolNames } from '../tool/selection'
 import type { SenderIdentity } from './identities'
 import { agentIdentity } from './identities'
+import type { MessageExtra } from './types'
 
 export type NoteSender = {
   agent: Doc<'agents'>

@@ -10,8 +10,9 @@ import {
   update,
 } from '@cv/convex/model/prompts'
 import { list as listReminders } from '@cv/convex/model/reminders'
-import type { Prompt, PromptItem, PromptScope } from '@cv/convex/types'
+import type { PromptScope } from '@cv/convex/validators/prompts'
 import { MAX_PROMPT_CONTENT_CHARS, MAX_SCOPE_PROMPTS } from '@cv/core/limits'
+import type { Prompt, PromptItem } from '@cv/core/types/prompts'
 import { describe, expect, test } from 'bun:test'
 
 const OWNER = 'user_1'

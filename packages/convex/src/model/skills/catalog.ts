@@ -10,11 +10,11 @@ import type { FolderWorkspace } from '@cv/core/types/workspace'
 
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
-import type { AgentWithHome } from '../../types'
 import { postSidecar } from '../sidecar'
 import { toolkitRequest } from '../toolkits/transport'
 import { CatalogWindow } from './catalogWindow'
 import type { CatalogRequest } from './catalogWindow'
+import type { AgentWithHome } from './homes'
 
 type AssignmentPage = {
   page: { name: string }[]

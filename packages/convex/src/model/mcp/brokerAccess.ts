@@ -6,8 +6,8 @@ import type {
   McpBrokerSearchArgs,
   McpBrokerServerArgs,
   McpBrokerTargetArgs,
-  StreamExecutionArgs,
-} from '../../types'
+} from '../../validators/mcpBroker'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { assignName, findName } from './brokerNames'
 import {
   available,

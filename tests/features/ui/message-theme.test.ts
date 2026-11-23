@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 import { resolveMessageTheme } from '@/lib/chat/message-theme'
-import type { ThemeSnapshot } from '@cv/convex/types'
+import type { ThemeSnapshot } from '@cv/core/types/theme'
 import { describe, expect, test } from 'bun:test'
 
 const userTheme = { source: '#222222' } as ThemeSnapshot

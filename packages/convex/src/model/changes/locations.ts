@@ -4,9 +4,9 @@ import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import { requireRole } from '../../functions'
-import type { AgentWithHome, Session } from '../../types'
 import { requireEnabled, requireMember } from '../session/memberships'
-import { agentWithHome } from '../skills/homes'
+import type { Session } from '../session/types'
+import { type AgentWithHome, agentWithHome } from '../skills/homes'
 import { findUserBySubject } from '../users'
 
 export async function checkpointAgents(

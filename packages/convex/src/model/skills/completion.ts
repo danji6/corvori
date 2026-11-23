@@ -3,7 +3,10 @@ import { errorMessage } from '@cv/core/utils/errors'
 import type { Doc } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import type { CompleteAgentFileArgs, FailAgentFileArgs } from '../../types'
+import type {
+  CompleteAgentFileArgs,
+  FailAgentFileArgs,
+} from '../../validators/fileOperations'
 import { assertHomeDestination } from './destinations'
 import { bindHome } from './homes'
 import { scheduleHomeInvalidation } from './invalidation'

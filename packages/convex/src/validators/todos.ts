@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 export const todoStatusValidator = v.union(
   v.literal('pending'),
@@ -6,10 +6,14 @@ export const todoStatusValidator = v.union(
   v.literal('completed'),
 )
 
+export type TodoStatus = Infer<typeof todoStatusValidator>
+
 export const todoItemValidator = v.object({
   content: v.string(),
   status: todoStatusValidator,
 })
+
+export type TodoItem = Infer<typeof todoItemValidator>
 
 /** A session’s task list and reminder progress. */
 export const todoSchema = v.object({

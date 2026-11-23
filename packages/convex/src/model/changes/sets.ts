@@ -17,7 +17,7 @@ import type {
   ReservePublicationArgs,
   RestoreChangesArgs,
   RestoreChangesResultArgs,
-} from '../../types'
+} from '../../validators/changes'
 import { agentIdentity } from '../chat/identities'
 import { insertMessage } from '../messageContents'
 import { requireEnabled, requireMember } from '../session/memberships'

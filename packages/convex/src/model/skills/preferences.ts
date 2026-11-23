@@ -1,7 +1,7 @@
 import type { Doc, Id } from '../../_generated/dataModel'
 import { error } from '../../errors'
 import type { AuthMutationCtx } from '../../functions'
-import type { SetSkillEnabledArgs } from '../../types'
+import type { SetSkillEnabledArgs } from '../../validators/skills'
 import { requireAdmin, requireOwnedAgent } from './access'
 
 export function isSkillEnabled(

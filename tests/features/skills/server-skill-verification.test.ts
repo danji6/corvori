@@ -13,7 +13,7 @@ import type {
   RemoveMissingSkillArgs,
   SkillListArgs,
   VerifySkillIdsArgs,
-} from '@cv/convex/types'
+} from '@cv/convex/validators/skills'
 import { libraryRoot } from '@cv/sidecar/agent-files/storage'
 import { verifyLibrary } from '@cv/sidecar/agent-files/verify-library'
 import { afterAll, beforeAll, expect, test } from 'bun:test'

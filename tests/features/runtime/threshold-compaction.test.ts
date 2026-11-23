@@ -30,7 +30,7 @@ import { _compactAtThreshold } from '@cv/convex/model/stream/thresholdCompaction
 import type {
   StreamExecutionArgs,
   ThresholdCompactionArgs,
-} from '@cv/convex/types'
+} from '@cv/convex/validators/streams'
 import { messagePosition } from '@cv/core/message-position'
 import { modelReference } from '@cv/core/model-reference'
 import { tool } from 'ai'

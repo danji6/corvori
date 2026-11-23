@@ -5,7 +5,6 @@ import { usableContextWindow } from '@cv/core/discovered-model'
 
 import { internal } from '../../_generated/api'
 import { error } from '../../errors'
-import type { StreamContext } from '../../types'
 import {
   effectiveAgentSelection,
   unavailableModelOverride,
@@ -22,6 +21,7 @@ import {
 } from './historySnapshot'
 import { buildProviderPrefix } from './operations'
 import type { resolveStreamCacheId } from './providerCacheId'
+import type { StreamContext } from './types'
 
 export function resolveStepModel(data: StreamContext) {
   const { modelOverride } = data.agent

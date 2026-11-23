@@ -1,7 +1,7 @@
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import type { AuthMutationCtx } from '../../functions'
-import type { StopStreamArgs } from '../../types'
+import type { StopStreamArgs } from '../../validators/streams'
 import { cancelEvaluation, listPending } from '../promptEvaluation/records'
 import { removeForSession as removeSessionCache } from '../session/cache'
 import * as Memberships from '../session/memberships'

@@ -1,6 +1,6 @@
 import { internal } from '@cv/convex/_generated/api'
 import type { ActionCtx } from '@cv/convex/_generated/server'
-import type { McpOperationExecutionArgs } from '@cv/convex/types'
+import type { McpOperationExecutionArgs } from '@cv/convex/validators/mcpOperations'
 import type { McpResult } from '@cv/core/types/mcp-result'
 
 /** Validates output before completion, including resumed calls. */

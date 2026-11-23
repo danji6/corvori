@@ -1,5 +1,5 @@
 import { isDisplayableUrl, thumbnail } from '@/lib/io'
-import type { AttachmentImageDimensions } from '@cv/convex/types'
+import type { AttachmentImageDimensions } from '@cv/convex/validators/attachments'
 import { isKnownTextFile } from '@cv/core/workspace/files'
 import { useEffect, useRef, useState } from 'react'
 

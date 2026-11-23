@@ -6,6 +6,7 @@ import {
   toPlanBlock,
 } from '@cv/convex/lib/workspace'
 import { decodeMcpOutput } from '@cv/core/types/mcp-result'
+import type { MessageRole } from '@cv/core/types/roles'
 import type {
   WorkspaceBinaryRefLink,
   WorkspaceFileLink,
@@ -20,7 +21,6 @@ import type { ActionCtx } from '../../_generated/server'
 import { isShellReportPart, toShellReportBlock } from '../../lib/shellReport'
 import { isSubagentReportPart, toSubagentReportBlock } from '../../lib/subagent'
 import { isShellToolPart, toUserShellBlock } from '../../lib/userShell'
-import type { MessageRole } from '../../types'
 import { encodeBase64 } from '../io/base64'
 import type { PlanLinkPart } from '../plans'
 import {

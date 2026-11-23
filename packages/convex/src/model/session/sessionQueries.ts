@@ -4,17 +4,14 @@ import { toDisplayName } from '@cv/core/utils/names'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { QueryCtx } from '../../_generated/server'
 import { type AuthQueryCtx } from '../../functions'
-import type {
-  ListSessionsArgs,
-  SessionListItem,
-  SessionMode,
-  SessionParticipant,
-} from '../../types'
+import type { SessionMode } from '../../validators/sessionModes'
+import type { ListSessionsArgs } from '../../validators/sessions'
 import { getByOwnerId as getSettings } from '../settings'
 import { readFolderTrail } from './folderTree'
 import { getMember } from './memberships'
 import { sessionListQuery, sessionSearchMatcher } from './sessionSearch'
 import { getApprovals, getState } from './state'
+import type { SessionListItem, SessionParticipant } from './types'
 
 export async function list(
   ctx: AuthQueryCtx,

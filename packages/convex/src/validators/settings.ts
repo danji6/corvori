@@ -1,5 +1,5 @@
 import { SEARCH_ENGINE_IDS } from '@cv/core/types'
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 /** Resolved theme variables as their hex values. */
 export const schemeColorsValidator = v.record(v.string(), v.string())
@@ -83,6 +83,8 @@ export const settingsPatchArgsValidator = v.object({
   theme: v.optional(v.union(themeSnapshotValidator, v.null())),
 })
 
+export type SettingsPatch = Infer<typeof settingsPatchArgsValidator>
+
 /**
  * The settings field that was requested to be cleared. Needed because Convex
  * drops `undefined` from a patch.
@@ -92,6 +94,8 @@ export const settingsKeyValidator = v.union(
     Object.keys(settingsMutableFields) as (keyof typeof settingsMutableFields)[]
   ).map((key) => v.literal(key)),
 )
+
+export type SettingsKey = Infer<typeof settingsKeyValidator>
 
 /** An owner’s shared application preferences. */
 export const settingsSchema = v.object({

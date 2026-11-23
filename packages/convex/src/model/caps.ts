@@ -14,7 +14,7 @@ import { serializedSize } from '@cv/core/utils/size'
 import { approvalPathsError, foldPaths } from '@cv/core/workspace/path-policy'
 
 import { error } from '../errors'
-import type { TodoItem } from '../types'
+import type { TodoItem } from '../validators/todos'
 
 export function assertCustomCssCap(css: string | undefined) {
   if (css && css.length > MAX_CUSTOM_CSS_CHARS) {

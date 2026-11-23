@@ -2,15 +2,11 @@ import {
   defaultModelReasoning,
   normalizeReasoningEffort,
 } from '@cv/core/model-reasoning'
+import type { AgentSubagentOverride } from '@cv/core/types/agents'
+import type { ModelSelection, ReasoningEffort } from '@cv/core/types/providers'
 
 import type { Doc } from '../../_generated/dataModel'
 import type { QueryCtx } from '../../_generated/server'
-import type { Session } from '../../types'
-import type {
-  AgentSubagentOverride,
-  ModelSelection,
-  ReasoningEffort,
-} from '../../types'
 import {
   effectiveAgentSelection,
   unavailableModelOverride,
@@ -20,6 +16,7 @@ import {
   findCredentialsForModel,
   findModelSelection,
 } from '../provider/providers'
+import type { Session } from '../session/types'
 
 export type SubagentModelSettings = {
   model?: ModelSelection

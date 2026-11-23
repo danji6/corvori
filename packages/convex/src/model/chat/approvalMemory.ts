@@ -1,5 +1,6 @@
 import { mcpApprovalKey } from '@cv/core/types/mcp-catalog'
 import { mcpProtocolApprovalKey } from '@cv/core/types/mcp-protocol'
+import type { RememberScope } from '@cv/core/types/tools'
 
 import { internal } from '../../_generated/api'
 import type { AuthMutationCtx } from '../../functions'
@@ -8,10 +9,10 @@ import {
   isFileTool,
   toolNamesForApproval,
 } from '../../lib/tool/approval'
-import type { RememberScope, Session } from '../../types'
 import { approvalTarget, findName } from '../mcp/brokerNames'
 import { _allowToolPaths as allowToolPaths } from '../session/sessions'
 import { appendApprovals, getApprovals } from '../session/state'
+import type { Session } from '../session/types'
 
 /** The tool call an approval answered. */
 export type ApprovedTool = {

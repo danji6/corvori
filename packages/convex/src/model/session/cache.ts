@@ -1,6 +1,6 @@
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
-import type { SaveSessionCacheArgs } from '../../types'
+import type { SaveSessionCacheArgs } from '../../validators/sessions'
 import { pinManifest, releasePins } from '../mcp/catalogs/pins'
 import { releaseEvaluation } from '../promptEvaluation/records'
 import { getSessionWithWorkspace, workspaceKey } from './folderContext'

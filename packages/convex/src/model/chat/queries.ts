@@ -1,4 +1,3 @@
-import type { MessageWindowArgs } from '@cv/convex/types'
 import {
   MESSAGE_WINDOW_BUDGET_BYTES,
   MESSAGE_WINDOW_MAX_ROWS,
@@ -10,6 +9,7 @@ import type { PaginationOptions } from 'convex/server'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { AuthQueryCtx } from '../../functions'
 import schema from '../../schema'
+import type { MessageWindowArgs } from '../../validators/messages'
 import {
   getActiveSegmentRow,
   getSegmentRow,

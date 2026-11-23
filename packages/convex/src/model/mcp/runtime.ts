@@ -16,7 +16,7 @@ import type {
   McpRuntimePageArgs,
   McpRuntimeRetireArgs,
   McpRuntimeStatusArgs,
-} from '../../types'
+} from '../../validators/mcp'
 import { getSessionWithWorkspace, workspaceKey } from '../session/folderContext'
 import { getMembership } from '../session/memberships'
 import { cancelForRuntime } from './operations/records'

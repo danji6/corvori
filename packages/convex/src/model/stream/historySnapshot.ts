@@ -4,7 +4,7 @@ import { type Value, convexToJson } from 'convex/values'
 
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import type { MessageWithParts } from '../messageContents'
 import { assembleProviderHistory } from './providerHistory'
 

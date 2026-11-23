@@ -3,7 +3,7 @@
 import type { ToolSet } from 'ai'
 
 import type { ActionCtx } from '../../_generated/server'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import type { ToolDefinition, ToolManifest } from './manifest'
 
 /** Serializes the exact function definitions independently of their live behavior. */

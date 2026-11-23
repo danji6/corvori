@@ -14,7 +14,10 @@ import {
 } from '@cv/convex/model/session/folders'
 import { create as createSession } from '@cv/convex/model/session/sessions'
 import { getApprovals } from '@cv/convex/model/session/state'
-import type { FolderMoveArgs, FolderTransitionArgs } from '@cv/convex/types'
+import type {
+  FolderMoveArgs,
+  FolderTransitionArgs,
+} from '@cv/convex/validators/folders'
 import { describe, expect, test } from 'bun:test'
 import {
   type Row,

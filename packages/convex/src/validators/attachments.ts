@@ -1,9 +1,11 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 export const attachmentImageDimensions = v.object({
   width: v.number(),
   height: v.number(),
 })
+
+export type AttachmentImageDimensions = Infer<typeof attachmentImageDimensions>
 
 export const confirmAttachmentArgsValidator = v.object({
   storageId: v.id('_storage'),
@@ -13,10 +15,16 @@ export const confirmAttachmentArgsValidator = v.object({
   mediaType: v.string(),
 })
 
+export type ConfirmAttachmentArgs = Infer<typeof confirmAttachmentArgsValidator>
+
 export const confirmAttachmentWithDimensionsArgsValidator = v.object({
   ...confirmAttachmentArgsValidator.fields,
   imageDimensions: v.optional(attachmentImageDimensions),
 })
+
+export type ConfirmAttachmentWithDimensionsArgs = Infer<
+  typeof confirmAttachmentWithDimensionsArgsValidator
+>
 
 export const createGeneratedAttachmentArgsValidator = v.object({
   generation: v.number(),
@@ -29,6 +37,10 @@ export const createGeneratedAttachmentArgsValidator = v.object({
   mediaType: v.string(),
   imageDimensions: v.optional(attachmentImageDimensions),
 })
+
+export type CreateGeneratedAttachmentArgs = Infer<
+  typeof createGeneratedAttachmentArgsValidator
+>
 
 /** A session attachment referencing a shared file. */
 export const attachmentSchema = v.object({
@@ -77,6 +89,8 @@ export const attachmentCursorSettings = v.object({
   limit: v.number(),
 })
 
+export type AttachmentCursorSettings = Infer<typeof attachmentCursorSettings>
+
 export const attachmentCursorSchema = v.object({
   ...attachmentCursorScope,
   ...attachmentCursorSettings.fields,
@@ -104,6 +118,8 @@ export const attachmentCursorCall = v.object({
   operationId: v.optional(v.string()),
 })
 
+export type AttachmentCursorCall = Infer<typeof attachmentCursorCall>
+
 export const saveAttachmentCursorArgs = v.object({
   ...attachmentCursorCall.fields,
   next: attachmentCursorPosition,
@@ -113,3 +129,5 @@ export const saveAttachmentCursorArgs = v.object({
     v.object({ revision: v.number() }),
   ),
 })
+
+export type SaveAttachmentCursorArgs = Infer<typeof saveAttachmentCursorArgs>

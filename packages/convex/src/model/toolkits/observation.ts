@@ -1,6 +1,6 @@
 import type { MutationCtx } from '../../_generated/server'
 import { requireRole } from '../../functions'
-import type { ToolkitObservationArgs } from '../../types'
+import type { ToolkitObservationArgs } from '../../validators/toolkits'
 import { requireExecution } from '../mcp/operations/access'
 import { availableToolkits } from './access'
 import { reconcileToolkit } from './components'

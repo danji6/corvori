@@ -1,5 +1,5 @@
 import { paginationOptsValidator } from 'convex/server'
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 import { streamExecutionArgsValidator } from './streams'
 
@@ -11,19 +11,27 @@ export const skillReadArgsValidator = v.object({
   length: v.number(),
 })
 
+export type SkillReadArgs = Infer<typeof skillReadArgsValidator>
+
 export const projectSkillReadArgsValidator = v.object({
   ...skillReadArgsValidator.fields,
   sourceId: v.string(),
 })
+
+export type ProjectSkillReadArgs = Infer<typeof projectSkillReadArgsValidator>
 
 export const toolkitSkillReadArgsValidator = v.object({
   ...skillReadArgsValidator.fields,
   toolkitId: v.string(),
 })
 
+export type ToolkitSkillReadArgs = Infer<typeof toolkitSkillReadArgsValidator>
+
 export const verifySkillIdsValidator = v.object({
   skillIds: v.array(v.id('skills')),
 })
+
+export type VerifySkillIdsArgs = Infer<typeof verifySkillIdsValidator>
 
 export const skillVerificationPageValidator = v.object({
   missing: v.array(v.object({ skillId: v.id('skills'), name: v.string() })),
@@ -33,11 +41,17 @@ export const skillVerificationPageValidator = v.object({
   continueCursor: v.string(),
 })
 
+export type SkillVerificationPage = Infer<typeof skillVerificationPageValidator>
+
 export const removeMissingSkillArgsValidator = v.object({
   skillId: v.id('skills'),
   ownerId: v.id('users'),
   importOperationId: v.optional(v.id('agentFileOperations')),
 })
+
+export type RemoveMissingSkillArgs = Infer<
+  typeof removeMissingSkillArgsValidator
+>
 
 export const skillAssignmentsArgsValidator = v.object({
   agentId: v.id('agents'),
@@ -46,11 +60,15 @@ export const skillAssignmentsArgsValidator = v.object({
   enabledOnly: v.optional(v.boolean()),
 })
 
+export type SkillAssignmentsArgs = Infer<typeof skillAssignmentsArgsValidator>
+
 export const setSkillEnabledArgsValidator = v.object({
   agentId: v.id('agents'),
   assignmentId: v.id('agentSkills'),
   enabled: v.boolean(),
 })
+
+export type SetSkillEnabledArgs = Infer<typeof setSkillEnabledArgsValidator>
 
 export const prepareSkillImportArgsValidator = v.object({
   attempt: v.number(),
@@ -58,6 +76,10 @@ export const prepareSkillImportArgsValidator = v.object({
   cursor: v.number(),
   metadata: v.object({ name: v.string(), description: v.string() }),
 })
+
+export type PrepareSkillImportArgs = Infer<
+  typeof prepareSkillImportArgsValidator
+>
 
 export const finishSkillImportArgsValidator = v.object({
   attempt: v.number(),
@@ -73,6 +95,8 @@ export const finishSkillImportArgsValidator = v.object({
   message: v.optional(v.string()),
 })
 
+export type FinishSkillImportArgs = Infer<typeof finishSkillImportArgsValidator>
+
 export const skillListArgsValidator = v.object({
   paginationOpts: paginationOptsValidator,
   search: v.optional(v.string()),
@@ -80,11 +104,17 @@ export const skillListArgsValidator = v.object({
   assignment: v.optional(v.union(v.literal('added'), v.literal('not-added'))),
 })
 
+export type SkillListArgs = Infer<typeof skillListArgsValidator>
+
 export const continueSkillImportArgsValidator = v.object({
   operationId: v.id('agentFileOperations'),
   cursor: v.number(),
   attempt: v.number(),
 })
+
+export type ContinueSkillImportArgs = Infer<
+  typeof continueSkillImportArgsValidator
+>
 
 /** An owner-bound upload ticket and its verified storage object. */
 export const skillUploadSchema = v.object({

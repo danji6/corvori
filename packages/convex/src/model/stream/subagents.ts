@@ -13,8 +13,7 @@ import {
   pendingTaskParts,
   taskInput,
 } from '../../lib/subagent'
-import type { StreamExecutionArgs } from '../../types'
-import type { Session } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { resolveSpawnableAgents } from '../agent/subagents'
 import { agentIdentity } from '../chat/identities'
 import {
@@ -29,6 +28,7 @@ import { withModelParts } from '../promptEvaluation/messageParts'
 import { getSessionWithWorkspace } from '../session/folderContext'
 import { getActiveStream } from '../session/memberships'
 import { reserveTaskDirectory } from '../session/sessionFiles'
+import type { Session } from '../session/types'
 import { assertAgentAvailable } from '../skills/access'
 import {
   type SubagentModelSettings,

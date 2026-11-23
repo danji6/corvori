@@ -6,7 +6,7 @@ import { api } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import { authorizeAdmin } from '../../functions'
-import type { ToolkitSkillsArgs } from '../../types'
+import type { ToolkitSkillsArgs } from '../../validators/toolkits'
 import { toolkitRequest } from './transport'
 
 export type ToolkitSkillPreview = SkillCatalogSlice & {

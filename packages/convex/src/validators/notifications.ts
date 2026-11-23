@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 export const notificationApprovalValidator = v.object({
   streamId: v.id('streams'),
@@ -8,11 +8,17 @@ export const notificationApprovalValidator = v.object({
   approvalId: v.string(),
 })
 
+export type NotificationApproval = Infer<typeof notificationApprovalValidator>
+
 export const notificationApprovalActionValidator = v.union(
   v.literal('allow'),
   v.literal('allow-session'),
   v.literal('deny'),
 )
+
+export type NotificationApprovalAction = Infer<
+  typeof notificationApprovalActionValidator
+>
 
 /** Activity kinds that can produce durable notifications. */
 export const notificationKindValidator = v.union(
@@ -23,11 +29,15 @@ export const notificationKindValidator = v.union(
   v.literal('turn_error'),
 )
 
+export type NotificationKind = Infer<typeof notificationKindValidator>
+
 /** Inbox states supported by notification retention and ordering. */
 export const notificationStatusValidator = v.union(
   v.literal('unread'),
   v.literal('read'),
 )
+
+export type NotificationStatus = Infer<typeof notificationStatusValidator>
 
 export const notificationRequestValidator = v.object({
   streamId: v.id('streams'),
@@ -36,6 +46,8 @@ export const notificationRequestValidator = v.object({
   toolCallId: v.string(),
 })
 
+export type NotificationRequest = Infer<typeof notificationRequestValidator>
+
 export const notificationRequestStateValidator = v.union(
   v.literal('pending'),
   v.literal('handled'),
@@ -43,6 +55,10 @@ export const notificationRequestStateValidator = v.union(
   v.literal('expired'),
   v.literal('unavailable'),
 )
+
+export type NotificationRequestState = Infer<
+  typeof notificationRequestStateValidator
+>
 
 /** A notification with denormalized display snapshots. */
 export const notificationSchema = v.object({

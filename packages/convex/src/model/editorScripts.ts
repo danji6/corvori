@@ -1,7 +1,10 @@
 import type { Id } from '../_generated/dataModel'
 import { error } from '../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../functions'
-import type { CreateScriptArgs, UpdateScriptArgs } from '../types'
+import type {
+  CreateScriptArgs,
+  UpdateScriptArgs,
+} from '../validators/editorScripts'
 
 export async function list(ctx: AuthQueryCtx) {
   return ctx.db

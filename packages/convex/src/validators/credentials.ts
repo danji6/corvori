@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 /** Identifies the connection type a stored API key belongs to. */
 export const credentialScopeValidator = v.union(
@@ -6,6 +6,8 @@ export const credentialScopeValidator = v.union(
   v.literal('mcp'),
   v.literal('mcp-env'),
 )
+
+export type CredentialScope = Infer<typeof credentialScopeValidator>
 
 /** An API key, never exposed to clients. */
 export const credentialSchema = v.object({

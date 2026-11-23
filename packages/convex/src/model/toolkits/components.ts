@@ -4,7 +4,10 @@ import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import type { AuthMutationCtx } from '../../functions'
-import type { ToolkitComponentArgs, ToolkitPublishArgs } from '../../types'
+import type {
+  ToolkitComponentArgs,
+  ToolkitPublishArgs,
+} from '../../validators/toolkits'
 import { saveCredentials } from '../mcp/configuration'
 import { revokeRestrictedTargets } from '../mcp/policyRevocation'
 import { isAuthorized, retire, revoke } from '../mcp/runtime'

@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 import { streamExecutionArgsValidator } from './streams'
 
@@ -15,11 +15,15 @@ export const brokerServerValidator = v.object({
   server: v.string(),
 })
 
+export type McpBrokerServerArgs = Infer<typeof brokerServerValidator>
+
 export const brokerTargetValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   tool: v.string(),
   forDefinition: v.optional(v.boolean()),
 })
+
+export type McpBrokerTargetArgs = Infer<typeof brokerTargetValidator>
 
 export const brokerSearchValidator = v.object({
   ...streamExecutionArgsValidator.fields,
@@ -29,7 +33,11 @@ export const brokerSearchValidator = v.object({
   limit: v.number(),
 })
 
+export type McpBrokerSearchArgs = Infer<typeof brokerSearchValidator>
+
 export const brokerOutputValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   output: v.string(),
 })
+
+export type McpBrokerOutputArgs = Infer<typeof brokerOutputValidator>

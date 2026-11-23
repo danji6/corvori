@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 import { roleValidator } from './messages'
 
@@ -7,6 +7,8 @@ export const reminderScopeValidator = v.union(
   v.literal('own'),
   v.literal('library'),
 )
+
+export type ReminderScope = Infer<typeof reminderScopeValidator>
 
 export const reminderPromptValidator = v.object({
   id: v.string(),

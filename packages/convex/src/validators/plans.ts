@@ -1,9 +1,11 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 export const planStatusValidator = v.union(
   v.literal('draft'),
   v.literal('approved'),
 )
+
+export type PlanStatus = Infer<typeof planStatusValidator>
 
 /** A session’s editable plan and completion status. */
 export const planSchema = v.object({

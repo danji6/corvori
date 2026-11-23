@@ -1,7 +1,9 @@
+import type { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
 import type { WindowMessage } from '@cv/convex/model/chat/queries'
-import type { MessageWindowArgs } from '@cv/convex/types'
+import type { FunctionArgs } from 'convex/server'
 
+type MessageWindowArgs = FunctionArgs<typeof api.chat.messagesWindow>
 type MessageFactory = (time: number, segments?: number) => WindowMessage
 
 /** Models a small restored window and older history with large rendered text. */

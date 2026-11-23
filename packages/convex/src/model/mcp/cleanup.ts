@@ -1,5 +1,5 @@
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
-import type { McpCleanupArgs } from '../../types'
+import type { McpCleanupArgs } from '../../validators/mcp'
 
 export function get(ctx: QueryCtx, { cleanupId }: McpCleanupArgs) {
   return ctx.db.get(cleanupId)

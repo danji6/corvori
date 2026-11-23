@@ -3,14 +3,14 @@ import { isRoutingHeader } from '@cv/core/provider-continuity'
 
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
+import type { ProviderContinuityScope } from '../../validators/providerRequests'
 import type {
   PrepareProviderRequestArgs,
-  ProviderContinuityScope,
   RecordCacheDiagnosticArgs,
   ResolveProviderCacheIdArgs,
   SaveProviderContinuityArgs,
   StreamExecutionArgs,
-} from '../../types'
+} from '../../validators/streams'
 import { getState, patchState } from '../session/state'
 import { ownsExecution } from './execution'
 

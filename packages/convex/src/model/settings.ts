@@ -1,7 +1,7 @@
 import type { Doc, Id } from '../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../_generated/server'
 import type { AuthMutationCtx, AuthQueryCtx } from '../functions'
-import type { SettingsKey, SettingsPatch } from '../types'
+import type { SettingsKey, SettingsPatch } from '../validators/settings'
 import * as Avatars from './avatars'
 import {
   assertCustomCssCap,

@@ -2,8 +2,9 @@ import type { MessageIdentity } from '@cv/core/message-position'
 
 import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
-import type { CommandStatus, MessageExtra } from '../../types'
+import type { CommandStatus } from '../../validators/commands'
 import { insertMessage } from '../messageContents'
+import type { MessageExtra } from './types'
 
 type CommandInvocation = Pick<
   MessageExtra['command'],

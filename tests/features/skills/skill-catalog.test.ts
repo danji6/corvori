@@ -1,12 +1,13 @@
 import type { ActionCtx } from '@cv/convex/_generated/server'
 import { assignments } from '@cv/convex/model/skills/endpoints'
+import type { AgentWithHome } from '@cv/convex/model/skills/homes'
 import {
   catalogForTool,
   catalogNote,
   compactSkillCatalog,
   readSkillCatalog,
 } from '@cv/convex/model/skills/runtime'
-import type { AgentWithHome, SkillAssignmentsArgs } from '@cv/convex/types'
+import type { SkillAssignmentsArgs } from '@cv/convex/validators/skills'
 import { SKILL_CATALOG_CHARACTERS } from '@cv/core/skills/catalog'
 import type { FolderWorkspace } from '@cv/core/types/workspace'
 import {

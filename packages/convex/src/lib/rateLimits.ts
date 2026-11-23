@@ -1,6 +1,6 @@
 import { internal } from '../_generated/api'
 import type { ActionCtx } from '../_generated/server'
-import type { RateLimitRuleArgs } from '../types'
+import type { RateLimitRuleArgs } from '../validators/rateLimits'
 
 export const RETRY_AFTER_HEADER = 'X-Retry-After'
 

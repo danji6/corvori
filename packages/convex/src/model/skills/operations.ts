@@ -1,7 +1,7 @@
 import type { Doc, Id } from '../../_generated/dataModel'
 import { error } from '../../errors'
 import type { AuthMutationCtx } from '../../functions'
-import type { FileOperationArgs } from '../../types'
+import type { FileOperationArgs } from '../../validators/fileOperations'
 import { assertAgentIdle, requireAdmin } from './access'
 import { prepareLibraryDeletion } from './libraryDeletion'
 import {

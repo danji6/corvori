@@ -8,8 +8,8 @@ import {
   shellHistoryTools,
   shellToModelOutput,
 } from '@cv/convex/model/tool/shell'
-import type { ShellToolOutput } from '@cv/convex/types'
 import { stripTerminalCodes } from '@cv/core/shell/ansi'
+import type { ShellToolOutput } from '@cv/core/types/tools'
 import { describe, expect, test } from 'bun:test'
 import { collect, context, fast, mockSidecar } from '~/tests/helpers/shell-job'
 import type { SseEvent } from '~/tests/helpers/shell-job'

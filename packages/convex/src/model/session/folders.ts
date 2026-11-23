@@ -8,7 +8,10 @@ import {
   type AuthQueryCtx,
   requireRole,
 } from '../../functions'
-import type { FolderCreateArgs, FolderCreateBasicArgs } from '../../types'
+import type {
+  FolderCreateArgs,
+  FolderCreateBasicArgs,
+} from '../../validators/folders'
 import { findUserBySubject } from '../users'
 import { requireFolder, sessionGroup } from './folderContext'
 import { folderView, ownerFolders } from './folderTree'

@@ -2,7 +2,10 @@ import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import type { AuthQueryCtx } from '../../functions'
-import type { RemoveMissingSkillArgs, VerifySkillIdsArgs } from '../../types'
+import type {
+  RemoveMissingSkillArgs,
+  VerifySkillIdsArgs,
+} from '../../validators/skills'
 import { assertAgentIdle, requireAdmin, requireOwnedSkill } from './access'
 import { homeMembers } from './homes'
 

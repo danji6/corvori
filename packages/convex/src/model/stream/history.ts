@@ -7,13 +7,13 @@ import {
   TOOL_CONTEXT_POLICY_VERSION,
   canReplayToolContext,
 } from '@cv/core/tool-context'
+import type { MessageRole } from '@cv/core/types/roles'
 import { block } from '@cv/core/utils/blocks'
 import { settleUnansweredToolParts } from '@cv/core/utils/tool-parts'
 import type { UIMessage } from 'ai'
 
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
-import type { MessageRole, StreamContext } from '../../types'
 import type { MessageWithParts } from '../messageContents'
 import { buildPrompts } from '../prompt/prompts'
 import { rememberWireCalls } from '../tool/dispatchTransport'
@@ -27,6 +27,7 @@ import { representMessage } from './historySenders'
 import { prefixSenderName } from './historySenders'
 import { removeOrphanToolCalls } from './historyTools'
 import { type TrimHistoryOptions, trimProviderHistory } from './trimHistory'
+import type { StreamContext } from './types'
 
 export { collectApprovalNotes } from './historyApprovals'
 export { collectRespondedApprovalNotes } from './historyApprovals'

@@ -7,7 +7,7 @@ import type {
   PatchStreamMessageArgs,
   RecordStreamStepArgs,
   StreamExecutionArgs,
-} from '../../types'
+} from '../../validators/streams'
 import { mergePublishedAttachments } from '../attachments/transfers'
 import { senderIdentity } from '../chat/identities'
 import { injectModeNote } from '../chat/notes'

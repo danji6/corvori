@@ -3,7 +3,7 @@ import type { ToolExecutionOptions, ToolSet } from 'ai'
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
 import { ToolError } from '../../errors'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import type { WorkspaceToolContext } from './context'
 
 type FilesystemExecution = {

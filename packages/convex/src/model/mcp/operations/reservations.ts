@@ -1,13 +1,14 @@
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
 import type { MutationCtx } from '@cv/convex/_generated/server'
 import { error } from '@cv/convex/errors'
-import type { McpReserveArgs, RunningStream } from '@cv/convex/types'
+import type { McpReserveArgs } from '@cv/convex/validators/mcpOperations'
 import { mcpOperationTimeouts } from '@cv/core/types/mcp-operation'
 
 import {
   getProcessingSegmentRow,
   patchSegmentParts,
 } from '../../messageContents'
+import type { RunningStream } from '../../stream/types'
 import { assignName, findName } from '../brokerNames'
 import { _getExecution } from '../servers'
 import { assertSameInvocation, requireExecution } from './access'

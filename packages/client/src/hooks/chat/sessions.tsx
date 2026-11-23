@@ -4,7 +4,7 @@ import type { SessionListItem } from '@/lib/chat'
 import type { PaginationMetadata } from '@/lib/chat/message-store'
 import { type SessionStore, createSessionStore } from '@/lib/chat/session-store'
 import { api } from '@cv/convex/_generated/api'
-import type { FolderView } from '@cv/convex/types'
+import type { FolderView } from '@cv/convex/model/session/types'
 import { parseSessionSearch } from '@cv/core/session-search/parse'
 import { usePaginatedQuery } from 'convex-helpers/react/cache/hooks'
 import {

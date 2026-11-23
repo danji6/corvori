@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 export const providerContinuityValueValidator = v.object({
   token: v.string(),
@@ -13,6 +13,10 @@ export const providerContinuityScopeValidator = v.object({
   cacheKeyHash: v.string(),
   messageId: v.id('messages'),
 })
+
+export type ProviderContinuityScope = Infer<
+  typeof providerContinuityScopeValidator
+>
 
 export const providerContinuityValidator = v.object({
   scope: providerContinuityScopeValidator,
@@ -68,3 +72,5 @@ export const cacheDiagnosticValidator = v.object({
     v.literal('transport_error'),
   ),
 })
+
+export type CacheDiagnostic = Infer<typeof cacheDiagnosticValidator>

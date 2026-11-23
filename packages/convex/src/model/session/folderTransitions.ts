@@ -10,8 +10,7 @@ import type {
   FolderCommitPlan,
   FolderLockTarget,
   FolderTransitionArgs,
-  Session,
-} from '../../types'
+} from '../../validators/folders'
 import {
   getSessionWithWorkspace,
   requireFolder,
@@ -47,6 +46,7 @@ import {
   clearSharedFolder,
   moveSharedSession,
 } from './personalFolders'
+import type { Session } from './types'
 
 type Command<K extends FolderCommand['kind']> = Extract<
   FolderCommand,

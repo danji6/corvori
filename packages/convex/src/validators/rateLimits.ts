@@ -1,10 +1,12 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 export const rateLimitRuleArgsValidator = v.object({
   key: v.string(),
   limit: v.number(),
   windowMs: v.number(),
 })
+
+export type RateLimitRuleArgs = Infer<typeof rateLimitRuleArgsValidator>
 
 /** A rate limit counter for one time window. */
 export const rateLimitSchema = v.object({

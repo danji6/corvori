@@ -2,7 +2,7 @@
 
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
-import type { ToolkitSkillReadArgs } from '../../types'
+import type { ToolkitSkillReadArgs } from '../../validators/skills'
 import { toolkitRequest } from './transport'
 
 export async function readSkill(ctx: ActionCtx, args: ToolkitSkillReadArgs) {

@@ -2,8 +2,8 @@
 
 import type { ActionCtx } from '../../_generated/server'
 import { minRole } from '../../lib/roles'
-import type { StreamContext } from '../../types'
 import type { PreparedSkillCatalog } from '../skills/runtime'
+import type { StreamContext } from '../stream/types'
 import { skillCatalogSource } from './capabilitySource'
 import type { ToolAvailability } from './manifest'
 

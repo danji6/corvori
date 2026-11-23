@@ -6,8 +6,10 @@ import { internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { authorize, authorizeAdmin } from '../../functions'
-import type { FolderCreateArgs } from '../../types'
-import type { FolderTransitionArgs } from '../../types'
+import type {
+  FolderCreateArgs,
+  FolderTransitionArgs,
+} from '../../validators/folders'
 import type { postSidecar } from '../sidecar'
 import type { begin } from './folderTransitions'
 

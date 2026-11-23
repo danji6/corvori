@@ -8,13 +8,13 @@ import type { Infer } from 'convex/values'
 
 import type { Doc } from '../../_generated/dataModel'
 import { type Role, minRole } from '../../lib/roles'
-import type { Session } from '../../types'
 import type {
   toolDefinitionValidator,
   toolkitContextValidator,
 } from '../../validators/tools'
 import type { SpawnableAgent } from '../agent/subagents'
 import { isMcpServerSelected, isMcpToolSelected } from '../mcp/toolPolicy'
+import type { Session } from '../session/types'
 import {
   type ToolResources,
   enabledMcpServers,

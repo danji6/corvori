@@ -1,5 +1,5 @@
 import { paginationOptsValidator } from 'convex/server'
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 import {
   promptItemValidator,
@@ -58,6 +58,8 @@ export const createAgentArgsValidator = v.object({
   ...agentMutableFieldsValidator,
 })
 
+export type CreateAgentArgs = Infer<typeof createAgentArgsValidator>
+
 /**
  * The agent field that was requested to be cleared. Needed because Convex
  * drops `undefined` from a patch.
@@ -77,6 +79,8 @@ export const updateAgentArgsValidator = v.object({
   unset: v.optional(v.array(agentKeyValidator)),
   ...agentMutableFieldsValidator,
 })
+
+export type UpdateAgentArgs = Infer<typeof updateAgentArgsValidator>
 
 /** Shared ownership, path, revision, and operation lease for a personal folder. */
 export const agentHomeSchema = v.object({
@@ -119,3 +123,5 @@ export const agentPageArgsValidator = v.object({
   search: v.optional(v.string()),
   paginationOpts: paginationOptsValidator,
 })
+
+export type AgentPageArgs = Infer<typeof agentPageArgsValidator>

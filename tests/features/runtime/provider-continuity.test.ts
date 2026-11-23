@@ -9,8 +9,8 @@ import { activeStreamView } from '@cv/convex/model/stream/view'
 import type {
   CacheDiagnostic,
   ProviderContinuityScope,
-  StreamExecutionArgs,
-} from '@cv/convex/types'
+} from '@cv/convex/validators/providerRequests'
+import type { StreamExecutionArgs } from '@cv/convex/validators/streams'
 import { describe, expect, test } from 'bun:test'
 
 import { lifecycleDatabase } from '../../helpers/lifecycle-db'

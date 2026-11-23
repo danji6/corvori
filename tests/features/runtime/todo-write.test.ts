@@ -3,7 +3,7 @@ import { injectDueReminders } from '@cv/convex/model/chat/reminders'
 import { _edit, _write, applyTodoEdits } from '@cv/convex/model/todos'
 import { getEnabledTools } from '@cv/convex/model/tool/build'
 import { resolveToolManifest } from '@cv/convex/model/tool/manifest'
-import type { TodoItem } from '@cv/convex/types'
+import type { TodoItem } from '@cv/convex/validators/todos'
 import { TODO_NUDGE_INTERVAL_STEPS, TODO_TOOL_TOGGLE } from '@cv/core/const'
 import { describe, expect, test } from 'bun:test'
 

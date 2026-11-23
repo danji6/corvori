@@ -2,11 +2,12 @@
 
 import { internal } from '@cv/convex/_generated/api'
 import type { ActionCtx } from '@cv/convex/_generated/server'
-import type { StreamContext, StreamExecutionArgs } from '@cv/convex/types'
+import type { StreamExecutionArgs } from '@cv/convex/validators/streams'
 import { sha256 } from '@cv/core/sha256'
 import { contextDependencies } from '@cv/core/tool-context'
 import { mcpToolName } from '@cv/core/types'
 
+import type { StreamContext } from '../../stream/types'
 import { isMcpToolSelected } from '../toolPolicy'
 import { refreshStaleCatalogs } from './actions'
 

@@ -1,5 +1,5 @@
 import type { Doc } from '../../_generated/dataModel'
-import type { ActiveStream, YieldRequest } from '../../types'
+import type { ActiveStream, YieldRequest } from '../../validators/streams'
 
 /** Projects the fields used by chat controls and optimistic responses. */
 export function activeStreamView(

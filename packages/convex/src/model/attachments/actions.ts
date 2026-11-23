@@ -7,7 +7,7 @@ import { getSubject } from '../../functions'
 import type {
   AttachmentImageDimensions,
   ConfirmAttachmentArgs,
-} from '../../types'
+} from '../../validators/attachments'
 import { transferTarget } from './transfers'
 
 export type ConfirmedImage = {

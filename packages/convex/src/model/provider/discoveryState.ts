@@ -1,6 +1,6 @@
 import { DISCOVERY_STALE_MS } from '@cv/core/model-discovery'
 
-import type { ProviderDiscovery } from '../../types'
+import type { ProviderDiscovery } from '../../validators/providers'
 
 const LEASE_MS = 120_000
 

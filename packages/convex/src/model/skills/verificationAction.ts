@@ -6,7 +6,10 @@ import { api, internal } from '../../_generated/api'
 import type { Doc } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { authorizeAdmin } from '../../functions'
-import type { SkillVerificationPage, VerifySkillIdsArgs } from '../../types'
+import type {
+  SkillVerificationPage,
+  VerifySkillIdsArgs,
+} from '../../validators/skills'
 import { postSidecar } from '../sidecar'
 
 /** Checks one complete-library page, independent of the UI's search and loaded rows. */

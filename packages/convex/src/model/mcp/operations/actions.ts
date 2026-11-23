@@ -6,8 +6,8 @@ import type { ActionCtx } from '@cv/convex/_generated/server'
 import type {
   McpOperationArgs,
   McpOperationExecutionArgs,
-  StreamExecutionArgs,
-} from '@cv/convex/types'
+} from '@cv/convex/validators/mcpOperations'
+import type { StreamExecutionArgs } from '@cv/convex/validators/streams'
 import type { McpOperationStatus } from '@cv/core/types/mcp-operation'
 import {
   type McpResult,

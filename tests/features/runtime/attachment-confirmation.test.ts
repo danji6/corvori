@@ -2,7 +2,7 @@ import type { Id } from '@cv/convex/_generated/dataModel'
 import type { ActionCtx } from '@cv/convex/_generated/server'
 import { confirmImage } from '@cv/convex/actions/attachments'
 import type { ConfirmedImage } from '@cv/convex/model/attachments/actions'
-import type { ConfirmAttachmentArgs } from '@cv/convex/types'
+import type { ConfirmAttachmentArgs } from '@cv/convex/validators/attachments'
 import { expect, mock, test } from 'bun:test'
 import { type FunctionReference, getFunctionName } from 'convex/server'
 

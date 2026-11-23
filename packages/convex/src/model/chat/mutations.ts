@@ -2,7 +2,10 @@ import type { Doc, Id } from '../../_generated/dataModel'
 import { error } from '../../errors'
 import type { AuthMutationCtx } from '../../functions'
 import { minRole } from '../../lib/roles'
-import type { DeleteMessagePartsArgs, EditMessagePartArgs } from '../../types'
+import type {
+  DeleteMessagePartsArgs,
+  EditMessagePartArgs,
+} from '../../validators/messages'
 import * as Attachments from '../attachments/files'
 import * as Avatars from '../avatars'
 import {

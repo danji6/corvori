@@ -2,7 +2,7 @@
 
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 
 export const STEP_DEADLINE_GRACE_MS = 45_000
 

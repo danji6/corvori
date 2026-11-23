@@ -6,7 +6,7 @@ import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import { type AuthQueryCtx, requireRole } from '../../functions'
-import type { FolderCommitPlan, FolderMoveArgs } from '../../types'
+import type { FolderCommitPlan, FolderMoveArgs } from '../../validators/folders'
 import { workspaceKey } from './folderContext'
 import { assertSessionsUnlocked } from './folderTransitionLocks'
 import {

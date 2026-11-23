@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { safeValidateTypes } from '@ai-sdk/provider-utils'
 import type * as ShellToolModule from '@cv/convex/model/tool/shell'
-import type { ShellToolOutput } from '@cv/convex/types'
+import type { ShellToolOutput } from '@cv/core/types/tools'
 import type * as RegistryModule from '@cv/sidecar/shell/registry'
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { mkdtemp, realpath, rm } from 'node:fs/promises'

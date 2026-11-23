@@ -1,6 +1,6 @@
 import { MCP_OPERATION_STATES } from '@cv/core/types/mcp-operation'
 import { MCP_PROTOCOL_METHODS } from '@cv/core/types/mcp-protocol'
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 import { mcpScopeValidator } from './mcp'
 import { streamExecutionArgsValidator } from './streams'
@@ -58,6 +58,8 @@ export const mcpOperationArgsValidator = v.object({
   operationId: v.id('mcpOperations'),
 })
 
+export type McpOperationArgs = Infer<typeof mcpOperationArgsValidator>
+
 export const mcpOperationFindValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   messageId: v.id('messages'),
@@ -72,6 +74,8 @@ export const mcpOperationFindValidator = v.object({
   catalogToolId: v.optional(v.id('mcpCatalogTools')),
 })
 
+export type McpOperationFindArgs = Infer<typeof mcpOperationFindValidator>
+
 export const mcpReserveArgsValidator = v.object({
   ...mcpOperationFindValidator.fields,
   runtimeId: v.id('mcpRuntimes'),
@@ -79,6 +83,8 @@ export const mcpReserveArgsValidator = v.object({
   bootId: v.string(),
   connectionGeneration: v.string(),
 })
+
+export type McpReserveArgs = Infer<typeof mcpReserveArgsValidator>
 
 export const mcpObserveArgsValidator = v.object({
   ...streamExecutionArgsValidator.fields,
@@ -90,7 +96,13 @@ export const mcpObserveArgsValidator = v.object({
   outputRef: v.optional(v.id('_storage')),
 })
 
+export type McpObserveArgs = Infer<typeof mcpObserveArgsValidator>
+
 export const mcpOperationExecutionValidator = v.object({
   ...streamExecutionArgsValidator.fields,
   ...mcpOperationArgsValidator.fields,
 })
+
+export type McpOperationExecutionArgs = Infer<
+  typeof mcpOperationExecutionValidator
+>

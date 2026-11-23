@@ -4,7 +4,7 @@ import type { AuthMutationCtx } from '../../functions'
 import type {
   CreateModelProviderArgs,
   UpdateModelProviderArgs,
-} from '../../types'
+} from '../../validators/providers'
 import { refreshForOwner } from '../session/models'
 import * as Catalog from './catalog'
 import * as Connections from './connections'

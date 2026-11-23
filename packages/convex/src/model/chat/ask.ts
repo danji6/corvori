@@ -17,7 +17,7 @@ import { toDisplayName } from '@cv/core/utils/names'
 
 import { error } from '../../errors'
 import type { AuthMutationCtx } from '../../functions'
-import type { AnswerQuestionsArgs } from '../../types'
+import type { AnswerQuestionsArgs } from '../../validators/messages'
 import { getProcessingSegmentRow, patchSegmentParts } from '../messageContents'
 import { settleRequest } from '../notifications/requests'
 import * as Memberships from '../session/memberships'

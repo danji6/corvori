@@ -5,7 +5,7 @@ import type { QueryCtx } from '../../_generated/server'
 import type {
   ProviderHistorySnapshotArgs,
   StreamExecutionArgs,
-} from '../../types'
+} from '../../validators/streams'
 import type { MessageWithParts } from '../messageContents'
 import { withModelParts } from '../promptEvaluation/messageParts'
 import { historyEvaluationStatus } from '../promptEvaluation/state'

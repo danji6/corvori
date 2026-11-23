@@ -6,7 +6,10 @@ import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../../functions'
-import type { PreviewDetailArgs, StorePreviewArgs } from '../../types'
+import type {
+  PreviewDetailArgs,
+  StorePreviewArgs,
+} from '../../validators/discovery'
 
 export async function storePreview(ctx: MutationCtx, args: StorePreviewArgs) {
   const id = await ctx.db.insert('discoveryPreviews', {

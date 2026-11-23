@@ -25,7 +25,7 @@ import { skillAccess, skillContext } from '@cv/convex/model/toolkits/skills'
 import type {
   PrepareContextNoteArgs,
   StreamExecutionArgs,
-} from '@cv/convex/types'
+} from '@cv/convex/validators/streams'
 import { skillMetadata } from '@cv/sidecar/agent-files/catalog'
 import {
   projectSkillReadSchema,

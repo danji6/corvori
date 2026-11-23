@@ -23,8 +23,8 @@ import type {
   AttachmentCursorCall,
   AttachmentCursorSettings,
   SaveAttachmentCursorArgs,
-  StreamExecutionArgs,
-} from '../../types'
+} from '../../validators/attachments'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { readAttachmentPage } from './attachmentPaging'
 import { type AttachmentRanges, attachmentRanges } from './attachmentRanges'
 import {

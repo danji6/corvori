@@ -4,7 +4,6 @@ import type { ModelMessage } from '@ai-sdk/provider-utils'
 
 import type { Doc } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
-import type { StreamContext } from '../../types'
 import type { MessageWithParts } from '../messageContents'
 import {
   buildExtraInstructions,
@@ -19,6 +18,7 @@ import type { PromptItem } from '../prompt/prompts'
 import type { ToolManifest } from '../tool/manifest'
 import type { ToolReplay } from '../tool/sessionTools'
 import { buildProviderHistory } from './history'
+import type { StreamContext } from './types'
 
 export type PromptEvalResult = {
   items: PromptItem[]

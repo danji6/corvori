@@ -1,6 +1,6 @@
 import type { Id } from '../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../_generated/server'
-import type { CredentialScope } from '../types'
+import type { CredentialScope } from '../validators/credentials'
 
 export async function get(
   ctx: QueryCtx | MutationCtx,

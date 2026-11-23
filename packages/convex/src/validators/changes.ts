@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 import { streamExecutionArgsValidator } from './streams'
 import { workspaceRefValidator } from './workspaces'
@@ -71,17 +71,25 @@ export const prepareChangesArgsValidator = v.object({
   workspace: workspaceRefValidator,
 })
 
+export type PrepareChangesArgs = Infer<typeof prepareChangesArgsValidator>
+
 export const restoreChangesArgsValidator = v.object({
   changeSetId: v.id('changeSets'),
   revision: v.number(),
   direction: v.union(v.literal('revert'), v.literal('reapply')),
 })
 
+export type RestoreChangesArgs = Infer<typeof restoreChangesArgsValidator>
+
 export const reservePublicationArgsValidator = v.object({
   changeSetId: v.id('changeSets'),
   checkpointId: v.string(),
   late: v.boolean(),
 })
+
+export type ReservePublicationArgs = Infer<
+  typeof reservePublicationArgsValidator
+>
 
 export const appendChangesArgsValidator = v.object({
   changeSetId: v.id('changeSets'),
@@ -90,6 +98,8 @@ export const appendChangesArgsValidator = v.object({
   ),
 })
 
+export type AppendChangesArgs = Infer<typeof appendChangesArgsValidator>
+
 export const publishChangesArgsValidator = v.object({
   changeSetId: v.id('changeSets'),
   fileCount: v.number(),
@@ -97,6 +107,8 @@ export const publishChangesArgsValidator = v.object({
   deletions: v.number(),
   issues: v.array(v.string()),
 })
+
+export type PublishChangesArgs = Infer<typeof publishChangesArgsValidator>
 
 export const settleChangesArgsValidator = v.object({
   changeSetId: v.id('changeSets'),
@@ -113,6 +125,10 @@ export const restoreChangesResultValidator = v.object({
   error: v.optional(v.string()),
   stale: v.optional(v.boolean()),
 })
+
+export type RestoreChangesResultArgs = Infer<
+  typeof restoreChangesResultValidator
+>
 
 export const changesLocationContextValidator = v.object({
   changeSetId: v.id('changeSets'),

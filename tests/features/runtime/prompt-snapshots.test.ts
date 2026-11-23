@@ -18,7 +18,7 @@ import {
 } from '@cv/convex/model/promptEvaluation/state'
 import { removeForSession } from '@cv/convex/model/session/cache'
 import { patchState } from '@cv/convex/model/session/state'
-import type { Prompt, PromptItem } from '@cv/convex/types'
+import type { Prompt, PromptItem } from '@cv/core/types/prompts'
 import { expect, test } from 'bun:test'
 import { skillsDatabase } from '~/tests/helpers/skills-db'
 

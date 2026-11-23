@@ -18,7 +18,7 @@ import type { AuthMutationCtx, AuthQueryCtx } from '../../functions'
 import type {
   CreateModelProviderArgs,
   UpdateModelProviderArgs,
-} from '../../types'
+} from '../../validators/providers'
 import * as Credentials from '../credentials'
 import {
   normalizeProviderModels,

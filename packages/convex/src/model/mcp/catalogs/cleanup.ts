@@ -1,6 +1,6 @@
 import { internal } from '@cv/convex/_generated/api'
 import type { MutationCtx } from '@cv/convex/_generated/server'
-import type { McpCatalogSweepArgs } from '@cv/convex/types'
+import type { McpCatalogSweepArgs } from '@cv/convex/validators/mcpCatalogs'
 import { MCP_DEFINITION_CONTENT_TYPE } from '@cv/core/types/mcp-catalog'
 
 /** Reclaims uploads interrupted between blob storage and their catalog-row transaction. */

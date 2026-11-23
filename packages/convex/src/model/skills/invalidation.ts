@@ -1,7 +1,7 @@
 import { internal } from '../../_generated/api'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
-import type { InvalidateAgentHomeArgs } from '../../types'
+import type { InvalidateAgentHomeArgs } from '../../validators/fileOperations'
 import { getState, patchState } from '../session/state'
 import { finishOperation } from './completion'
 import { matchesAttempt } from './lifecycle'

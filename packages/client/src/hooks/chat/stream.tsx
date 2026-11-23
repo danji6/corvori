@@ -5,10 +5,10 @@ import {
   hasVisibleMessageContent,
   messageActivitySignature,
 } from '@/lib/chat/messages'
+import type { ActiveStream } from '@/lib/chat/stream'
 import { type StreamStore, createStreamStore } from '@/lib/chat/stream-store'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
-import type { ActiveStream } from '@cv/convex/types'
 import type { ChatStatus, UIMessage } from 'ai'
 import { useQuery } from 'convex/react'
 import {

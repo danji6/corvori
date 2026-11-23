@@ -1,6 +1,6 @@
 import type { Id } from '../../_generated/dataModel'
 import type { AuthQueryCtx } from '../../functions'
-import type { ActiveStream } from '../../types'
+import type { ActiveStream } from '../../validators/streams'
 import { getActiveStream, getMembership } from '../session/memberships'
 import { activeStreamView } from '../stream/view'
 import { lastRequestInputTokens } from './usage'

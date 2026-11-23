@@ -6,7 +6,7 @@ import type { PaginationResult } from 'convex/server'
 import { api, internal } from '../../_generated/api'
 import type { Doc } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
-import type { McpCleanupArgs, McpRuntimeArgs } from '../../types'
+import type { McpCleanupArgs, McpRuntimeArgs } from '../../validators/mcp'
 import { getSidecar, postSidecar } from '../sidecar'
 import { runtimeScope } from './runtime'
 

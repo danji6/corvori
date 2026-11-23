@@ -1,5 +1,6 @@
 import { MAX_PLAN_CONTENT_CHARS } from '@cv/core/limits'
 import { TOOL_DESCRIPTIONS, editFileFields } from '@cv/core/types'
+import type { ShellToolOutput } from '@cv/core/types/tools'
 import { systemReminder } from '@cv/core/utils/blocks'
 import type { ToolSet } from 'ai'
 
@@ -8,7 +9,6 @@ import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { ToolError } from '../../errors'
 import { isUnrestrictedAccess } from '../../lib/tool/approval'
-import type { ShellToolOutput } from '../../types'
 import { modeNoteBody } from '../chat/notes'
 import type { PlanToolContext } from './context'
 

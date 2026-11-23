@@ -1,10 +1,10 @@
+import type { MessageRole } from '@cv/core/types/roles'
 import { toDisplayName } from '@cv/core/utils/names'
 
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import type { AuthMutationCtx } from '../../functions'
-import type { MessageRole } from '../../types'
 import { getByOwnerId as getSettingsByOwnerId } from '../settings'
 
 /** The denormalized sender fields every message and segment 0 carries. */

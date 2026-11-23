@@ -1,7 +1,7 @@
 import { resolveCacheUsage } from '@cv/core/cache-usage'
 import type { LanguageModelUsage } from 'ai'
 
-import type { TokenUsage } from '../../types'
+import type { TokenUsage } from '../../validators/providers'
 import { estimateTokens } from '../context'
 
 export async function resolveUsage(args: {

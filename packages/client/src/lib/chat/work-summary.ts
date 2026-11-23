@@ -1,5 +1,5 @@
 import { formatDuration } from '@/lib/utils'
-import type { ReasoningPart } from '@cv/convex/types'
+import type { ReasoningPart } from '@cv/convex/model/chat/types'
 import type { ShellToolOutput } from '@cv/core/types/tools'
 import { type ToolUIPart, isReasoningUIPart } from 'ai'
 

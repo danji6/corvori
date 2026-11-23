@@ -4,7 +4,10 @@ import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../../functions'
-import type { NotificationRequest, NotificationRequestState } from '../../types'
+import type {
+  NotificationRequest,
+  NotificationRequestState,
+} from '../../validators/notifications'
 import { withApprovalActions } from './approvals'
 import { pruneReadNotifications } from './retention'
 

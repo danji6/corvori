@@ -1,5 +1,5 @@
 import { MCP_PROTOCOL_METHODS } from '@cv/core/types/mcp-protocol'
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 export const protocolRequestValidator = v.object({
   serverId: v.id('mcpServers'),
@@ -8,6 +8,8 @@ export const protocolRequestValidator = v.object({
   arguments: v.optional(v.record(v.string(), v.string())),
   uri: v.optional(v.string()),
 })
+
+export type McpProtocolRequestArgs = Infer<typeof protocolRequestValidator>
 
 export const protocolCheckSchema = v.object({
   ownerId: v.id('users'),
@@ -24,6 +26,8 @@ export const protocolPublishValidator = v.object({
   resultRef: v.id('_storage'),
   bytes: v.number(),
 })
+
+export type McpProtocolPublishArgs = Infer<typeof protocolPublishValidator>
 
 export const protocolCheckValidator = v.object({
   checkId: v.id('mcpProtocolChecks'),

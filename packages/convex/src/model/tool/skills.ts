@@ -2,7 +2,7 @@ import { TOOL_DESCRIPTIONS } from '@cv/core/types'
 
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 
 export type SkillsContext = {
   ctx: ActionCtx

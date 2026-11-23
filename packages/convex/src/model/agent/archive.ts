@@ -1,10 +1,11 @@
-import { generateId } from '../../lib/utils'
 import type {
-  CreateAgentArgs,
   Prompt,
   PromptItem,
   PromptMarkerType,
-} from '../../types'
+} from '@cv/core/types/prompts'
+
+import { generateId } from '../../lib/utils'
+import type { CreateAgentArgs } from '../../validators/agents'
 import { PROMPT_MARKERS } from '../prompt/markers'
 import type { PromptOrderRef } from '../prompt/merge'
 

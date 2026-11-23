@@ -1,7 +1,7 @@
 import type { ShellJobStatus } from '@cv/core/shell/job-protocol'
+import type { ShellToolOutput } from '@cv/core/types/tools'
 
 import { extractErrorMessage } from '../../errors'
-import type { ShellToolOutput } from '../../types'
 import { type ShellStreamEvent, openShellStream } from '../sidecar'
 import { type ShellJobContext } from './shellContracts'
 import { type PostSidecar } from './shellContracts'

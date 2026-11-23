@@ -1,6 +1,6 @@
 import type { ModelMessage } from '@ai-sdk/provider-utils'
+import type { Prompt, PromptMarker, PromptSource } from '@cv/core/types/prompts'
 
-import type { Prompt, PromptMarker, PromptSource } from '../../types'
 import {
   createDefaultCompactionPrompts,
   createDefaultImpersonationPrompts,

@@ -1,6 +1,6 @@
 import { MarkdownSnippet } from '@/components/markdown'
 import { cn } from '@/lib/utils'
-import type { ReplyQuote } from '@cv/convex/types'
+import type { ReplyQuote } from '@cv/convex/validators/messages'
 import { toDisplayName } from '@cv/core/utils/names'
 import { BotIcon, UserIcon } from 'lucide-react'
 import { useCallback } from 'react'

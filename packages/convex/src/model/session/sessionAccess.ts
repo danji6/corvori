@@ -1,7 +1,7 @@
 import type { Id } from '../../_generated/dataModel'
 import { error } from '../../errors'
 import { type AuthMutationCtx } from '../../functions'
-import type { UpdateSessionArgs } from '../../types'
+import type { UpdateSessionArgs } from '../../validators/sessions'
 import { requireMember } from './memberships'
 
 export async function requireOwnedAgent(

@@ -4,7 +4,7 @@ import { systemReminder } from '@cv/core/utils/blocks'
 
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
-import type { MessageExtra, TodoItem } from '../../types'
+import type { TodoItem } from '../../validators/todos'
 import { resolveSets as resolveReminderSets } from '../reminders'
 import { getState, getStepCount, patchState } from '../session/state'
 import {
@@ -16,6 +16,7 @@ import { sessionToolNames } from '../tool/selection'
 import { agentIdentity } from './identities'
 import { insertHiddenNote } from './notes'
 import type { NoteSender } from './notes'
+import type { MessageExtra } from './types'
 
 type ReminderState = Record<string, number>
 

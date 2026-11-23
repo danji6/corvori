@@ -5,8 +5,9 @@ import type { QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import type { AuthQueryCtx } from '../../functions'
 import schema from '../../schema'
-import type { FolderPageArgs, FolderPickerArgs, FolderView } from '../../types'
+import type { FolderPageArgs, FolderPickerArgs } from '../../validators/folders'
 import { folderWorkspace, readFolderTrail } from './folderTree'
+import type { FolderView } from './types'
 
 /** Resolves one folder without loading unrelated branches. */
 export async function view(

@@ -1,7 +1,10 @@
-import type { MessagesWindowResult } from '@cv/convex/model/chat/queries'
-import type { MessageWindowArgs } from '@cv/convex/types'
+import type { api } from '@cv/convex/_generated/api'
 import type { ConvexReactClient } from 'convex/react'
+import type { FunctionArgs, FunctionReturnType } from 'convex/server'
 import { type FunctionReference, getFunctionName } from 'convex/server'
+
+type MessageWindowArgs = FunctionArgs<typeof api.chat.messagesWindow>
+type MessagesWindowResult = FunctionReturnType<typeof api.chat.messagesWindow>
 
 /** Supplies cached or explicitly deferred window responses without module mocks. */
 export function messageWindowClient(

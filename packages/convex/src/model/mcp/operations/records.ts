@@ -5,8 +5,8 @@ import type {
   McpObserveArgs,
   McpOperationArgs,
   McpOperationExecutionArgs,
-  StreamExecutionArgs,
-} from '@cv/convex/types'
+} from '@cv/convex/validators/mcpOperations'
+import type { StreamExecutionArgs } from '@cv/convex/validators/streams'
 
 import { patchSegmentParts } from '../../messageContents'
 import { allowed, get, requireExecution } from './access'

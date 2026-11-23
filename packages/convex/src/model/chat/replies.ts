@@ -3,7 +3,7 @@ import { clipReplyQuote, quotableText } from '@cv/core/reply-quote'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import type { PartAddress, ReplyQuote } from '../../types'
+import type { PartAddress, ReplyQuote } from '../../validators/messages'
 import {
   getSegmentRow,
   invalidateCompletedHistory,

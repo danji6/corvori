@@ -12,8 +12,8 @@ import type {
   AttachmentImageDimensions,
   ConfirmAttachmentWithDimensionsArgs,
   CreateGeneratedAttachmentArgs,
-  StreamExecutionArgs,
-} from '../../types'
+} from '../../validators/attachments'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { allVersionParts } from '../messageContents'
 import {
   getMember,

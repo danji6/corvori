@@ -15,10 +15,11 @@ import {
   buildProviderPrefix,
   createOperationPlan,
 } from '@cv/convex/model/stream/operations'
-import type { Prompt, PromptItem, StreamContext } from '@cv/convex/types'
+import type { StreamContext } from '@cv/convex/model/stream/types'
 import { evaluate } from '@cv/core/interpreter/evaluate'
 import { createVariableStore } from '@cv/core/interpreter/store'
 import type { JsonValue } from '@cv/core/interpreter/types'
+import type { Prompt, PromptItem } from '@cv/core/types/prompts'
 import { describe, expect, test } from 'bun:test'
 
 function prompt(overrides: Partial<Prompt> & { id: string }): Prompt {

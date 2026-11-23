@@ -7,7 +7,7 @@ import { MAX_MCP_RESULT_BYTES } from '@cv/core/types/mcp-result'
 import { internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
-import type { McpProtocolRequestArgs } from '../../types'
+import type { McpProtocolRequestArgs } from '../../validators/mcpProtocol'
 import { externalRequest } from '../tool/mcp'
 
 /** Checks the saved server in an isolated probe and retains a bounded temporary artifact. */

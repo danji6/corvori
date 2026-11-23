@@ -4,7 +4,10 @@ import { usableContextWindow } from '@cv/core/discovered-model'
 
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
-import type { StreamCommand, StreamExecutionArgs } from '../../types'
+import type {
+  StreamCommand,
+  StreamExecutionArgs,
+} from '../../validators/streams'
 import { canCheckCompactionThreshold } from './historyBoundary'
 import {
   type RequestToEstimate,

@@ -1,11 +1,12 @@
 'use node'
 
+import type { Prompt } from '@cv/core/types/prompts'
+
 import { api, internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import { getSubject } from '../../functions'
-import type { Prompt } from '../../types'
 import { generateAvatarThumbnail } from '../avatars/actions'
 import { postSidecar } from '../sidecar'
 import { agentArchiveToCreateArgs, createAgentArchive } from './archive'

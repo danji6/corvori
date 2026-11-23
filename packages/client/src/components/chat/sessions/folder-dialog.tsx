@@ -6,7 +6,7 @@ import { toastError } from '@/lib/notifications'
 import { generateId } from '@/lib/utils'
 import { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
-import type { FolderView } from '@cv/convex/types'
+import type { FolderView } from '@cv/convex/model/session/types'
 import { useAction, useMutation, useQuery } from 'convex/react'
 import { ArrowUpIcon, PlusIcon, XIcon } from 'lucide-react'
 import { useState } from 'react'
@@ -93,9 +93,7 @@ export function FolderDialog({
       <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
         <Dialog.Content>
           <Dialog.Header>
-            <Dialog.Title>
-              {folder ? 'Edit folder' : 'New folder'}
-            </Dialog.Title>
+            <Dialog.Title>{folder ? 'Edit folder' : 'New folder'}</Dialog.Title>
           </Dialog.Header>
           <div className="flex flex-col gap-5 py-4">
             <div className="flex items-center gap-2">

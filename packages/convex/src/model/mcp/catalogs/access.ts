@@ -3,11 +3,11 @@ import type { QueryCtx } from '@cv/convex/_generated/server'
 import { error } from '@cv/convex/errors'
 import { minRole } from '@cv/convex/lib/roles'
 import type {
+  McpCatalogDefinitionAccessArgs,
   McpCatalogSearchArgs,
   McpCatalogTargetArgs,
-  StreamExecutionArgs,
-} from '@cv/convex/types'
-import type { McpCatalogDefinitionAccessArgs } from '@cv/convex/types'
+} from '@cv/convex/validators/mcpCatalogs'
+import type { StreamExecutionArgs } from '@cv/convex/validators/streams'
 import { sha256 } from '@cv/core/sha256'
 import { type McpServer, mcpToolName } from '@cv/core/types'
 

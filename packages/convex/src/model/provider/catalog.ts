@@ -5,7 +5,10 @@ import { internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import type { AuthQueryCtx } from '../../functions'
-import type { DetailTargetsArgs, DiscoveryRun } from '../../types'
+import type {
+  DetailTargetsArgs,
+  DiscoveryRun,
+} from '../../validators/discovery'
 import { requireOwned } from './connections'
 import {
   canBeginDiscovery,

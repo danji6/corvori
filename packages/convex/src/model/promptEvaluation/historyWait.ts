@@ -2,7 +2,7 @@
 
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { sleep } from '../stream/engineWatchdog'
 
 export async function waitForPendingHistory(

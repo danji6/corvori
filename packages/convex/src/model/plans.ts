@@ -4,7 +4,7 @@ import type { Id } from '../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../_generated/server'
 import { extractErrorMessage } from '../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../functions'
-import type { PlanStatus } from '../types'
+import type { PlanStatus } from '../validators/plans'
 import { assertPlanContentCap, planContentCapError } from './caps'
 import { getMember, requireMember } from './session/memberships'
 

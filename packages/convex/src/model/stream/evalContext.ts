@@ -6,7 +6,7 @@ import { toDisplayName, toOptionalName } from '@cv/core/utils/names'
 
 import type { Doc } from '../../_generated/dataModel'
 import { minRole } from '../../lib/roles'
-import type { Session } from '../../types'
+import type { Session } from '../session/types'
 
 type EvalContextInput = {
   agent: Doc<'agents'> | null

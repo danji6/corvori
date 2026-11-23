@@ -6,7 +6,10 @@ import { internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import { error } from '../../errors'
 import type { AuthMutationCtx } from '../../functions'
-import type { EnsureConnectionArgs, SaveProvidersArgs } from '../../types'
+import type {
+  EnsureConnectionArgs,
+  SaveProvidersArgs,
+} from '../../validators/providers'
 import * as Credentials from '../credentials'
 import { refreshForOwner } from '../session/models'
 import * as Providers from './connections'

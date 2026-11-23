@@ -5,7 +5,7 @@ import { internal } from '../../_generated/api'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { ToolError } from '../../errors'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import {
   operationOutput,
   settle,

@@ -4,9 +4,8 @@ import { internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { getSubject } from '../../functions'
-import type { SessionArchive } from '../../types'
 import { decodeBase64, encodeBase64 } from '../io/base64'
-import type { SessionArchiveExportData } from './archive'
+import type { SessionArchive, SessionArchiveExportData } from './archive'
 
 export async function exportOne(
   ctx: ActionCtx,

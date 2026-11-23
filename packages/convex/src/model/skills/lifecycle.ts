@@ -1,7 +1,7 @@
 import { internal } from '../../_generated/api'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
-import type { OperationAttemptArgs } from '../../types'
+import type { OperationAttemptArgs } from '../../validators/fileOperations'
 import { releaseHome } from './homes'
 
 type Operation = Doc<'agentFileOperations'>

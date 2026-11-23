@@ -3,8 +3,8 @@ import { transitionActive } from '@cv/core/workspace/transition'
 import type { Id } from '../../_generated/dataModel'
 import type { QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import type { Session } from '../../types'
 import { folderWorkspace, readFolderTrail } from './folderTree'
+import type { Session } from './types'
 
 /** Resolves workspace authority exclusively from the root session's folder. */
 export async function withFolderWorkspace(ctx: QueryCtx, session: Session) {

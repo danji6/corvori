@@ -3,7 +3,7 @@
 import { internal } from '../../_generated/api'
 import type { ActionCtx } from '../../_generated/server'
 import { sanitizeChatError } from '../../errors'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { resumeOperations } from '../mcp/operations/actions'
 import { waitForPendingHistory } from '../promptEvaluation/historyWait'
 import { compactBeforeDispatch } from './engineCompaction'
@@ -67,8 +67,7 @@ export async function _stream(ctx: ActionCtx, execution: StreamExecutionArgs) {
           return
       }
 
-      if (!(await waitForPendingHistory(ctx, execution, windowDeadline)))
-        return
+      if (!(await waitForPendingHistory(ctx, execution, windowDeadline))) return
 
       const setup = await prepare(
         ctx,

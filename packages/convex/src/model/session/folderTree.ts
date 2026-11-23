@@ -3,7 +3,7 @@ import { folderTrail } from '@cv/core/utils/folder-tree'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import type { FolderView, Session } from '../../types'
+import type { FolderView, Session } from './types'
 
 export async function ownerFolders(ctx: QueryCtx, ownerId: Id<'users'>) {
   return ctx.db

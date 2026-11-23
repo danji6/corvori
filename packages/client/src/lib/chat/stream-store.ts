@@ -1,7 +1,6 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
-import type { ActiveStream } from '@cv/convex/types'
 
-import { normalizeStatus } from './stream'
+import { type ActiveStream, normalizeStatus } from './stream'
 
 export type StreamStore = ReturnType<typeof createStreamStore>
 

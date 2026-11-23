@@ -1,15 +1,16 @@
 import { effectiveModel, usableContextWindow } from '@cv/core/discovered-model'
 import { modelReference, parseModelReference } from '@cv/core/model-reference'
-import type { UIModel, UIModelConfig } from '@cv/core/types/providers'
-
-import type { Id } from '../../_generated/dataModel'
-import type { MutationCtx, QueryCtx } from '../../_generated/server'
-import type { AuthQueryCtx } from '../../functions'
 import type {
   ModelEntry,
   ModelProviderConfig,
   ModelSelection,
-} from '../../types'
+  UIModel,
+  UIModelConfig,
+} from '@cv/core/types/providers'
+
+import type { Id } from '../../_generated/dataModel'
+import type { MutationCtx, QueryCtx } from '../../_generated/server'
+import type { AuthQueryCtx } from '../../functions'
 import { listProviders, resolve as resolveProviders } from './connections'
 import { resolveModelReasoning } from './known'
 

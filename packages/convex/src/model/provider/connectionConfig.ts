@@ -12,7 +12,7 @@ import type { ModelEntry } from '@cv/core/types'
 import type { Doc } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import type { CreateModelProviderArgs } from '../../types'
+import type { CreateModelProviderArgs } from '../../validators/providers'
 import { normalizeConfiguredReasoning, requireProviderKey } from './known'
 
 export function validateConnection(args: CreateModelProviderArgs) {

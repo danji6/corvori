@@ -12,7 +12,7 @@ import {
   mergePrompts as mergeServerPrompts,
   removeStarterPrompts,
 } from '@cv/convex/model/prompt/prompts'
-import type { OrderedItem, Prompt, PromptItem } from '@cv/convex/types'
+import type { OrderedItem, Prompt, PromptItem } from '@cv/core/types/prompts'
 import { describe, expect, test } from 'bun:test'
 
 const firstSystem: Prompt = {

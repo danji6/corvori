@@ -1,8 +1,8 @@
+import type { ShellToolOutput, ToolApprovals } from '@cv/core/types/tools'
 import type { FolderWorkspace } from '@cv/core/types/workspace'
 
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
-import type { ShellToolOutput, ToolApprovals } from '../../types'
 import type { ShellReadPosition } from './shellContracts'
 
 export type WorkspaceToolContext = {

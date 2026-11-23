@@ -9,11 +9,11 @@ import {
   prepare,
 } from '@cv/convex/model/skills/imports'
 import { retry, start } from '@cv/convex/model/skills/operations'
+import type { CompleteAgentFileArgs } from '@cv/convex/validators/fileOperations'
 import type {
-  CompleteAgentFileArgs,
   FinishSkillImportArgs,
   PrepareSkillImportArgs,
-} from '@cv/convex/types'
+} from '@cv/convex/validators/skills'
 import { libraryRoot } from '@cv/sidecar/agent-files/storage'
 import type { createApp } from '@cv/sidecar/main'
 import { afterAll, beforeAll, expect, test } from 'bun:test'

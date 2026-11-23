@@ -12,7 +12,7 @@ import { cleanupRecords } from '@cv/convex/model/skills/removal'
 import type {
   InvalidateAgentHomeArgs,
   OperationAttemptArgs,
-} from '@cv/convex/types'
+} from '@cv/convex/validators/fileOperations'
 import { expect, test } from 'bun:test'
 import { getFunctionName } from 'convex/server'
 import type { FunctionReference } from 'convex/server'

@@ -17,7 +17,7 @@ import type {
   NotificationKind,
   NotificationRequest,
   NotificationStatus,
-} from '../../types'
+} from '../../validators/notifications'
 import { getProcessingSegmentRow } from '../messageContents'
 import * as ApprovalNotifications from './approvals'
 import { hasRequest, settleRequest } from './requests'

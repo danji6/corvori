@@ -1,6 +1,6 @@
 import { earliestUnconsumedMessage } from '@cv/convex/model/stream/lifecycle'
 import { trackJob } from '@cv/convex/model/tool/shellTools'
-import type { ShellToolOutput } from '@cv/convex/types'
+import type { ShellToolOutput } from '@cv/core/types/tools'
 import { describe, expect, test } from 'bun:test'
 import { fakeCtx, output, owner } from '~/tests/helpers/shell-report'
 import type { Row } from '~/tests/helpers/shell-report'

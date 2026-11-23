@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { type Infer, v } from 'convex/values'
 
 import {
   mcpLaunchFields,
@@ -44,6 +44,8 @@ export const toolkitPublishValidator = v.object({
   ),
 })
 
+export type ToolkitPublishArgs = Infer<typeof toolkitPublishValidator>
+
 export const toolkitSettingsValidator = v.object({
   ...toolkitIdValidator.fields,
   skillsEnabled: v.optional(v.boolean()),
@@ -51,15 +53,21 @@ export const toolkitSettingsValidator = v.object({
   skill: v.optional(v.object({ name: v.string(), enabled: v.boolean() })),
 })
 
+export type ToolkitSettingsArgs = Infer<typeof toolkitSettingsValidator>
+
 export const toolkitSelectionValidator = v.object({
   ...toolkitIdValidator.fields,
   agentId: v.id('agents'),
   enabled: v.boolean(),
 })
 
+export type ToolkitSelectionArgs = Infer<typeof toolkitSelectionValidator>
+
 export const toolkitListValidator = v.object({
   agentId: v.optional(v.id('agents')),
 })
+
+export type ToolkitListArgs = Infer<typeof toolkitListValidator>
 
 export const toolkitComponentValidator = v.object({
   tools: v.optional(v.array(mcpToolMetaValidator)),
@@ -70,12 +78,16 @@ export const toolkitComponentValidator = v.object({
   apiKey: v.optional(v.string()),
 })
 
+export type ToolkitComponentArgs = Infer<typeof toolkitComponentValidator>
+
 export const toolkitMissingValidator = v.object({
   ...toolkitIdValidator.fields,
   subject: v.string(),
   acceptedRevision: v.string(),
   diagnostic: v.string(),
 })
+
+export type ToolkitMissingArgs = Infer<typeof toolkitMissingValidator>
 
 export const toolkitObservationValidator = v.object({
   acceptedRevision: v.string(),
@@ -86,8 +98,12 @@ export const toolkitObservationValidator = v.object({
   diagnostic: v.optional(v.string()),
 })
 
+export type ToolkitObservationArgs = Infer<typeof toolkitObservationValidator>
+
 export const toolkitSkillsValidator = v.object({
   ...toolkitIdValidator.fields,
   offset: v.number(),
   fingerprint: v.optional(v.string()),
 })
+
+export type ToolkitSkillsArgs = Infer<typeof toolkitSkillsValidator>

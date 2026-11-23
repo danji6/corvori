@@ -1,18 +1,18 @@
 'use node'
 
+import type { ShellJobPoll, ShellJobSummary } from '@cv/core/types/tools'
+
 import { internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { authorizeAdmin } from '../../functions'
 import type {
-  ShellJobPoll,
-  ShellJobSummary,
   TerminalKillArgs,
   TerminalPollArgs,
   TerminalResizeArgs,
   TerminalSessionArgs,
   TerminalWriteArgs,
-} from '../../types'
+} from '../../validators/shell'
 
 export async function write(ctx: ActionCtx, args: TerminalWriteArgs) {
   await requireSessionAccess(ctx, args.sessionId)

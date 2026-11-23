@@ -26,7 +26,8 @@ import {
   _getProviderHistory,
   _getProviderHistorySnapshot,
 } from '@cv/convex/model/stream/providerHistory'
-import type { StreamContext, StreamExecutionArgs } from '@cv/convex/types'
+import type { StreamContext } from '@cv/convex/model/stream/types'
+import type { StreamExecutionArgs } from '@cv/convex/validators/streams'
 import { expect, test } from 'bun:test'
 import { getFunctionName } from 'convex/server'
 import { providerData } from '~/tests/helpers/provider-history'

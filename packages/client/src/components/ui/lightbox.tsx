@@ -1,7 +1,7 @@
 import { createOptionalContext } from '@/hooks'
 import { getFocusReturnTarget } from '@/lib/focus-return'
 import { cn } from '@/lib/utils'
-import type { AttachmentImageDimensions } from '@cv/convex/types'
+import type { AttachmentImageDimensions } from '@cv/convex/validators/attachments'
 import { ChevronLeftIcon, ChevronRightIcon, XIcon } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'

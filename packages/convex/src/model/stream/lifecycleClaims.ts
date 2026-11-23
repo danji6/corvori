@@ -1,6 +1,6 @@
 import type { Doc } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
-import type { StreamExecutionArgs } from '../../types'
+import type { StreamExecutionArgs } from '../../validators/streams'
 import { streamOutputIdentity } from '../chat/identities'
 import { injectModeNote } from '../chat/notes'
 import { injectDueReminders } from '../chat/reminders'
