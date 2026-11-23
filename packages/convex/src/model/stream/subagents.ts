@@ -15,7 +15,6 @@ import {
 } from '../../lib/subagent'
 import type { StreamExecutionArgs } from '../../validators/streams'
 import { resolveSpawnableAgents } from '../agent/subagents'
-import { agentIdentity } from '../chat/identities'
 import {
   getProcessingSegmentRow,
   insertMessage,
@@ -297,8 +296,6 @@ async function spawnChild(
     addedBy: session.ownerId,
   })
 
-  const parentAgent = await ctx.db.get(stream.agentId)
-
   // Carry over the parent's plan (resolved to a <plan> block)
   const plan = await getPlan(ctx, session._id)
   const parts = [
@@ -312,7 +309,6 @@ async function spawnChild(
       sessionId: childSessionId,
       sender: { type: 'agent', id: stream.agentId },
       role: 'user',
-      ...(parentAgent ? agentIdentity(parentAgent) : {}),
       status: 'done',
     },
     parts,
@@ -384,7 +380,6 @@ export async function deliverChildReport(
       sessionId: parent.sessionId,
       sender: { type: 'agent', id: childStream.agentId },
       role: 'user',
-      ...(agent ? agentIdentity(agent) : {}),
       status: 'done',
     },
     [part],

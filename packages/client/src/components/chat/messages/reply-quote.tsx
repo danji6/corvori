@@ -1,4 +1,5 @@
 import { MarkdownSnippet } from '@/components/markdown'
+import { useAuthorProfile } from '@/hooks/chat/author-profile'
 import { cn } from '@/lib/utils'
 import type { ReplyQuote } from '@cv/convex/validators/messages'
 import { toDisplayName } from '@cv/core/utils/names'
@@ -83,12 +84,16 @@ export function ReplyQuoteCard({
 
 /** The quoted participant's role icon and name. */
 export function ReplyQuoteSender({ quote }: { quote: ReplyQuote }) {
-  const Icon = quote.sender.type === 'agent' ? BotIcon : UserIcon
+  const profile = useAuthorProfile(quote.sender)
+  const fromAgent = (profile?.kind ?? quote.sender.type) === 'agent'
+  const Icon = fromAgent ? BotIcon : UserIcon
 
   return (
     <span className="text-foreground/70 flex min-w-0 items-center gap-1.5 text-xs font-semibold tracking-wide">
       <Icon className="size-3.5 shrink-0" />
-      <span className="truncate">{toDisplayName(quote.senderName)}</span>
+      <span className="truncate">
+        {toDisplayName(quote.senderName, fromAgent ? 'Assistant' : 'User')}
+      </span>
     </span>
   )
 }

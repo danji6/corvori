@@ -17,13 +17,10 @@ import {
 import { removeForSession as removeSessionCache } from '../session/cache'
 import type { Session } from '../session/types'
 import { sessionToolNames } from '../tool/selection'
-import type { SenderIdentity } from './identities'
-import { agentIdentity } from './identities'
 import type { MessageExtra } from './types'
 
 export type NoteSender = {
   agent: Doc<'agents'>
-  identity: SenderIdentity
 }
 
 export type HiddenNote = {
@@ -44,7 +41,7 @@ export async function resolveNoteSender(
   const agent = await ctx.db.get(session.activeAgentId)
   if (!agent) return null
 
-  return { agent, identity: agentIdentity(agent) }
+  return { agent }
 }
 
 /**
@@ -65,7 +62,6 @@ export async function insertHiddenNote(
       sessionId: session._id,
       sender: { type: 'agent', id: sender.agent._id },
       role: note.role,
-      ...sender.identity,
       status: 'done',
       type: note.type,
       hidden: true,

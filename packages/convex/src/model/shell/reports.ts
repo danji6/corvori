@@ -9,7 +9,6 @@ import {
   type ShellReportStatus,
 } from '../../lib/shellReport'
 import { sharedSessionId } from '../../lib/subagent'
-import { agentIdentity } from '../chat/identities'
 import { insertMessage } from '../messageContents'
 import { getSessionWithWorkspace } from '../session/folderContext'
 import { getActiveStream } from '../session/memberships'
@@ -111,8 +110,6 @@ async function insertShellReport(
   row: Doc<'shellJobs'>,
   { output, errorText }: ShellReportResult,
 ) {
-  const agent = await ctx.db.get(row.agentId)
-
   const part: ShellReportPart = {
     type: SHELL_REPORT_PART_TYPE,
     jobId: row.jobId,
@@ -127,7 +124,6 @@ async function insertShellReport(
       sessionId: row.sessionId,
       sender: { type: 'agent', id: row.agentId },
       role: 'user', // no 'system' because some providers complain
-      ...(agent ? agentIdentity(agent) : {}),
       status: 'done',
       ...(row.userKilled && { extra: { userKilled: true } }),
     },

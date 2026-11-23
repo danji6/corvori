@@ -5,6 +5,7 @@ import { useActiveSessionId } from '@/hooks/chat/session'
 import type { MessageRole } from '@/lib/chat'
 import { cn, formatRelativeTime } from '@/lib/utils'
 import type { Id } from '@cv/convex/_generated/dataModel'
+import { toDisplayName } from '@cv/core/utils/names'
 import { BotIcon, CogIcon, SearchIcon, UserIcon } from 'lucide-react'
 import { type ReactNode, useCallback } from 'react'
 
@@ -121,7 +122,13 @@ function HistorySearchResultRow({
   term,
   onSelect,
 }: HistorySearchResultRowProps) {
-  const avatarUrls = useAvatarUrls(result.senderAvatarId)
+  const avatarUrls = useAvatarUrls(
+    result.role === 'system' ? undefined : result.avatarId,
+  )
+  const name =
+    result.role === 'system'
+      ? 'System'
+      : toDisplayName(result.senderName, roleLabel(result.role))
 
   return (
     <li>
@@ -134,14 +141,14 @@ function HistorySearchResultRow({
       >
         <Avatar
           src={avatarUrls.thumbnail ?? avatarUrls.original}
-          alt={result.senderName}
+          alt={name}
           size="sm"
           fallbackIcon={<RoleIcon role={result.role} />}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-foreground/80 truncate text-sm font-semibold">
-              {result.senderName ?? roleLabel(result.role)}
+              {name}
             </span>
             <span className="text-muted-foreground shrink-0 text-xs">
               {formatRelativeTime(result._creationTime)}
@@ -163,7 +170,7 @@ function RoleIcon({ role }: { role: MessageRole }) {
 }
 
 function roleLabel(role: MessageRole): string {
-  return role === 'user' ? 'You' : role === 'system' ? 'System' : 'Assistant'
+  return role === 'user' ? 'User' : role === 'system' ? 'System' : 'Assistant'
 }
 
 function escapeRegExp(value: string): string {

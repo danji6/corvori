@@ -7,6 +7,7 @@ import { insertMessage, withParts } from '../messageContents'
 import { finalizeMessageParts, notACommandChip } from '../messages'
 import { getBySession as getPlan, upsert as upsertPlan } from '../plans'
 import { portableContextExtra } from '../stream/contextNotes'
+import { duplicateAuthorProfiles } from './authorProfileLifecycle'
 import { assertSessionsIdle, sessionFamilies } from './folderTransitionSessions'
 import { getActiveStream, requireOwner } from './memberships'
 import { getState, patchState } from './state'
@@ -149,26 +150,35 @@ export async function duplicate(
   }
 
   const messageIdMap = new Map<Id<'messages'>, Id<'messages'>>()
+  const remapSender = await duplicateAuthorProfiles(
+    ctx,
+    sessionId,
+    newSessionId,
+  )
   for (const message of copied) {
     const parts = Attachments.remapPartAttachmentIds(
       partsByMessage.get(message._id) ?? [],
       attachmentMap,
     )
 
+    const quote = await remapReplyQuote(ctx, message.replyTo, messageIdMap)
+    const extra = portableContextExtra(message)
     const { messageId } = await insertMessage(
       ctx,
       {
         sessionId: newSessionId,
-        sender: message.sender,
+        sender: remapSender(message.sender),
+        senderName: message.senderName,
         role: message.role,
         type: message.type,
         status: 'done',
         hidden: message.hidden,
-        extra: portableContextExtra(message),
-        replyTo: await remapReplyQuote(ctx, message.replyTo, messageIdMap),
+        extra:
+          extra && 'event' in extra && extra.participant
+            ? { ...extra, participant: remapSender(extra.participant) }
+            : extra,
+        replyTo: quote && { ...quote, sender: remapSender(quote.sender) },
         metadata: message.metadata,
-        senderName: message.senderName,
-        senderAvatarId: message.senderAvatarId,
       },
       finalizeMessageParts(parts),
     )

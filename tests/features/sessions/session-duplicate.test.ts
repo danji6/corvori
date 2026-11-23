@@ -54,7 +54,11 @@ describe('sessions.duplicate', () => {
 
     const textId = seedMessage(
       tables,
-      { sessionId: 'session_1', senderName: 'Ada', appearanceId: 'look_1' },
+      {
+        sessionId: 'session_1',
+        appearanceId: 'look_1',
+        senderName: 'At send time',
+      },
       [{ type: 'text', text: 'hello' }],
     )
     // An older retry generation that must not be copied
@@ -117,7 +121,8 @@ describe('sessions.duplicate', () => {
     expect(copies).toHaveLength(1)
     const [copied] = copies
     expect(copied.status).toBe('done')
-    expect(copied.senderName).toBe('Ada')
+    expect(copied.sender).toEqual(tables.messages[0].sender)
+    expect(copied.senderName).toBe('At send time')
     expect(copied).not.toHaveProperty('appearanceId')
     expect(copied.metadata).toEqual({ duration: 12 })
     // The selected generation becomes the copy's version 1

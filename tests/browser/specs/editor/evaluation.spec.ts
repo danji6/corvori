@@ -69,5 +69,5 @@ test('failures surface and a subsequent edit recovers', async ({ page }) => {
 
 test('shell is side-effect-free in prompt previews', async ({ page }) => {
   await page.getByLabel('Prompt').fill('{{ shell("echo preview") }}')
-  await expect(page.getByLabel('Preview')).toHaveText('Error: not an admin')
+  await expect(page.getByLabel('Preview')).toHaveText('Not an admin')
 })

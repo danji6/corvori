@@ -15,6 +15,8 @@ export function makeCtx() {
     sessionFolders: [],
     userSessions: [],
     sessionAgents: [],
+    sessionAuthors: [],
+    sessionProfiles: [],
     plans: [],
     sessionState: [],
     messages: [],

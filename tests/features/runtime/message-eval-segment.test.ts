@@ -10,6 +10,7 @@ import {
   readState,
 } from '@cv/convex/model/promptEvaluation/state'
 import { patchState } from '@cv/convex/model/session/state'
+import { buildEvalContext } from '@cv/convex/model/stream/evalContext'
 import { evaluateRequest } from '@cv/core/interpreter/request'
 import { expect, spyOn, test } from 'bun:test'
 import { getFunctionName } from 'convex/server'
@@ -145,6 +146,48 @@ test('role changes and edits revoke shell access and the previous result cannot 
   expect(row.parts).toEqual([
     { type: 'text', text: 'Evaluating prompt…', evaluationPending: true },
   ])
+})
+
+test('fresh evaluation uses session names and inherits each global name on reset', async () => {
+  const f = fixture('user', false)
+  const agentId = 'agent' as Id<'agents'>
+  f.rows('agents').push({ _id: agentId, ownerId: owner, name: 'Global agent' })
+  await f.db.patch(sessionId, { activeAgentId: agentId })
+  await f.db.patch('settings', { displayName: 'Global user' })
+  f.rows('sessionProfiles').push(
+    {
+      _id: 'user-profile',
+      sessionId,
+      sender: { type: 'user', id: owner },
+      name: 'Session user',
+    },
+    {
+      _id: 'agent-profile',
+      sessionId,
+      sender: { type: 'agent', id: agentId },
+      name: 'Session agent',
+    },
+  )
+  await sendMessage(f.ctx, {
+    sessionId,
+    content: '{{user}} and {{assistant}}',
+    silent: true,
+  })
+  const id = f.rows('messageContents')[0]
+    .promptEvaluationId as Id<'promptEvaluations'>
+  const context = async () =>
+    buildEvalContext({ ...(await readInput(f.ctx, { id }))!, toolNames: [] })
+
+  expect(await context()).toMatchObject({
+    user: 'Session user',
+    assistant: 'Session agent',
+  })
+  await f.db.patch('user-profile', { name: undefined })
+  await f.db.patch('agent-profile', { name: undefined })
+  expect(await context()).toMatchObject({
+    user: 'Global user',
+    assistant: 'Global agent',
+  })
 })
 
 test('a non-admin send still evaluates scripts with the normal shell denial', async () => {

@@ -13,7 +13,6 @@ import {
   hasUnresolvedTodos,
 } from '../todos'
 import { sessionToolNames } from '../tool/selection'
-import { agentIdentity } from './identities'
 import { insertHiddenNote } from './notes'
 import type { NoteSender } from './notes'
 import type { MessageExtra } from './types'
@@ -107,7 +106,6 @@ export async function injectDueReminders(
 
   const sender: NoteSender = {
     agent,
-    identity: agentIdentity(agent),
   }
   const currentStep = stepCount ?? (await getStepCount(ctx, session._id))
 

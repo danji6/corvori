@@ -15,7 +15,6 @@ import type {
 } from '../../validators/streams'
 import { effectiveAgentSelection } from '../agent/modelOverride'
 import { insertCommandChip } from '../chat/commandChips'
-import { senderIdentity } from '../chat/identities'
 import { scheduledCompactForStream } from '../chat/scheduling'
 import { pending as pendingMcp } from '../mcp/operations/records'
 import {
@@ -241,7 +240,6 @@ async function prepareSummaryOutput(
       sessionId: message.sessionId,
       sender: message.sender,
       role: 'assistant',
-      ...senderIdentity(message),
       status: 'processing',
     },
     [],

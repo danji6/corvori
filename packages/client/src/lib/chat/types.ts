@@ -73,7 +73,6 @@ export type MessageRecord = Pick<
   Doc<'messages'>,
   | 'sender'
   | 'senderName'
-  | 'senderAvatarId'
   | 'type'
   | 'hidden'
   | 'extra'

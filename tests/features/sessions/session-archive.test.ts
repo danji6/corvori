@@ -1,70 +1,21 @@
 /// <reference types="bun-types" />
 import type { Id } from '@cv/convex/_generated/dataModel'
+import { quoteMessage } from '@cv/convex/model/chat/replies'
 import { insertMessage } from '@cv/convex/model/messageContents'
 import { exportOne, importOne } from '@cv/convex/model/session/archive'
 import type { SessionArchive } from '@cv/convex/model/session/archive'
 import { describe, expect, test } from 'bun:test'
 import { skillsDatabase } from '~/tests/helpers/skills-db'
 
-type Row = Record<string, unknown> & { _id: string }
-
-/** A multi-table stub. Every read here goes through an equality index. */
 function makeCtx() {
-  const tables: Record<string, Row[]> = {
-    users: [{ _id: 'users_1', subject: 'sub_1' }],
-    sessions: [],
-    sessionState: [],
-    userSessions: [],
-    messages: [],
-    messageContents: [],
-    avatars: [],
-  }
-  let nextId = 1
-
-  const ctx = {
-    db: {
-      get: async (id: string) =>
-        Object.values(tables)
-          .flat()
-          .find((row) => row._id === id) ?? null,
-      insert: async (table: string, doc: Record<string, unknown>) => {
-        const _id = `${table}_${nextId++}`
-        tables[table].push({ _id, ...doc })
-        return _id
-      },
-      patch: async () => {},
-      query: (table: string) => ({
-        withIndex: (_index: string, build?: (q: unknown) => unknown) => {
-          const captured: Record<string, unknown> = {}
-          const q = {
-            eq: (field: string, value: unknown) => {
-              captured[field] = value
-              return q
-            },
-          }
-          build?.(q)
-
-          const matches = tables[table].filter((row) =>
-            Object.entries(captured).every(
-              ([key, value]) => row[key] === value,
-            ),
-          )
-
-          return {
-            order: () => ({ collect: async () => matches }),
-            collect: async () => matches,
-            unique: async () => matches[0] ?? null,
-            first: async () => matches[0] ?? null,
-          }
-        },
-      }),
-    },
-  } as never
-
-  return { ctx, tables }
+  const { ctx, rows } = skillsDatabase()
+  rows('users').push({ _id: 'users_1', subject: 'sub_1' })
+  return { ctx, rows }
 }
 
-function message(): SessionArchive['session']['messages'][number] {
+type LegacyArchive = Extract<SessionArchive, { version: 1 }>
+
+function message(): LegacyArchive['session']['messages'][number] {
   return {
     role: 'assistant',
     parts: [{ type: 'text', text: 'hi' }],
@@ -73,8 +24,8 @@ function message(): SessionArchive['session']['messages'][number] {
 }
 
 function archive(
-  messages: SessionArchive['session']['messages'],
-): SessionArchive {
+  messages: LegacyArchive['session']['messages'],
+): LegacyArchive {
   return {
     version: 1,
     exportedAt: 0,
@@ -84,23 +35,29 @@ function archive(
 
 describe('session archive import', () => {
   test('preserves sender identity and content', async () => {
-    const { ctx, tables } = makeCtx()
+    const { ctx, rows } = makeCtx()
     await importOne(ctx, {
       subject: 'sub_1',
       avatars: { ada: 'storage_1' as never },
       payload: archive([message()]),
     })
-    expect(tables.messages).toHaveLength(1)
-    expect(tables.messages[0].senderName).toBe('Ada')
-    expect(tables.messages[0].senderAvatarId).toBe(tables.avatars[0]._id)
-    expect(tables.avatars[0].storageId).toBe('storage_1')
-    expect(tables.messageContents[0].parts).toEqual([
+    expect(rows('messages')).toHaveLength(1)
+    const [author] = rows('sessionAuthors')
+    expect(rows('messages')[0].sender).toEqual({
+      type: 'archived',
+      id: author._id,
+    })
+    expect(author.name).toBe('Ada')
+    expect(rows('messages')[0].senderName).toBe('Ada')
+    expect(author.avatarId).toBe(rows('avatars')[0]._id)
+    expect(rows('avatars')[0].storageId).toBe('storage_1')
+    expect(rows('messageContents')[0].parts).toEqual([
       { type: 'text', text: 'hi' },
     ])
   })
 
   test('imports messages without sender snapshots or avatar data', async () => {
-    const { ctx, tables } = makeCtx()
+    const { ctx, rows } = makeCtx()
     await importOne(ctx, {
       subject: 'sub_1',
       avatars: {},
@@ -117,13 +74,17 @@ describe('session archive import', () => {
         },
       ]),
     })
-    expect(tables.messages).toHaveLength(2)
-    expect(tables.avatars).toEqual([])
-    expect(tables.messages[0].senderName).toBe('Ada')
-    expect(tables.messages[0].senderAvatarId).toBeUndefined()
-    expect(tables.messages[1].senderName).toBeUndefined()
-    expect(tables.sessions[0].lastMessagePreview).toBe('Hello from Rome')
-    expect(tables.messages[1].role).toBe('user')
+    expect(rows('messages')).toHaveLength(2)
+    expect(rows('avatars')).toEqual([])
+    expect(rows('sessionAuthors')[0]).toMatchObject({
+      name: 'Ada',
+      kind: 'agent',
+    })
+    expect(rows('sessionAuthors')[0].avatarId).toBeUndefined()
+    expect(rows('sessionAuthors')[1]).toMatchObject({ kind: 'user' })
+    expect(rows('sessionAuthors')[1].name).toBeUndefined()
+    expect(rows('sessions')[0].lastMessagePreview).toBe('Hello from Rome')
+    expect(rows('messages')[1].role).toBe('user')
   })
 
   test('round-trips a context reset in transcript order', async () => {
@@ -169,4 +130,96 @@ describe('session archive import', () => {
       contextEligible: false,
     })
   })
+})
+
+test('round-trips distinct authors with identical display names into another install', async () => {
+  const { ctx, rows } = makeCtx()
+  const sessionId = 'origin-session' as Id<'sessions'>
+  const first = 'first-person' as Id<'users'>
+  const second = 'second-person' as Id<'users'>
+  rows('sessions').push({ _id: sessionId, ownerId: 'users_1', title: 'Origin' })
+  rows('userSessions').push({ _id: 'membership', sessionId, userId: 'users_1' })
+  rows('settings').push(
+    { _id: 'first-settings', ownerId: first, displayName: 'Same name' },
+    {
+      _id: 'second-settings',
+      ownerId: second,
+      displayName: 'Different global name',
+    },
+  )
+  rows('sessionProfiles').push({
+    _id: 'second-override',
+    sessionId,
+    sender: { type: 'user', id: second },
+    name: 'Same name',
+    avatarId: 'override-avatar',
+  })
+  rows('avatars').push({ _id: 'override-avatar', storageId: 'original-image' })
+
+  const send = (
+    id: Id<'users'>,
+    text: string,
+    replyTo?: Awaited<ReturnType<typeof quoteMessage>>,
+  ) =>
+    insertMessage(
+      ctx,
+      {
+        sessionId,
+        sender: { type: 'user', id },
+        role: 'user',
+        status: 'done',
+        replyTo,
+      },
+      [{ type: 'text', text }],
+    )
+  const firstMessage = await send(first, 'One')
+  await send(second, 'Two')
+  await ctx.db.patch('first-settings' as Id<'settings'>, {
+    displayName: 'New name',
+  })
+  const quote = await quoteMessage(ctx, sessionId, firstMessage.messageId)
+  await send(first, 'Three', quote)
+  await ctx.db.patch('first-settings' as Id<'settings'>, {
+    displayName: 'Same name',
+  })
+
+  const { archive: payload, avatars } = await exportOne(ctx, {
+    sessionId,
+    subject: 'sub_1',
+  })
+  const [a, b] = payload.session.authors
+  expect([a.name, b.name]).toEqual(['Same name', 'Same name'])
+  expect(a.key).not.toBe(b.key)
+  expect(b.avatarKey).toBe(avatars[0].key)
+  expect(JSON.stringify(payload)).not.toContain('second-person')
+
+  const destination = makeCtx()
+  await importOne(destination.ctx, {
+    payload,
+    subject: 'sub_1',
+    avatars: { [avatars[0].key]: 'imported-image' as Id<'_storage'> },
+  })
+  const messages = destination.rows('messages')
+  expect(messages[0].sender).toEqual(messages[2].sender)
+  expect(messages[0].sender).not.toEqual(messages[1].sender)
+  expect(messages.map((message) => message.senderName)).toEqual([
+    'Same name',
+    'Same name',
+    'New name',
+  ])
+  expect(messages[2].replyTo).toMatchObject({
+    sender: messages[0].sender,
+    senderName: 'Same name',
+    text: 'One',
+    target: { id: messages[0]._id },
+  })
+  const authors = destination.rows('sessionAuthors')
+  expect(authors.map((author) => author.name)).toEqual([
+    'Same name',
+    'Same name',
+  ])
+  expect(authors[1].avatarId).toBe(destination.rows('avatars')[0]._id)
+  expect(destination.rows('users')).toHaveLength(1)
+  expect(destination.rows('userSessions')).toHaveLength(1)
+  expect(destination.rows('agents')).toHaveLength(0)
 })

@@ -8,7 +8,7 @@ import type { MessageExtra } from '../chat/types'
 import { insertMessage } from '../messageContents'
 import { getByOwnerId as getSettings } from '../settings'
 
-type Participant = Doc<'messages'>['sender']
+type Participant = Exclude<Doc<'messages'>['sender'], { type: 'archived' }>
 
 type AnnounceArgs = {
   sessionId: Id<'sessions'>

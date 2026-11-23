@@ -71,8 +71,71 @@ let continuationActive = params.has('continuation')
 let messages = initialMessages()
 let planContent = 'Original plan'
 let submittedShell: ReturnType<typeof message> | undefined
+let liveAuthor = {
+  kind: 'agent',
+  name: 'Original author',
+  avatarId: 'avatar-before',
+}
+let overrideName: string | undefined
+const fixtureAgent = { _id: 'agent', name: 'Fixture agent' }
+let linkedAgents = [fixtureAgent]
+let members = [
+  {
+    membership: { _id: 'owner-member', userId: 'owner', role: 'owner' },
+    name: 'Viewer',
+  },
+  {
+    membership: { _id: 'guest-member', userId: 'guest', role: 'member' },
+    name: 'Guest',
+  },
+]
+
+if (params.has('liveAuthors')) {
+  window.addEventListener('rename-fixture-author', () => {
+    liveAuthor = {
+      kind: 'agent',
+      name: 'Renamed author',
+      avatarId: 'avatar-after',
+    }
+    refresh()
+  })
+  window.addEventListener('send-fixture-author-message', () => {
+    messages = [
+      messages[0],
+      {
+        ...message('new', 1.5),
+        role: 'assistant',
+        senderName: overrideName ?? liveAuthor.name,
+      },
+      ...messages.slice(1),
+    ]
+    refresh()
+  })
+}
 
 function initialMessages() {
+  if (params.has('liveAuthors')) {
+    const answer = {
+      ...message('answer', 1),
+      role: 'assistant',
+      senderName: 'Original author',
+    }
+    return [
+      answer,
+      {
+        ...message('reply', 2),
+        sender: { type: 'user', id: 'owner' },
+        senderName: 'Viewer',
+        replyTo: {
+          target: { id: answer._id, creationTime: 1 },
+          sender: answer.sender,
+          senderName: answer.senderName,
+          text: 'Content for answer',
+        },
+      },
+    ]
+  }
+
   if (params.has('contextReset')) {
     return [
       {
@@ -395,6 +458,47 @@ const cache = new Map<string, unknown>()
 const listeners = new Set<() => void>()
 
 function query(name: string, args: Record<string, unknown>) {
+  if (params.has('liveAuthors')) {
+    if (name === 'agents:list') return [fixtureAgent]
+    if (name === 'sessionAgents:list') return linkedAgents
+    if (name === 'userSessions:list') return members
+    if (name === 'sessions:editableAuthorProfile') {
+      return {
+        name: overrideName,
+        inherited: { name: liveAuthor.name, avatarId: liveAuthor.avatarId },
+      }
+    }
+    if (name === 'sessions:authorProfile') {
+      const sender = args.sender as { type: string; id: string }
+      return sender.type === 'agent'
+        ? { ...liveAuthor, name: overrideName ?? liveAuthor.name }
+        : { kind: 'user', name: sender.id === 'owner' ? 'Viewer' : 'Guest' }
+    }
+    if (name === 'avatars:getUrlMap') {
+      const ids = args.ids as string[]
+      return Object.fromEntries(
+        ids.map((id) => {
+          const url = new URL(`/${id}.svg`, location.origin).href
+          return [id, { thumbnail: url, original: url }]
+        }),
+      )
+    }
+    if (name === 'chat:searchMessages') {
+      return {
+        page: [
+          {
+            ...messages[0],
+            segmentIndex: 0,
+            text: 'Content for answer',
+            avatarId: liveAuthor.avatarId,
+          },
+        ],
+        isDone: true,
+        continueCursor: '',
+      }
+    }
+  }
+
   if (name === 'promptEvaluations:active') {
     const start = sessionStorage.getItem('fixture-evaluation-started-at')
     return start ? Number(start) : null
@@ -524,9 +628,32 @@ export const notesClient = {
   },
   async mutation(
     reference: FunctionReference<'mutation'>,
-    args: { messageId?: string; content?: string },
+    args: {
+      messageId?: string
+      content?: string
+      name?: string
+      agentId?: string
+      userId?: string
+    },
   ) {
     const name = getFunctionName(reference)
+    if (name === 'sessions:updateAuthorProfile' && params.has('liveAuthors')) {
+      overrideName = args.name?.trim() || undefined
+      refresh()
+      return
+    }
+    if (name === 'sessionAgents:unlink' && params.has('liveAuthors')) {
+      linkedAgents = linkedAgents.filter((agent) => agent._id !== args.agentId)
+      refresh()
+      return
+    }
+    if (name === 'userSessions:remove' && params.has('liveAuthors')) {
+      members = members.filter(
+        ({ membership }) => membership.userId !== args.userId,
+      )
+      refresh()
+      return
+    }
     if (name === 'chat:stopStream' && params.has('promptEvaluation')) {
       sessionStorage.removeItem('fixture-evaluation-started-at')
       refresh()

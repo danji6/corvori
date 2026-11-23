@@ -12,6 +12,7 @@ import {
   replaceEvaluationPlaceholders,
   scheduleTitle,
 } from '../messages'
+import { findOverride } from '../session/authorProfiles'
 import { getSessionWithWorkspace } from '../session/folderContext'
 import {
   countParticipants,
@@ -110,13 +111,18 @@ export async function readInput(ctx: QueryCtx, { id }: { id: EvaluationId }) {
   const configured = !message || 'promptId' in target
   if (configured && (!agent || !(await ctx.db.get(ownerId)))) return null
 
-  const [ownerSettings, mcpServers, model] = await Promise.all([
-    agent ? getByOwnerId(ctx, agent.ownerId) : null,
-    message && agent ? resolveMcpServers(ctx, agent.ownerId) : [],
-    message && agent?.modelOverride
-      ? modelOverrideView(ctx, agent.ownerId, agent.modelOverride)
-      : undefined,
-  ])
+  const [ownerSettings, mcpServers, model, userOverride, agentOverride] =
+    await Promise.all([
+      agent ? getByOwnerId(ctx, agent.ownerId) : null,
+      message && agent ? resolveMcpServers(ctx, agent.ownerId) : [],
+      message && agent?.modelOverride
+        ? modelOverrideView(ctx, agent.ownerId, agent.modelOverride)
+        : undefined,
+      findOverride(ctx, sessionId, { type: 'user', id: invokedBy }),
+      agent
+        ? findOverride(ctx, sessionId, { type: 'agent', id: agent._id })
+        : null,
+    ])
 
   return {
     ...state,
@@ -125,6 +131,8 @@ export async function readInput(ctx: QueryCtx, { id }: { id: EvaluationId }) {
     invoker,
     invokerSettings,
     ownerSettings,
+    userNameOverride: userOverride?.name,
+    assistantNameOverride: agentOverride?.name,
     mcpServers,
     model,
     ...counts,

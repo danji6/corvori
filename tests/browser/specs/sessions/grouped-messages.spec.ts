@@ -1,5 +1,101 @@
 import { type Locator, expect, test } from '@playwright/test'
 
+test('keeps old names in the transcript and search while avatars update', async ({
+  page,
+}) => {
+  await page.route('**/avatar-*.svg', (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="green"/></svg>',
+    }),
+  )
+  await page.goto('/?fixture=notes&id=notes&liveAuthors')
+
+  const header = page
+    .locator('[data-slot="message-header"]')
+    .filter({ hasText: 'Original author' })
+  await expect(header.locator('img')).toHaveAttribute(
+    'src',
+    /avatar-before\.svg$/,
+  )
+  const quote = page.locator('[data-slot="reply-quote"]')
+  await expect(quote).toContainText('Original author')
+
+  await page.keyboard.press('Control+Shift+f')
+  const search = page.getByRole('dialog', { name: 'Search messages' })
+  await search.getByRole('textbox').fill('answer')
+  await expect(search.getByText('Original author')).toBeVisible()
+
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event('rename-fixture-author')),
+  )
+  await expect(search.getByText('Original author')).toBeVisible()
+  await expect(search.locator('img')).toHaveAttribute(
+    'src',
+    /avatar-after\.svg$/,
+  )
+  await page.keyboard.press('Escape')
+
+  await expect(header.locator('img')).toHaveAttribute(
+    'src',
+    /avatar-after\.svg$/,
+  )
+  await expect(quote).toContainText('Original author')
+
+  const options = (name: string) =>
+    page.getByRole('button', { name: `Options for ${name}` })
+  const edit = page.getByRole('menuitem', { name: 'Edit...', exact: true })
+  await options('Renamed author').press('Enter')
+  await edit.click()
+  const editor = page.getByRole('dialog', { name: 'Edit session profile' })
+  await editor.getByLabel('Name').fill('Only in this session')
+  await editor.getByRole('button', { name: 'Save' }).click()
+  await options('Only in this session').waitFor()
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event('send-fixture-author-message')),
+  )
+  const newHeader = page
+    .locator('[data-slot="message-header"]')
+    .filter({ hasText: 'Only in this session' })
+  await expect(newHeader).toBeVisible()
+  await expect(header).toBeVisible()
+  await options('Only in this session').click()
+  await edit.click()
+  await editor.getByRole('button', { name: 'Use profile name' }).click()
+  await editor.getByRole('button', { name: 'Save' }).click()
+  await expect(options('Renamed author')).toBeVisible()
+  await expect(newHeader).toBeVisible()
+  await expect(quote).toContainText('Original author')
+})
+
+test('the participant menu removes members and unlinks agents', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=notes&id=notes&liveAuthors')
+
+  const guestOptions = page.getByRole('button', { name: 'Options for Guest' })
+  await guestOptions.click()
+  const menu = page.getByRole('menu')
+  const remove = menu.getByRole('menuitem', { name: 'Remove' })
+  await expect(menu.getByRole('menuitem', { name: 'Edit...' })).toHaveCount(0)
+  await remove.click()
+  const confirmation = page.getByRole('alertdialog', { name: 'Remove member?' })
+  await confirmation.getByRole('button', { name: 'Cancel' }).click()
+  await guestOptions.click()
+  await remove.click()
+  await confirmation.getByRole('button', { name: 'Remove' }).click()
+  await expect(guestOptions).toHaveCount(0)
+
+  const agentOptions = page.getByRole('button', {
+    name: 'Options for Original author',
+  })
+  await agentOptions.click()
+  await expect(menu.getByRole('menuitem', { name: 'Edit...' })).toBeVisible()
+  await remove.click()
+  await expect(agentOptions).toHaveCount(0)
+  await expect(page.getByRole('combobox', { name: 'Link agent' })).toBeVisible()
+})
+
 test('opening a long summary at the bottom brings its start below the nav', async ({
   page,
 }) => {

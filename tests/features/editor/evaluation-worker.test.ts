@@ -308,7 +308,7 @@ describe('authored prompt shell operations', () => {
     const ordinary = await evaluate(["{{ shell('printf hello') }}"], {
       context: { isAdmin: true },
     })
-    expect((await ordinary.json()).parts[0].text).toBe('Error: not an admin')
+    expect((await ordinary.json()).parts[0].text).toBe('Not an admin')
     await operation('acknowledge', ref)
   })
 

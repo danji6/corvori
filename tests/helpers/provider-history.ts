@@ -23,9 +23,9 @@ export function agent(
 export function stored(
   sender: Doc<'messages'>['sender'],
   role: Doc<'messages'>['role'],
-  name: string,
+  senderName: string | null = null,
 ): Doc<'messages'> {
-  return { sender, role, senderName: name } as Doc<'messages'>
+  return { sender, role, senderName } as Doc<'messages'>
 }
 
 /**
@@ -35,10 +35,9 @@ export function stored(
 export function note(
   sender: Doc<'messages'>['sender'],
   role: Doc<'messages'>['role'],
-  name: string,
   type: NonNullable<Doc<'messages'>['type']> = 'reminder',
 ): Doc<'messages'> {
-  return { ...stored(sender, role, name), type, hidden: true }
+  return { ...stored(sender, role), type, hidden: true }
 }
 
 export function providerData(boundaryId?: string) {
@@ -96,7 +95,6 @@ export function userMessage(parts: unknown[]): Doc<'messages'> {
     _id: 'message_1',
     role: 'user',
     sender: { type: 'user', id: USER },
-    senderName: 'Alice',
     parts,
   } as unknown as Doc<'messages'>
 }

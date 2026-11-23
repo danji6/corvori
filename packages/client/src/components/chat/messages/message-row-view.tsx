@@ -7,6 +7,7 @@ import {
   useMessageAppearance,
   useUserProfile,
 } from '@/hooks/chat'
+import { useAuthorProfile } from '@/hooks/chat/author-profile'
 import { useIsAwaitingVisibleContinuation } from '@/hooks/chat/messages'
 import {
   canMutateMessage,
@@ -241,13 +242,18 @@ function HeaderRow({ row, message, messageMeta }: HeaderRowProps) {
   const role = messageDisplayRole(message, messageMeta)
 
   const reasoning = useReasoningHeader(message, messageMeta, row.reasoning)
+  const profile = useAuthorProfile(role === 'system' ? undefined : messageMeta?.sender) // prettier-ignore
 
   const sender = {
     name: toDisplayName(
-      messageMeta?.senderName,
-      role === 'system' ? 'System' : undefined,
+      role === 'system' ? undefined : messageMeta?.senderName,
+      role === 'system'
+        ? 'System'
+        : role === 'assistant'
+          ? 'Assistant'
+          : 'User',
     ),
-    avatarId: messageMeta?.senderAvatarId,
+    avatarId: profile?.avatarId,
   }
 
   return (

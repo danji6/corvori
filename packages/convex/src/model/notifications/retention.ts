@@ -6,6 +6,19 @@ import {
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import type { NotificationStatus } from '../../validators/notifications'
+import { removeIfUnreferenced } from '../avatars'
+
+export async function removeNotificationDocs(
+  ctx: MutationCtx,
+  rows: Doc<'notifications'>[],
+) {
+  const avatarIds = new Set<Id<'avatars'>>()
+  for (const row of rows) {
+    await ctx.db.delete(row._id)
+    if (row.actorAvatarId) avatarIds.add(row.actorAvatarId)
+  }
+  for (const avatarId of avatarIds) await removeIfUnreferenced(ctx, avatarId)
+}
 
 export function statusLimit(status: NotificationStatus) {
   return status === 'unread' ? MAX_UNREAD_NOTIFICATIONS : MAX_READ_NOTIFICATIONS
@@ -35,9 +48,7 @@ export async function pruneReadNotifications(
   recipientId: Id<'users'>,
 ) {
   const rows = await ordinaryNotifications(ctx, recipientId, 'read').collect()
-  for (const row of rows.slice(MAX_READ_NOTIFICATIONS)) {
-    await ctx.db.delete(row._id)
-  }
+  await removeNotificationDocs(ctx, rows.slice(MAX_READ_NOTIFICATIONS))
 }
 
 type NewNotification = Omit<
@@ -62,9 +73,7 @@ export async function insertUnreadNotification(
       recipientId,
       'unread',
     ).collect()
-    for (const row of rows.slice(MAX_UNREAD_NOTIFICATIONS)) {
-      await ctx.db.delete(row._id)
-    }
+    await removeNotificationDocs(ctx, rows.slice(MAX_UNREAD_NOTIFICATIONS))
     await ctx.db.insert('notificationUnreadCounts', {
       recipientId,
       count: Math.min(rows.length, MAX_UNREAD_NOTIFICATIONS),
@@ -78,7 +87,7 @@ export async function insertUnreadNotification(
       'unread',
       'asc',
     ).first()
-    if (oldest) await ctx.db.delete(oldest._id)
+    if (oldest) await removeNotificationDocs(ctx, [oldest])
   }
 }
 

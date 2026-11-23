@@ -6,6 +6,7 @@ import {
   jsonResponse,
   preflightResponse,
 } from '../../lib/httpResponses'
+import type { MessageSender } from '../../validators/messages'
 import { uploadAvatar } from './actions'
 
 export async function avatarUploadHandler(ctx: ActionCtx, req: Request) {
@@ -34,6 +35,23 @@ export async function avatarUploadHandler(ctx: ActionCtx, req: Request) {
       return jsonResponse(result, 200, origin)
     }
 
+    if (target === 'session') {
+      const sessionId = form.get('sessionId')
+      const sender = readSender(form)
+      const name = form.get('name')
+      if (typeof sessionId !== 'string' || !sender) {
+        return jsonResponse({ error: 'Invalid session author' }, 400, origin)
+      }
+      const result = await uploadAvatar(ctx, {
+        target: 'session',
+        sessionId: sessionId as Id<'sessions'>,
+        sender,
+        name: typeof name === 'string' ? name : undefined,
+        file,
+      })
+      return jsonResponse(result, 200, origin)
+    }
+
     const agentId = form.get('agentId')
     if (typeof agentId !== 'string') {
       return jsonResponse({ error: 'Missing agentId' }, 400, origin)
@@ -47,5 +65,18 @@ export async function avatarUploadHandler(ctx: ActionCtx, req: Request) {
     return jsonResponse(result, 200, origin)
   } catch (error) {
     return jsonResponse({ error: extractErrorMessage(error) }, 500, origin)
+  }
+}
+
+function readSender(form: FormData): MessageSender | undefined {
+  const id = form.get('senderId')
+  if (typeof id !== 'string') return
+  switch (form.get('senderType')) {
+    case 'user':
+      return { type: 'user', id: id as Id<'users'> }
+    case 'agent':
+      return { type: 'agent', id: id as Id<'agents'> }
+    case 'archived':
+      return { type: 'archived', id: id as Id<'sessionAuthors'> }
   }
 }

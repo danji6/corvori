@@ -388,7 +388,7 @@ function Transcript({
                     part: { segmentIndex, partIndex: 2 },
                   },
                   sender: short.sender,
-                  senderName: 'Agent',
+                  senderName: short.senderName ?? null,
                   text: `Quoted text in segment ${segmentIndex}`,
                 }}
               />

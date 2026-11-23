@@ -10,7 +10,6 @@ import { assertAgentAvailable } from '../skills/access'
 import { scheduleStream } from '../stream/execution'
 import { latestHistoryAnchor } from '../stream/historyBoundary'
 import { STREAM_LEASE_MS } from '../stream/lifecycle'
-import { agentIdentity } from './identities'
 
 type ReserveStreamArgs = {
   sessionId: Id<'sessions'>
@@ -271,7 +270,6 @@ export async function reserveRetryStream(
   // Append a fresh version to regenerate into
   const { contentId } = await addVersion(ctx, {
     message,
-    identity: agentIdentity(agent),
   })
   await ctx.db.patch(args.messageId, {
     status: 'processing',

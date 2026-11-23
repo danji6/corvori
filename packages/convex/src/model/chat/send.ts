@@ -18,8 +18,8 @@ import {
   getBySession as getPlan,
 } from '../plans'
 import { reserveSegmentEvaluation } from '../promptEvaluation/reserve'
+import { resolveAuthor } from '../session/authorProfiles'
 import * as Memberships from '../session/memberships'
-import { get as getSettings } from '../settings'
 import { latestHistoryAnchor } from '../stream/historyBoundary'
 import { resolveSender } from './identities'
 import { injectDueReminders } from './reminders'
@@ -70,8 +70,6 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
     error('Message is empty')
   }
 
-  const settings = await getSettings(ctx)
-
   await maybeInsertStarters(ctx, session)
   await injectDueReminders(ctx, session, ctx.userId)
 
@@ -81,7 +79,6 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
     return runShellCommand(ctx, {
       session,
       membership,
-      settings,
       command,
       silent,
       hasAttachments: attachments.length > 0,
@@ -107,11 +104,7 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
     ...(content.trim() ? [{ type: 'text', text: content.trim() }] : []),
   ]
 
-  const { sender, identity } = await resolveSender(ctx, {
-    role,
-    session,
-    settings,
-  })
+  const sender = await resolveSender(ctx, session, role)
 
   const replyTo = args.replyToId
     ? await quoteMessage(ctx, args.sessionId, args.replyToId, args.replyToPart)
@@ -123,7 +116,6 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
       sessionId: args.sessionId,
       sender,
       role,
-      ...identity,
       ...(replyTo && { replyTo }),
       status: 'done',
     },
@@ -148,12 +140,16 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
   const members = await syncActivity(ctx, args.sessionId, parts)
 
   if (sender.type === 'user') {
+    const profile =
+      role === 'system'
+        ? null
+        : await resolveAuthor(ctx, args.sessionId, sender)
     await notifyUserMessage(ctx, {
       sessionId: args.sessionId,
       senderId: sender.id,
       members,
-      actorName: identity.senderName ?? 'User',
-      actorAvatarId: identity.senderAvatarId,
+      actorName: profile?.name ?? 'User',
+      actorAvatarId: profile?.avatarId,
       preview: content.trim() || 'Sent an attachment',
       sourceMessageId: messageId,
     })

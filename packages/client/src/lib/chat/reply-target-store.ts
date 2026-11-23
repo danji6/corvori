@@ -70,7 +70,7 @@ export function replyTargetFor(
       part: selected.address,
     },
     sender: record.sender,
-    ...(record.senderName && { senderName: record.senderName }),
+    senderName: record.senderName,
     text: clipReplyQuote(text),
   }
 }

@@ -46,6 +46,7 @@ export function SessionAgentList() {
         <SessionAgentItem
           agent={agent}
           isActive={session?.activeAgentId === agent._id}
+          canEdit={ownedIds.has(agent._id)}
           canUnlink={isOwner || ownedIds.has(agent._id)}
           onActivate={() => void activate(agent._id)}
           onUnlink={() => void unlink(agent._id)}

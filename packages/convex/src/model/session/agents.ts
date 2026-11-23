@@ -1,4 +1,5 @@
 import type { Id } from '../../_generated/dataModel'
+import type { QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../../functions'
 import { modelOverrideView } from '../agent/modelOverride'
@@ -124,7 +125,7 @@ export async function activate(ctx: AuthMutationCtx, args: Args) {
   if (isActive) await stopForSession(ctx, args.sessionId)
 }
 
-async function findLink(ctx: AuthQueryCtx | AuthMutationCtx, args: Args) {
+export async function findLink(ctx: QueryCtx, args: Args) {
   return ctx.db
     .query('sessionAgents')
     .withIndex('by_sessionId_agentId', (q) =>

@@ -11,9 +11,6 @@ const store = createMediaUrlStore(api.avatars.getUrlMap)
 /** Resolves every requested avatar in one query. */
 export const AvatarUrlProvider = store.Provider
 
-/** Eagerly adds avatars to the shared subscription before they render. */
-export const registerAvatarIds = store.register
-
 /** Resolves a single avatar's normalized URLs from the shared cache. */
 export function useAvatarUrls(avatarId?: Id<'avatars'>): AvatarUrls {
   const urls = store.useMediaUrl(avatarId)

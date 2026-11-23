@@ -10,8 +10,11 @@ import { MessageSeekContext } from '@/components/chat/messages/message-seek-cont
 import { NoteGroupBlock } from '@/components/chat/messages/note-group-block'
 import { WorkBlock } from '@/components/chat/messages/work-block'
 import { ChatSearchProvider } from '@/components/chat/search/chat-search-context'
+import { SessionAgentList } from '@/components/chat/sessions/session-agent-list'
+import { SessionMemberList } from '@/components/chat/sessions/session-member-list'
 import { SessionPlanSection } from '@/components/chat/sessions/session-plan-section'
 import '@/globals.css'
+import { AvatarUrlProvider } from '@/hooks/chat/avatars'
 import { useScrollPersistence } from '@/hooks/chat/message-list/scroll-persistence'
 import { useSeek } from '@/hooks/chat/message-list/seek'
 import {
@@ -53,7 +56,9 @@ const compaction = new URLSearchParams(location.search).has('compaction')
 const thinkingWork = new URLSearchParams(location.search).has('thinkingWork')
 const composerParams = new URLSearchParams(location.search)
 const showComposer =
-  composerParams.has('shellComposer') || composerParams.has('composer')
+  composerParams.has('shellComposer') ||
+  composerParams.has('composer') ||
+  composerParams.has('liveAuthors')
 
 function NoteRow({ row }: { row: MessageRow }) {
   const { message, messageMeta } = useChatMessage(row.messageId)
@@ -254,6 +259,13 @@ function Composer() {
 export function NotesFixture() {
   return (
     <ConvexProvider client={notesClient}>
+      {composerParams.has('liveAuthors') && <AvatarUrlProvider />}
+      {composerParams.has('liveAuthors') && (
+        <div className="fixed top-0 left-0 z-40 w-56">
+          <SessionAgentList />
+          <SessionMemberList />
+        </div>
+      )}
       <ConvexQueryCacheProvider>
         {composerParams.has('plan') ? (
           <SessionPlanSection />

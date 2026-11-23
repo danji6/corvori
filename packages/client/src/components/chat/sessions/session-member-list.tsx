@@ -3,6 +3,7 @@ import {
   useIsSessionOwner,
   useRemoveMember,
   useSessionMembers,
+  useUserProfile,
 } from '@/hooks/chat'
 import type { Id } from '@cv/convex/_generated/dataModel'
 import { useState } from 'react'
@@ -13,6 +14,7 @@ import { SessionMemberItem } from './session-member-item'
 export function SessionMemberList() {
   const members = useSessionMembers()
   const isOwner = useIsSessionOwner()
+  const viewer = useUserProfile()
   const remove = useRemoveMember()
   const [pending, setPending] = useState<Id<'users'> | null>(null)
 
@@ -26,6 +28,7 @@ export function SessionMemberList() {
         renderItem={(member) => (
           <SessionMemberItem
             member={member}
+            canEdit={member.membership.userId === viewer?._id}
             canRemove={isOwner && member.membership.role !== 'owner'}
             onRemove={() => setPending(member.membership.userId)}
           />

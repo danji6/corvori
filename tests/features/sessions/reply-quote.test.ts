@@ -76,7 +76,9 @@ describe('reply block selection', () => {
   const record = {
     _creationTime: 1,
     sender: { type: 'agent', id: 'agent_1' },
-    senderName: 'Agent',
+    position: '0',
+    selectedVersion: 2,
+    versionCount: 2,
     segments: [
       { index: 3, partCount: firstParts.length, sizeBytes: 1 },
       { index: 7, partCount: lastParts.length, sizeBytes: 1 },
@@ -91,7 +93,6 @@ describe('reply block selection', () => {
           _creationTime: 1,
           sessionId: SESSION,
           sender: record.sender,
-          senderName: record.senderName,
           role: message.role,
           status: 'done',
           selectedVersion: 2,
@@ -309,7 +310,7 @@ describe('forgetQuotedMessage', () => {
       replyTo: {
         target: { id: targetId, creationTime: 1 },
         sender,
-        senderName: 'Alice',
+        senderName: 'Quoted name',
         text: 'quoted',
       },
     })
@@ -321,7 +322,7 @@ describe('forgetQuotedMessage', () => {
 
     expect(rows('messages')[0].replyTo).toEqual({
       sender,
-      senderName: 'Alice',
+      senderName: 'Quoted name',
       text: '',
     })
     expect(rows('messages')[1].replyTo).toMatchObject({

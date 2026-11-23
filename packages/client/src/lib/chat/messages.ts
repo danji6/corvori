@@ -67,7 +67,6 @@ function convertDoc(doc: MessageDoc): ConvertedEntry {
       sender: doc.sender,
       senderName: doc.senderName,
       hasChanges: doc.hasChanges,
-      senderAvatarId: doc.senderAvatarId,
       type: doc.type,
       hidden: doc.hidden,
       extra: doc.extra,
@@ -324,7 +323,8 @@ export function canMutateMessage(
 
   if (isSessionOwner || minRole(profile.role, 'moderator')) return true
   // Join/leave notices are a session record, not their participant's message
-  if (record?.type === 'presence') return false
+  if (record?.type === 'presence' || record?.sender.type === 'archived')
+    return false
 
   return record?.sender.type !== 'user' || record.sender.id === profile._id
 }

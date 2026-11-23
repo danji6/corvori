@@ -13,13 +13,15 @@ import { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
 import type { EvalContext } from '@cv/core/interpreter/types'
 import type { AgentModelOverride, UIModel } from '@cv/core/types'
-import { toDisplayName, toOptionalName } from '@cv/core/utils/names'
+import { toDisplayName } from '@cv/core/utils/names'
 import { useQuery as useCachedQuery } from 'convex-helpers/react/cache/hooks'
 import { useMutation, useQuery } from 'convex/react'
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 
 import { useAgentHomeStatus } from './agent-home-status'
+import { useParticipantNames } from './author-profile'
 import { useActiveModel } from './models'
+import { useUserProfile } from './profile'
 import { usePromptPreviews } from './prompt-previews'
 import { usePromptRows } from './prompts'
 import { useActiveSession, useActiveSessionId } from './session'
@@ -115,6 +117,8 @@ export function useAgentPrompts(workDir?: string) {
   const settings = useSettings()
   const isAdmin = useIsAdmin()
   const agent = activeAgent && 'ownerId' in activeAgent ? activeAgent : null
+  const viewer = useUserProfile()
+  const { user, assistant } = useParticipantNames(viewer?._id, agent)
   const ownRows = usePromptRows('own', agent?._id)
   const libraryRows = usePromptRows('library')
 
@@ -156,8 +160,8 @@ export function useAgentPrompts(workDir?: string) {
       : []
 
     const context: EvalContext = {
-      assistant: agent?.name,
-      user: toOptionalName(settings?.displayName),
+      assistant,
+      user,
       owner: toDisplayName(settings?.displayName),
       modelId,
       modelName,
@@ -189,7 +193,7 @@ export function useAgentPrompts(workDir?: string) {
       }))
 
     const sender = agent
-      ? { name: agent.name, avatarId: agent.avatarId }
+      ? { name: assistant ?? agent.name, avatarId: agent.avatarId }
       : undefined
 
     return {
@@ -203,6 +207,8 @@ export function useAgentPrompts(workDir?: string) {
     agent,
     sessionId,
     settings?.displayName,
+    user,
+    assistant,
     modelId,
     modelName,
     agentDir,

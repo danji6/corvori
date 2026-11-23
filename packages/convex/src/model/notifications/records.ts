@@ -27,6 +27,7 @@ import {
   ordinaryNotifications,
   pruneReadNotifications,
   recordUnreadRemovals,
+  removeNotificationDocs,
   statusLimit,
 } from './retention'
 
@@ -361,7 +362,7 @@ async function markNotificationsRead(
 /** Clears the current user's read notification history. */
 export async function clearRead(ctx: AuthMutationCtx) {
   const rows = await ordinaryNotifications(ctx, ctx.userId, 'read').collect()
-  for (const row of rows) await ctx.db.delete(row._id)
+  await removeNotificationDocs(ctx, rows)
 }
 
 /** Removes all notifications belonging to a deleted session. */
@@ -390,7 +391,7 @@ async function deleteNotifications(
   ctx: MutationCtx,
   rows: Doc<'notifications'>[],
 ) {
-  for (const row of rows) await ctx.db.delete(row._id)
+  await removeNotificationDocs(ctx, rows)
   await recordUnreadRemovals(ctx, rows)
 }
 

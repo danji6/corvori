@@ -22,11 +22,11 @@ import {
 } from '../messageContents'
 import { syncActivity } from '../messages'
 import { notifyUserMessage } from '../notifications/records'
+import { resolveAuthor } from '../session/authorProfiles'
 import { getSessionWithWorkspace } from '../session/folderContext'
 import * as Memberships from '../session/memberships'
 import type { Session } from '../session/types'
 import * as Settings from '../settings'
-import { resolveSender } from './identities'
 import { reserveOrDebounceTurn } from './reserve'
 
 /**
@@ -44,7 +44,6 @@ const USER_SHELL_REAP_MS = 15 * 60 * 1000
 type RunShellCommandArgs = {
   session: Session
   membership: Doc<'userSessions'>
-  settings: Doc<'settings'> | null
   command: string
   silent: boolean
   hasAttachments: boolean
@@ -57,14 +56,7 @@ type RunShellCommandArgs = {
  */
 export async function runShellCommand(
   ctx: AuthMutationCtx,
-  {
-    session,
-    membership,
-    settings,
-    command,
-    silent,
-    hasAttachments,
-  }: RunShellCommandArgs,
+  { session, membership, command, silent, hasAttachments }: RunShellCommandArgs,
 ) {
   requireRole(ctx.role, 'admin')
   if (!session.workspace) {
@@ -81,11 +73,7 @@ export async function runShellCommand(
     input: { command },
   }
 
-  const { sender, identity } = await resolveSender(ctx, {
-    role: 'user',
-    session,
-    settings,
-  })
+  const sender = { type: 'user' as const, id: ctx.userId }
 
   const { messageId } = await insertMessage(
     ctx,
@@ -93,7 +81,6 @@ export async function runShellCommand(
       sessionId: session._id,
       sender,
       role: 'user',
-      ...identity,
       status: 'processing',
     },
     [part],
@@ -101,17 +88,16 @@ export async function runShellCommand(
 
   // The preview reads from text parts, which a command message has none of
   const members = await syncActivity(ctx, session._id, `$ ${command}`)
-  if (sender.type === 'user') {
-    await notifyUserMessage(ctx, {
-      sessionId: session._id,
-      senderId: sender.id,
-      members,
-      actorName: identity.senderName ?? 'User',
-      actorAvatarId: identity.senderAvatarId,
-      preview: `$ ${command}`,
-      sourceMessageId: messageId,
-    })
-  }
+  const profile = await resolveAuthor(ctx, session._id, sender)
+  await notifyUserMessage(ctx, {
+    sessionId: session._id,
+    senderId: sender.id,
+    members,
+    actorName: profile?.name ?? 'User',
+    actorAvatarId: profile?.avatarId,
+    preview: `$ ${command}`,
+    sourceMessageId: messageId,
+  })
   await ctx.db.patch(membership._id, { lastSendAt: Date.now() })
 
   await ctx.scheduler.runAfter(0, internal.actions.userShell._run, {

@@ -13,6 +13,8 @@ type EvalContextInput = {
   invoker: Doc<'users'>
   invokerSettings: Doc<'settings'> | null
   ownerSettings: Doc<'settings'> | null
+  userNameOverride?: string
+  assistantNameOverride?: string
   session: Session
   model?: Pick<NonNullable<Session['model']>, 'id' | 'label'>
   userCount: number
@@ -29,6 +31,8 @@ export function buildEvalContext({
   invoker,
   invokerSettings,
   ownerSettings,
+  userNameOverride,
+  assistantNameOverride,
   session,
   model = session.model,
   userCount,
@@ -42,8 +46,8 @@ export function buildEvalContext({
       : undefined
 
   return {
-    assistant: agent?.name,
-    user: toOptionalName(invokerSettings?.displayName),
+    assistant: assistantNameOverride ?? agent?.name,
+    user: userNameOverride ?? toOptionalName(invokerSettings?.displayName),
     owner: agent ? toDisplayName(ownerSettings?.displayName) : undefined,
     modelId: model ? parseModelReference(model.id).modelId : undefined,
     modelName:

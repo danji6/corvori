@@ -124,7 +124,6 @@ describe('_finalizeStopped', () => {
             version: 1,
             segmentIndex: 0,
             parts: [{ type: 'text', text: 'Original response' }],
-            senderName: 'Original agent',
             metadata: { duration: 100 },
           },
         ],
@@ -136,7 +135,6 @@ describe('_finalizeStopped', () => {
         selectedVersion: 1,
         versionCount: 2,
         status: 'done',
-        senderName: 'Original agent',
         contextEligible: true,
         metadata: { duration: 100 },
       })

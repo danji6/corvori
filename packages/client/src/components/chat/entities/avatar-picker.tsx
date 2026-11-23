@@ -11,6 +11,8 @@ export type AvatarPickerProps = {
   avatarCleared: boolean
   onStageAvatar: (file: File | null) => void
   onClearAvatar: () => void
+  clearLabel?: string
+  canClear?: boolean
 }
 
 export function AvatarPicker({
@@ -19,6 +21,8 @@ export function AvatarPicker({
   avatarCleared,
   onStageAvatar,
   onClearAvatar,
+  clearLabel = 'Remove avatar',
+  canClear = true,
 }: AvatarPickerProps) {
   const dropZoneRef = useRef<DropZoneHandle | null>(null)
   const savedAvatarUrl = useAvatarThumbnail(avatarId)
@@ -96,12 +100,12 @@ export function AvatarPicker({
           className="cursor-pointer"
         />
       </DropZone>
-      {hasAvatar && (
+      {hasAvatar && (pendingAvatar || canClear) && (
         <button
           type="button"
           className="bg-m3-surface-container-highest text-muted-foreground hover:text-foreground focus-visible:border-ring focus-visible:ring-ring absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full border shadow-sm outline-0 transition-colors focus-visible:ring-1"
           onClick={handleRemove}
-          title={pendingAvatar ? 'Cancel avatar change' : 'Remove avatar'}
+          title={pendingAvatar ? 'Cancel avatar change' : clearLabel}
         >
           <XIcon className="size-3" />
         </button>

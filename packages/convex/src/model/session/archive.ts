@@ -1,12 +1,14 @@
-import type { MessageRole } from '@cv/core/types/roles'
 import type { Infer } from 'convex/values'
 
-import type { Doc, Id } from '../../_generated/dataModel'
+import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import type { sessionArchiveValidator } from '../../validators/sessionArchives'
-import type { importSessionArgsValidator } from '../../validators/sessions'
-import type { SenderIdentity } from '../chat/identities'
+import { type ReplyQuote, authorKey } from '../../validators/messages'
+import type {
+  currentSessionArchiveValidator,
+  sessionArchiveValidator,
+} from '../../validators/sessionArchives'
+import type { ImportSessionArgs } from '../../validators/sessions'
 import {
   type MessageWithParts,
   insertMessage,
@@ -19,18 +21,22 @@ import {
 } from '../messages'
 import { portableContextExtra } from '../stream/contextNotes'
 import { findUserBySubject } from '../users'
+import {
+  exportAuthors,
+  importAuthors,
+  normalizeArchive,
+} from './archiveAuthors'
 import { getMember } from './memberships'
 import { resolveTitle } from './title'
 
 export type SessionArchive = Infer<typeof sessionArchiveValidator>
+export type CurrentSessionArchive = Infer<typeof currentSessionArchiveValidator>
 
-export type ImportSessionArgs = Infer<typeof importSessionArgsValidator>
-
-export type SessionArchiveMessage =
-  SessionArchive['session']['messages'][number]
+type ArchiveMessage = CurrentSessionArchive['session']['messages'][number]
+type ArchivedSenders = Awaited<ReturnType<typeof importAuthors>>
 
 export type SessionArchiveExportData = {
-  archive: SessionArchive
+  archive: CurrentSessionArchive
   avatars: Array<{
     key: string
     storageId: Id<'_storage'>
@@ -39,13 +45,7 @@ export type SessionArchiveExportData = {
 
 export async function exportOne(
   ctx: QueryCtx,
-  {
-    sessionId,
-    subject,
-  }: {
-    sessionId: Id<'sessions'>
-    subject: string
-  },
+  { sessionId, subject }: { sessionId: Id<'sessions'>; subject: string },
 ): Promise<SessionArchiveExportData> {
   const user = await findUserBySubject(ctx, subject)
   if (!user) error('Profile not initialized', 409)
@@ -60,16 +60,24 @@ export async function exportOne(
     .order('asc')
     .collect()
 
-  const avatars = await collectAvatars(ctx, messages)
-  const messagesWithParts = await withPartsMany(ctx, messages)
+  const [messagesWithParts, { authors, avatars, authorKeys }] =
+    await Promise.all([
+      withPartsMany(ctx, messages),
+      exportAuthors(ctx, sessionId, messages),
+    ])
+
+  const messageIndices = new Map(messages.map(({ _id }, index) => [_id, index]))
 
   return {
     archive: {
-      version: 1,
+      version: 2,
       exportedAt: Date.now(),
       session: {
         title: resolveTitle(member.session.title, messagesWithParts),
-        messages: messagesWithParts.map(exportMessage),
+        authors,
+        messages: messagesWithParts.map((message) =>
+          exportMessage(message, authorKeys, messageIndices),
+        ),
       },
     },
     avatars,
@@ -83,132 +91,138 @@ export async function importOne(
   const user = await findUserBySubject(ctx, subject)
   if (!user) error('Profile not initialized', 409)
 
-  const avatarIds = await createAvatars(ctx, avatars)
-  const now = Date.now()
-  const title = payload.session.title.trim() || 'Imported chat'
-  const imported = payload.session.messages.map((message) =>
-    importMessage(user._id, avatarIds, message),
-  )
-  const lastMessage = imported.at(-1)
+  const { authors, messages } = normalizeArchive(payload)
+  const imported = messages.map((message) => ({
+    ...message,
+    parts: sanitizeParts(finalizeMessageParts(message.parts)),
+  }))
+  const sessionId = await createImportedSession(ctx, {
+    userId: user._id,
+    title: payload.session.title.trim() || 'Imported chat',
+    preview: messagePreview(imported.at(-1)?.parts ?? []),
+  })
+  const senders = await importAuthors(ctx, { sessionId, authors, avatars })
+  await importMessages(ctx, sessionId, imported, senders)
 
+  return { sessionId }
+}
+
+async function importMessages(
+  ctx: MutationCtx,
+  sessionId: Id<'sessions'>,
+  messages: ArchiveMessage[],
+  senders: ArchivedSenders,
+) {
+  const ids: Id<'messages'>[] = []
+  for (const { authorKey, extra, parts, replyTo, ...fields } of messages) {
+    const sender = senders.get(authorKey)!
+    const { messageId } = await insertMessage(
+      ctx,
+      {
+        ...fields,
+        sessionId,
+        sender,
+        replyTo: replyTo && readArchiveQuote(replyTo, senders),
+        extra:
+          extra && 'event' in extra ? { ...extra, participant: sender } : extra,
+        status: 'done',
+      },
+      parts,
+    )
+    ids.push(messageId)
+  }
+  await restoreReplyTargets(ctx, messages, ids, senders)
+}
+
+function readArchiveQuote(
+  replyTo: NonNullable<ArchiveMessage['replyTo']>,
+  senders: ArchivedSenders,
+): ReplyQuote {
+  return {
+    sender: senders.get(replyTo.authorKey)!,
+    senderName: replyTo.senderName,
+    text: replyTo.text,
+    rendered: replyTo.rendered,
+  }
+}
+
+async function restoreReplyTargets(
+  ctx: MutationCtx,
+  messages: ArchiveMessage[],
+  ids: Id<'messages'>[],
+  senders: ArchivedSenders,
+) {
+  for (const [index, { replyTo }] of messages.entries()) {
+    if (!replyTo) continue
+    const { targetIndex } = replyTo
+    if (targetIndex === undefined || targetIndex === index) continue
+    const targetId = ids[targetIndex]
+    if (!targetId) continue
+    if (replyTo.authorKey !== messages[targetIndex].authorKey) continue
+    const target = await ctx.db.get(targetId)
+    if (!target) continue
+    await ctx.db.patch(ids[index], {
+      replyTo: {
+        ...readArchiveQuote(replyTo, senders),
+        target: { id: target._id, creationTime: target._creationTime },
+      },
+    })
+  }
+}
+
+type ImportedSession = {
+  userId: Id<'users'>
+  title: string
+  preview?: string
+}
+
+async function createImportedSession(
+  ctx: MutationCtx,
+  { userId, title, preview }: ImportedSession,
+) {
+  const now = Date.now()
   const sessionId = await ctx.db.insert('sessions', {
-    ownerId: user._id,
+    ownerId: userId,
     title,
     lastMessageAt: now,
-    lastMessagePreview: lastMessage && messagePreview(lastMessage.parts),
+    lastMessagePreview: preview,
   })
 
   await ctx.db.insert('userSessions', {
     sessionId,
-    userId: user._id,
+    userId,
     role: 'owner',
     groupKey: 'ungrouped',
     lastMessageAt: now,
     title,
   })
-
-  for (const { fields, parts } of imported) {
-    await insertMessage(ctx, { ...fields, sessionId }, parts)
-  }
-
-  return { sessionId }
+  return sessionId
 }
 
-async function createAvatars(
-  ctx: MutationCtx,
-  avatars: Record<string, Id<'_storage'>>,
-): Promise<Record<string, Id<'avatars'>>> {
-  const entries = await Promise.all(
-    Object.entries(avatars).map(async ([key, storageId]) => {
-      const avatarId = await ctx.db.insert('avatars', {
-        storageId,
-        thumbStorageId: storageId,
-      })
-      return [key, avatarId] as const
-    }),
-  )
-
-  return Object.fromEntries(entries)
-}
-
-async function collectAvatars(
-  ctx: QueryCtx,
-  messages: Doc<'messages'>[],
-): Promise<SessionArchiveExportData['avatars']> {
-  const avatarIds = [
-    ...new Set(
-      messages.flatMap((message) =>
-        message.senderAvatarId ? [message.senderAvatarId] : [],
-      ),
-    ),
-  ]
-
-  const avatars = await Promise.all(
-    avatarIds.map(async (avatarId) => {
-      const avatar = await ctx.db.get(avatarId)
-      return avatar ? { key: avatarId, storageId: avatar.storageId } : null
-    }),
-  )
-
-  return avatars.filter((avatar): avatar is NonNullable<typeof avatar> =>
-    Boolean(avatar),
-  )
-}
-
-function exportMessage(message: MessageWithParts): SessionArchiveMessage {
+function exportMessage(
+  message: MessageWithParts,
+  authorKeys: Map<string, string>,
+  messageIndices: Map<Id<'messages'>, number>,
+) {
+  const extra = portableContextExtra(message)
+  const { replyTo } = message
   return {
     role: message.role,
     type: message.type,
     hidden: message.hidden,
-    extra: portableContextExtra(message),
+    extra:
+      extra && 'event' in extra ? { ...extra, participant: undefined } : extra,
     parts: sanitizeParts(finalizeMessageParts(message.parts)),
-    senderSnapshot: exportSnapshot(message),
-    metadata: message.metadata,
-  }
-}
-
-function importMessage(
-  userId: Id<'users'>,
-  avatars: Record<string, Id<'avatars'>>,
-  message: SessionArchiveMessage,
-) {
-  const parts = sanitizeParts(finalizeMessageParts(message.parts))
-
-  return {
-    fields: {
-      sender: { type: 'user' as const, id: userId },
-      role: message.role as MessageRole,
-      ...(message.role === 'system'
-        ? {}
-        : importIdentity(message.senderSnapshot, avatars)),
-      type: message.type,
-      hidden: message.hidden,
-      extra: message.extra,
-      status: 'done' as const,
-      metadata: message.metadata,
+    authorKey: authorKeys.get(authorKey(message.sender))!,
+    senderName: message.senderName,
+    replyTo: replyTo && {
+      authorKey: authorKeys.get(authorKey(replyTo.sender))!,
+      senderName: replyTo.senderName,
+      text: replyTo.text,
+      rendered: replyTo.rendered,
+      targetIndex: replyTo.target && messageIndices.get(replyTo.target.id),
     },
-    parts,
-  }
-}
-
-function exportSnapshot(message: Doc<'messages'>) {
-  if (!message.senderName) return undefined
-  return {
-    name: message.senderName,
-    avatarKey: message.senderAvatarId,
-  }
-}
-
-function importIdentity(
-  snapshot: SessionArchiveMessage['senderSnapshot'],
-  avatars: Record<string, Id<'avatars'>>,
-): SenderIdentity {
-  if (!snapshot) return {}
-  return {
-    senderName: snapshot.name,
-    senderAvatarId: snapshot.avatarKey
-      ? avatars[snapshot.avatarKey]
-      : undefined,
+    metadata: message.metadata,
   }
 }
 

@@ -27,7 +27,8 @@ export function messageSenderKey(
 ): string | null {
   if (!record?.sender || record.type) return null
   const role = messageDisplayRole(message, record)
-  return `${role}:${record.sender.type}:${record.sender.id}`
+  const name = role === 'system' ? null : record.senderName
+  return `${role}:${record.sender.type}:${record.sender.id}:${name ?? ''}`
 }
 
 type FooterDurationOptions = {

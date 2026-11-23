@@ -3,6 +3,10 @@ import { v } from 'convex/values'
 
 import * as V from './validators'
 import { attachmentTransferSchema } from './validators/attachmentTransfers'
+import {
+  sessionAuthorSchema,
+  sessionProfileSchema,
+} from './validators/sessionAuthors'
 import { sessionFileOperationSchema } from './validators/sessionFiles'
 
 const schemaValidation = true
@@ -171,8 +175,8 @@ export default defineSchema({
     .index('by_sessionId_sender', ['sessionId', 'sender.type', 'sender.id'])
     .index('by_sessionId_status_contextEligible', ['sessionId', 'status', 'contextEligible'])
     .index('by_sessionId_type_status', ['sessionId', 'type', 'status'])
-    .index('by_senderAvatarId', ['senderAvatarId'])
     .index('by_replyTarget', ['replyTo.target.id'])
+    .index('by_sessionId_quotedSender', ['sessionId', 'replyTo.sender.type', 'replyTo.sender.id'])
     .index('by_sender_status', ['sender.type', 'sender.id', 'status']),
 
   changeSets: defineTable(V.changeSetSchema)
@@ -190,6 +194,14 @@ export default defineSchema({
     .index('by_messageId_version_segment', ['messageId', 'version', 'segmentIndex'])
     .searchIndex('search_contents', { searchField: 'searchText', filterFields: ['sessionId'] }),
 
+  sessionProfiles: defineTable(sessionProfileSchema)
+    .index('by_sessionId_sender', ['sessionId', 'sender.type', 'sender.id'])
+    .index('by_avatarId', ['avatarId']),
+
+  sessionAuthors: defineTable(sessionAuthorSchema)
+    .index('by_sessionId', ['sessionId'])
+    .index('by_avatarId', ['avatarId']),
+
   userSessions: defineTable(V.userSessionSchema)
     .index('by_folderId', ['folderId'])
     .index('by_user_group_activity', ['userId', 'hidden', 'groupKey', 'lastMessageAt'])
@@ -199,6 +211,7 @@ export default defineSchema({
     .searchIndex('search_title', { searchField: 'title', filterFields: ['userId', 'hidden'] }),
 
   notifications: defineTable(V.notificationSchema)
+    .index('by_actorAvatarId', ['actorAvatarId'])
     .index('by_recipientId_attention', ['recipientId', 'attention', 'requestState'])
     .index('by_requestStreamId', ['request.streamId'])
     .index('by_recipient_status_attention_readAt', ['recipientId', 'status', 'attention', 'readAt'])

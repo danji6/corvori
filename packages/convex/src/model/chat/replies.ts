@@ -42,7 +42,7 @@ export async function quoteMessage(
       ...(part && { part }),
     },
     sender: message.sender,
-    ...(message.senderName && { senderName: message.senderName }),
+    senderName: message.senderName,
     text,
     ...(hasMessageScript(text) && { rendered: true }),
   }
@@ -89,7 +89,7 @@ export async function forgetQuotedMessage(
     if (!reply.replyTo) continue
     const { sender, senderName } = reply.replyTo
     await ctx.db.patch(reply._id, {
-      replyTo: { sender, ...(senderName && { senderName }), text: '' },
+      replyTo: { sender, senderName, text: '' },
     })
     await invalidateCompletedHistory(ctx, reply)
   }

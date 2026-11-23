@@ -4,7 +4,6 @@ import { systemNote, systemReminder } from '@cv/core/utils/blocks'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import type { PrepareContextNoteArgs } from '../../validators/streams'
-import { agentIdentity } from '../chat/identities'
 import { WORKSPACE_CHANGE_GUIDANCE } from '../chat/notes'
 import { insertMessage, withParts } from '../messageContents'
 import { ownsExecution } from '../stream/execution'
@@ -45,7 +44,7 @@ export async function prepareContextNote(
   )
   const noteId = unchanged
     ? undefined
-    : await insertContextNote(ctx, stream, agent, { ...args, content }, type)
+    : await insertContextNote(ctx, stream, { ...args, content }, type)
 
   await ctx.db.patch(stream._id, {
     ...contextPatch(type, args.fingerprint, noteId),
@@ -127,7 +126,6 @@ function matchesContext(
 async function insertContextNote(
   ctx: MutationCtx,
   stream: RunningStream,
-  agent: Doc<'agents'>,
   args: PrepareContextNoteArgs,
   type: ContextType,
 ) {
@@ -142,7 +140,6 @@ async function insertContextNote(
     {
       sessionId: stream.sessionId,
       sender: { type: 'agent', id: stream.agentId },
-      ...agentIdentity(agent),
       role: 'system',
       status: 'done',
       hidden: true,

@@ -164,7 +164,7 @@ describe('chat message visibility', () => {
     })
   })
 
-  test('projects the sender identity without a stored style', () => {
+  test('projects frozen sender names without carrying legacy avatar or appearance fields', () => {
     const { byId } = convertMessages([
       {
         _id: 'user',
@@ -173,6 +173,7 @@ describe('chat message visibility', () => {
         role: 'user',
         sender: { type: 'user', id: 'user' },
         senderName: 'User',
+        senderAvatarId: 'avatar',
         appearanceId: 'appearance_1',
         status: 'done',
         segments: [
@@ -187,6 +188,7 @@ describe('chat message visibility', () => {
       sender: { type: 'user', id: 'user' },
       senderName: 'User',
     })
+    expect(byId.get('user')).not.toHaveProperty('senderAvatarId')
     expect(byId.get('user')).not.toHaveProperty('appearanceId')
   })
 

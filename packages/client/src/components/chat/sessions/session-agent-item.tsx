@@ -1,12 +1,12 @@
-import { RippleButton } from '@/components/ui'
 import type { LinkedAgent } from '@/hooks/chat'
-import { XIcon } from 'lucide-react'
+import { useAuthorProfile } from '@/hooks/chat/author-profile'
 
 import { ParticipantRow } from './participant-row'
 
 interface SessionAgentItemProps {
   agent: LinkedAgent
   isActive: boolean
+  canEdit: boolean
   canUnlink: boolean
   onActivate: () => void
   onUnlink: () => void
@@ -15,14 +15,20 @@ interface SessionAgentItemProps {
 export function SessionAgentItem({
   agent,
   isActive,
+  canEdit,
   canUnlink,
   onActivate,
   onUnlink,
 }: SessionAgentItemProps) {
+  const sender = { type: 'agent' as const, id: agent._id }
+  const profile = useAuthorProfile(sender)
+  const name = profile?.name ?? agent.name
   return (
     <ParticipantRow
-      name={agent.name}
-      avatarId={agent.avatarId}
+      name={name}
+      avatarId={profile?.avatarId ?? agent.avatarId}
+      editSender={canEdit ? sender : undefined}
+      onRemove={canUnlink ? onUnlink : undefined}
       active={isActive}
       onClick={onActivate}
       badge={
@@ -30,22 +36,6 @@ export function SessionAgentItem({
           <span className="text-secondary shrink-0 text-xs font-semibold">
             Active
           </span>
-        )
-      }
-      action={
-        canUnlink && (
-          <RippleButton
-            size="icon"
-            variant="stealth"
-            aria-label={`Unlink ${agent.name}`}
-            className="size-7"
-            onClick={(e) => {
-              e.stopPropagation()
-              onUnlink()
-            }}
-          >
-            <XIcon className="size-4" />
-          </RippleButton>
         )
       }
     />

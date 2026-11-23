@@ -1,6 +1,7 @@
 import { Sidebar } from '@/components/ui'
 import { useActiveSession, useIsSessionOwner } from '@/hooks/chat'
 
+import { ImportedAuthors } from './imported-authors'
 import { SessionAgentList } from './session-agent-list'
 import { SessionConfig } from './session-config'
 import { SessionMemberList } from './session-member-list'
@@ -26,6 +27,7 @@ export function SessionPanel() {
       <Sidebar.Section label="Members">
         <SessionMemberList />
       </Sidebar.Section>
+      <ImportedAuthors sessionId={session._id} canEdit={isOwner} />
       <SessionPlanSection />
       {isOwner && <SessionConfig />}
     </>

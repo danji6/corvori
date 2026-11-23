@@ -3,11 +3,17 @@ import { v } from 'convex/values'
 import { internalMutation, internalQuery } from './_generated/server'
 import { authMutation, authQuery } from './functions'
 import * as SessionArchive from './model/session/archive'
+import * as AuthorProfiles from './model/session/authorProfiles'
 import * as SessionFiles from './model/session/sessionFiles'
 import * as Sessions from './model/session/sessions'
 import * as SessionState from './model/session/state'
 import * as SessionTitles from './model/session/title'
 import { approvalModeValidator } from './validators/approvals'
+import {
+  confirmSessionProfileAvatarValidator,
+  sessionProfileTargetValidator,
+  updateSessionProfileValidator,
+} from './validators/sessionAuthors'
 import { sessionModeValidator } from './validators/sessionModes'
 import * as V from './validators/sessions'
 
@@ -30,6 +36,39 @@ export const list = authQuery({
 export const get = authQuery({
   args: { sessionId: v.id('sessions') },
   handler: Sessions.get,
+})
+
+export const authorProfile = authQuery({
+  args: sessionProfileTargetValidator.fields,
+  handler: AuthorProfiles.getProfile,
+})
+
+export const editableAuthorProfile = authQuery({
+  args: sessionProfileTargetValidator.fields,
+  handler: AuthorProfiles.getEditableProfile,
+})
+
+export const importedAuthors = authQuery({
+  args: { sessionId: v.id('sessions') },
+  handler: AuthorProfiles.listImportedAuthors,
+})
+
+export const updateAuthorProfile = authMutation({
+  args: updateSessionProfileValidator.fields,
+  handler: AuthorProfiles.updateProfile,
+})
+
+export const _confirmAuthorAvatar = internalMutation({
+  args: { ...confirmSessionProfileAvatarValidator.fields, subject: v.string() },
+  handler: AuthorProfiles.confirmProfileAvatar,
+})
+
+export const _archivedAuthorKinds = internalQuery({
+  args: {
+    sessionId: v.id('sessions'),
+    ids: v.array(v.id('sessionAuthors')),
+  },
+  handler: AuthorProfiles.getArchivedAuthorKinds,
 })
 
 export const getLogUrls = authQuery({

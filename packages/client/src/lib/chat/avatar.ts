@@ -1,4 +1,5 @@
 import type { Id } from '@cv/convex/_generated/dataModel'
+import type { SessionProfileTarget } from '@cv/convex/validators/sessionAuthors'
 
 import { ImageTool } from '../io'
 
@@ -18,6 +19,20 @@ export async function avatarUploadForm(agentId: Id<'agents'>, file: File) {
 export async function profileAvatarUploadForm(file: File) {
   const form = await prepareAvatarUploadForm(file)
   form.set('target', 'profile')
+  return form
+}
+
+export async function sessionAvatarUploadForm(
+  target: SessionProfileTarget,
+  file: File,
+  name?: string,
+) {
+  const form = await prepareAvatarUploadForm(file)
+  form.set('target', 'session')
+  form.set('sessionId', target.sessionId)
+  form.set('senderType', target.sender.type)
+  form.set('senderId', target.sender.id)
+  if (name !== undefined) form.set('name', name)
   return form
 }
 

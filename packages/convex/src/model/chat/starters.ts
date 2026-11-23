@@ -5,7 +5,6 @@ import { insertMessage } from '../messageContents'
 import { collectStarterPrompts, mergePrompts } from '../prompt/prompts'
 import { reserveMessageEvaluation } from '../promptEvaluation/reserve'
 import { resolveSets as resolvePromptSets } from '../prompts'
-import { agentIdentity } from './identities'
 
 export async function maybeInsertStarters(
   ctx: AuthMutationCtx,
@@ -37,8 +36,6 @@ export async function maybeInsertStarters(
   const starters = collectStarterPrompts(prompts)
   if (starters.length === 0) return
 
-  const identity = agentIdentity(agent)
-
   for (const prompt of starters) {
     const parts = [{ type: 'text', text: prompt.content }]
     const { messageId, contentId } = await insertMessage(
@@ -47,7 +44,6 @@ export async function maybeInsertStarters(
         sessionId: session._id,
         sender: { type: 'agent', id: agent._id },
         role: prompt.role,
-        ...identity,
         status: 'done',
       },
       parts,

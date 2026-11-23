@@ -2,7 +2,6 @@ import { useActiveAgent } from '@/hooks/chat/agent'
 import type { ActiveAgent } from '@/hooks/chat/agent'
 import { useUserProfile } from '@/hooks/chat/profile'
 import { useActiveSession } from '@/hooks/chat/session'
-import { useSettings } from '@/hooks/chat/settings'
 import { generateId } from '@/lib'
 import { normalizeBrowserUrl } from '@/lib/auth/site-url'
 import type { MessageRole, PendingFilePart, PendingMessage } from '@/lib/chat'
@@ -17,19 +16,18 @@ import {
 import type { SharedAttachment } from '@/lib/chat/types'
 import { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
-import type { ResolvedSettings } from '@cv/convex/model/defaults'
 import type { ConfirmAttachmentArgs } from '@cv/convex/validators/attachments'
-import type { ReplyQuote } from '@cv/convex/validators/messages'
+import type { MessageSender, ReplyQuote } from '@cv/convex/validators/messages'
 import { parseFileMentions } from '@cv/core/mentions/parse'
 import { parseShellCommand, unescapeShellPrefix } from '@cv/core/shell/command'
 import type { WorkspaceLinkSnapshot } from '@cv/core/types/workspace'
-import { toDisplayName } from '@cv/core/utils/names'
 import type { FileUIPart } from 'ai'
 import type { OptimisticLocalStore } from 'convex/browser'
 import { useAction, useMutation } from 'convex/react'
 import type { FunctionArgs, FunctionReturnType } from 'convex/server'
 import { useCallback } from 'react'
 
+import { useParticipantNames } from './author-profile'
 import { useIsWorkspaceAdmin } from './tools'
 
 type WindowMessage = FunctionReturnType<
@@ -60,9 +58,9 @@ type ResolveFileLinks = (args: {
 
 export function useSendMessage() {
   const session = useActiveSession()
-  const settings = useSettings()
   const profile = useUserProfile()
   const agent = useActiveAgent()
+  const { user, assistant } = useParticipantNames(profile?._id, agent)
   const generateUploadUrl = useMutation(api.attachments.generateUploadUrl)
   const confirmAttachment = useMutation(api.attachments.confirm)
   const confirmImageAttachment = useAction(api.actions.attachments.confirmImage)
@@ -93,6 +91,9 @@ export function useSendMessage() {
       }
 
       const optimisticId = createOptimisticMessageId()
+      const sender = optimisticSender(messageRole, profile, agent, optimisticId)
+      const senderName = (sender.type === 'agent' ? assistant : user) ?? null
+      const attribution = { sender, senderName }
       const uploadsOnly = pending.files.filter((part) => !part.share)
 
       const localFiles = uploadsOnly.map((part) =>
@@ -138,9 +139,7 @@ export function useSendMessage() {
         pending.files.map((part) =>
           part.share ? sharedFilePreview(part.share) : localById.get(part.id)!,
         ),
-        profile,
-        settings,
-        agent,
+        attribution,
         optimisticId,
         pending.replyTo,
       )
@@ -188,9 +187,7 @@ export function useSendMessage() {
                   ? sharedFilePreview(part.share)
                   : confirmedFilePart(uploadedById.get(part.id)!),
               ),
-              profile,
-              settings,
-              agent,
+              attribution,
               optimisticId,
               pending.replyTo,
             )
@@ -237,8 +234,9 @@ export function useSendMessage() {
       resolveFileLinks,
       isWorkspaceAdmin,
       profile,
-      settings,
       agent,
+      user,
+      assistant,
     ],
   )
 }
@@ -358,9 +356,7 @@ async function resolveMentionedFileLinks(
 function buildOptimisticMessage(
   args: SendArgs,
   fileParts: MessageFile[],
-  profile: Doc<'users'> | null,
-  settings: ResolvedSettings | undefined,
-  agent: ActiveAgent | null,
+  attribution: Pick<WindowMessage, 'sender' | 'senderName'>,
   id: Id<'messages'>,
   replyTo?: ReplyQuote,
 ) {
@@ -388,7 +384,7 @@ function buildOptimisticMessage(
     position: `~${id}`,
     sessionId: args.sessionId,
     role,
-    ...optimisticSender(role, profile, settings, agent, id),
+    ...attribution,
     // Shell commands run in place and never carry a quote
     ...(replyTo && !command && { replyTo }),
     status: command ? 'processing' : 'done',
@@ -423,30 +419,15 @@ function optimisticallyInsertMessage(
 function optimisticSender(
   role: MessageRole,
   profile: Doc<'users'> | null,
-  settings: ResolvedSettings | undefined,
   agent: ActiveAgent | null,
   fallbackId: Id<'messages'>,
-) {
-  // Assistant messages are sent on behalf of the active agent.
+): MessageSender {
   if (role === 'assistant' && agent) {
-    return {
-      sender: { type: 'agent', id: agent._id },
-      senderName: agent.name,
-      senderAvatarId: agent.avatarId,
-    }
+    return { type: 'agent', id: agent._id }
   }
-
-  const sender = {
-    type: 'user',
-    id: profile?._id ?? (fallbackId as unknown as Id<'users'>),
-  }
-
-  // System messages carry no sender identity (no header, no name prefix).
-  if (role === 'system') return { sender }
 
   return {
-    sender,
-    senderName: toDisplayName(settings?.displayName),
-    senderAvatarId: settings?.avatarId,
+    type: 'user',
+    id: profile?._id ?? (fallbackId as unknown as Id<'users'>),
   }
 }

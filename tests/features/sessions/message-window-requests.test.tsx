@@ -28,6 +28,7 @@ const page: WindowMessage[] = [
     status: 'done',
     sessionId,
     sender: { type: 'agent', id: 'agent' as Id<'agents'> },
+    senderName: null,
     segments: [
       {
         segmentIndex: 4,

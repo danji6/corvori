@@ -1,4 +1,3 @@
-import { registerAvatarIds } from '@/hooks/chat/avatars'
 import { useMessageWindow } from '@/hooks/chat/message-window'
 import { useActiveSession } from '@/hooks/chat/session'
 import { useSettings } from '@/hooks/chat/settings'
@@ -80,12 +79,6 @@ export function ChatMessagesProvider({ children }: { children: ReactNode }) {
       groupBySender,
     })
   }, [store, session?._id, converted, controls, meta, resetKey, groupBySender])
-
-  // Eagerly start the avatar cache
-  useLayoutEffect(() => {
-    const ids = [...converted.byId.values()].map((m) => m.senderAvatarId)
-    registerAvatarIds([...ids, settings?.avatarId])
-  }, [converted, settings?.avatarId])
 
   return (
     <MessageStoreContext.Provider value={store}>

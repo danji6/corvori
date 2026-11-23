@@ -2,6 +2,8 @@ import { api, internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { error } from '../../errors'
+import { getSubject } from '../../functions'
+import type { SessionProfileTarget } from '../../validators/sessionAuthors'
 import { decodeBase64 } from '../io/base64'
 import { postSidecar } from '../sidecar'
 
@@ -18,11 +20,22 @@ type PngImageResult = {
 export type AvatarUploadTarget =
   | { target: 'agent'; agentId: Id<'agents'>; file: Blob }
   | { target: 'profile'; file: Blob }
+  | ({ target: 'session'; file: Blob; name?: string } & SessionProfileTarget)
 
 export async function uploadAvatar(
   ctx: ActionCtx,
   args: AvatarUploadTarget,
 ): Promise<{ avatarId: Id<'avatars'> }> {
+  const subject = args.target === 'session' ? await getSubject(ctx) : undefined
+
+  if (args.target === 'session') {
+    const editable = await ctx.runQuery(api.sessions.editableAuthorProfile, {
+      sessionId: args.sessionId,
+      sender: args.sender,
+    })
+    if (!editable) error('Forbidden', 403)
+  }
+
   const uploadStorageId = await ctx.storage.store(args.file)
   let originalStorageId: Id<'_storage'> | undefined
   let thumbStorageId: Id<'_storage'> | undefined
@@ -32,6 +45,21 @@ export async function uploadAvatar(
     await ctx.storage.delete(uploadStorageId).catch(() => {})
 
     thumbStorageId = await generateAvatarThumbnail(ctx, originalStorageId)
+
+    if (args.target === 'session' && subject) {
+      const avatarId = await ctx.runMutation(
+        internal.sessions._confirmAuthorAvatar,
+        {
+          subject,
+          sessionId: args.sessionId,
+          sender: args.sender,
+          name: args.name,
+          originalStorageId,
+          thumbStorageId,
+        },
+      )
+      return { avatarId }
+    }
 
     // The profile confirm creates the avatar record itself (and swaps out any
     // previous one), so we hand it the raw storage ids rather than pre-creating.
@@ -43,6 +71,7 @@ export async function uploadAvatar(
       return { avatarId }
     }
 
+    if (args.target !== 'agent') error('Invalid avatar target', 400)
     const avatarId = await ctx.runMutation(internal.avatars._create, {
       storageId: originalStorageId,
       thumbStorageId,

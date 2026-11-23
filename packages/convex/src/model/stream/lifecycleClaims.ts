@@ -1,7 +1,7 @@
 import type { Doc } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import type { StreamExecutionArgs } from '../../validators/streams'
-import { streamOutputIdentity } from '../chat/identities'
+import { resolveStreamSender } from '../chat/identities'
 import { injectModeNote } from '../chat/notes'
 import { injectDueReminders } from '../chat/reminders'
 import { getProcessingSegmentRow, insertMessage } from '../messageContents'
@@ -134,7 +134,7 @@ export async function claimFreshTurn(ctx: MutationCtx, stream: Doc<'streams'>) {
   const boundaryCreationTime = preserveContextBoundary
     ? stream.contextBoundaryCreationTime
     : boundary?._creationTime
-  const output = await streamOutputIdentity(ctx, stream)
+  const output = await resolveStreamSender(ctx, stream)
 
   const { messageId, contentId } = await insertMessage(
     ctx,
@@ -142,7 +142,6 @@ export async function claimFreshTurn(ctx: MutationCtx, stream: Doc<'streams'>) {
       sessionId: stream.sessionId,
       sender: output.sender,
       role: output.role,
-      ...output.identity,
       type: stream.command.kind === 'compact' ? 'summary' : undefined,
       summaryBoundaryCreationTime:
         stream.command.kind === 'compact' ? boundaryCreationTime : undefined,

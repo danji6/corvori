@@ -3,13 +3,13 @@ import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { type AuthMutationCtx } from '../../functions'
 import * as Attachments from '../attachments/files'
-import * as Avatars from '../avatars'
 import { removeChanges } from '../changes/sets'
 import { revoke as revokeMcp } from '../mcp/runtime'
 import { deleteVersions } from '../messageContents'
 import { removeForSession as removeNotifications } from '../notifications/records'
 import { cancelForSession as cancelScheduledEvents } from '../scheduledEvents'
 import { remove as removeStream, stopForSession } from '../stream/lifecycle'
+import { removeAuthorProfiles } from './authorProfileLifecycle'
 import { removeForSession as removeSessionCache } from './cache'
 import { requireOwner } from './memberships'
 import { getState } from './state'
@@ -117,12 +117,6 @@ export async function remove(
     .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
     .collect()
 
-  const avatarIds = new Set(
-    messages.flatMap((message) =>
-      message.senderAvatarId ? [message.senderAvatarId] : [],
-    ),
-  )
-
   for (const message of messages) {
     await deleteVersions(ctx, message._id)
     await ctx.db.delete(message._id)
@@ -137,9 +131,7 @@ export async function remove(
   }
   await ctx.db.delete(sessionId)
 
-  for (const avatarId of avatarIds) {
-    await Avatars.removeIfUnreferenced(ctx, avatarId)
-  }
+  await removeAuthorProfiles(ctx, sessionId)
 }
 
 export async function deleteStorageIfPresent(

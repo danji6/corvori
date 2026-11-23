@@ -10,8 +10,6 @@ import type { MutationCtx, QueryCtx } from '../_generated/server'
 import { error } from '../errors'
 import type { TokenUsage } from '../validators/providers'
 import { assertPartsCap, assertSegmentFits } from './caps'
-import type { SenderIdentity } from './chat/identities'
-import { senderIdentity } from './chat/identities'
 import { removeForMessage as removeMcpOperations } from './mcp/operations/records'
 import {
   isContextEligible,
@@ -19,6 +17,7 @@ import {
   searchTextFromParts,
 } from './messages'
 import { releaseEvaluation } from './promptEvaluation/records'
+import { resolveAuthor } from './session/authorProfiles'
 import { advanceCompletedHistoryRevision } from './session/state'
 import { removeDeliveriesForMessage } from './shell/outputDeliveries'
 import { removeShellReferences } from './shell/references'
@@ -30,6 +29,7 @@ export type MessageWithParts = Doc<'messages'> & { parts: unknown[] }
 type InsertMessageFields = {
   sessionId: Id<'sessions'>
   sender: Doc<'messages'>['sender']
+  senderName?: Doc<'messages'>['senderName']
   role: Doc<'messages'>['role']
   type?: Doc<'messages'>['type']
   status: Doc<'messages'>['status']
@@ -38,7 +38,7 @@ type InsertMessageFields = {
   extra?: Doc<'messages'>['extra']
   replyTo?: Doc<'messages'>['replyTo']
   summaryBoundaryCreationTime?: number
-} & SenderIdentity
+}
 
 /** Invalidates history if this document could be present in a completed snapshot. */
 export async function invalidateCompletedHistory(
@@ -199,10 +199,12 @@ export async function insertMessage(
 ) {
   assertPartsCap(parts)
   const segments = splitParts(parts, MESSAGE_SPLIT_BUDGET_BYTES)
+  const senderName = await readMessageSenderName(ctx, fields)
 
   // Convex assigns both inputs to the position key on insert, in this transaction.
   const messageId = await ctx.db.insert('messages', {
     ...fields,
+    senderName,
     position: '',
     selectedVersion: 1,
     versionCount: 1,
@@ -233,6 +235,16 @@ export async function insertMessage(
   return { messageId, contentId, segments }
 }
 
+async function readMessageSenderName(
+  ctx: QueryCtx,
+  fields: InsertMessageFields,
+) {
+  const { sessionId, sender, senderName, role, type, hidden } = fields
+  if (senderName !== undefined) return senderName
+  if (role === 'system' && (type || hidden)) return null
+  return (await resolveAuthor(ctx, sessionId, sender))?.name ?? null
+}
+
 function insertSegment(
   ctx: MutationCtx,
   messageId: Id<'messages'>,
@@ -247,7 +259,6 @@ function insertSegment(
     segmentIndex,
     parts,
     metadata: segmentIndex === 0 ? fields.metadata : undefined,
-    ...senderIdentity(fields),
     // Hidden messages must not surface in message search
     searchText: fields.hidden ? undefined : searchTextFromParts(parts),
   })
@@ -256,13 +267,12 @@ function insertSegment(
 type AddVersionArgs = {
   message: Doc<'messages'>
   parts?: unknown[]
-  identity?: SenderIdentity
 }
 
 /** Appends a fresh version and selects it (used by Retry). */
 export async function addVersion(
   ctx: MutationCtx,
-  { message, parts = [], identity }: AddVersionArgs,
+  { message, parts = [] }: AddVersionArgs,
 ) {
   assertSegmentFits(parts)
   const version = message.versionCount + 1
@@ -273,7 +283,6 @@ export async function addVersion(
     version,
     segmentIndex: 0,
     parts,
-    ...senderIdentity(identity ?? message),
     searchText: searchTextFromParts(parts),
   })
 
@@ -281,7 +290,6 @@ export async function addVersion(
   await ctx.db.patch(message._id, {
     selectedVersion: version,
     versionCount: version,
-    ...senderIdentity(identity ?? message),
     contextEligible,
     metadata: undefined,
   })
@@ -479,7 +487,6 @@ export async function setSelectedVersion(
     selectedVersion: version,
     contextEligible,
     metadata: mergeSegmentMetadata(segments),
-    ...senderIdentity(head.senderName ? head : message),
   })
   await invalidatePartsChange(ctx, message, contextEligible)
 }

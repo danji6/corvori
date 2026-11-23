@@ -9,7 +9,6 @@ import type {
   StreamExecutionArgs,
 } from '../../validators/streams'
 import { mergePublishedAttachments } from '../attachments/transfers'
-import { senderIdentity } from '../chat/identities'
 import { injectModeNote } from '../chat/notes'
 import { injectDueReminders } from '../chat/reminders'
 import { mergeOperationParts } from '../mcp/operations/parts'
@@ -215,7 +214,6 @@ export async function rolloverProcessingMessage(
       sessionId: stream.sessionId,
       sender: current.sender,
       role: 'assistant',
-      ...senderIdentity(current),
       status: 'processing',
     },
     [],

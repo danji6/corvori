@@ -6,6 +6,7 @@ import type { ActionCtx } from '../../_generated/server'
 import { getSubject } from '../../functions'
 import { decodeBase64, encodeBase64 } from '../io/base64'
 import type { SessionArchive, SessionArchiveExportData } from './archive'
+import { normalizeArchive } from './archiveAuthors'
 
 export async function exportOne(
   ctx: ActionCtx,
@@ -41,25 +42,28 @@ export async function importOne(
   { payload }: { payload: SessionArchive },
 ): Promise<{ sessionId: Id<'sessions'> }> {
   const subject = await getSubject(ctx)
+  const { authors } = normalizeArchive(payload)
+  const referenced = new Set(authors.map(({ avatarKey }) => avatarKey))
+  const incoming = new Map(
+    (payload.avatars ?? []).map((avatar) => [avatar.key, avatar]),
+  )
   const storageIds: Id<'_storage'>[] = []
 
   try {
-    const avatars = Object.fromEntries(
-      await Promise.all(
-        (payload.avatars ?? []).map(async (avatar) => {
-          const storageId = (await ctx.storage.store(
-            new Blob([decodeBase64(avatar.data)], { type: avatar.mediaType }),
-          )) as Id<'_storage'>
-          storageIds.push(storageId)
-          return [avatar.key, storageId] as const
-        }),
-      ),
-    )
+    const entries: Array<[string, Id<'_storage'>]> = []
+    for (const [key, avatar] of incoming) {
+      if (!referenced.has(key)) continue
+      const storageId = await ctx.storage.store(
+        new Blob([decodeBase64(avatar.data)], { type: avatar.mediaType }),
+      )
+      storageIds.push(storageId)
+      entries.push([key, storageId])
+    }
 
     return await ctx.runMutation(internal.sessions._importOne, {
       payload,
       subject,
-      avatars,
+      avatars: Object.fromEntries(entries),
     })
   } catch (err) {
     await Promise.all(

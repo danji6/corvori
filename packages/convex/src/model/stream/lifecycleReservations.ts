@@ -1,6 +1,5 @@
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
-import { agentIdentity } from '../chat/identities'
 import { injectModeNote } from '../chat/notes'
 import { injectDueReminders } from '../chat/reminders'
 import { insertMessage } from '../messageContents'
@@ -129,7 +128,6 @@ export async function reserveInvokeTurn(
       sessionId: session._id,
       sender: { type: 'agent', id: agent._id },
       role: 'assistant',
-      ...agentIdentity(agent),
       status: 'processing',
     },
     [],

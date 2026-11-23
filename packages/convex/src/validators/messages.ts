@@ -10,10 +10,15 @@ export const senderValidator = v.union(
   v.object({ type: v.literal('agent'), id: v.id('agents') }),
 )
 
-/** Who a message was sent as, at send time. */
-export const senderIdentityFields = {
-  senderName: v.optional(v.string()),
-  senderAvatarId: v.optional(v.id('avatars')),
+export const messageSenderValidator = v.union(
+  ...senderValidator.members,
+  v.object({ type: v.literal('archived'), id: v.id('sessionAuthors') }),
+)
+
+export type MessageSender = Infer<typeof messageSenderValidator>
+
+export function authorKey(sender: MessageSender) {
+  return `${sender.type}:${sender.id}`
 }
 
 export const messageTypeValidator = v.union(
@@ -95,7 +100,7 @@ export const presenceEventValidator = v.union(
 /** A participant joining or leaving, with their name at that moment. */
 export const presenceExtraValidator = v.object({
   event: presenceEventValidator,
-  participant: senderValidator,
+  participant: v.optional(messageSenderValidator),
   name: v.string(),
 })
 
@@ -118,8 +123,8 @@ export const replyQuoteValidator = v.object({
       part: v.optional(partAddressValidator),
     }),
   ),
-  sender: senderValidator,
-  senderName: v.optional(v.string()),
+  sender: messageSenderValidator,
+  senderName: v.union(v.string(), v.null()),
   /** Markdown excerpt of the quoted message; empty when it has no text. */
   text: v.string(),
   rendered: v.optional(v.literal(true)),
@@ -280,9 +285,10 @@ export const messageSchema = v.object({
   sessionId: v.id('sessions'),
   /** Sortable key for this message's place in the session transcript. */
   position: v.string(),
-  sender: senderValidator,
+  sender: messageSenderValidator,
+  /** Display name at insertion. Null means no name was configured. */
+  senderName: v.union(v.string(), v.null()),
   role: roleValidator,
-  ...senderIdentityFields,
   type: v.optional(messageTypeValidator),
   status: messageStatusValidator,
   contextEligible: v.optional(v.boolean()),
@@ -315,7 +321,6 @@ export const messageContentSchema = v.object({
   parts: v.array(v.any()),
   /** This segment's slice of the turn metadata. */
   metadata: v.optional(messageMetaValidator),
-  ...senderIdentityFields, // segment 0 only
   searchText: v.optional(v.string()),
 })
 

@@ -1,3 +1,4 @@
+import { useAuthorProfile } from '@/hooks/chat/author-profile'
 import type { ReplyTarget } from '@/lib/chat'
 import { toDisplayName } from '@cv/core/utils/names'
 import { ReplyIcon, XIcon } from 'lucide-react'
@@ -12,6 +13,9 @@ type ComposerReplyProps = {
 
 /** Shows which message the composer is replying to, with a way to cancel. */
 export function ComposerReply({ target, onCancel }: ComposerReplyProps) {
+  const profile = useAuthorProfile(target.sender)
+  const fromAgent = (profile?.kind ?? target.sender.type) === 'agent'
+
   return (
     <div data-slot="composer-reply" className="order-first w-full px-2 pt-1">
       <div className="bg-m3-surface-container flex min-w-0 items-stretch overflow-hidden rounded-2xl">
@@ -22,7 +26,10 @@ export function ComposerReply({ target, onCancel }: ComposerReplyProps) {
             <span className="truncate">
               Replying to{' '}
               <span className="text-foreground/70 font-semibold">
-                {toDisplayName(target.senderName)}
+                {toDisplayName(
+                  target.senderName,
+                  fromAgent ? 'Assistant' : 'User',
+                )}
               </span>
             </span>
           </span>

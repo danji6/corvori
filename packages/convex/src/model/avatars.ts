@@ -15,7 +15,7 @@ export async function removeIfUnreferenced(
   ctx: MutationCtx,
   avatarId: Id<'avatars'>,
 ): Promise<void> {
-  const [agent, settings, message] = await Promise.all([
+  const [agent, settings, profile, author, notification] = await Promise.all([
     ctx.db
       .query('agents')
       .withIndex('by_avatarId', (q) => q.eq('avatarId', avatarId))
@@ -25,16 +25,26 @@ export async function removeIfUnreferenced(
       .withIndex('by_avatarId', (q) => q.eq('avatarId', avatarId))
       .first(),
     ctx.db
-      .query('messages')
-      .withIndex('by_senderAvatarId', (q) => q.eq('senderAvatarId', avatarId))
+      .query('sessionProfiles')
+      .withIndex('by_avatarId', (q) => q.eq('avatarId', avatarId))
+      .first(),
+    ctx.db
+      .query('sessionAuthors')
+      .withIndex('by_avatarId', (q) => q.eq('avatarId', avatarId))
+      .first(),
+    ctx.db
+      .query('notifications')
+      .withIndex('by_actorAvatarId', (q) => q.eq('actorAvatarId', avatarId))
       .first(),
   ])
-  if (agent || settings || message) return
+  if (agent || settings || profile || author || notification) return
 
   const avatar = await ctx.db.get(avatarId)
   if (!avatar) return
   await ctx.storage.delete(avatar.storageId).catch(() => {})
-  await ctx.storage.delete(avatar.thumbStorageId).catch(() => {})
+  if (avatar.thumbStorageId !== avatar.storageId) {
+    await ctx.storage.delete(avatar.thumbStorageId).catch(() => {})
+  }
   await ctx.db.delete(avatarId)
 }
 

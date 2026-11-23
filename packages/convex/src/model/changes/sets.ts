@@ -18,7 +18,6 @@ import type {
   RestoreChangesArgs,
   RestoreChangesResultArgs,
 } from '../../validators/changes'
-import { agentIdentity } from '../chat/identities'
 import { insertMessage } from '../messageContents'
 import { requireEnabled, requireMember } from '../session/memberships'
 import { ownsExecution, scheduleStream } from '../stream/execution'
@@ -190,15 +189,12 @@ export async function reservePublication(
   const existing = group.find((item) => item.checkpointId === args.checkpointId)
   if (existing && existing._id !== row._id) return existing._id
 
-  const agent = await ctx.db.get(row.agentId)
-
   const { messageId } = await insertMessage(
     ctx,
     {
       sessionId: row.sessionId,
       role: 'assistant',
       sender: { type: 'agent', id: row.agentId },
-      ...(agent ? agentIdentity(agent) : {}),
       status: 'done',
     },
     [

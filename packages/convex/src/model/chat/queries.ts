@@ -18,6 +18,7 @@ import {
   withParts,
 } from '../messageContents'
 import { notATranscriptMarker, textFromParts } from '../messages'
+import { authorResolver } from '../session/authorProfiles'
 import * as Memberships from '../session/memberships'
 import { hasOutputRef } from '../stream/toolOutput'
 import { activeStreamView } from '../stream/view'
@@ -417,8 +418,8 @@ export type MessageSearchResult = {
   segmentIndex: number
   role: Doc<'messages'>['role']
   sender: Doc<'messages'>['sender']
-  senderName?: string
-  senderAvatarId?: Id<'avatars'>
+  senderName: Doc<'messages'>['senderName']
+  avatarId?: Id<'avatars'>
   text: string
 }
 
@@ -447,11 +448,13 @@ export async function searchMessages(
     .paginate(paginationOpts)
 
   // Hits on non-selected versions are dropped (pages may run short)
+  const resolveProfile = authorResolver(ctx, sessionId)
   const hits = await Promise.all(
     result.page.map(async (row) => {
       const message = await ctx.db.get(row.messageId)
       if (!message || row.version !== message.selectedVersion) return null
-      return toSearchResult(message, row)
+      const profile = await resolveProfile(message.sender)
+      return toSearchResult(message, row, profile?.avatarId)
     }),
   )
 
@@ -464,6 +467,7 @@ export async function searchMessages(
 function toSearchResult(
   message: Doc<'messages'>,
   row: Doc<'messageContents'>,
+  avatarId: Id<'avatars'> | undefined,
 ): MessageSearchResult {
   return {
     _id: message._id,
@@ -472,7 +476,7 @@ function toSearchResult(
     role: message.role,
     sender: message.sender,
     senderName: message.senderName,
-    senderAvatarId: message.senderAvatarId,
+    avatarId,
     text: row.searchText ?? '',
   }
 }
@@ -485,11 +489,17 @@ export async function listFirstHumanMessage(
 
   const message = await ctx.db
     .query('messages')
-    .withIndex('by_sessionId_senderType', (q) =>
-      q.eq('sessionId', sessionId).eq('sender.type', 'user'),
+    .withIndex('by_sessionId_position', (q) => q.eq('sessionId', sessionId))
+    .filter((q) =>
+      q.or(
+        q.eq(q.field('sender.type'), 'user'),
+        q.and(
+          q.eq(q.field('sender.type'), 'archived'),
+          q.eq(q.field('role'), 'user'),
+        ),
+      ),
     )
     .filter(notATranscriptMarker)
-    .order('asc')
     .first()
   if (!message) return null
 

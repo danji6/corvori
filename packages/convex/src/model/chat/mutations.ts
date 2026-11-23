@@ -7,7 +7,6 @@ import type {
   EditMessagePartArgs,
 } from '../../validators/messages'
 import * as Attachments from '../attachments/files'
-import * as Avatars from '../avatars'
 import {
   allVersionParts,
   deleteVersions,
@@ -182,12 +181,8 @@ export async function deleteMessagesFrom(
 
   assertRangeDeletable(ctx, range, session)
 
-  const avatarIds = new Set<Id<'avatars'>>()
   for (const doc of range) {
-    await deleteMessageDoc(ctx, doc, avatarIds)
-  }
-  for (const avatarId of avatarIds) {
-    await Avatars.removeIfUnreferenced(ctx, avatarId)
+    await deleteMessageDoc(ctx, doc)
   }
   await forgetDeletedModeNotes(ctx, message.sessionId, range)
 }
@@ -218,7 +213,6 @@ export function assertRangeDeletable(
 async function deleteMessageDoc(
   ctx: AuthMutationCtx,
   message: Doc<'messages'>,
-  deferredAvatarIds?: Set<Id<'avatars'>>,
 ) {
   await cancelByMessage(ctx, message._id)
 
@@ -235,14 +229,6 @@ async function deleteMessageDoc(
   await deleteVersions(ctx, message._id)
   await forgetQuotedMessage(ctx, message._id)
   await ctx.db.delete(message._id)
-
-  const avatarId = message.senderAvatarId
-  if (!avatarId) return
-  if (deferredAvatarIds) {
-    deferredAvatarIds.add(avatarId)
-  } else {
-    await Avatars.removeIfUnreferenced(ctx, avatarId)
-  }
 }
 
 async function deleteToolOutput(ctx: AuthMutationCtx, parts: unknown[]) {
@@ -340,7 +326,9 @@ function requireDeletableSender(
   if (canModerate(ctx, session)) return
 
   // Join/leave notices are a session record, not their participant's message
-  if (message.type === 'presence') error('Forbidden', 403)
+  if (message.type === 'presence' || message.sender.type === 'archived') {
+    error('Forbidden', 403)
+  }
 
   const othersMessage =
     message.sender.type === 'user' && message.sender.id !== ctx.userId

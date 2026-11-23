@@ -25,6 +25,7 @@ import { resolveParts } from './historyContent'
 import { insertReplyQuote } from './historySenders'
 import { representMessage } from './historySenders'
 import { prefixSenderName } from './historySenders'
+import { readArchivedAuthorKinds } from './historySenders'
 import { removeOrphanToolCalls } from './historyTools'
 import { type TrimHistoryOptions, trimProviderHistory } from './trimHistory'
 import type { StreamContext } from './types'
@@ -95,6 +96,12 @@ export async function buildProviderHistory(
       : data.stream.contextBoundaryMessageId,
   )
   const readerEnabled = names.includes(READ_ATTACHMENT_TOOL_NAME)
+  const archivedKindFor = await readArchivedAuthorKinds(
+    ctx,
+    data.stream.sessionId,
+    history,
+    historyAgent,
+  )
 
   const messages: UIMessage[] = []
   for (const message of history) {
@@ -109,6 +116,7 @@ export async function buildProviderHistory(
           !data.stream.omitActiveMedia &&
           message._id === data.stream.state.processingMessageId,
       }),
+      archivedKindFor(message.sender),
     )
     messages.push({
       id: message._id,
@@ -123,7 +131,12 @@ export async function buildProviderHistory(
   const attributed = messages.map((message, index) => {
     const stored = history[index]
     // Inject quotes after attribution so literal reply tags stay sender text.
-    const parts = prefixSenderName(message, stored, historyAgent)
+    const parts = prefixSenderName(
+      message,
+      stored,
+      historyAgent,
+      archivedKindFor(stored.sender),
+    )
     return {
       ...message,
       parts: insertReplyQuote({ ...message, parts }, stored),
