@@ -120,6 +120,7 @@ export const replyQuoteValidator = v.object({
   senderName: v.optional(v.string()),
   /** Markdown excerpt of the quoted message; empty when it has no text. */
   text: v.string(),
+  rendered: v.optional(v.literal(true)),
 })
 
 export const messageExtraValidator = v.union(
@@ -285,6 +286,7 @@ export const messageSchema = v.object({
 
 /** One segment of a message version's content (split by the byte cap). */
 export const messageContentSchema = v.object({
+  promptEvaluationId: v.optional(v.id('promptEvaluations')),
   messageId: v.id('messages'),
   /** Denormalized for the search index filter. */
   sessionId: v.id('sessions'),

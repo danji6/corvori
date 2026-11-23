@@ -25,8 +25,8 @@ import {
   notAContextNote,
   notATranscriptMarker,
   notAUserKilledReport,
-  scheduleMessageEval,
 } from '../messages'
+import { reserveSegmentEvaluation } from '../promptEvaluation/reserve'
 import { advanceStepCount } from '../session/state'
 import {
   newShellReadResults,
@@ -111,6 +111,13 @@ export async function consumeInterjections(
       parts: row.parts,
       metadata: row.metadata,
     })
+    await reserveSegmentEvaluation(ctx, {
+      messageId: current._id,
+      invokerId: stream.invokedBy,
+      parts: row.parts,
+      version: row.version,
+      segmentIndex: row.segmentIndex,
+    })
   } else {
     await ctx.db.patch(current._id, { status: 'done' })
   }
@@ -150,7 +157,7 @@ export async function _continue(
 
   if (row && overCap) {
     await sealSegment(ctx, row, row.parts, row.metadata)
-    await scheduleMessageEval(ctx, {
+    await reserveSegmentEvaluation(ctx, {
       messageId: current._id,
       invokerId: stream.invokedBy,
       parts: row.parts,

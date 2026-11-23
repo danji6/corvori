@@ -2,6 +2,7 @@ import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import type { AuthMutationCtx } from '../../functions'
 import type { StopStreamArgs } from '../../types'
+import { cancelEvaluation, listPending } from '../promptEvaluation/records'
 import { removeForSession as removeSessionCache } from '../session/cache'
 import * as Memberships from '../session/memberships'
 import { matchesExecution, scheduleStream } from '../stream/execution'
@@ -19,14 +20,18 @@ export async function stopStream(
   )
 
   const stream = await Memberships.getActiveStream(ctx, sessionId)
-  if (!stream) return
   if (
     execution &&
-    (stream._id !== execution.streamId || !matchesExecution(stream, execution))
+    (stream?._id !== execution.streamId || !matchesExecution(stream, execution))
   ) {
     return
   }
 
+  for (const evaluation of await listPending(ctx, sessionId)) {
+    if (evaluation.target.kind === 'message')
+      await cancelEvaluation(ctx, evaluation)
+  }
+  if (!stream) return
   const result = await requestImmediateStop(ctx, stream, {
     // A sub-agent stopped by the user may have nothing to report back
     suppressReport: Boolean(session.parent),

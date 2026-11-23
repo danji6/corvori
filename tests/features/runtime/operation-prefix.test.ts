@@ -111,6 +111,7 @@ function operationFixture(
     ],
   }
   const cache = {
+    promptEvaluationId: 'frozen',
     items: [prompt('agent', 'Frozen agent rules')],
     historyPresentation: { shareUserDisplayNames: true },
     tools: frozenManifest,
@@ -165,6 +166,11 @@ function operationFixture(
     ],
   }
   const evaluations: EvalInput[] = []
+  const runs = new Map<
+    string,
+    { items: PromptItem[]; result?: ReturnType<typeof render> }
+  >()
+  let evaluationCount = 0
   const rows = [...history]
   const writes: unknown[] = []
   const reads: unknown[] = []
@@ -181,6 +187,35 @@ function operationFixture(
           return data
         case 'streams:_getProviderHistory':
           return rows
+        case 'streams:_getProviderHistorySnapshot':
+          return {
+            identity: 'history',
+            completed: rows,
+            live: { notes: [], current: null },
+          }
+        case 'promptEvaluations:_input': {
+          const { id } = args as { id: string }
+          const run = runs.get(id)
+          return (
+            run && {
+              ...data,
+              allowed: false,
+              evaluation: { target: { kind: 'snapshot' } },
+              items: run.items.map((item, index) => ({
+                _id: String(index),
+                item,
+              })),
+            }
+          )
+        }
+        case 'promptEvaluations:_get':
+          return { evaluation: { state: 'complete' } }
+        case 'promptEvaluations:_result': {
+          const { id } = args as { id: string }
+          return id === cache.promptEvaluationId
+            ? cache.items
+            : runs.get(id)?.result?.items
+        }
         case 'mcpCatalogs:_definitionAccess':
           reads.push(args)
       }
@@ -191,6 +226,19 @@ function operationFixture(
       args: unknown,
     ) => {
       switch (getFunctionName(ref)) {
+        case 'promptEvaluations:_reserve': {
+          const id = String(++evaluationCount)
+          runs.set(id, { items: (args as { items: PromptItem[] }).items })
+          return id
+        }
+        case 'promptEvaluations:_pin':
+          return { bootId: 'fixture', start: true }
+        case 'promptEvaluations:_finish': {
+          const run = runs.get((args as { id: string }).id)
+          if (run?.result?.dirty)
+            data.environment = run.result.environment as typeof data.environment
+          break
+        }
         case 'streams:_saveSessionCache':
           writes.push(args)
           break
@@ -226,9 +274,21 @@ function operationFixture(
     init?: RequestInit,
   ) => {
     const body = JSON.parse(String(init?.body))
-    if (String(url).endsWith('/eval/prompts')) {
-      evaluations.push(body)
-      return Response.json(render(body))
+    if (String(url).endsWith('/eval/operations/instance')) {
+      return Response.json({ bootId: 'fixture' })
+    }
+    if (String(url).endsWith('/eval/operations/start')) {
+      const run = runs.get(body.id)!
+      const input = { ...body.input, items: run.items }
+      evaluations.push(input)
+      run.result = render(input)
+      const texts = run.result.items.flatMap((item) =>
+        'content' in item && item.enabled ? [item.content] : [],
+      )
+      return Response.json({ state: 'complete', result: { texts } })
+    }
+    if (String(url).endsWith('/eval/operations/acknowledge')) {
+      return Response.json({ ok: true })
     }
     bodies.push(provider === 'chatgpt' ? body.body : body)
     return new Response('Captured provider request', { status: 400 })
@@ -293,18 +353,10 @@ test.each(operations)(
       })
       expect(f.evaluations[1]).toMatchObject({ context: { tools: [] } })
       expect(f.evaluations[1]?.authorizedAgentId).toBeUndefined()
-      expect(request.evalResult).toMatchObject({
-        environment: { value: 'captured state' },
-        dirty: true,
-      })
+      expect(f.data.environment).toEqual({ value: 'captured state' })
       expect(f.writes).toEqual([
         expect.objectContaining({
-          items: [
-            expect.objectContaining({
-              id: 'agent',
-              content: request.systemPrompt,
-            }),
-          ],
+          promptEvaluationId: '1',
           tools: expect.objectContaining({
             names: ['read_file', 'get_tool', 'call_tool'],
           }),
@@ -380,7 +432,6 @@ test.each(['openai', 'chatgpt', 'anthropic', 'ollama'] as const)(
               ? chat.tool_choice
               : 'none',
         )
-        expect(request.evalResult.dirty).toBe(false)
       }
       expect(f.evaluations.map((evalInput) => evalInput.items)).toEqual(
         operations.map(() => f.data.prompts.compaction),

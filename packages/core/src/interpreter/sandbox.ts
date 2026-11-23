@@ -23,13 +23,17 @@ export function createSandbox(
   const runtime = getQuickJSSync().newRuntime()
   runtime.setMemoryLimit(EVAL_LIMITS.memoryBytes)
   runtime.setMaxStackSize(EVAL_LIMITS.stackBytes)
-  const deadline = Date.now() + EVAL_LIMITS.executionMs
+  let deadline = Date.now() + EVAL_LIMITS.executionMs
   runtime.setInterruptHandler(() => Date.now() >= deadline)
   const vm = runtime.newContext()
+  let usedShell = false
 
   try {
     bindContext(vm, context)
-    bindHelpers(vm, store, helpers)
+    bindHelpers(vm, store, helpers, (elapsed) => {
+      usedShell = true
+      deadline += elapsed
+    })
   } catch (error) {
     vm.dispose()
     runtime.dispose()
@@ -37,7 +41,9 @@ export function createSandbox(
   }
 
   return {
+    usedShell: () => usedShell,
     run(body: string): unknown {
+      usedShell = false
       const source = `(function(${SESSION_ENV_NAMES.join(',')}) {${body}\n})(${SESSION_ENV_NAMES.join(',')})`
       const result = vm.evalCode(source)
       if (result.error) {
@@ -84,6 +90,7 @@ function bindHelpers(
   vm: QuickJSContext,
   store: VariableStore,
   helpers: EvalHelpers,
+  extendDeadline: (elapsed: number) => void,
 ) {
   const functions = {
     getVar: (key: QuickJSHandle) =>
@@ -95,6 +102,18 @@ function bindHelpers(
       if (encoded === undefined) throw new Error('setVar requires a JSON value')
       store.set(stringArg(vm, key), JSON.parse(encoded) as JsonValue)
       return vm.undefined
+    },
+    shell: (...args: QuickJSHandle[]) => {
+      if (!helpers.shell) return vm.newString('Not an admin')
+      const values = args.map((value) => stringArg(vm, value))
+      if (!values[0]?.trim() || values.some((value) => value.includes('\0')))
+        return vm.newString('Expected a shell command and string arguments')
+      const start = Date.now()
+      try {
+        return vm.newString(helpers.shell(...values))
+      } finally {
+        extendDeadline(Date.now() - start)
+      }
     },
     readFile: (...args: QuickJSHandle[]) => {
       if (args.length > 2) throw new Error('readFile accepts path and options')

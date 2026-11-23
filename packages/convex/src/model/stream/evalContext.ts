@@ -9,10 +9,9 @@ import { minRole } from '../../lib/roles'
 import type { Session } from '../../types'
 
 type EvalContextInput = {
-  agent: Doc<'agents'>
+  agent: Doc<'agents'> | null
   invoker: Doc<'users'>
   invokerSettings: Doc<'settings'> | null
-  owner: Doc<'users'>
   ownerSettings: Doc<'settings'> | null
   session: Session
   model?: Pick<NonNullable<Session['model']>, 'id' | 'label'>
@@ -43,9 +42,9 @@ export function buildEvalContext({
       : undefined
 
   return {
-    assistant: agent.name,
+    assistant: agent?.name,
     user: toOptionalName(invokerSettings?.displayName),
-    owner: toDisplayName(ownerSettings?.displayName),
+    owner: agent ? toDisplayName(ownerSettings?.displayName) : undefined,
     modelId: model ? parseModelReference(model.id).modelId : undefined,
     modelName:
       model?.label ??
@@ -55,7 +54,7 @@ export function buildEvalContext({
     userCount,
     agentCount,
     workDir: workspace && !workspace.agentOnly ? workspace.path : undefined,
-    agentDir: session.workspace?.agentHome?.path,
+    agentDir: agent ? workspace?.agentHome?.path : undefined,
     workDirs,
   }
 }

@@ -11,6 +11,7 @@ import type {
 
 /** Host-provided functions exposed to dynamic blocks (all synchronous). */
 export type EvalHelpers = {
+  shell?: (...args: string[]) => string
   readFile?: (path: string, options?: ReadFileOptions) => string
   fileExists?: (path: string) => boolean
 }
@@ -26,19 +27,32 @@ export function evaluate(
 
   const sandbox = createSandbox(context, store, helpers)
   try {
-    return render(text, sandbox.run)
+    return render(text, sandbox.run, sandbox.usedShell)
   } finally {
     sandbox.dispose()
   }
 }
 
 /** Renders parsed directives using the supplied isolated guest. */
-export function render(text: string, run: (body: string) => unknown): string {
+export function render(
+  text: string,
+  run: (body: string) => unknown,
+  usedShell?: () => boolean,
+): string {
   const segments = parse(text)
   const parts: string[] = []
   const stack: BranchFrame[] = []
+  const outputs: string[] = []
+  const placeholder = `\u0001${Math.random().toString(36).slice(2)}:`
 
-  const currentActive = () => stack.length === 0 || stack[stack.length - 1].branchActive // prettier-ignore
+  const preserve = (value: string) => {
+    outputs.push(value)
+    return `${placeholder}${outputs.length - 1}\u0002`
+  }
+
+  const currentActive = () =>
+    stack.length === 0 || stack[stack.length - 1].branchActive
+
   const truthy = (cond: Condition) => Boolean(run(conditionBody(cond)))
 
   for (const segment of segments) {
@@ -88,12 +102,20 @@ export function render(text: string, run: (body: string) => unknown): string {
         const str = stringify(run(body))
         // An eval block that renders nothing takes its own line with it
         const empty = segment.type === 'block' && str === ''
-        parts.push(empty ? CONSUMED_LINE : str)
+        parts.push(
+          empty ? CONSUMED_LINE : str && usedShell?.() ? preserve(str) : str,
+        )
       }
     }
   }
 
-  return formatOutput(parts.join(''))
+  const result = formatOutput(parts.join(''))
+  if (!outputs.length) return result
+  const pattern = new RegExp(`${placeholder}(\\d+)\u0002`, 'g')
+  return result.replace(
+    pattern,
+    (_, index: string) => outputs[Number(index)] ?? '',
+  )
 }
 
 type BranchFrame = {

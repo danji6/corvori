@@ -8,7 +8,6 @@ function contextForModel(model?: Session['model']) {
     agent: { name: 'Fable' } as never,
     invoker: { role: 'user' } as never,
     invokerSettings: null,
-    owner: {} as never,
     ownerSettings: null,
     session: { model } as Session,
     userCount: 1,

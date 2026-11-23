@@ -395,6 +395,10 @@ const cache = new Map<string, unknown>()
 const listeners = new Set<() => void>()
 
 function query(name: string, args: Record<string, unknown>) {
+  if (name === 'promptEvaluations:active') {
+    const start = sessionStorage.getItem('fixture-evaluation-started-at')
+    return start ? Number(start) : null
+  }
   if (name === 'chat:getActiveStream' && continuationActive) {
     return {
       _id: 'stream',
@@ -523,6 +527,11 @@ export const notesClient = {
     args: { messageId?: string; content?: string },
   ) {
     const name = getFunctionName(reference)
+    if (name === 'chat:stopStream' && params.has('promptEvaluation')) {
+      sessionStorage.removeItem('fixture-evaluation-started-at')
+      refresh()
+      return
+    }
     if (name === 'plans:update' && params.has('plan')) {
       planContent = args.content ?? ''
       refresh()

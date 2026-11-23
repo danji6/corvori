@@ -6,14 +6,17 @@ import {
 import { parentPort, workerData } from 'node:worker_threads'
 
 import { createFileExistsHelper, createFileHelper } from './file-helper'
+import { requestShell } from './shell-bridge'
 
 const request = workerData as EvaluationRequest & {
+  shellEnabled?: boolean
   authorizedAgentDir?: string
   authorizedWorkDir?: string
   authorizedWorkDirs?: string[]
 }
 try {
   const result = await evaluateRequest(request, {
+    shell: request.shellEnabled ? requestShell : undefined,
     readFile: createFileHelper(
       request.authorizedWorkDir,
       request.authorizedWorkDirs,

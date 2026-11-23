@@ -73,6 +73,7 @@ export type ChatComposerProps = Omit<InputGroupProps, 'onSubmit'> & {
   onSubmit: (message: PendingMessage) => void | Promise<void>
   onStop?: () => void
   stopDisabled?: boolean
+  evaluatingPrompt?: boolean
   onRunCommand?: (name: string, argument: string, silent: boolean) => void
   onContinueAgent?: () => void
   canContinueAgent?: boolean
@@ -114,6 +115,7 @@ export function ChatComposer({
   onSubmit,
   onStop,
   stopDisabled = false,
+  evaluatingPrompt = false,
   onRunCommand,
   onContinueAgent,
   canContinueAgent = false,
@@ -208,7 +210,7 @@ export function ChatComposer({
     attachments.clearAttachmentDraft()
   }
 
-  const isStop = isProcessing && !hasContent
+  const isStop = evaluatingPrompt || (isProcessing && !hasContent)
   const canContinue = canContinueAgent && !isStop
 
   const availableCommands = commandRegistry.list(commandAvailability)

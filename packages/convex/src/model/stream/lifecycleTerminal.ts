@@ -24,7 +24,6 @@ import {
 } from '../messageContents'
 import {
   finalizeMessageParts,
-  scheduleMessageEval,
   scheduleTitle,
   syncActivity,
   textFromParts,
@@ -35,6 +34,11 @@ import {
 } from '../notifications/records'
 import { settleStream } from '../notifications/requests'
 import { createPlanLinkPart, getBySession as getPlan } from '../plans'
+import {
+  cancelStreamEvaluations,
+  releaseEvaluation,
+} from '../promptEvaluation/records'
+import { reserveSegmentEvaluation } from '../promptEvaluation/reserve'
 import { ownsExecution } from './execution'
 import { cleanUpOffloadedOutputs } from './lifecycleCleanup'
 import { killSessionJobs } from './lifecycleControl'
@@ -111,7 +115,7 @@ export async function completeStream(
     scheduledCompact = await handleStreamEnd(ctx, stream, 'complete')
   }
 
-  await scheduleMessageEval(ctx, {
+  await reserveSegmentEvaluation(ctx, {
     messageId: processingMessageId,
     invokerId: stream.invokedBy,
     parts,
@@ -229,6 +233,13 @@ export async function failStream(
         ...row.metadata,
         error: message,
       })
+      await reserveSegmentEvaluation(ctx, {
+        messageId: row.messageId,
+        invokerId: stream.invokedBy,
+        parts,
+        version: row.version,
+        segmentIndex: row.segmentIndex,
+      })
     }
     const doc = await ctx.db.get(stream.state.processingMessageId)
     await ctx.db.patch(stream.state.processingMessageId, {
@@ -310,7 +321,7 @@ export async function _finalizeStopped(
   await handleStreamEnd(ctx, stream, 'stopped')
 
   if (!restored) {
-    await scheduleMessageEval(ctx, {
+    await reserveSegmentEvaluation(ctx, {
       messageId: processingMessageId,
       invokerId: stream.invokedBy,
       parts,
@@ -372,5 +383,8 @@ export async function discardStream(ctx: MutationCtx, streamId: Id<'streams'>) {
   await cleanUpOffloadedOutputs(ctx, streamId)
   await cleanUpGeneratedAttachments(ctx, streamId)
   await expireStreamTransfers(ctx, streamId)
+  const stream = await ctx.db.get(streamId)
+  await cancelStreamEvaluations(ctx, streamId)
+  await releaseEvaluation(ctx, stream?.promptEvaluationId)
   await ctx.db.delete(streamId)
 }

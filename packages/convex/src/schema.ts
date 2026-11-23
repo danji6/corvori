@@ -48,6 +48,13 @@ export default defineSchema({
     .index('by_sessionId_agentId', ['sessionId', 'agentId'])
     .index('by_agentId', ['agentId']),
 
+  promptEvaluations: defineTable(V.promptEvaluationSchema)
+    .index('by_sessionId_state_finishedAt', ['sessionId', 'state', 'finishedAt'])
+    .index('by_streamId', ['streamId']),
+
+  promptEvaluationItems: defineTable(V.promptEvaluationItemSchema)
+    .index('by_evaluationId_position', ['evaluationId', 'position']),
+
   agentHomes: defineTable(V.agentHomeSchema)
     .index('by_path', ['path'])
     .index('by_ownerId', ['ownerId']),

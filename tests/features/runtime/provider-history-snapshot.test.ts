@@ -8,6 +8,14 @@ import {
   setSegmentParts,
   setSelectedVersion,
 } from '@cv/convex/model/messageContents'
+import {
+  reserveLiveEvaluation,
+  reserveSegmentEvaluation,
+} from '@cv/convex/model/promptEvaluation/reserve'
+import {
+  finishEvaluation,
+  pendingHistory,
+} from '@cv/convex/model/promptEvaluation/state'
 import { prepareContextNote } from '@cv/convex/model/stream/contextNotes'
 import { buildProviderHistory } from '@cv/convex/model/stream/history'
 import {
@@ -105,7 +113,9 @@ function fixture(sessionId = 'session') {
         return _getProviderHistory(f.ctx, args)
       }
       const result = await _getProviderHistorySnapshot(f.ctx, args)
-      reads.push(result?.completed != null)
+      reads.push(
+        result != null && 'completed' in result && result.completed != null,
+      )
       return result
     },
     storage: { get: async () => new Blob([new Uint8Array([1, 2, 3])]) },
@@ -127,6 +137,51 @@ function fixture(sessionId = 'session') {
 function text(value: string) {
   return { type: 'text', text: value }
 }
+
+test('waits for evaluated history and the current reply before a provider continuation', async () => {
+  const f = fixture()
+  const source = [text('#eval\nreturn "rendered"\n#end')]
+  const messageId = 'prompt' as Id<'messages'>
+  await f.db.patch('prompt-part', { parts: source })
+  await reserveSegmentEvaluation(f.ctx, {
+    messageId,
+    invokerId: 'owner' as Id<'users'>,
+    version: 1,
+    segmentIndex: 0,
+    parts: source,
+  })
+  await f.db.patch('output-part', { parts: source })
+  expect(await _getProviderHistorySnapshot(f.ctx, f.execution)).toEqual({
+    waiting: true,
+  })
+  await reserveLiveEvaluation(f.ctx, f.execution)
+  const [prompt, output] = f.rows('promptEvaluations')
+  expect(output.target).toMatchObject({ origin: 'transcript' })
+  await finishEvaluation(f.ctx, {
+    id: prompt._id as Id<'promptEvaluations'>,
+    parts: [text('user rendered')],
+  })
+  expect(await pendingHistory(f.ctx, f.execution)).toMatchObject({
+    waiting: true,
+  })
+  await finishEvaluation(f.ctx, {
+    id: output._id as Id<'promptEvaluations'>,
+    parts: [text('model rendered')],
+  })
+  expect((await f.verify()).flatMap((row) => row.parts)).toEqual([
+    text('user rendered'),
+    text('model rendered'),
+  ])
+})
+
+test('omits legacy unevaluated text while preserving fenced examples and literal results', async () => {
+  const f = fixture()
+  const source = '#eval\nreturn "example"\n#end'
+  const fenced = text('\x60\x60\x60js\n' + source + '\n\x60\x60\x60')
+  const rendered = { ...text(source), evaluationRendered: true }
+  await f.db.patch('prompt-part', { parts: [text(source), fenced, rendered] })
+  expect((await f.verify())[0].parts).toEqual([fenced, rendered])
+})
 
 test('reuses completed rows while joining fresh output from split segments', async () => {
   const f = fixture()

@@ -153,11 +153,6 @@ export const pruneOrphanedOutputs = internalMutation({
   handler: StreamLifecycle.pruneOrphanedOutputs,
 })
 
-export const _saveEnvironment = internalMutation({
-  args: V.saveStreamEnvironmentArgsValidator.fields,
-  handler: StreamMeta.saveEnvironment,
-})
-
 export const _saveLog = internalMutation({
   args: V.saveStreamLogArgsValidator.fields,
   handler: StreamMeta.saveLog,

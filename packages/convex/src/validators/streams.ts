@@ -187,6 +187,7 @@ export const scheduleStreamRetryArgsValidator = v.object({
 
 /** A leased background turn, including retries and deferred work. */
 export const streamSchema = v.object({
+  promptEvaluationId: v.optional(v.id('promptEvaluations')),
   generation: v.number(),
   providerContinuity: v.optional(providerContinuityValidator),
   changeGroupId: v.optional(v.string()),
@@ -227,11 +228,6 @@ export const compactAtThresholdArgsValidator = v.object({
   modelId: v.string(),
   contextWindow: v.number(),
   environment: v.optional(v.record(v.string(), v.any())),
-})
-
-export const saveStreamEnvironmentArgsValidator = v.object({
-  ...streamExecutionArgsValidator.fields,
-  environment: v.record(v.string(), v.any()),
 })
 
 export const saveStreamLogArgsValidator = v.object({

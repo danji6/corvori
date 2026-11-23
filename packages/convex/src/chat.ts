@@ -8,7 +8,6 @@ import * as Changes from './model/changes/sets'
 import * as Chat from './model/chat'
 import * as ChangesV from './validators/changes'
 import * as V from './validators/messages'
-import { environmentValidator } from './validators/sessions'
 import {
   userShellFinishArgsValidator,
   userShellPatchArgsValidator,
@@ -205,28 +204,6 @@ export const _expireYield = internalMutation({
 export const _runScheduledEvent = internalMutation({
   args: { eventId: v.id('scheduledEvents') },
   handler: Chat.runScheduledEvent,
-})
-
-export const _getMessageEvalContext = internalQuery({
-  args: {
-    messageId: v.id('messages'),
-    invokerId: v.id('users'),
-    version: v.number(),
-    segmentIndex: v.number(),
-  },
-  handler: Chat._getMessageEvalContext,
-})
-
-export const _applyMessageEval = internalMutation({
-  args: {
-    messageId: v.id('messages'),
-    version: v.number(),
-    segmentIndex: v.number(),
-    parts: v.array(v.any()),
-    environment: environmentValidator,
-    dirty: v.boolean(),
-  },
-  handler: Chat._applyMessageEval,
 })
 
 export const _beginUserShellWindow = internalMutation({

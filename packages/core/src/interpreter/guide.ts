@@ -34,10 +34,10 @@ const functionSections = SESSION_ENV.filter(isEnvFunction)
   .join('\n\n')
 
 export const PROMPT_CONTENT_GUIDE = `
-You can write JavaScript code in the content of your prompts. Code is evaluated
-before sending a message and the output replaces the block itself. This is
-useful when you want to inject dynamic values into your prompts, like the
-current user's name, or values from previous messages.
+You can write JavaScript code in the content of your prompts and chat messages.
+Code is evaluated before sending a message and the output replaces the block
+itself. This is useful when you want to inject dynamic values into your prompts,
+like the current user's name, or values from previous messages.
 
 To write a dynamic code block, open it with \`#eval\` and close it with \`#end\`:
 

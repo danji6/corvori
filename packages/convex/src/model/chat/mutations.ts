@@ -14,7 +14,8 @@ import {
   replaceSelectedContent,
   setSegmentParts,
 } from '../messageContents'
-import { scheduleMessageEval } from '../messages'
+import { releaseEvaluation } from '../promptEvaluation/records'
+import { reserveSegmentEvaluation } from '../promptEvaluation/reserve'
 import { cancelByMessage } from '../scheduledEvents'
 import * as Memberships from '../session/memberships'
 import { removeDeliveriesForParts } from '../shell/outputDeliveries'
@@ -36,7 +37,7 @@ export async function editMessage(
   await replaceSelectedContent(ctx, message, parts)
   await removeUnreferencedAttachmentsForParts(ctx, message._id, removed)
 
-  await scheduleMessageEval(ctx, {
+  await reserveSegmentEvaluation(ctx, {
     messageId: message._id,
     invokerId: ctx.userId,
     parts,
@@ -63,11 +64,16 @@ export async function editMessagePart(
   if (!isEditablePart(part)) error('Part is not editable', 400)
 
   const parts = [...row.parts]
-  parts[args.partIndex] = { ...part, text: args.text }
+  const {
+    evaluationRendered: _rendered,
+    evaluationPending: _pending,
+    ...edited
+  } = part
+  parts[args.partIndex] = { ...edited, text: args.text }
 
   await setSegmentParts(ctx, message, row, parts)
 
-  await scheduleMessageEval(ctx, {
+  await reserveSegmentEvaluation(ctx, {
     messageId: message._id,
     invokerId: ctx.userId,
     parts,
@@ -130,6 +136,7 @@ export async function deleteMessageParts(
     if (kept.length === 0) {
       // Emptied segments are dropped without renumbering the remaining
       // ones (gaps keep later part addresses stable)
+      await releaseEvaluation(ctx, row.promptEvaluationId)
       await ctx.db.delete(row._id)
       await invalidateCompletedHistory(ctx, message)
     } else {
@@ -260,9 +267,12 @@ async function removeUnreferencedAttachmentsForParts(
   }
 }
 
-function isEditablePart(
-  part: unknown,
-): part is { type: 'text' | 'reasoning'; text: string } {
+function isEditablePart(part: unknown): part is {
+  type: 'text' | 'reasoning'
+  text: string
+  evaluationRendered?: true
+  evaluationPending?: true
+} {
   return (
     typeof part === 'object' &&
     part !== null &&

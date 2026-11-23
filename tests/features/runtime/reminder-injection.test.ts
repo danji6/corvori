@@ -208,7 +208,7 @@ describe('injectDueReminders', () => {
 
   test('schedules an eval for dynamic reminder content', async () => {
     const session = baseSession()
-    const { ctx, scheduled } = makeCtx({
+    const { ctx, scheduled, inserts } = makeCtx({
       agent: baseAgent,
       reminders: [reminder({ content: 'hello {{user}}' })],
       session,
@@ -218,7 +218,13 @@ describe('injectDueReminders', () => {
     await injectDueReminders(ctx, session as never, 'user_1' as never, 4)
 
     expect(scheduled).toHaveLength(1)
-    expect(scheduled[0]).toMatchObject({ invokerId: 'user_1' })
+    expect(scheduled[0]).toHaveProperty('id')
+    expect(
+      inserts.find((row) => row.table === 'promptEvaluations')?.doc,
+    ).toMatchObject({
+      invokedBy: 'user_1',
+      target: { kind: 'message', origin: 'reminder', promptId: 'r1' },
+    })
   })
 })
 

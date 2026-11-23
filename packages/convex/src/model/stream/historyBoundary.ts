@@ -15,6 +15,10 @@ export function isHistoricalTurn(command: StreamCommand) {
   )
 }
 
+export function replaysProcessingMessage(command: StreamCommand) {
+  return command.kind === 'invoke' || command.kind === 'retry'
+}
+
 export function canCheckCompactionThreshold(command: StreamCommand) {
   return (
     command.kind === 'invoke' &&

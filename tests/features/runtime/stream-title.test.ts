@@ -118,6 +118,8 @@ function streamAction(ctx: MutationCtx, baseURL?: string) {
     storage: { store: async () => 'log' },
     runQuery: async (ref: Reference, args: { assistantText?: string }) => {
       switch (getFunctionName(ref)) {
+        case 'promptEvaluations:_pendingHistory':
+          return { waiting: false }
         case 'streams:_getStopState':
           return 'active'
         case 'streams:_isActive':

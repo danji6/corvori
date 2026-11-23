@@ -60,16 +60,28 @@ export function assertPlanContentCap(content: string) {
 }
 
 export function assertPartsCap(parts: unknown[]) {
-  if (parts.some((part) => serializedSize(part) > MAX_MESSAGE_PART_BYTES)) {
-    error(limitError('messagePart'), 400)
-  }
+  const capError = partCapError(parts)
+  if (capError) error(capError, 400)
 }
 
 export function assertSegmentFits(parts: unknown[]) {
-  assertPartsCap(parts)
+  const capError = segmentCapError(parts)
+  if (capError) error(capError, 400)
+}
+
+export function segmentCapError(parts: unknown[]) {
+  const capError = partCapError(parts)
+  if (capError) return capError
   if (serializedSize(parts) > MAX_SEGMENT_BYTES) {
-    error(limitError('messageContent'), 400)
+    return limitError('messageContent')
   }
+  return null
+}
+
+function partCapError(parts: unknown[]) {
+  return parts.some((part) => serializedSize(part) > MAX_MESSAGE_PART_BYTES)
+    ? limitError('messagePart')
+    : null
 }
 
 export function normalizeAgentPaths(paths: string[] | undefined) {

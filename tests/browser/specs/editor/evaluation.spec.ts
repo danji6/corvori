@@ -66,3 +66,8 @@ test('failures surface and a subsequent edit recovers', async ({ page }) => {
     .fill('{{ readFile("/etc/passwd") || "No filesystem" }}')
   await expect(page.getByLabel('Preview')).toHaveText('No filesystem')
 })
+
+test('shell is side-effect-free in prompt previews', async ({ page }) => {
+  await page.getByLabel('Prompt').fill('{{ shell("echo preview") }}')
+  await expect(page.getByLabel('Preview')).toHaveText('Error: not an admin')
+})

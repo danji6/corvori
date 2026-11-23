@@ -13,7 +13,12 @@ import { assertPartsCap, assertSegmentFits } from './caps'
 import type { SenderIdentity } from './chat/identities'
 import { senderIdentity } from './chat/identities'
 import { removeForMessage as removeMcpOperations } from './mcp/operations/records'
-import { isContextEligible, searchTextFromParts } from './messages'
+import {
+  isContextEligible,
+  replaceEvaluationPlaceholders,
+  searchTextFromParts,
+} from './messages'
+import { releaseEvaluation } from './promptEvaluation/records'
 import { advanceCompletedHistoryRevision } from './session/state'
 import { removeDeliveriesForMessage } from './shell/outputDeliveries'
 import { removeShellReferences } from './shell/references'
@@ -413,12 +418,15 @@ export async function replaceSelectedContent(
 
   await removeDeliveriesForMessage(ctx, message._id, message.selectedVersion)
 
+  await releaseEvaluation(ctx, head.promptEvaluationId)
   await ctx.db.patch(head._id, {
+    promptEvaluationId: undefined,
     segmentIndex: 0,
     parts,
     searchText: searchTextFromParts(parts),
   })
   for (const row of segments.slice(1)) {
+    await releaseEvaluation(ctx, row.promptEvaluationId)
     await ctx.db.delete(row._id)
   }
 
@@ -433,14 +441,23 @@ export async function setSegmentParts(
   message: Doc<'messages'>,
   row: Doc<'messageContents'>,
   parts: unknown[],
+  evaluationId?: Id<'promptEvaluations'>,
 ) {
+  if (row.promptEvaluationId && !evaluationId)
+    parts = replaceEvaluationPlaceholders(parts, 'Prompt evaluation stopped')
   assertSegmentFits(parts)
+
+  if (row.promptEvaluationId !== evaluationId)
+    await releaseEvaluation(ctx, row.promptEvaluationId)
+
   await ctx.db.patch(row._id, {
     parts,
-    searchText: searchTextFromParts(parts),
+    searchText: message.hidden ? undefined : searchTextFromParts(parts),
+    promptEvaluationId: evaluationId,
   })
 
   if (row.version !== message.selectedVersion) return
+
   const segments = await listSelectedSegments(ctx, message)
   const contextEligible = segments.some((segment) => segment.parts.length > 0)
   await ctx.db.patch(message._id, { contextEligible })
@@ -477,6 +494,7 @@ export async function deleteVersions(
   await removeMcpOperations(ctx, messageId)
   const rows = await listAllRows(ctx, messageId)
   for (const row of rows) {
+    await releaseEvaluation(ctx, row.promptEvaluationId)
     for (const storageId of collectToolOutputStorageIds(row.parts)) {
       await ctx.storage.delete(storageId).catch(() => {})
     }

@@ -179,6 +179,7 @@ test('a filesystem-authorized prompt snapshot cannot cross into an unprivileged 
   const { ctx, rows } = setup()
   const sessionId = 'session' as Id<'sessions'>
   rows('sessions').push({ _id: sessionId, ownerId: 'owner' })
+  rows('promptEvaluations').push({ _id: 'evaluation', state: 'complete' })
   rows('sessionCache').push({
     _id: 'cache',
     sessionId,
@@ -187,7 +188,7 @@ test('a filesystem-authorized prompt snapshot cannot cross into an unprivileged 
     homeRevision: 0,
     filesystemAccess: true,
     workspaceRevision: '[]',
-    items: [{ content: 'Previously read personal file' }],
+    promptEvaluationId: 'evaluation',
     tools: { contextId: 'context', names: [] },
   })
   expect(await getBySessionAgent(ctx, sessionId, agentId, true)).not.toBeNull()
@@ -313,7 +314,7 @@ test('assigning and removing skills preserve the frozen prompt and tool cache', 
     homeRevision: 0,
     filesystemAccess: true,
     workspaceRevision: '[]',
-    items: [{ id: 'system', content: 'Captured instructions' }],
+    promptEvaluationId: 'evaluation',
     tools: { names: ['read_file', 'list_skills'] },
   }
   rows('sessionCache').push(frozen)

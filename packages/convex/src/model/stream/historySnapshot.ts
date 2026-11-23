@@ -19,6 +19,7 @@ export async function readHistorySnapshot(
   ctx: ActionCtx,
   execution: StreamExecutionArgs,
   snapshot: ProviderHistorySnapshot,
+  onPending?: () => Promise<unknown>,
 ) {
   const result = await ctx.runQuery(
     internal.streams._getProviderHistorySnapshot,
@@ -31,7 +32,10 @@ export async function readHistorySnapshot(
     snapshot.completed = undefined
     return null
   }
-
+  if ('waiting' in result) {
+    await onPending?.()
+    return null
+  }
   if (result.completed) {
     snapshot.completed =
       Buffer.byteLength(
@@ -40,6 +44,7 @@ export async function readHistorySnapshot(
         ? { identity: result.identity, rows: result.completed }
         : undefined
   }
+
   const completed = result.completed ?? snapshot.completed!.rows
   return assembleProviderHistory(completed, result.live)
 }

@@ -7,11 +7,7 @@ import {
 } from '@cv/convex/model/shell/jobs'
 import { _claim, _handoff } from '@cv/convex/model/stream/lifecycleClaims'
 import { _trackOffloadedOutput } from '@cv/convex/model/stream/lifecycleCleanup'
-import {
-  saveCache,
-  saveEnvironment,
-  saveLog,
-} from '@cv/convex/model/stream/lifecycleMeta'
+import { saveCache, saveLog } from '@cv/convex/model/stream/lifecycleMeta'
 import { expect, test } from 'bun:test'
 import {
   execution,
@@ -32,17 +28,15 @@ test('handoff advances ownership without changing the retry count', async () => 
   expect(await _claim(ctx, { ...execution, generation: 3 })).toBeNull()
 })
 
-test('stale cache, environment, and storage callbacks cannot mutate the replacement', async () => {
+test('stale cache and storage callbacks cannot mutate the replacement', async () => {
   const { ctx, rows, deletedStorage } = fixture()
   expect(
     await saveCache(ctx, {
       ...execution,
       sessionId: 'session' as never,
       agentId: 'agent' as never,
-      items: [],
     }),
   ).toBeNull()
-  await saveEnvironment(ctx, { ...execution, environment: { stale: true } })
   expect(await saveLog(ctx, { ...execution, storageId: 'log' as never })).toBe(
     false,
   )

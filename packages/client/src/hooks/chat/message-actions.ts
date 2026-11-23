@@ -38,10 +38,12 @@ export function useAbortStream() {
 
   return useCallback(() => {
     const stream = streamStore.getStream()
-    if (!session || !stream || stream.status === 'stopping') return
+    if (!session || stream?.status === 'stopping') return
     stopMutation({
       sessionId: session._id,
-      execution: { streamId: stream._id, generation: stream.generation },
+      execution: stream
+        ? { streamId: stream._id, generation: stream.generation }
+        : undefined,
     }).catch(console.error)
   }, [session, stopMutation, streamStore])
 }

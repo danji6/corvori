@@ -12,7 +12,8 @@ import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import { queryMessageSegments } from '../messageContents'
-import { hasSavedTitle, isTextPart } from '../messages'
+import { hasMessageScript, hasSavedTitle, isTextPart } from '../messages'
+import { modelSegmentParts } from '../promptEvaluation/messageParts'
 import { resolve as resolveProviders } from '../provider/connections'
 import { findCredentialsForModel } from '../provider/providers'
 import { getByOwnerId as getSettings } from '../settings'
@@ -143,7 +144,8 @@ async function firstExchange(
   )
   if (!includeAssistant) return { fallback }
 
-  if (assistantText === undefined) {
+  if (assistantText === undefined || hasMessageScript(assistantText)) {
+    assistantText = undefined
     const assistant = messages.find(
       (m) => m.role === 'assistant' && m.type !== 'summary',
     )
@@ -178,7 +180,7 @@ async function readOpening(
     message._id,
     message.selectedVersion,
   )) {
-    for (const part of segment.parts) {
+    for (const part of await modelSegmentParts(ctx, segment)) {
       if (!isTextPart(part)) continue
       if (!proseTitle) {
         const { prose, code } = openingTitles(part.text)
@@ -215,7 +217,7 @@ async function readExcerpt(ctx: QueryCtx, message: Doc<'messages'>) {
   )
 
   for await (const segment of segments) {
-    for (const part of segment.parts) {
+    for (const part of await modelSegmentParts(ctx, segment)) {
       if (!isTextPart(part)) continue
       if (seenTextPart) excerpt += ' '
       seenTextPart = true

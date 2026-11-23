@@ -49,7 +49,7 @@ export function SendButton({
             else if (!disabled) onSend(false)
           }}
           size="icon"
-          aria-label={sending ? 'Sending message' : 'Send'}
+          aria-label={sending ? 'Sending message' : isStop ? 'Stop' : 'Send'}
           aria-busy={sending || undefined}
           className="mr-1.5 ml-2 size-10"
         />

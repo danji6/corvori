@@ -238,7 +238,6 @@ export type TrackStreamOutputArgs = Infer<typeof V.trackStreamOutputArgsValidato
 export type SaveStreamMetaArgs = Infer<typeof V.saveStreamMetaArgsValidator>
 export type ScheduleStreamRetryArgs = Infer<typeof V.scheduleStreamRetryArgsValidator> // prettier-ignore
 export type SaveStreamCacheArgs = Infer<typeof V.saveStreamCacheArgsValidator>
-export type SaveStreamEnvironmentArgs = Infer<typeof V.saveStreamEnvironmentArgsValidator> // prettier-ignore
 export type SaveStreamLogArgs = Infer<typeof V.saveStreamLogArgsValidator>
 export type CreateModelProviderArgs = Infer<typeof V.createModelProviderArgsValidator> // prettier-ignore
 export type UpdateModelProviderArgs = Infer<typeof V.updateModelProviderArgsValidator> // prettier-ignore

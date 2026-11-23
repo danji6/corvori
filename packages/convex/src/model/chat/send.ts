@@ -10,13 +10,14 @@ import type { AuthMutationCtx } from '../../functions'
 import type { SendMessageArgs } from '../../types'
 import * as Attachments from '../attachments/files'
 import { insertMessage } from '../messageContents'
-import { scheduleMessageEval, syncActivity } from '../messages'
+import { partsHaveScript, syncActivity } from '../messages'
 import { notifyUserMessage } from '../notifications/records'
 import {
   type PlanLinkPart,
   createPlanLinkPart,
   getBySession as getPlan,
 } from '../plans'
+import { reserveSegmentEvaluation } from '../promptEvaluation/reserve'
 import * as Memberships from '../session/memberships'
 import { get as getSettings } from '../settings'
 import { latestHistoryAnchor } from '../stream/historyBoundary'
@@ -135,9 +136,10 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
 
   // A long send may comprise several segments, each evaluated on its own row
   for (const [segmentIndex, segmentParts] of segments.entries()) {
-    await scheduleMessageEval(ctx, {
+    await reserveSegmentEvaluation(ctx, {
       messageId,
       invokerId: ctx.userId,
+      origin: role === 'user' ? 'userSend' : undefined,
       parts: segmentParts,
       version: 1,
       segmentIndex,
@@ -167,6 +169,7 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
     invokedBy: ctx.userId,
     silent,
     activeStream,
+    deferTitle: role === 'user' && partsHaveScript(parts),
   })
 
   return messageId

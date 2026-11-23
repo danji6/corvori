@@ -2,6 +2,7 @@ import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import type { SaveSessionCacheArgs } from '../../types'
 import { pinManifest, releasePins } from '../mcp/catalogs/pins'
+import { releaseEvaluation } from '../promptEvaluation/records'
 import { getSessionWithWorkspace, workspaceKey } from './folderContext'
 
 /**
@@ -20,10 +21,13 @@ export async function getBySessionAgent(
 ) {
   const row = await findCache(ctx, sessionId, agentId)
   const sameAuthority = (row?.filesystemAccess ?? false) === filesystemAccess
-  return row?.tools?.contextId && sameAuthority ? row : null
+  if (!row?.tools?.contextId || !sameAuthority) return null
+  if (!row.promptEvaluationId) return row
+  const evaluation = await ctx.db.get(row.promptEvaluationId)
+  return evaluation?.state === 'complete' ? row : null
 }
 
-async function findCache(
+export async function findCache(
   ctx: QueryCtx,
   sessionId: Id<'sessions'>,
   agentId: Id<'agents'>,
@@ -48,7 +52,6 @@ export async function _save(ctx: MutationCtx, args: SaveSessionCacheArgs) {
 
   if (existing) {
     await ctx.db.patch(existing._id, {
-      ...(args.items && { items: args.items }),
       ...(args.effectiveTools && { effectiveTools: args.effectiveTools }),
       ...(args.capabilitySource && { capabilitySource: args.capabilitySource }),
       ...(args.tools && { tools: args.tools }),
@@ -73,7 +76,6 @@ export async function _save(ctx: MutationCtx, args: SaveSessionCacheArgs) {
   const id = await ctx.db.insert('sessionCache', {
     sessionId: args.sessionId,
     agentId: args.agentId,
-    items: args.items ?? [],
     tools: args.tools,
     effectiveTools: args.effectiveTools,
     capabilitySource: args.capabilitySource,
@@ -109,5 +111,6 @@ export async function removeCacheRow(
 ) {
   if (row.tools?.mcp?.some((entry) => entry.definitionRef))
     await releasePins(ctx, row._id)
+  await releaseEvaluation(ctx, row.promptEvaluationId)
   await ctx.db.delete(row._id)
 }

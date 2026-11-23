@@ -5,6 +5,7 @@ import type { ActionCtx } from '../../_generated/server'
 import { sanitizeChatError } from '../../errors'
 import type { StreamExecutionArgs } from '../../types'
 import { resumeOperations } from '../mcp/operations/actions'
+import { waitForPendingHistory } from '../promptEvaluation/historyWait'
 import { compactBeforeDispatch } from './engineCompaction'
 import { prepare } from './engineSetup'
 import { resumeShellWaits } from './engineShellWait'
@@ -66,6 +67,9 @@ export async function _stream(ctx: ActionCtx, execution: StreamExecutionArgs) {
           return
       }
 
+      if (!(await waitForPendingHistory(ctx, execution, windowDeadline)))
+        return
+
       const setup = await prepare(
         ctx,
         execution,
@@ -96,13 +100,6 @@ export async function _stream(ctx: ActionCtx, execution: StreamExecutionArgs) {
       } = result
 
       hasGeneratedOutput = hasGeneratedOutput || hasOutput.value
-
-      if (setup.evalResult.dirty) {
-        await ctx.runMutation(internal.streams._saveEnvironment, {
-          ...execution,
-          environment: setup.evalResult.environment,
-        })
-      }
 
       await ctx.runMutation(internal.streams._saveMeta, {
         ...execution,

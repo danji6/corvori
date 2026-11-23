@@ -20,12 +20,12 @@ import { agentIdentity } from '../chat/identities'
 import {
   getProcessingSegmentRow,
   insertMessage,
-  listSelectedSegments,
   patchSegmentParts,
 } from '../messageContents'
 import { syncActivity } from '../messages'
 import { notifyQuestions, notifyToolApprovals } from '../notifications/records'
 import { createPlanLinkPart, getBySession as getPlan } from '../plans'
+import { withModelParts } from '../promptEvaluation/messageParts'
 import { getSessionWithWorkspace } from '../session/folderContext'
 import { getActiveStream } from '../session/memberships'
 import { reserveTaskDirectory } from '../session/sessionFiles'
@@ -439,8 +439,7 @@ async function childReportText(
   const message = await ctx.db.get(childStream.state.processingMessageId)
   if (!message) return ''
 
-  const segments = await listSelectedSegments(ctx, message)
-  const parts = segments.flatMap((segment) => segment.parts)
+  const { parts } = await withModelParts(ctx, message)
 
   let start = parts.length
   while (start > 0 && isTextPart(parts[start - 1])) start--

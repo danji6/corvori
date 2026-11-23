@@ -16,7 +16,6 @@ import {
   resolveImpersonationPrompts,
 } from '../prompt/prompts'
 import type { PromptItem } from '../prompt/prompts'
-import { type SnapshotPatch, planSnapshotEval } from '../prompt/snapshots'
 import type { ToolManifest } from '../tool/manifest'
 import type { ToolReplay } from '../tool/sessionTools'
 import { buildProviderHistory } from './history'
@@ -27,7 +26,7 @@ export type PromptEvalResult = {
   dirty: boolean
 }
 
-type CachePatch = SnapshotPatch & {
+type CachePatch = {
   tools?: ToolManifest
   historyPresentation?: Doc<'sessionCache'>['historyPresentation']
 }
@@ -42,19 +41,16 @@ export function createOperationPlan(
       data.prompts.library,
     ),
   )
-  const plan = planSnapshotEval({ cache: data.sessionCache, prompts })
   const operationPrompts = resolveOperationPrompts(data)
 
   return {
-    ...plan,
+    evalItems: prompts,
     operationPrompts,
-    snapshotPatch: (evaluated: PromptItem[]): CachePatch | null => {
-      const patch = plan.snapshotPatch(evaluated)
+    snapshotPatch: (): CachePatch | null => {
       const capturesTools = manifest !== data.sessionCache?.tools
       const presentation = data.sessionCache?.historyPresentation
-      if (!patch && !capturesTools && presentation) return null
+      if (!capturesTools && presentation) return null
       return {
-        ...patch,
         ...(capturesTools ? { tools: manifest } : {}),
         ...(presentation
           ? {}

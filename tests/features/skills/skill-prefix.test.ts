@@ -358,7 +358,7 @@ test('folder renames, source changes, and personal-folder changes preserve the f
     }
     const cache = fixture.rows('sessionCache')[0]!
     expect(cache.tools).toEqual(initialCache[0]!.tools)
-    expect(cache.items).toEqual(initialCache[0]!.items)
+    expect(cache.promptEvaluationId).toBe(initialCache[0]!.promptEvaluationId)
     expect(cache.historyPresentation).toEqual(
       initialCache[0]!.historyPresentation,
     )

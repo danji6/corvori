@@ -1,5 +1,5 @@
 import { CONTEXT_NOTE_TYPES } from '@cv/core/context-notes'
-import { hasInterpolation } from '@cv/core/interpreter/parse'
+import { hasInterpolation, parse } from '@cv/core/interpreter/parse'
 import {
   limitPreview,
   readMarkdownPreview,
@@ -266,39 +266,42 @@ export const notAContextNote = (q: MessageFilter) =>
 export const notAUserKilledReport = (q: MessageFilter) =>
   q.neq(q.field('extra.userKilled'), true)
 
-export async function scheduleMessageEval(
-  ctx: MutationCtx,
-  {
-    messageId,
-    invokerId,
-    parts,
-    version,
-    segmentIndex,
-  }: {
-    messageId: Id<'messages'>
-    invokerId: Id<'users'>
-    /** The target segment's parts (used to skip script-free segments). */
-    parts: unknown[]
-    version: number
-    segmentIndex: number
-  },
-) {
-  if (!partsHaveScript(parts)) return
-  await ctx.scheduler.runAfter(0, internal.actions.messages._evalMessage, {
-    messageId,
-    invokerId,
-    version,
-    segmentIndex,
-  })
+export function hasMessageScript(text: string) {
+  if (!hasInterpolation(text)) return false
+  return parse(text).some((segment) => segment.type !== 'literal')
 }
 
 export function partsHaveScript(parts: unknown[]): boolean {
-  return parts.some(
-    (part) =>
-      isMessagePartRecord(part) &&
-      part.type === 'text' &&
-      typeof part.text === 'string' &&
-      hasInterpolation(part.text),
+  return parts.some(isUnevaluatedTextPart)
+}
+
+export function isUnevaluatedTextPart(
+  part: unknown,
+): part is { type: 'text'; text: string } {
+  return (
+    isTextPart(part) &&
+    !('evaluationRendered' in part && part.evaluationRendered === true) &&
+    hasMessageScript(part.text)
+  )
+}
+
+export function withoutUnevaluatedText(parts: unknown[]) {
+  return parts.filter(
+    (part) => !isUnevaluatedTextPart(part) && !isEvaluationPlaceholder(part),
+  )
+}
+
+export function isEvaluationPlaceholder(part: unknown): boolean {
+  return (
+    isTextPart(part) &&
+    'evaluationPending' in part &&
+    part.evaluationPending === true
+  )
+}
+
+export function replaceEvaluationPlaceholders(parts: unknown[], text: string) {
+  return parts.map((part) =>
+    isEvaluationPlaceholder(part) ? { type: 'text', text } : part,
   )
 }
 

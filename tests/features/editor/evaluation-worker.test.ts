@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { buildSidecar, resolveNodeBinary } from '~/scripts/sidecar'
@@ -7,16 +7,22 @@ import { buildSidecar, resolveNodeBinary } from '~/scripts/sidecar'
 let child: ReturnType<typeof Bun.spawn>
 let root: string
 let base: string
+let port: number
+let entry: string
 const secret = 'isolated-sidecar-fixture'
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'corvori-eval-'))
   await writeFile(join(root, 'fixture.txt'), 'workspace fixture')
   const probe = Bun.serve({ port: 0, fetch: () => new Response() })
-  const port = probe.port!
+  port = probe.port!
   probe.stop(true)
   base = `http://127.0.0.1:${port}`
-  const entry = await buildSidecar()
+  entry = await buildSidecar()
+  await startFixtureSidecar()
+}, 15_000)
+
+async function startFixtureSidecar() {
   child = Bun.spawn([resolveNodeBinary(), entry], {
     env: {
       PATH: process.env.PATH,
@@ -37,7 +43,7 @@ beforeAll(async () => {
     await Bun.sleep(50)
   }
   throw new Error('Fixture sidecar failed to start')
-}, 15_000)
+}
 
 afterAll(async () => {
   child?.kill()
@@ -161,4 +167,235 @@ describe('packaged Node evaluation workers', () => {
       )
     }
   })
+})
+
+type AuthoredStatus = {
+  state: string
+  call?: number
+  result?: { texts: string[] }
+}
+
+function operation<T>(name: string, body: Record<string, unknown> = {}) {
+  return fetch(`${base}/eval/operations/${name}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${secret}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  }).then(async (response) => {
+    expect(response.status).toBe(200)
+    return (await response.json()) as T
+  })
+}
+
+async function authored(
+  texts: string[],
+  kind: 'prompt' | 'message' = 'prompt',
+) {
+  const { bootId } = await operation<{ bootId: string }>('instance')
+  const ref = { id: crypto.randomUUID(), bootId }
+  const input = {
+    texts,
+    context: {},
+    kind,
+    shell: {
+      sessionId: 'session',
+      workspaceId: 'workspace',
+      workspace: {
+        workspaceId: 'workspace',
+        path: root,
+        label: 'Test workspace',
+        sources: [{ id: 'workspace', path: root, label: 'Test workspace' }],
+      },
+    },
+  }
+  const start = () => operation<AuthoredStatus>('start', { ...ref, input })
+  await start()
+  return { ref, start }
+}
+
+async function poll(
+  ref: { id: string; bootId: string },
+  until: (status: AuthoredStatus) => boolean,
+  grant?: { call: number; allowed: boolean },
+) {
+  const deadline = Date.now() + 3000
+  let status = await operation<AuthoredStatus>('status', { ...ref, grant })
+  while (!until(status) && Date.now() < deadline) {
+    await Bun.sleep(20)
+    status = await operation<AuthoredStatus>('status', ref)
+  }
+  expect(until(status)).toBe(true)
+  return status
+}
+
+function nodeShell(script: string, ...args: string[]) {
+  return (
+    '{{ shell(' +
+    [resolveNodeBinary(), '-e', script, ...args]
+      .map((arg) => JSON.stringify(arg))
+      .join(', ') +
+    ') }}'
+  )
+}
+
+describe('authored prompt shell operations', () => {
+  test('renders a workspace error for a user send without opening a shell', async () => {
+    const { bootId } = await operation<{ bootId: string }>('instance')
+    const ref = { id: crypto.randomUUID(), bootId }
+    await operation('start', {
+      ...ref,
+      input: {
+        kind: 'message',
+        texts: ["{{ shell('printf unsafe') }}"],
+        context: { isAdmin: true },
+        shellWorkspaceRequired: true,
+      },
+    })
+    const waiting = await poll(
+      ref,
+      (result) => result.state === 'running' && result.call !== undefined,
+    )
+    expect(waiting).toMatchObject({ state: 'running', call: 1 })
+    const status = await poll(ref, (result) => result.state !== 'running', {
+      call: 1,
+      allowed: true,
+    })
+    expect(status).toMatchObject({
+      state: 'complete',
+      result: {
+        texts: ['Error: a workspace is required to run shell commands'],
+      },
+    })
+    await operation('acknowledge', ref)
+  })
+
+  test('returns full literal stdout and stderr, passes literal argv and runs once', async () => {
+    const source = nodeShell(
+      'require("node:fs").appendFileSync("eval-count", "1"); process.stdout.write("\\n#eval\\n" + process.argv[1] + "\\n"); process.stderr.write("stderr\\n"); process.exitCode = 7',
+      'literal ; & $ character',
+    )
+    const { ref, start } = await authored([source], 'message')
+    const waiting = await poll(ref, (status) => status.call !== undefined)
+    const result = await poll(ref, (status) => status.state !== 'running', {
+      call: waiting.call!,
+      allowed: true,
+    })
+    expect(result.result?.texts).toEqual([
+      '\n#eval\nliteral ; & $ character\nstderr\nError: shell command exited with status 7',
+    ])
+    expect(await start()).toEqual(result)
+    expect(await Bun.file(join(root, 'eval-count')).text()).toBe('1')
+    const lost = await operation<AuthoredStatus>('status', {
+      ...ref,
+      bootId: 'different-sidecar',
+    })
+    expect(lost.state).toBe('lost')
+    await operation('acknowledge', ref)
+  })
+
+  test('requires a grant for every call and denies ordinary messages', async () => {
+    const { ref } = await authored([
+      nodeShell('process.stdout.write("should not run")'),
+    ])
+    const waiting = await poll(ref, (status) => status.call !== undefined)
+    const denied = await poll(ref, (status) => status.state !== 'running', {
+      call: waiting.call!,
+      allowed: false,
+    })
+    expect(denied.result?.texts).toEqual(['Error: not an admin'])
+    const ordinary = await evaluate(["{{ shell('printf hello') }}"], {
+      context: { isAdmin: true },
+    })
+    expect((await ordinary.json()).parts[0].text).toBe('Error: not an admin')
+    await operation('acknowledge', ref)
+  })
+
+  test('returns empty output and reports oversized output inline', async () => {
+    const { ref } = await authored([
+      nodeShell(''),
+      nodeShell('process.stdout.write("x".repeat(210000))'),
+    ])
+    const first = await poll(ref, (status) => status.call === 1)
+    const second = await poll(ref, (status) => status.call === 2, {
+      call: first.call!,
+      allowed: true,
+    })
+    const complete = await poll(ref, (status) => status.state !== 'running', {
+      call: second.call!,
+      allowed: true,
+    })
+    expect(complete.result?.texts).toEqual([
+      '',
+      'Error: shell output exceeds the prompt size limit',
+    ])
+    await operation('acknowledge', ref)
+  })
+
+  test('survives the worker deadline and Stop kills a running descendant', async () => {
+    const { ref } = await authored([
+      nodeShell(
+        'const spawn = require("node:child_process").spawn; const node = process.execPath; const child = spawn(node, ["-e", "setInterval(() => {}, 100)"]); const fs = require("node:fs"); fs.writeFileSync("eval-child.tmp", String(child.pid)); fs.renameSync("eval-child.tmp", "eval-child"); setInterval(() => {}, 100)',
+      ),
+    ])
+    const waiting = await poll(ref, (status) => status.call === 1)
+    await operation('status', {
+      ...ref,
+      grant: { call: waiting.call, allowed: true },
+    })
+    const deadline = Date.now() + 3000
+    const marker = join(root, 'eval-child')
+    const readPid = async () =>
+      Number(await readFile(marker, 'utf8').catch(() => ''))
+    let pid = await readPid()
+    while (!pid && Date.now() < deadline) {
+      await Bun.sleep(20)
+      pid = await readPid()
+    }
+    expect(pid).toBeGreaterThan(0)
+    await Bun.sleep(5200)
+    expect((await operation<AuthoredStatus>('status', ref)).state).toBe(
+      'running',
+    )
+    expect((await evaluate(['{{ 2 + 2 }}'])).status).toBe(200)
+    await operation('cancel', ref)
+    expect((await operation<AuthoredStatus>('status', ref)).state).toBe(
+      'failed',
+    )
+    const gone = () => {
+      try {
+        process.kill(pid, 0)
+        return (
+          process.platform === 'linux' &&
+          Bun.file(`/proc/${pid}/stat`)
+            .text()
+            .then(
+              (state) => state.includes(') Z '),
+              () => true,
+            )
+        )
+      } catch {
+        return true
+      }
+    }
+    for (let attempt = 0; attempt < 100 && !(await gone()); attempt++) {
+      await Bun.sleep(20)
+    }
+    expect(await gone()).toBe(true)
+  }, 12_000)
+  test('reports the old occurrence lost after a packaged sidecar restart', async () => {
+    const { ref, start } = await authored(["{{ shell('echo Ready') }}"])
+    const waiting = await poll(ref, (status) => status.call === 1)
+    const result = await poll(ref, (status) => status.state !== 'running', {
+      call: waiting.call!,
+      allowed: true,
+    })
+    expect(result.result?.texts[0]).toMatch(/^Ready\r?\n$/)
+    child.kill()
+    await child.exited
+    await startFixtureSidecar()
+    expect((await operation<AuthoredStatus>('status', ref)).state).toBe('lost')
+    expect((await start()).state).toBe('lost')
+  }, 10_000)
 })

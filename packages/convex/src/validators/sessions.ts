@@ -3,7 +3,6 @@ import { v } from 'convex/values'
 
 import { approvalModeValidator, toolApprovalsValidator } from './approvals'
 import { queuedCommandValidator } from './commands'
-import { promptItemValidator } from './prompts'
 import { cacheDiagnosticValidator } from './providerRequests'
 import { modelSelectionValidator, tokenUsageValidator } from './providers'
 import { sessionArchiveValidator } from './sessionArchives'
@@ -49,11 +48,11 @@ export const capabilityCacheFields = {
 }
 
 export const saveSessionCacheArgsValidator = v.object({
+  promptEvaluationId: v.optional(v.id('promptEvaluations')),
   ...capabilityCacheFields,
   filesystemAccess: v.optional(v.boolean()),
   sessionId: v.id('sessions'),
   agentId: v.id('agents'),
-  items: v.optional(v.array(promptItemValidator)),
   tools: v.optional(toolManifestValidator),
   historyPresentation: v.optional(historyPresentationValidator),
 })
@@ -181,8 +180,7 @@ export const sessionCacheSchema = v.object({
   workspaceRevision: v.optional(v.string()),
   sessionId: v.id('sessions'),
   agentId: v.id('agents'),
-  /** Evaluated invoke prompts for this (session, agent). */
-  items: v.array(promptItemValidator),
+  promptEvaluationId: v.optional(v.id('promptEvaluations')),
   /** Tool set shape. Their behavior is kept volatile. */
   tools: v.optional(toolManifestValidator),
   capturedAt: v.number(),

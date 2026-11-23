@@ -10,6 +10,7 @@ import { deleteVersions } from '../messageContents'
 import { removeForSession as removeNotifications } from '../notifications/records'
 import { cancelForSession as cancelScheduledEvents } from '../scheduledEvents'
 import { remove as removeStream, stopForSession } from '../stream/lifecycle'
+import { removeForSession as removeSessionCache } from './cache'
 import { requireOwner } from './memberships'
 import { getState } from './state'
 
@@ -60,13 +61,14 @@ export async function remove(
     await remove(ctx, { sessionId: child._id })
   }
 
+  await removeSessionCache(ctx, sessionId)
+
   const sessionTables = [
     'userSessions',
     'sessionShares',
     'sessionAgents',
     'plans',
     'todos',
-    'sessionCache',
     'mcpBrokerNames',
     'sessionState',
     'typing',

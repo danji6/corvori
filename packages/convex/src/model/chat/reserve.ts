@@ -79,6 +79,7 @@ type TurnReservation = {
   invokedBy: Id<'users'>
   silent: boolean
   activeStream: Doc<'streams'> | null
+  deferTitle?: boolean
 }
 
 /**
@@ -88,7 +89,14 @@ type TurnReservation = {
  */
 export async function reserveOrDebounceTurn(
   ctx: MutationCtx,
-  { session, messageId, invokedBy, silent, activeStream }: TurnReservation,
+  {
+    session,
+    messageId,
+    invokedBy,
+    silent,
+    activeStream,
+    deferTitle,
+  }: TurnReservation,
 ) {
   const debounceMs = session.settings?.agentDebounceMs ?? 0
   const willStream =
@@ -123,7 +131,7 @@ export async function reserveOrDebounceTurn(
     })
   }
 
-  if (!willStream) await scheduleTitle(ctx, session._id)
+  if (!willStream && !deferTitle) await scheduleTitle(ctx, session._id)
 }
 
 /** Identifies a queued invocation whose context can still absorb new messages. */

@@ -5,6 +5,7 @@ import { finishChanges } from '../changes/sets'
 import { cancelForStream } from '../mcp/operations/records'
 import { scheduleTitle } from '../messages'
 import { settleStream } from '../notifications/requests'
+import { cancelStreamEvaluations } from '../promptEvaluation/records'
 import { cancelScheduledExecution } from './execution'
 
 type StopOptions = { suppressReport?: boolean }
@@ -22,6 +23,7 @@ export async function stopExecution(
     return
   }
 
+  await cancelStreamEvaluations(ctx, stream._id)
   await cancelForStream(ctx, stream._id, 'Turn stopped by user.')
   await settleStream(ctx, stream._id, 'cancelled')
   await cancelScheduledExecution(ctx, stream)

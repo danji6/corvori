@@ -18,7 +18,6 @@ type Setup = RequestToEstimate & {
   modelId?: string
   contextWindow?: number
   trimContext?: boolean
-  evalResult?: { dirty: boolean; environment: Record<string, unknown> }
 }
 
 export async function compactBeforeDispatch(
@@ -36,8 +35,5 @@ export async function compactBeforeDispatch(
     ...execution,
     modelId: setup.modelId,
     contextWindow,
-    environment: setup.evalResult?.dirty
-      ? setup.evalResult.environment
-      : undefined,
   })
 }

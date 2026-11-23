@@ -10,6 +10,8 @@ import {
   listSelectedSegments,
   queryMessageSegments,
 } from '../messageContents'
+import { hasMessageScript } from '../messages'
+import { modelSegmentParts } from '../promptEvaluation/messageParts'
 
 /** Snapshots the message a reply quotes, rejecting ones that can't be quoted. */
 export async function quoteMessage(
@@ -28,6 +30,11 @@ export async function quoteMessage(
   if (!isConversationMessage) error('This message cannot be quoted')
   if (message.status === 'processing') error('Message is being processed', 409)
 
+  const text = clipReplyQuote(
+    part
+      ? await quotedPartText(ctx, message, part)
+      : await quotedText(ctx, message),
+  )
   return {
     target: {
       id: message._id,
@@ -36,11 +43,8 @@ export async function quoteMessage(
     },
     sender: message.sender,
     ...(message.senderName && { senderName: message.senderName }),
-    text: clipReplyQuote(
-      part
-        ? await quotedPartText(ctx, message, part)
-        : await quotedText(ctx, message),
-    ),
+    text,
+    ...(hasMessageScript(text) && { rendered: true }),
   }
 }
 
@@ -62,7 +66,11 @@ async function quotedPartText(
     message.selectedVersion,
     address.segmentIndex,
   )
-  const text = quotableText([segment?.parts[address.partIndex]], false)
+  const selectedPart = segment?.parts[address.partIndex]
+  const safe = segment && (await modelSegmentParts(ctx, segment))
+  const text = safe?.includes(selectedPart)
+    ? quotableText([selectedPart], false)
+    : ''
   if (!text) error('Quoted text block not found', 404)
   return text
 }
@@ -148,7 +156,7 @@ async function quotedText(ctx: QueryCtx, message: Doc<'messages'>) {
   ).order(answerLast ? 'desc' : 'asc')
 
   for await (const segment of segments) {
-    const text = quotableText(segment.parts, answerLast)
+    const text = quotableText(await modelSegmentParts(ctx, segment), answerLast)
     if (text) return text
   }
   return ''

@@ -22,6 +22,7 @@ import { useRestoreShellFocus } from '@/hooks/chat/shell-focus'
 import { useHasElapsed } from '@/hooks/expiry'
 import { useAtBottomSticky } from '@/hooks/scroll'
 import type { PendingMessage } from '@/lib/chat'
+import { ChatWarning } from '@/lib/chat/errors'
 import {
   avatarGutter,
   avatarVars,
@@ -29,7 +30,9 @@ import {
 } from '@/lib/chat/message-geometry'
 import { isOngoingStream } from '@/lib/chat/stream'
 import { cn } from '@/lib/utils'
+import { api } from '@cv/convex/_generated/api'
 import { parseShellCommand } from '@cv/core/shell/command'
+import { useQuery } from 'convex/react'
 import {
   useCallback,
   useEffect,
@@ -119,6 +122,17 @@ export function ChatSessionView({
   const [isPinned, setPinned] = useState(false)
   const [hasContent, setHasContent] = useState(false)
   const [draftReady, setDraftReady] = useState(false)
+
+  // Prompt evaluation
+  const evaluationStartedAt = useQuery(
+    api.promptEvaluations.active,
+    session ? { sessionId: session._id } : 'skip',
+  )
+  const evaluating = evaluationStartedAt != null
+  const evaluationWarningElapsed = useHasElapsed(
+    evaluating ? evaluationStartedAt + 5000 : undefined,
+  )
+  const slowEvaluation = evaluating && evaluationWarningElapsed
 
   // Message editing
   const editCtx = useMessageEdit()
@@ -215,7 +229,10 @@ export function ChatSessionView({
     reviewBlocked: isEditing || searchOpen,
   })
 
-  const showDock = composerDocked || review.showApproval || (!isEditing && keepComposerVisible) // prettier-ignore
+  const showDock =
+    composerDocked ||
+    review.showApproval ||
+    (!isEditing && (keepComposerVisible || evaluating))
   const showInteractionPicker = review.showApproval || awaitingAnswer
   const showToolbar = !isAtBottom || isEditing
   const showReviewAction = review.showReviewButton && !review.fullscreen && !isEditing // prettier-ignore
@@ -403,7 +420,15 @@ export function ChatSessionView({
                 onAlertHeightChange={setAlertHeight}
                 alert={
                   <ChatAlert
-                    error={error}
+                    error={
+                      slowEvaluation
+                        ? new ChatWarning(
+                            'Prompt evaluation is taking too long...',
+                            'prompt-evaluation',
+                          )
+                        : error
+                    }
+                    dismissible={!slowEvaluation}
                     onDismiss={onDismissError}
                     className="mb-1.5 w-[calc(100%-var(--spacing)*8)]"
                   />
@@ -466,6 +491,7 @@ export function ChatSessionView({
                       onTyping={notify}
                       onStop={onStop}
                       stopDisabled={isStopping}
+                      evaluatingPrompt={evaluating}
                       onRunCommand={onRunCommand}
                       onContinueAgent={onContinueAgent}
                       canContinueAgent={hasActiveAgent && status === 'ready'}

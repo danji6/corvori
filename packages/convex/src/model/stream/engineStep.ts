@@ -10,6 +10,7 @@ import type { ActionCtx } from '../../_generated/server'
 import { sanitizeChatError } from '../../errors'
 import { hasPendingTaskParts } from '../../lib/subagent'
 import type { StreamExecutionArgs } from '../../types'
+import { hasMessageScript } from '../messages'
 import {
   attachWireCalls,
   dispatchLanguageModel,
@@ -295,7 +296,9 @@ export async function consumeProviderStep(
 
     const needsTitle = setup.needsTitle && finishReason !== 'error'
     const titleText =
-      needsTitle && lastStep ? truncateTitleExcerpt(lastStep.text.trim()) : ''
+      needsTitle && lastStep && !hasMessageScript(lastStep.text)
+        ? truncateTitleExcerpt(lastStep.text.trim())
+        : ''
 
     return {
       shouldContinue: !toolsDisabled && finishReason === 'tool-calls',

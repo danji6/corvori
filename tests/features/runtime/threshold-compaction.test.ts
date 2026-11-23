@@ -246,7 +246,6 @@ test('preempts normal dispatch, consumes the one-shot, and resumes with unread m
         messages: [],
         tools: {},
         systemPrompt: atThreshold,
-        evalResult: { dirty: true, environment: { prepared: true } },
         resolved: { languageModel: model },
       }) as unknown as NonNullable<
         Awaited<ReturnType<typeof EngineSetup.prepare>>
@@ -286,7 +285,6 @@ test('preempts normal dispatch, consumes the one-shot, and resumes with unread m
     contextBoundaryMessageId: f.prior,
   })
   expect(f.rows('scheduledEvents')).toHaveLength(0)
-  expect(f.rows('sessionState')[0]?.environment).toEqual({ prepared: true })
   const [oneShot, ...extraChips] = f
     .rows('messages')
     .filter((message) => message.type === 'command')

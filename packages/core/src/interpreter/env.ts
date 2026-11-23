@@ -132,6 +132,19 @@ export const SESSION_ENV: SessionEnvEntry[] = [
     snippet: "readFile('${1:path}')",
   },
   {
+    name: 'shell',
+    description: "Run a shell command (admins only)",
+    params: [
+      { name: 'command', description: 'Shell command or executable' },
+      {
+        name: '...args',
+        optional: true,
+        description: 'Executable arguments',
+      },
+    ],
+    snippet: "shell('${1:command}')",
+  },
+  {
     name: 'getVar',
     description: 'Get a value from the current session',
     params: [

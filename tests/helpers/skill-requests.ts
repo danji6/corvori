@@ -2,6 +2,8 @@ import type { Id } from '@cv/convex/_generated/dataModel'
 import type { ActionCtx } from '@cv/convex/_generated/server'
 import { prepareChanges } from '@cv/convex/model/changes/sets'
 import { reserveStream } from '@cv/convex/model/chat/reserve'
+import { reserveStreamEvaluation } from '@cv/convex/model/promptEvaluation/reserve'
+import * as PromptEval from '@cv/convex/model/promptEvaluation/state'
 import { _save, removeForSession } from '@cv/convex/model/session/cache'
 import {
   assignedSkillAccess,
@@ -12,6 +14,7 @@ import { assignments } from '@cv/convex/model/skills/endpoints'
 import { prepareCapabilities } from '@cv/convex/model/stream/capabilities'
 import { prepareWorkspaceContext } from '@cv/convex/model/stream/contextNotes'
 import { prepare } from '@cv/convex/model/stream/engineSetup'
+import { _getProviderHistorySnapshot } from '@cv/convex/model/stream/providerHistory'
 import { _getContext, _getProviderHistory } from '@cv/convex/model/stream/reads'
 import { filesystemToolContext } from '@cv/convex/model/tool/filesystemContext'
 import { assertToolAccess } from '@cv/convex/model/tool/liveAccess'
@@ -152,6 +155,16 @@ export function skillRequests(root: string) {
         }
         case 'streams:_assertToolAccess':
           return assertToolAccess(fixture.ctx, args as never)
+        case 'promptEvaluations:_input':
+          return PromptEval.readInput(fixture.ctx, args as never)
+        case 'promptEvaluations:_get':
+          return PromptEval.readState(fixture.ctx, args as never)
+        case 'promptEvaluations:_result':
+          return PromptEval.readResult(fixture.ctx, args as never)
+        case 'streams:_isActive':
+          return true
+        case 'streams:_getProviderHistorySnapshot':
+          return _getProviderHistorySnapshot(fixture.ctx, args as never)
         case 'streams:_getProviderHistory':
           return _getProviderHistory(fixture.ctx, args as StreamExecutionArgs)
         case 'streams:_getFilesystemContext':
@@ -185,6 +198,14 @@ export function skillRequests(root: string) {
       args: unknown,
     ) => {
       args = convexRoundTrip(args)
+      if (getFunctionName(reference) === 'promptEvaluations:_reserve')
+        return reserveStreamEvaluation(fixture.ctx, args as never)
+      if (getFunctionName(reference) === 'promptEvaluations:_pin')
+        return PromptEval.pinInstance(fixture.ctx, args as never)
+      if (getFunctionName(reference) === 'promptEvaluations:_stage')
+        return PromptEval.stageItem(fixture.ctx, args as never)
+      if (getFunctionName(reference) === 'promptEvaluations:_finish')
+        return PromptEval.finishEvaluation(fixture.ctx, args as never)
       if (getFunctionName(reference) === 'toolkits:_observe')
         return observe(fixture.ctx, args as never)
       if (getFunctionName(reference) === 'streams:_prepareCapabilities')
@@ -273,13 +294,18 @@ export function skillRequests(root: string) {
   const secret = process.env.SIDECAR_SECRET
   process.env.SIDECAR_SECRET = 'fixture-secret'
   globalThis.fetch = (async (url, init) => {
-    if (String(url).endsWith('/eval/prompts')) {
-      const input = JSON.parse(String(init?.body))
+    if (String(url).endsWith('/eval/operations/instance')) {
+      return Response.json({ bootId: 'fixture-sidecar' })
+    }
+    if (String(url).endsWith('/eval/operations/start')) {
+      const { input } = JSON.parse(String(init?.body))
       return Response.json({
-        items: input.items,
-        environment: input.environment,
-        dirty: false,
+        state: 'complete',
+        result: { texts: input.texts },
       })
+    }
+    if (String(url).endsWith('/eval/operations/acknowledge')) {
+      return Response.json({ ok: true })
     }
     if (String(url).endsWith('/shell/info'))
       return Response.json({ shell: '/bin/bash' })

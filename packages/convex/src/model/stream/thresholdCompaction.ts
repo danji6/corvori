@@ -24,7 +24,9 @@ import {
   getProcessingSegmentRow,
   insertMessage,
 } from '../messageContents'
-import { finalizeMessageParts, scheduleMessageEval } from '../messages'
+import { finalizeMessageParts } from '../messages'
+import { releaseEvaluation } from '../promptEvaluation/records'
+import { reserveSegmentEvaluation } from '../promptEvaluation/reserve'
 import { getSavedModel } from '../provider/providers'
 import { consume as consumeEvent } from '../scheduledEvents'
 import { patchState } from '../session/state'
@@ -226,7 +228,7 @@ async function prepareSummaryOutput(
     parts,
     metadata: row.metadata,
   })
-  await scheduleMessageEval(ctx, {
+  await reserveSegmentEvaluation(ctx, {
     messageId: message._id,
     invokerId: invokedBy,
     parts,
@@ -281,7 +283,9 @@ export async function resumeAfterThresholdCompaction(
 ) {
   if (stream.command.kind !== 'compact' || !stream.command.thresholdResume)
     return
+  await releaseEvaluation(ctx, stream.promptEvaluationId)
   await ctx.db.patch(stream._id, {
+    promptEvaluationId: undefined,
     command: {
       kind: 'invoke',
       mode: stream.command.thresholdResume.mode,

@@ -201,17 +201,17 @@ test('snapshot capture reuses the frozen manifest until reset', () => {
     prompts: { own: [], library: [] },
     mcpServers: [],
     settings: null,
-    sessionCache: { tools: frozen, items: [], historyPresentation: {} },
+    sessionCache: { tools: frozen, historyPresentation: {} },
     agent: { tools: ['shell', 'mcp_access', 'skills'] },
   }
   const plan = createOperationPlan(data as never, frozen)
-  expect(plan.snapshotPatch([])).toBeNull()
+  expect(plan.snapshotPatch()).toBeNull()
   const current = resolveToolManifest(input(['shell', 'mcp_access', 'skills']))
   const uncached = createOperationPlan(
     { ...data, sessionCache: null } as never,
     current,
   )
-  expect(uncached.snapshotPatch([])?.tools).toBe(current)
+  expect(uncached.snapshotPatch()?.tools).toBe(current)
 })
 
 test('context policy hides disabled, incompatible, foreign, and unstamped notes without suppressing evidence', () => {

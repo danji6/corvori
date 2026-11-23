@@ -38,7 +38,11 @@ test('all built-ins off makes no capability sidecar requests and injects no work
     const request = (await f.nextTurn())!
     expect(request.toolRuntime!.current.names).toEqual([])
     expect(request.messages).toHaveLength(1)
-    expect(requests.filter((url) => !url.endsWith('/eval/prompts'))).toEqual([])
+    expect(
+      requests.filter(
+        (url) => !new URL(url).pathname.startsWith('/eval/operations/'),
+      ),
+    ).toEqual([])
     expect(request.toolRuntime!.frozen.names).toEqual(['get_tool', 'call_tool'])
     await expect(
       request.tools.get_tool.execute!({ name: 'read_file' }, {} as never),

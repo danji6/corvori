@@ -1,6 +1,8 @@
 import { MAX_SCOPE_PROMPTS } from '@cv/core/limits'
 import { z } from 'zod'
 
+import { workspaceContextSchema } from '../mcp/workspace/context'
+
 const contextSchema = z.object({
   user: z.string().optional(),
   assistant: z.string().optional(),
@@ -33,3 +35,22 @@ const records = z
 export const promptsSchema = requestSchema.extend({ items: records })
 
 export const messageSchema = requestSchema.extend({ parts: records })
+
+export const evaluationShellSchema = z.object({
+  sessionId: z.string(),
+  workspaceId: z.string(),
+  workspace: workspaceContextSchema,
+  shell: z.string().optional(),
+})
+
+export const authoredEvaluationSchema = requestSchema.extend({
+  texts: z.array(z.string()).max(MAX_SCOPE_PROMPTS * 4),
+  kind: z.enum(['prompt', 'message']),
+  shell: evaluationShellSchema.optional(),
+  shellWorkspaceRequired: z.literal(true).optional(),
+})
+
+export const evaluationOperationSchema = z.object({
+  id: z.string().min(1).max(128),
+  bootId: z.string().min(1).max(128),
+})

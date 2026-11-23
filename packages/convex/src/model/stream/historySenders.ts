@@ -6,6 +6,7 @@ import { toDisplayName } from '@cv/core/utils/names'
 import type { UIMessage } from 'ai'
 
 import type { Doc } from '../../_generated/dataModel'
+import { hasMessageScript } from '../messages'
 
 export function representMessage(
   stored: Doc<'messages'>,
@@ -59,6 +60,7 @@ export function insertReplyQuote(
 ): UIMessage['parts'] {
   const quote = stored.replyTo
   if (!quote?.text) return message.parts
+  if (!quote.rendered && hasMessageScript(quote.text)) return message.parts
 
   const quotePart = {
     type: 'text' as const,

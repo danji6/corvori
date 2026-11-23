@@ -6,14 +6,15 @@ import type {
   ProviderHistorySnapshotArgs,
   StreamExecutionArgs,
 } from '../../types'
-import {
-  type MessageWithParts,
-  withParts,
-  withPartsMany,
-} from '../messageContents'
+import type { MessageWithParts } from '../messageContents'
+import { withModelParts } from '../promptEvaluation/messageParts'
+import { historyEvaluationStatus } from '../promptEvaluation/state'
 import { getState } from '../session/state'
 import { ownsExecution } from './execution'
-import { resolveHistoryBoundary } from './historyBoundary'
+import {
+  replaysProcessingMessage,
+  resolveHistoryBoundary,
+} from './historyBoundary'
 
 type Boundary = Awaited<ReturnType<typeof resolveHistoryBoundary>>
 
@@ -23,8 +24,8 @@ export async function _getProviderHistory(
 ) {
   const stream = await ctx.db.get(execution.streamId)
   if (!ownsExecution(stream, execution)) return []
-
   const boundary = await resolveHistoryBoundary(ctx, stream)
+  if (await hasUnsettledEvaluation(ctx, stream, boundary)) return []
   const [completed, live] = await Promise.all([
     readCompleted(ctx, stream, boundary),
     readLive(ctx, stream, boundary.floor),
@@ -43,6 +44,8 @@ export async function _getProviderHistorySnapshot(
     resolveHistoryBoundary(ctx, stream),
     getState(ctx, stream.sessionId),
   ])
+  if (await hasUnsettledEvaluation(ctx, stream, boundary))
+    return { waiting: true as const }
   const identity = JSON.stringify([
     stream._id,
     stream.generation,
@@ -62,6 +65,15 @@ export async function _getProviderHistorySnapshot(
   return { identity, completed, live }
 }
 
+async function hasUnsettledEvaluation(
+  ctx: QueryCtx,
+  stream: Doc<'streams'>,
+  boundary: Boundary,
+) {
+  const status = await historyEvaluationStatus(ctx, stream, boundary)
+  return status.waiting || status.needsLiveEvaluation || Boolean(status.error)
+}
+
 async function readCompleted(
   ctx: QueryCtx,
   stream: Doc<'streams'>,
@@ -71,9 +83,10 @@ async function readCompleted(
   const ordered = summary
     ? [summary, ...messages.filter((message) => message._id !== summary._id)]
     : messages
-  return withPartsMany(
-    ctx,
-    ordered.filter((row) => visibleToAgent(row, stream)),
+  return Promise.all(
+    ordered
+      .filter((row) => visibleToAgent(row, stream))
+      .map((row) => withModelParts(ctx, row)),
   )
 }
 
@@ -89,8 +102,7 @@ async function readLive(ctx: QueryCtx, stream: Doc<'streams'>, floor: number) {
     )
     .collect()
 
-  const includeCurrent =
-    stream.command.kind === 'invoke' || stream.command.kind === 'retry'
+  const includeCurrent = replaysProcessingMessage(stream.command)
   const current = includeCurrent ? await ctx.db.get(currentId) : null
   const visible = notes.filter(
     (note) =>
@@ -99,8 +111,8 @@ async function readLive(ctx: QueryCtx, stream: Doc<'streams'>, floor: number) {
       visibleToAgent(note, stream),
   )
   const [joinedNotes, joinedCurrent] = await Promise.all([
-    withPartsMany(ctx, visible),
-    current ? withParts(ctx, current) : null,
+    Promise.all(visible.map((row) => withModelParts(ctx, row))),
+    current ? withModelParts(ctx, current) : null,
   ])
 
   return { notes: joinedNotes, current: joinedCurrent }

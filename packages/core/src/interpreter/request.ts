@@ -14,12 +14,14 @@ export type EvaluationRequest = {
   context: EvalContext
   environment?: Record<string, JsonValue>
   kind: 'prompt' | 'message'
+  authored?: boolean
 }
 
 export type EvaluationResult = {
   texts: string[]
   environment: Record<string, JsonValue>
   dirty: boolean
+  writes?: Record<string, JsonValue>
 }
 
 export type EvaluationReply =
@@ -36,12 +38,20 @@ export async function evaluateRequest(
   const capError = environmentCapError(environment)
   if (capError) throw new Error(capError)
   const store = createVariableStore(environment)
+  const written = new Set<string>()
+  const set = store.set
+  store.set = (key, value) => {
+    set(key, value)
+    written.add(key)
+  }
   const sandbox = createSandbox(request.context, store, helpers)
 
   try {
     const texts = request.texts.map((text) => {
       checkText(text, request.kind)
-      const result = render(text, sandbox.run)
+      const result = render(text, sandbox.run, sandbox.usedShell)
+      if (request.authored && exceedsTextLimit(result, request.kind))
+        return 'Error: evaluated output exceeds the prompt size limit'
       checkText(result, request.kind)
       return result
     })
@@ -51,16 +61,33 @@ export async function evaluateRequest(
     ) {
       throw new Error('Evaluated message exceeds the segment limit')
     }
-    return { texts, environment: store.toRecord(), dirty: store.isDirty() }
+    const result = {
+      texts,
+      environment: store.toRecord(),
+      dirty: store.isDirty(),
+    }
+    if (!request.authored) return result
+    return {
+      ...result,
+      writes: Object.fromEntries(
+        [...written].map((key) => [key, result.environment[key]]),
+      ),
+    }
   } finally {
     sandbox.dispose()
   }
 }
 
-function checkText(text: string, kind: EvaluationRequest['kind']) {
+function exceedsTextLimit(text: string, kind: EvaluationRequest['kind']) {
   const size =
     kind === 'prompt' ? text.length : new TextEncoder().encode(text).length
   const limit =
     kind === 'prompt' ? MAX_PROMPT_CONTENT_CHARS : MAX_MESSAGE_PART_BYTES
-  if (size > limit) throw new Error('Dynamic content exceeds its size limit')
+  return size > limit
+}
+
+function checkText(text: string, kind: EvaluationRequest['kind']) {
+  if (exceedsTextLimit(text, kind)) {
+    throw new Error('Dynamic content exceeds its size limit')
+  }
 }

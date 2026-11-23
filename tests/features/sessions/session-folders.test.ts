@@ -361,7 +361,6 @@ describe('session folders', () => {
     await _save(ctx, {
       sessionId: 's' as never,
       agentId: 'agent' as never,
-      items: [],
     })
     expect(row('cache').tools).toBeDefined()
     expect(row('cache').workspaceRevision).toBe(

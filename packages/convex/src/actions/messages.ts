@@ -4,15 +4,20 @@ import { v } from 'convex/values'
 
 import { internalAction } from '../_generated/server'
 
-export const _evalMessage = internalAction({
-  args: {
-    messageId: v.id('messages'),
-    invokerId: v.id('users'),
-    version: v.number(),
-    segmentIndex: v.number(),
+export const _runPromptEvaluation = internalAction({
+  args: { id: v.id('promptEvaluations') },
+  handler: async (ctx, { id }) => {
+    const { runStandaloneEvaluation } =
+      await import('../model/promptEvaluation/runner')
+    await runStandaloneEvaluation(ctx, id)
   },
-  handler: async (ctx, args) => {
-    const { _evalMessage } = await import('../model/stream/evalMessage')
-    return _evalMessage(ctx, args)
+})
+
+export const _cancelPromptEvaluation = internalAction({
+  args: { id: v.id('promptEvaluations'), bootId: v.string() },
+  handler: async (_ctx, args) => {
+    const { cancelSidecarEvaluation } =
+      await import('../model/promptEvaluation/runner')
+    await cancelSidecarEvaluation(args)
   },
 })

@@ -29,6 +29,7 @@ import { verifySkillUpload } from './agent-files/upload'
 import { verifyLibrary } from './agent-files/verify-library'
 import { sidecarAuthentication } from './auth'
 import { checkpointRoutes } from './checkpoints/routes'
+import { drainEvaluations, evaluationRoutes } from './eval/operations'
 import { messageSchema, promptsSchema } from './eval/schemas'
 import { evaluateMessage, evaluatePrompts } from './eval/service'
 import { ioError, sidecarError } from './http-errors'
@@ -102,6 +103,7 @@ export function createApp(authenticate: MiddlewareHandler) {
   app.route('/session-files', sessionFileRoutes())
   app.route('/toolkits', toolkitRoutes())
   app.route('/checkpoints', checkpointRoutes)
+  app.route('/eval/operations', evaluationRoutes)
 
   app.post('/providers/chatgpt/start', startChatGPTSignIn)
   app.post('/providers/chatgpt/status', chatGPTStatus)
@@ -333,11 +335,11 @@ if (import.meta.main) {
       killAllShellJobs()
       void mcpRegistry
         .close()
-        .then(drainMcpOperations)
+        .then(() => Promise.all([drainMcpOperations(), drainEvaluations()]))
         .then(
           () => server.close(() => process.exit(0)),
           () => {
-            console.error('MCP shutdown cleanup failed')
+            console.error('Sidecar shutdown cleanup failed')
             server.close(() => process.exit(1))
           },
         )

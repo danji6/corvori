@@ -11,7 +11,10 @@ import {
   insertMessage,
   invalidateCompletedHistory,
 } from '../messageContents'
-import { scheduleMessageEval } from '../messages'
+import {
+  reserveMessageEvaluation,
+  reserveSegmentEvaluation,
+} from '../promptEvaluation/reserve'
 import { removeForSession as removeSessionCache } from '../session/cache'
 import { sessionToolNames } from '../tool/selection'
 import type { SenderIdentity } from './identities'
@@ -55,7 +58,7 @@ export async function insertHiddenNote(
   note: HiddenNote,
 ) {
   const parts = [{ type: 'text', text: note.content }]
-  const { messageId } = await insertMessage(
+  const { messageId, contentId } = await insertMessage(
     ctx,
     {
       sessionId: session._id,
@@ -69,7 +72,21 @@ export async function insertHiddenNote(
     },
     parts,
   )
-  await scheduleMessageEval(ctx, {
+  if (note.type === 'reminder' && note.extra && 'id' in note.extra) {
+    await reserveMessageEvaluation(ctx, {
+      agent: sender.agent,
+      sessionId: session._id,
+      invokedBy: invokerId,
+      messageId,
+      contentId,
+      origin: 'reminder',
+      promptId: note.extra.id,
+      hidden: true,
+      parts,
+    })
+    return messageId
+  }
+  await reserveSegmentEvaluation(ctx, {
     messageId,
     invokerId,
     parts,

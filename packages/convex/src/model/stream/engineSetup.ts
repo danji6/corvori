@@ -1,6 +1,7 @@
 'use node'
 
 import { usableContextWindow } from '@cv/core/discovered-model'
+import { hasInterpolation } from '@cv/core/interpreter/parse'
 import { stableStringify } from '@cv/core/stable-json'
 import {
   hasFilesystemTools,
@@ -9,6 +10,7 @@ import {
 import { contextEnabled } from '@cv/core/tool-context'
 
 import { internal } from '../../_generated/api'
+import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import { minRole } from '../../lib/roles'
@@ -20,6 +22,7 @@ import {
 } from '../agent/modelOverride'
 import { hasSavedTitle } from '../messages'
 import type { PromptItem } from '../prompt/prompts'
+import { runPromptEvaluation } from '../promptEvaluation/runner'
 import {
   type CacheableRequest,
   appendOperationMessages,
@@ -28,7 +31,7 @@ import {
 import type { ProviderOptions } from '../provider/options'
 import { getProviderOptions } from '../provider/options'
 import { findCredentialsForModel } from '../provider/providers'
-import { postSidecar, sidecarDefaultShell } from '../sidecar'
+import { sidecarDefaultShell } from '../sidecar'
 import { resolvePersonalWorkspace } from '../skills/runtime'
 import { prepareToolAvailability } from '../tool/availability'
 import { capabilitySource } from '../tool/capabilitySource'
@@ -44,7 +47,6 @@ import {
 import type { createCacheDiagnostics } from './cacheDiagnostics'
 import { buildSessionLogBody } from './engineLog'
 import { patchSessionLogBody } from './engineLog'
-import { buildEvalContext } from './evalContext'
 import {
   type ProviderHistorySnapshot,
   readHistorySnapshot,
@@ -54,7 +56,6 @@ import {
   buildProviderPrefix,
   createOperationPlan,
 } from './operations'
-import type { PromptEvalResult } from './operations'
 import { prepareToolContext } from './toolContext'
 
 // Keep the action's input type independent of Convex's generated API.
@@ -68,7 +69,6 @@ export type PreparedStreamStep = CacheableRequest &
     workspaceSessionId: StreamContext['session']['_id']
     isSubagent: boolean
     needsTitle: boolean
-    evalResult: PromptEvalResult
     resolved: ProviderOptions
     requestLog: { body?: string }
     cacheDiagnostics?: ReturnType<typeof createCacheDiagnostics>
@@ -135,12 +135,12 @@ export async function prepare(
     minRole(data.invoker.role, 'admin')
   const defaultShell = needsShell ? await sidecarDefaultShell() : undefined
 
-  const capturesFiles =
+  const capturesTools =
     invokesTools &&
-    minRole(data.invoker.role, 'admin') &&
     chosen.some((name) =>
       ['write_file', 'edit_file', 'shell', 'task'].includes(name),
     )
+  const capturesFiles = minRole(data.invoker.role, 'admin') && capturesTools
   if (capturesFiles) {
     const { prepareChanges } = await import('../changes/actions')
     if (!(await prepareChanges(ctx, execution, data))) return null
@@ -165,21 +165,66 @@ export async function prepare(
   const toolReplay = { wireDefinitions, wireCalls }
   const operationPlan = createOperationPlan(data, manifest)
 
-  const promptEval = await evaluatePromptItems({
-    data,
-    items: operationPlan.evalItems,
+  const authored = [
+    ...(data.sessionCache?.promptEvaluationId ? [] : operationPlan.evalItems),
+    ...operationPlan.operationPrompts,
+  ]
+  if (
+    !capturesFiles &&
+    minRole(data.invoker.role, 'admin') &&
+    minRole(data.owner.role, 'admin')
+  ) {
+    const hasScript = authored.some(
+      (item) =>
+        'content' in item && item.enabled && hasInterpolation(item.content),
+    )
+    if (hasScript) {
+      const { prepareChanges } = await import('../changes/actions')
+      if (!(await prepareChanges(ctx, execution, data))) return null
+    }
+  }
+
+  const evaluationOptions = {
     toolNames: current.names,
-    modelLabel: model?.label,
-  })
-  const patch = preparedTools && operationPlan.snapshotPatch(promptEval.items)
+    model: data.agent.modelOverride
+      ? { id: data.agent.modelOverride.modelId, label: model?.label }
+      : undefined,
+    deadline: windowDeadline ?? Date.now() + 60_000,
+  }
+  const snapshotId =
+    data.sessionCache?.promptEvaluationId ??
+    (await ctx.runMutation(internal.promptEvaluations._reserve, {
+      ...execution,
+      kind: 'snapshot',
+      items: operationPlan.evalItems,
+      cacheId: data.sessionCache?._id,
+    }))
+  if (!snapshotId) {
+    await ctx.runMutation(internal.streams._handoff, execution)
+    return null
+  }
+
+  const promptItems = await prepareEvaluation(
+    ctx,
+    execution,
+    snapshotId,
+    evaluationOptions,
+  )
+  if (!promptItems) return null
+  const patch = preparedTools && operationPlan.snapshotPatch()
   if (patch) {
-    await ctx.runMutation(internal.streams._saveSessionCache, {
+    const saved = await ctx.runMutation(internal.streams._saveSessionCache, {
       ...execution,
       sessionId: data.stream.sessionId,
       agentId: data.stream.agentId,
       ...patch,
+      promptEvaluationId: snapshotId,
       filesystemAccess: minRole(data.invoker.role, 'admin'),
     })
+    if (!saved) {
+      await ctx.runMutation(internal.streams._handoff, execution)
+      return null
+    }
   }
 
   const source = runtime ? await capabilitySource(data) : undefined
@@ -219,27 +264,33 @@ export async function prepare(
   )
   if (!contextPrepared) return null
 
-  const operationEval = invokesTools
-    ? undefined
-    : await evaluatePromptItems({
-        data,
-        items: operationPlan.operationPrompts,
-        toolNames: [],
-        modelLabel: model?.label,
-        previous: promptEval,
-      })
-  const operationMessages = operationEval
-    ? buildOperationMessages(operationEval.items, data.stream.command)
-    : undefined
-  const historyRows = historySnapshot
-    ? await readHistorySnapshot(ctx, execution, historySnapshot)
-    : undefined
-  if (historyRows === null) return null
+  let operationMessages
+  if (operationPlan.operationPrompts.length) {
+    const id = await ctx.runMutation(internal.promptEvaluations._reserve, {
+      ...execution,
+      kind: 'operation',
+      items: operationPlan.operationPrompts,
+    })
+    if (!id) return null
+    const items = await prepareEvaluation(ctx, execution, id, {
+      ...evaluationOptions,
+      toolNames: [],
+    })
+    if (!items) return null
+    operationMessages = buildOperationMessages(items, data.stream.command)
+  }
+  const historyRows = await readHistorySnapshot(
+    ctx,
+    execution,
+    historySnapshot ?? {},
+    () => ctx.runMutation(internal.streams._handoff, execution),
+  )
+  if (!historyRows) return null
 
   const { remainingPrompts, ...prefix } = await buildProviderPrefix(
     ctx,
     data,
-    operationPlan.requestItems(promptEval.items),
+    promptItems,
     {
       manifest,
       toolNames: current.names,
@@ -316,7 +367,6 @@ export async function prepare(
     isSubagent: !!data.session.parent,
     needsTitle:
       data.stream.command.kind === 'invoke' && !hasSavedTitle(data.session),
-    evalResult: operationEval ?? promptEval,
     systemPrompt: request.systemPrompt,
     messages: request.messages,
     resolved,
@@ -334,42 +384,44 @@ export async function prepare(
   }
 }
 
-type PromptEvalBatch = {
-  data: StreamContext & { userCount: number; agentCount: number }
-  items: PromptItem[]
-  toolNames: string[]
-  modelLabel?: string
-  previous?: PromptEvalResult
-}
+async function prepareEvaluation(
+  ctx: ActionCtx,
+  execution: StreamExecutionArgs,
+  id: Id<'promptEvaluations'>,
+  options: {
+    deadline: number
+    toolNames: string[]
+    model?: { id: string; label?: string }
+  },
+): Promise<PromptItem[] | null> {
+  const api = internal.promptEvaluations
 
-async function evaluatePromptItems({
-  data,
-  items,
-  toolNames,
-  modelLabel,
-  previous,
-}: PromptEvalBatch): Promise<PromptEvalResult> {
-  const environment = previous?.environment ?? data.environment
-  if (!items.length) return { items, environment, dirty: !!previous?.dirty }
+  const active = () => ctx.runQuery(internal.streams._isActive, execution)
 
-  const evalContext = buildEvalContext({
-    ...data,
-    model: data.agent.modelOverride
-      ? { id: data.agent.modelOverride.modelId, label: modelLabel }
-      : undefined,
-    toolNames,
+  const frozen = await ctx.runQuery(api._result, { id })
+  if (frozen) return (await active()) ? frozen : null
+
+  const heartbeat = () =>
+    ctx.runMutation(internal.streams._heartbeat, execution)
+  const result = await runPromptEvaluation(ctx, id, {
+    ...options,
+    active,
+    heartbeat,
   })
-  const canReadFiles = evalContext.isAdmin && toolNames.includes('read_file')
-  const result = await postSidecar<PromptEvalResult>('/eval/prompts', {
-    items,
-    context: evalContext,
-    authorizedAgentId: canReadFiles
-      ? (data.session.workspace?.agentHome?.homeId ?? data.agent._id)
-      : undefined,
-    authorizedWorkDirs: canReadFiles ? evalContext.workDirs : undefined,
-    authorizedAgentDir: canReadFiles ? evalContext.agentDir : undefined,
-    authorizedWorkDir: canReadFiles ? evalContext.workDir : undefined,
-    environment,
-  })
-  return { ...result, dirty: !!previous?.dirty || result.dirty }
+  if (result === 'waiting') {
+    await ctx.runMutation(internal.streams._handoff, execution)
+    return null
+  }
+
+  if (!(await active())) return null
+
+  const state = await ctx.runQuery(api._get, { id })
+  if (!state || state.evaluation.state === 'cancelled') {
+    await ctx.runMutation(internal.streams._handoff, execution)
+    return null
+  }
+  if (state.evaluation.state === 'failed')
+    throw new Error(state.evaluation.error)
+
+  return ctx.runQuery(api._result, { id })
 }

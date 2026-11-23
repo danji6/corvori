@@ -96,16 +96,11 @@ async function renderRequest(input: StreamContext) {
     plan.operationPrompts,
     base.environment as Record<string, JsonValue>,
   )
-  const prefix = await buildProviderPrefix(
-    ctx,
-    input,
-    plan.requestItems(base.items),
-    {
-      manifest,
-      toolNames: manifest.names,
-      replay: { wireDefinitions: [], wireCalls: new Map() },
-    },
-  )
+  const prefix = await buildProviderPrefix(ctx, input, base.items, {
+    manifest,
+    toolNames: manifest.names,
+    replay: { wireDefinitions: [], wireCalls: new Map() },
+  })
   return {
     ...prefix,
     messages: [
@@ -135,8 +130,7 @@ for (const operation of ['compact', 'impersonate'] as const) {
       const plan = createOperationPlan(input, manifest)
       expect(plan.evalItems).toEqual(own.slice(0, -1))
       expect(plan.operationPrompts).toEqual(trailing)
-      expect(plan.snapshotPatch(render(plan.evalItems).items)).toMatchObject({
-        items: own.slice(0, -1),
+      expect(plan.snapshotPatch()).toMatchObject({
         tools: manifest,
       })
       const request = await renderRequest(input)

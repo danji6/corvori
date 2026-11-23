@@ -81,6 +81,21 @@ function requestFixture(override?: AgentModelOverride) {
       const name = getFunctionName(ref)
       if (name === 'streams:_getContext') return data
       if (name === 'streams:_getProviderHistory') return rows
+      if (name === 'streams:_getProviderHistorySnapshot') {
+        return {
+          identity: 'history',
+          completed: rows,
+          live: { notes: [], current: null },
+        }
+      }
+      if (name === 'promptEvaluations:_input') return null
+      if (name === 'promptEvaluations:_get')
+        return { evaluation: { state: 'complete' } }
+      if (name === 'promptEvaluations:_result') {
+        return [
+          { role: 'system', enabled: true, content: 'Configured instruction' },
+        ]
+      }
       return 'active'
     },
     runMutation: async () => true,
@@ -92,22 +107,9 @@ function requestFixture(override?: AgentModelOverride) {
 test('uses the effective model’s limits and reasoning on a retry', async () => {
   const requests: Record<string, unknown>[] = []
   const fetch = spyOn(globalThis, 'fetch').mockImplementation((async (
-    url: RequestInfo | URL,
+    _url: RequestInfo | URL,
     init?: RequestInit,
   ) => {
-    if (String(url).endsWith('/eval/prompts')) {
-      return Response.json({
-        items: [
-          {
-            role: 'system',
-            enabled: true,
-            content: 'Configured instruction',
-          },
-        ],
-        environment: {},
-        dirty: false,
-      })
-    }
     requests.push(JSON.parse(String(init?.body)))
     return new Response('data: [DONE]\n\n', {
       headers: { 'Content-Type': 'text/event-stream' },

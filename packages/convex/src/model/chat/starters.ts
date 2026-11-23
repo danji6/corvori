@@ -2,8 +2,8 @@ import type { Id } from '../../_generated/dataModel'
 import { error } from '../../errors'
 import type { AuthMutationCtx } from '../../functions'
 import { insertMessage } from '../messageContents'
-import { scheduleMessageEval } from '../messages'
 import { collectStarterPrompts, mergePrompts } from '../prompt/prompts'
+import { reserveMessageEvaluation } from '../promptEvaluation/reserve'
 import { resolveSets as resolvePromptSets } from '../prompts'
 import { agentIdentity } from './identities'
 
@@ -41,7 +41,7 @@ export async function maybeInsertStarters(
 
   for (const prompt of starters) {
     const parts = [{ type: 'text', text: prompt.content }]
-    const { messageId } = await insertMessage(
+    const { messageId, contentId } = await insertMessage(
       ctx,
       {
         sessionId: session._id,
@@ -52,12 +52,15 @@ export async function maybeInsertStarters(
       },
       parts,
     )
-    await scheduleMessageEval(ctx, {
+    await reserveMessageEvaluation(ctx, {
+      agent,
+      sessionId: session._id,
       messageId,
-      invokerId: ctx.userId,
+      contentId,
+      invokedBy: ctx.userId,
       parts,
-      version: 1,
-      segmentIndex: 0,
+      origin: 'starter',
+      promptId: prompt.id,
     })
   }
 }

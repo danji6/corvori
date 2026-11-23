@@ -2,16 +2,12 @@ import { addCacheUsage } from '@cv/core/cache-usage'
 
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
-import type {
-  SaveStreamCacheArgs,
-  SaveStreamEnvironmentArgs,
-  SaveStreamLogArgs,
-} from '../../types'
+import type { SaveStreamCacheArgs, SaveStreamLogArgs } from '../../types'
 import type { SaveStreamMetaArgs } from '../../types'
 import type { TokenUsage } from '../../types'
 import { getProcessingSegmentRow, saveSegmentMeta } from '../messageContents'
 import { scheduleTitle } from '../messages'
-import { _save } from '../session/cache'
+import { _save, findCache } from '../session/cache'
 import { _patchSessionLog } from '../session/sessionWorkspace'
 import { getState, patchState } from '../session/state'
 import { ownsExecution } from './execution'
@@ -121,19 +117,15 @@ export async function accumulateSessionUsage(
 export async function saveCache(ctx: MutationCtx, args: SaveStreamCacheArgs) {
   const stream = await ctx.db.get(args.streamId)
   if (!ownsExecution(stream, args)) return null
-  if (stream.sessionId !== args.sessionId || stream.agentId !== args.agentId)
+  if (stream.sessionId !== args.sessionId || stream.agentId !== args.agentId) {
     return null
+  }
+  if (args.promptEvaluationId) {
+    const existing = await findCache(ctx, args.sessionId, args.agentId)
+    if (existing?.promptEvaluationId !== args.promptEvaluationId) return null
+  }
   const { streamId: _streamId, generation: _generation, ...cache } = args
   return _save(ctx, cache)
-}
-
-export async function saveEnvironment(
-  ctx: MutationCtx,
-  args: SaveStreamEnvironmentArgs,
-) {
-  const stream = await ctx.db.get(args.streamId)
-  if (!ownsExecution(stream, args)) return
-  await patchState(ctx, stream.sessionId, { environment: args.environment })
 }
 
 export async function saveLog(ctx: MutationCtx, args: SaveStreamLogArgs) {
