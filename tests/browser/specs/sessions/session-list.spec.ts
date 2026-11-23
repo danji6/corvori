@@ -239,6 +239,11 @@ test('a stationary drag scrolls through the bottom edge band and back up', async
   await page.getByRole('textbox', { name: 'Search sessions' }).fill('session')
   await expect.poll(async () => (await loadedPages(page)).search).toBe(20)
   const scroller = page.locator('[data-slot="session-list-scroll-area"]')
+  expect(
+    await scroller.evaluate(
+      (element: HTMLDivElement) => element.offsetWidth - element.clientWidth,
+    ),
+  ).toBe(0)
   const top = () => scroller.evaluate((element) => element.scrollTop)
   const source = sessionPage(page, 'search').getByRole('button').nth(3)
   const bounds = (await scroller.boundingBox())!

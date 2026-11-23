@@ -14,6 +14,7 @@ import {
 import { Collapsible } from './collapsible'
 import type { CollapsibleRootProps } from './collapsible'
 import { Drawer } from './drawer'
+import { OverlayScrollArea } from './overlay-scroll-area'
 import { RippleButton, type RippleButtonProps } from './ripple-button'
 import { Surface } from './surface'
 
@@ -508,12 +509,30 @@ function SidebarHeader({ children, className }: React.ComponentProps<'div'>) {
   )
 }
 
-function SidebarContent({ children, className }: React.ComponentProps<'div'>) {
+type SidebarContentProps = SidebarPanelProps & { scrollable?: boolean }
+
+function SidebarContent({
+  children,
+  className,
+  scrollable = true,
+}: SidebarContentProps) {
+  if (scrollable) {
+    return (
+      <OverlayScrollArea
+        data-slot="sidebar-content"
+        className="w-full flex-1"
+        contentClassName={cn('flex flex-col py-2', className)}
+      >
+        {children}
+      </OverlayScrollArea>
+    )
+  }
+
   return (
     <div
       data-slot="sidebar-content"
       className={cn(
-        'flex min-h-0 w-full flex-1 flex-col overflow-x-hidden overflow-y-auto py-2',
+        'flex min-h-0 w-full flex-1 flex-col overflow-clip py-2',
         className,
       )}
     >
@@ -553,8 +572,4 @@ export const Sidebar = Object.assign(SidebarRoot, {
 
 export { useSidebar, useOptionalSidebar }
 
-export type {
-  SidebarRootProps,
-  SidebarShellProps,
-  SidebarPanelProps as SidebarContentProps,
-}
+export type { SidebarRootProps, SidebarShellProps, SidebarContentProps }

@@ -106,7 +106,7 @@ const LeftSidebar = memo(function LeftSidebar() {
               <JoinSessionButton />
             </div>
           </Sidebar.Header>
-          <Sidebar.Content>
+          <Sidebar.Content scrollable={false}>
             <LeftSidebarSessions />
           </Sidebar.Content>
           <Sidebar.Footer>

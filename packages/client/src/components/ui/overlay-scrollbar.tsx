@@ -1,5 +1,5 @@
 import { cn, isTouchDevice } from '@/lib/utils'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
 
 const MIN_THUMB = 32
 const HIDE_DELAY = 1200
@@ -20,30 +20,56 @@ type Geometry = {
   trackHeight: number
 }
 
-type ChatScrollbarProps = {
-  className?: string
+type ElementScrollRefs = {
+  viewportRef: RefObject<HTMLDivElement | null>
+  contentRef: RefObject<HTMLDivElement | null>
+}
+
+type OverlayScrollbarProps = {
+  element?: ElementScrollRefs
   onNavigate?: () => void
 }
 
-export function ChatScrollbar({ className, onNavigate }: ChatScrollbarProps) {
+export function OverlayScrollbar({
+  element,
+  onNavigate,
+}: OverlayScrollbarProps) {
+  const { viewportRef, contentRef } = element ?? {}
+
+  const getScroller = useCallback(
+    () => (viewportRef ? viewportRef.current : window),
+    [viewportRef],
+  )
+
   const trackRef = useRef<HTMLDivElement>(null)
-  const geo = useScrollGeometry(trackRef)
+  const geo = useScrollGeometry(trackRef, getScroller, contentRef)
   const [dragging, setDragging] = useState(false)
-  const [active, poke] = useActivity(dragging)
+  const [active, poke] = useActivity()
   const dragCleanupRef = useRef<(() => void) | null>(null)
 
   const maxScroll = Math.max(0, geo.scrollHeight - geo.viewport)
   const scrollable = maxScroll > 1 && geo.trackHeight > 0
-  const thumbHeight = Math.max(
-    MIN_THUMB,
-    geo.trackHeight * (geo.viewport / geo.scrollHeight),
-  )
+  const thumbHeight = scrollable
+    ? Math.min(
+        geo.trackHeight,
+        Math.max(
+          MIN_THUMB,
+          geo.trackHeight * (geo.viewport / geo.scrollHeight),
+        ),
+      )
+    : 0
   const travel = geo.trackHeight - thumbHeight
   const thumbTop = maxScroll > 0 ? (geo.scrollY / maxScroll) * travel : 0
 
-  useEffect(() => () => { dragCleanupRef.current?.()}, []) // prettier-ignore
+  useEffect(() => () => { dragCleanupRef.current?.() }, []) // prettier-ignore
 
   useEffect(() => {
+    if (viewportRef) {
+      const viewport = viewportRef.current
+      viewport?.addEventListener('scroll', poke, { passive: true })
+      return () => viewport?.removeEventListener('scroll', poke)
+    }
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (SCROLL_KEYS.has(event.key)) poke()
     }
@@ -57,10 +83,14 @@ export function ChatScrollbar({ className, onNavigate }: ChatScrollbarProps) {
       window.removeEventListener('touchmove', poke)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [poke])
+  }, [poke, viewportRef])
 
   const beginDrag = useCallback(
-    (event: React.PointerEvent, startScroll: number) => {
+    (
+      event: React.PointerEvent,
+      scroller: Window | HTMLDivElement,
+      startScroll: number,
+    ) => {
       event.preventDefault()
       onNavigate?.()
 
@@ -80,8 +110,8 @@ export function ChatScrollbar({ className, onNavigate }: ChatScrollbarProps) {
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onEnd)
         window.removeEventListener('pointercancel', onEnd)
-        window.removeEventListener('blur', cleanup)
-        el.removeEventListener('lostpointercapture', cleanup)
+        window.removeEventListener('blur', finishDrag)
+        el.removeEventListener('lostpointercapture', finishDrag)
         if (el.hasPointerCapture(pointerId)) {
           el.releasePointerCapture(pointerId)
         }
@@ -90,61 +120,72 @@ export function ChatScrollbar({ className, onNavigate }: ChatScrollbarProps) {
       const onMove = (e: PointerEvent) => {
         if (e.pointerId !== pointerId) return
         e.preventDefault()
-        window.scrollTo({ top: startScroll + (e.clientY - startY) * perPx })
+        scroller.scrollTo({ top: startScroll + (e.clientY - startY) * perPx })
+      }
+
+      const finishDrag = () => {
+        cleanup()
+        poke()
       }
 
       const onEnd = (e: PointerEvent) => {
         if (e.pointerId !== pointerId) return
-        cleanup()
+        finishDrag()
       }
 
       dragCleanupRef.current = cleanup
       window.addEventListener('pointermove', onMove)
       window.addEventListener('pointerup', onEnd)
       window.addEventListener('pointercancel', onEnd)
-      window.addEventListener('blur', cleanup)
-      el.addEventListener('lostpointercapture', cleanup)
+      window.addEventListener('blur', finishDrag)
+      el.addEventListener('lostpointercapture', finishDrag)
     },
-    [maxScroll, onNavigate, travel],
+    [maxScroll, onNavigate, poke, travel],
   )
 
   const onThumbPointerDown = useCallback(
     (event: React.PointerEvent) => {
       event.stopPropagation()
-      beginDrag(event, window.scrollY)
+      const scroller = getScroller()
+      if (scroller) beginDrag(event, scroller, readScrollTop(scroller))
     },
-    [beginDrag],
+    [beginDrag, getScroller],
   )
 
   const onTrackPointerDown = useCallback(
     (event: React.PointerEvent) => {
       if (isTouchDevice()) return
       const track = trackRef.current
-      if (!track || travel <= 0) return
+      const scroller = getScroller()
+      if (!track || !scroller || travel <= 0) return
       const clickY = event.clientY - track.getBoundingClientRect().top
       const target = Math.min(Math.max(clickY - thumbHeight / 2, 0), travel)
       const scrollTop = (target / travel) * maxScroll
 
-      window.scrollTo({ top: scrollTop })
-      beginDrag(event, scrollTop)
+      scroller.scrollTo({ top: scrollTop })
+      beginDrag(event, scroller, scrollTop)
     },
-    [beginDrag, maxScroll, travel, thumbHeight],
+    [beginDrag, getScroller, maxScroll, travel, thumbHeight],
   )
 
+  const viewportHeight = viewportRef ? `${geo.viewport}px` : '100dvh'
+
   return (
-    <div className="pointer-events-none sticky top-0 z-20 h-0">
+    <div className="pointer-events-none sticky top-0 z-20 h-0 shrink-0">
       <div
         ref={trackRef}
+        data-slot="overlay-scrollbar"
+        aria-hidden="true"
         onPointerDown={onTrackPointerDown}
         onPointerEnter={poke}
         className={cn(
-          'group absolute top-1 right-0.5 bottom-1 w-2.5 touch-none select-none',
+          'group absolute top-1 right-0.5 w-2.5 touch-none select-none',
           scrollable ? 'pointer-events-auto' : 'pointer-events-none',
-          className,
         )}
-        style={{ height: 'calc(100dvh - var(--spacing) * 2)' }}
+        style={{ height: `max(0px, ${viewportHeight} - var(--spacing) * 2)` }}
       >
         <div
+          data-slot="overlay-scrollbar-thumb"
           onPointerDown={onThumbPointerDown}
           className={cn(
             'bg-primary absolute right-0 w-1 touch-none rounded-full transition-[opacity,width] duration-150 group-hover:w-2',
@@ -153,7 +194,7 @@ export function ChatScrollbar({ className, onNavigate }: ChatScrollbarProps) {
             dragging && 'w-2',
           )}
           style={{
-            height: thumbHeight || 0,
+            height: thumbHeight,
             transform: `translateY(${thumbTop}px)`,
           }}
         />
@@ -162,7 +203,15 @@ export function ChatScrollbar({ className, onNavigate }: ChatScrollbarProps) {
   )
 }
 
-function useScrollGeometry(trackRef: React.RefObject<HTMLDivElement | null>) {
+function readScrollTop(scroller: Window | HTMLDivElement) {
+  return scroller instanceof HTMLElement ? scroller.scrollTop : scroller.scrollY
+}
+
+function useScrollGeometry(
+  trackRef: RefObject<HTMLDivElement | null>,
+  getScroller: () => Window | HTMLDivElement | null,
+  contentRef: ElementScrollRefs['contentRef'] | undefined,
+) {
   const [geo, setGeo] = useState<Geometry>({
     scrollY: 0,
     scrollHeight: 0,
@@ -171,15 +220,18 @@ function useScrollGeometry(trackRef: React.RefObject<HTMLDivElement | null>) {
   })
 
   useEffect(() => {
+    const scroller = getScroller()
+    if (!scroller) return
+    const viewport = scroller instanceof HTMLElement ? scroller : null
     let raf = 0
     const measure = () => {
       raf = 0
-      const doc = document.documentElement
       setGeo({
-        scrollY: window.scrollY,
-        scrollHeight: doc.scrollHeight,
-        viewport: window.innerHeight,
-        trackHeight: trackRef.current?.clientHeight ?? window.innerHeight,
+        scrollY: readScrollTop(scroller),
+        scrollHeight:
+          viewport?.scrollHeight ?? document.documentElement.scrollHeight,
+        viewport: viewport?.clientHeight ?? window.innerHeight,
+        trackHeight: trackRef.current?.clientHeight ?? 0,
       })
     }
     const schedule = () => {
@@ -188,37 +240,38 @@ function useScrollGeometry(trackRef: React.RefObject<HTMLDivElement | null>) {
 
     measure()
 
-    window.addEventListener('scroll', schedule, { passive: true })
+    scroller.addEventListener('scroll', schedule, { passive: true })
     window.addEventListener('resize', schedule)
 
     const observer = new ResizeObserver(schedule)
-    observer.observe(document.body)
+    const content = contentRef ? contentRef.current : document.body
+    if (content) observer.observe(content)
+    if (viewport) observer.observe(viewport)
     if (trackRef.current) observer.observe(trackRef.current)
 
     return () => {
-      window.removeEventListener('scroll', schedule)
+      scroller.removeEventListener('scroll', schedule)
       window.removeEventListener('resize', schedule)
       observer.disconnect()
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [trackRef])
+  }, [contentRef, getScroller, trackRef])
 
   return geo
 }
 
 /** Reveals the thumb on activity and fades it after a short idle delay. */
-function useActivity(keepAlive: boolean): [boolean, () => void] {
+function useActivity(): [boolean, () => void] {
   const [active, setActive] = useState(false)
   const timer = useRef(0)
 
   const poke = useCallback(() => {
     setActive(true)
     clearTimeout(timer.current)
-    if (!keepAlive)
-      timer.current = window.setTimeout(() => setActive(false), HIDE_DELAY)
-  }, [keepAlive])
+    timer.current = window.setTimeout(() => setActive(false), HIDE_DELAY)
+  }, [])
 
   useEffect(() => () => clearTimeout(timer.current), [])
 
-  return [active || keepAlive, poke]
+  return [active, poke]
 }

@@ -1,7 +1,6 @@
 import { FadingGradient } from '@/components/ui'
+import { OverlayScrollbar } from '@/components/ui/overlay-scrollbar'
 import { useElementHeight } from '@/hooks/measure'
-
-import { ChatScrollbar } from './chat-scrollbar'
 
 export type ChatLayoutProps = {
   /** The main scrollable content with bottom padding compensation. */
@@ -38,7 +37,7 @@ export function ChatLayout({
       data-slot="chat-layout"
       className="relative flex min-h-dvh flex-1 flex-col overflow-y-clip"
     >
-      {scrollbar && <ChatScrollbar onNavigate={onScrollbarNavigate} />}
+      {scrollbar && <OverlayScrollbar onNavigate={onScrollbarNavigate} />}
       {mainContent(
         bottomHeight + bottomInset,
         Math.max(0, bottomHeight - footerHeight),

@@ -1,3 +1,4 @@
+import { OverlayScrollArea } from '@/components/ui/overlay-scroll-area'
 import { useSessionDragScroll } from '@/hooks/chat/session-drag-scroll'
 import type { ReactNode, RefObject } from 'react'
 
@@ -14,12 +15,13 @@ export function SessionListScrollArea({
   useSessionDragScroll(ref)
 
   return (
-    <div
+    <OverlayScrollArea
       ref={ref}
       data-slot="session-list-scroll-area"
-      className="min-h-0 flex-1 overflow-y-auto px-2 [overflow-anchor:none]"
+      className="flex-1 [overflow-anchor:none]"
+      contentClassName="px-2"
     >
       {children}
-    </div>
+    </OverlayScrollArea>
   )
 }
