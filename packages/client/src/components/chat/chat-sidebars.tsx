@@ -5,6 +5,7 @@ import {
   Sidebar,
   useSidebar,
 } from '@/components/ui'
+import { useAccountId } from '@/hooks/account-scope'
 import { SessionStoreProvider } from '@/hooks/chat'
 import { useNewSession } from '@/hooks/chat/new-session'
 import {
@@ -53,16 +54,19 @@ function ChatSidebar({
   side: SidebarSide
   children: React.ReactNode
 }) {
-  const state = getSidebarState(side)
+  const userId = useAccountId()
+  const state = getSidebarState(userId, side)
 
   return (
     <Sidebar
       side={side}
       width={80}
       defaultPinned={state.pinned}
-      onPinnedChange={(pinned) => setSidebarState(side, { pinned })}
+      onPinnedChange={(pinned) => setSidebarState(userId, side, { pinned })}
       defaultCollapsed={state.collapsed ?? true}
-      onCollapsedChange={(collapsed) => setSidebarState(side, { collapsed })}
+      onCollapsedChange={(collapsed) =>
+        setSidebarState(userId, side, { collapsed })
+      }
     >
       <MobileToggle side={side} />
       {children}

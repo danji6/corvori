@@ -30,15 +30,15 @@ function actions(): AgentSaveActions {
   }
 }
 
-afterEach(() => setEditingAgentId(null))
+afterEach(() => setEditingAgentId('owner', null))
 
 test('New stays local and Save submits all settings in one create', async () => {
   const backend = actions()
   const values = newAgentFormValues()
-  startNewAgent()
+  startNewAgent('owner')
   expect(backend.create).not.toHaveBeenCalled()
 
-  expect(await persistAgentSettings(values, options, backend)).toBe(ID)
+  expect(await persistAgentSettings('owner', values, options, backend)).toBe(ID)
   expect(backend.create).toHaveBeenCalledTimes(1)
   expect(backend.create).toHaveBeenCalledWith(
     expect.objectContaining({ name: 'New agent', prompts: values.prompts }),
@@ -52,14 +52,14 @@ test('a rejected create remains retryable without marking an agent as created', 
   backend.create = mock(async () => {
     throw new Error('Rejected')
   })
-  startNewAgent()
+  startNewAgent('owner')
   await expect(
-    persistAgentSettings(newAgentFormValues(), options, backend),
+    persistAgentSettings('owner', newAgentFormValues(), options, backend),
   ).rejects.toThrow('Rejected')
-  expect(getCreatedAgentId()).toBeUndefined()
+  expect(getCreatedAgentId('owner')).toBeUndefined()
   backend.create = mock(async () => ID)
   expect(
-    await persistAgentSettings(newAgentFormValues(), options, backend),
+    await persistAgentSettings('owner', newAgentFormValues(), options, backend),
   ).toBe(ID)
 })
 
@@ -70,15 +70,17 @@ test('retry after avatar failure updates the created agent instead of duplicatin
   })
   const avatar = new File(['avatar'], 'avatar.png')
   const withAvatar = { ...options, pendingAvatar: avatar }
-  startNewAgent()
+  startNewAgent('owner')
 
   await expect(
-    persistAgentSettings(newAgentFormValues(), withAvatar, backend),
+    persistAgentSettings('owner', newAgentFormValues(), withAvatar, backend),
   ).rejects.toThrow('Upload failed')
-  expect(getCreatedAgentId()).toBe(ID)
+  expect(getCreatedAgentId('owner')).toBe(ID)
   backend.uploadAvatar = mock(async () => {})
   const edited = { ...newAgentFormValues(), name: 'Edited after failure' }
-  expect(await persistAgentSettings(edited, withAvatar, backend)).toBe(ID)
+  expect(await persistAgentSettings('owner', edited, withAvatar, backend)).toBe(
+    ID,
+  )
   expect(backend.create).toHaveBeenCalledTimes(1)
   expect(backend.update).toHaveBeenCalledWith(
     expect.objectContaining({ agentId: ID, name: edited.name }),
@@ -93,6 +95,7 @@ test('retry after avatar failure updates the created agent instead of duplicatin
 test('saving an existing agent preserves the update path', async () => {
   const backend = actions()
   await persistAgentSettings(
+    'owner',
     newAgentFormValues(),
     { ...options, newAgent: false, agentId: ID },
     backend,

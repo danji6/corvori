@@ -1,3 +1,4 @@
+import { useAccountId } from '@/hooks/account-scope'
 import { APP_ID } from '@cv/core/const'
 import { useEffect, useMemo } from 'react'
 
@@ -8,7 +9,11 @@ import { createTextDraftStore } from './text-draft-store'
 export const NO_SESSION_DRAFT_KEY = '@new-chat'
 
 const SAVE_DEBOUNCE_MS = 300
-const store = createTextDraftStore(`${APP_ID}-composer-drafts`, NO_SESSION_DRAFT_KEY) // prettier-ignore
+
+const accountStore = createTextDraftStore(
+  `${APP_ID}-composer-drafts`,
+  NO_SESSION_DRAFT_KEY,
+)
 
 type ComposerDraft = {
   /** Current persisted draft text for the session. */
@@ -21,9 +26,11 @@ type ComposerDraft = {
 
 /** Provides draft accessors for a session or the new-chat composer. */
 export function useComposerDraft(key: string | undefined): ComposerDraft {
+  const userId = useAccountId()
+  const store = useMemo(() => accountStore(userId), [userId])
   const debouncedSave = useMemo(
     () => debounce(store.write, SAVE_DEBOUNCE_MS),
-    [],
+    [store],
   )
 
   useEffect(() => () => debouncedSave.cancel(), [debouncedSave])
@@ -39,6 +46,6 @@ export function useComposerDraft(key: string | undefined): ComposerDraft {
         if (key) store.clear(key)
       },
     }),
-    [key, debouncedSave],
+    [key, debouncedSave, store],
   )
 }

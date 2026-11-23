@@ -1,4 +1,5 @@
 import type { ScrollDeps } from '@/components/chat/messages/message-list/deps'
+import { useAccountId } from '@/hooks/account-scope'
 import type { useMessageStore } from '@/hooks/chat'
 import type { SeekTargetOptions } from '@/hooks/chat/message-list/seek'
 import { getNavPaddingPx } from '@/hooks/nav-padding'
@@ -44,6 +45,7 @@ export function useScrollPersistence(
     isPositioning = false,
   }: PersistenceOptions,
 ) {
+  const userId = useAccountId()
   const {
     metaRef,
     topPadding,
@@ -89,7 +91,7 @@ export function useScrollPersistence(
     // Anchor to the row within the message
     const rowAddress = scrollRowAddress(anchor.row, messageStore)
     const offset = anchor.top - topPaddingPx
-    setSavedScroll(sessionId, {
+    setSavedScroll(userId, sessionId, {
       anchorId,
       creationTime: meta?._creationTime ?? 0,
       segmentIndex: rowAddress?.segmentIndex,
@@ -100,6 +102,7 @@ export function useScrollPersistence(
       following,
     })
   }, [
+    userId,
     sessionId,
     topPadding,
     messageStore,
@@ -146,7 +149,7 @@ export function useScrollPersistence(
 
   // Restores a saved position. Returns true if it took over scrolling.
   const restore = useCallback((): boolean => {
-    const saved = sessionId ? getSavedScroll(sessionId) : undefined
+    const saved = sessionId ? getSavedScroll(userId, sessionId) : undefined
     scrollDebug('persistence.restore', () => ({ saved }))
     if (!saved || saved.following) {
       armedRef.current = true
@@ -173,7 +176,7 @@ export function useScrollPersistence(
       },
     )
     return true
-  }, [sessionId, requestScrollToMessage, followToBottom, restored])
+  }, [sessionId, requestScrollToMessage, followToBottom, restored, userId])
 
   return { restore }
 }

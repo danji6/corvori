@@ -17,26 +17,34 @@ export function isWorkerAction(
   const action = value as NotificationWorkerAction
   return (
     action.type === NOTIFICATION_ACTION &&
+    typeof action.userId === 'string' &&
+    action.userId.length > 0 &&
     typeof action.notificationId === 'string' &&
     ['read', 'show', 'allow', 'allow-session', 'deny'].includes(action.action)
   )
 }
 
 /** Applies durable clicks after authentication; failed actions remain retryable. */
-export async function drainPendingWorkerActions(apply: ApplyWorkerAction) {
+export async function drainPendingWorkerActions(
+  userId: string,
+  apply: ApplyWorkerAction,
+  signal?: AbortSignal,
+) {
   if (!('caches' in window)) return
-  const cache = await caches.open(NOTIFICATION_ACTION_CACHE)
+  const cache = await caches.open(`${NOTIFICATION_ACTION_CACHE}:${userId}`)
   const failures: unknown[] = []
   for (const request of await cache.keys()) {
+    if (signal?.aborted) break
     const response = await cache.match(request)
     const action: unknown = await response?.json().catch(() => null)
     if (!isWorkerAction(action)) {
       await cache.delete(request)
       continue
     }
+    if (action.userId !== userId || signal?.aborted) continue
     try {
       await apply(action)
-      await cache.delete(request)
+      if (!signal?.aborted) await cache.delete(request)
     } catch (error) {
       failures.push(error)
     }
@@ -55,5 +63,7 @@ export function acknowledgeWorkerAction(action: NotificationWorkerAction) {
   navigator.serviceWorker.controller?.postMessage({
     type: NOTIFICATION_ACTION_ACK,
     requestId: action.requestId,
+    userId: action.userId,
+    focus: action.action === 'show',
   })
 }

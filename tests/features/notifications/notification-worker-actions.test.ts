@@ -7,7 +7,7 @@ import { expect, mock, test } from 'bun:test'
 
 function pendingCache(value: unknown) {
   const url = 'https://example.test/__notification_actions__/notification'
-  const entries = new Map([[url, value]])
+  const entries = new Map(value === undefined ? [] : [[url, value]])
   return {
     entries,
     keys: async () => [...entries.keys()].map((key) => new Request(key)),
@@ -23,6 +23,7 @@ test('queued session approval survives a failed attempt and retains its selected
   const cache = pendingCache({
     type: 'corvori:notification-action',
     action: 'allow-session',
+    userId: 'owner',
     notificationId: 'notification',
     sessionId: 'session',
   })
@@ -35,12 +36,18 @@ test('queued session approval survives a failed attempt and retains its selected
   Object.defineProperty(globalThis, 'caches', {
     configurable: true,
     value: {
-      open: async () => cache,
+      open: async (key: string) =>
+        key.endsWith(':owner') ? cache : pendingCache(undefined),
     },
   })
   try {
+    const wrongAccount = mock(async () => undefined)
+    await drainPendingWorkerActions('other', wrongAccount)
+    expect(wrongAccount).not.toHaveBeenCalled()
+    expect(cache.entries.size).toBe(1)
+
     await expect(
-      drainPendingWorkerActions(async () => {
+      drainPendingWorkerActions('owner', async () => {
         throw new Error('offline')
       }),
     ).rejects.toThrow('offline')
@@ -48,12 +55,13 @@ test('queued session approval survives a failed attempt and retains its selected
     cache.entries.set('https://example.test/__notification_actions__/second', {
       type: 'corvori:notification-action',
       action: 'allow-session',
+      userId: 'owner',
       notificationId: 'second',
       sessionId: 'session',
     })
     const completed: string[] = []
     await expect(
-      drainPendingWorkerActions(async (action) => {
+      drainPendingWorkerActions('owner', async (action) => {
         if (action.notificationId === 'notification') throw new Error('offline')
         completed.push(action.notificationId)
       }),
@@ -61,7 +69,7 @@ test('queued session approval survives a failed attempt and retains its selected
     expect(completed).toEqual(['second'])
     expect(cache.entries.size).toBe(1)
     const apply = mock(async () => undefined)
-    await drainPendingWorkerActions(apply)
+    await drainPendingWorkerActions('owner', apply)
     expect(apply).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'allow-session' }),
     )

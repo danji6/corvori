@@ -8,6 +8,7 @@ import { desktopApprovalActions } from '@cv/core/notification-actions'
 
 /** Shows a native notification when browser permission allows it. */
 export async function showDesktopNotification(
+  userId: string,
   notification: NotificationItem,
   isCurrent = () => true,
 ) {
@@ -27,8 +28,9 @@ export async function showDesktopNotification(
     body: notificationBody(notification),
     requireInteraction: notification.requestState === 'pending',
     icon: '/favicon.png',
-    tag: notificationTag(notification._id),
+    tag: notificationTag(userId, notification._id),
     data: {
+      userId,
       notificationId: notification._id,
       sessionId: notification.sessionId,
     },
@@ -42,11 +44,14 @@ export async function showDesktopNotification(
 }
 
 /** Closes the native alert associated with a notification record. */
-export async function closeDesktopNotification(notificationId: string) {
+export async function closeDesktopNotification(
+  userId: string,
+  notificationId: string,
+) {
   if (!('serviceWorker' in navigator)) return
   const registration = await navigator.serviceWorker.getRegistration()
   const notifications = await registration?.getNotifications({
-    tag: notificationTag(notificationId),
+    tag: notificationTag(userId, notificationId),
   })
   notifications?.forEach((notification) => notification.close())
 }
@@ -74,9 +79,9 @@ export function supportsDesktopNotifications() {
 
 const DELIVERY_KEY = `${APP_ID}:desktop-delivery`
 
-function deliveredNotifications(): Record<string, number> {
+function deliveredNotifications(key: string): Record<string, number> {
   try {
-    const value = JSON.parse(localStorage.getItem(DELIVERY_KEY) ?? '{}')
+    const value = JSON.parse(localStorage.getItem(key) ?? '{}')
     return value && typeof value === 'object' && !Array.isArray(value)
       ? value
       : {}
@@ -87,13 +92,16 @@ function deliveredNotifications(): Record<string, number> {
 
 /** Suppresses replay across reloads and serializes delivery between browser tabs. */
 export async function showDesktopNotificationOnce(
+  userId: string,
   notification: NotificationItem,
   isCurrent: () => boolean,
 ) {
+  const key = `${DELIVERY_KEY}:${userId}`
   const deliver = async () => {
-    const delivered = deliveredNotifications()
+    const delivered = deliveredNotifications(key)
     if (delivered[notification._id]) return
-    if (!(await showDesktopNotification(notification, isCurrent))) return
+    if (!(await showDesktopNotification(userId, notification, isCurrent)))
+      return
     delivered[notification._id] = Date.now()
     const bounded = Object.fromEntries(
       Object.entries(delivered)
@@ -101,17 +109,18 @@ export async function showDesktopNotificationOnce(
         .slice(0, 1000),
     )
     try {
-      localStorage.setItem(DELIVERY_KEY, JSON.stringify(bounded))
+      localStorage.setItem(key, JSON.stringify(bounded))
     } catch {
       /* Desktop deduplication is best effort; requests remain on the server. */
     }
   }
-  if (navigator.locks) await navigator.locks.request(DELIVERY_KEY, deliver)
+  if (navigator.locks) await navigator.locks.request(key, deliver)
   else await deliver()
 }
 
 /** Closes settled or currently viewed banners, including those delivered by other tabs. */
 export async function closeInactiveDesktopNotifications(
+  userId: string,
   activeIds: string[],
   viewedSessionId: string | null = null,
 ) {
@@ -120,7 +129,7 @@ export async function closeInactiveDesktopNotifications(
   const notifications = await registration?.getNotifications()
   const active = new Set(activeIds)
   for (const notification of notifications ?? []) {
-    if (!notification.tag.startsWith(`${APP_ID}:`)) continue
+    if (notification.data?.userId !== userId) continue
     const id = notification.data?.notificationId
     const viewed =
       viewedSessionId !== null &&
@@ -131,11 +140,11 @@ export async function closeInactiveDesktopNotifications(
 }
 
 /** Closes delivered banners when the user disables desktop delivery. */
-export async function closeAllDesktopNotifications() {
+export async function closeAllDesktopNotifications(userId: string) {
   if (!('serviceWorker' in navigator)) return
   const registration = await navigator.serviceWorker.getRegistration()
   const notifications = await registration?.getNotifications()
   notifications
-    ?.filter((notification) => notification.tag.startsWith(`${APP_ID}:`))
+    ?.filter((notification) => notification.data?.userId === userId)
     .forEach((notification) => notification.close())
 }

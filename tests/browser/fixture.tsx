@@ -1,3 +1,4 @@
+import { AccountScope } from '@/hooks/account-scope'
 import { usePromptPreviews } from '@/hooks/chat/prompt-previews'
 import { Suspense, lazy, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -13,6 +14,12 @@ import { ProviderConnectionsFixture } from './provider-connections-fixture'
 import { ScrollFixture } from './scroll-fixture'
 import { ToolSettingsFixture } from './tool-settings-fixture'
 import { ToolkitsFixture } from './toolkits-fixture'
+
+const AccountStorageFixture = lazy(() =>
+  import('./account-storage-fixture').then((module) => ({
+    default: module.AccountStorageFixture,
+  })),
+)
 
 const XmlTagsFixture = lazy(() =>
   import('./xml-tags-fixture').then((module) => ({
@@ -156,108 +163,106 @@ function PreviewFixture() {
   )
 }
 
-createRoot(document.getElementById('root')!).render(
-  new URLSearchParams(location.search).get('fixture') === 'code' ? (
+const fixtureName = new URLSearchParams(location.search).get('fixture')
+const fixture =
+  fixtureName === 'account-storage' ? (
+    <Suspense fallback={null}>
+      <AccountStorageFixture />
+    </Suspense>
+  ) : fixtureName === 'code' ? (
     <CodeFixture />
-  ) : new URLSearchParams(location.search).get('fixture') ===
-    'attachment-download' ? (
+  ) : fixtureName === 'attachment-download' ? (
     <AttachmentDownloadFixture />
-  ) : new URLSearchParams(location.search).get('fixture') ===
-    'message-pagination' ? (
+  ) : fixtureName === 'message-pagination' ? (
     <Suspense fallback={<p>Loading pagination…</p>}>
       <MessagePaginationFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') === 'changes' ? (
+  ) : fixtureName === 'changes' ? (
     <ChangesFixture />
-  ) : new URLSearchParams(location.search).get('fixture') ===
-    'tool-settings' ? (
+  ) : fixtureName === 'tool-settings' ? (
     <ToolSettingsFixture />
-  ) : new URLSearchParams(location.search).get('fixture') === 'toolkits' ? (
+  ) : fixtureName === 'toolkits' ? (
     <ToolkitsFixture />
-  ) : new URLSearchParams(location.search).get('fixture') === 'mcp-protocol' ? (
+  ) : fixtureName === 'mcp-protocol' ? (
     <McpProtocolFixture />
-  ) : new URLSearchParams(location.search).get('fixture') === 'mcp-settings' ? (
+  ) : fixtureName === 'mcp-settings' ? (
     <McpSettingsFixture />
-  ) : new URLSearchParams(location.search).get('fixture') === 'mcp-catalog' ? (
+  ) : fixtureName === 'mcp-catalog' ? (
     <McpCatalogFixture />
-  ) : new URLSearchParams(location.search).get('fixture') === 'xml-tags' ? (
+  ) : fixtureName === 'xml-tags' ? (
     <Suspense fallback={<p>Loading XML editors…</p>}>
       <XmlTagsFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') ===
-    'notifications' ? (
+  ) : fixtureName === 'notifications' ? (
     <Suspense fallback={<p>Loading notifications…</p>}>
       <NotificationsFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') === 'sidebar' ? (
+  ) : fixtureName === 'sidebar' ? (
     <Suspense fallback={<p>Loading sidebar…</p>}>
       <SidebarFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') === 'ui-layout' ? (
+  ) : fixtureName === 'ui-layout' ? (
     <Suspense fallback={<p>Loading layout…</p>}>
       <UiLayoutFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') ===
-    'subagent-approvals' ? (
+  ) : fixtureName === 'subagent-approvals' ? (
     <Suspense fallback={<p>Loading approvals…</p>}>
       <SubagentApprovalsFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') ===
-    'provider-connections' ? (
+  ) : fixtureName === 'provider-connections' ? (
     <ProviderConnectionsFixture />
-  ) : new URLSearchParams(location.search).get('fixture') === 'script-menus' ? (
+  ) : fixtureName === 'script-menus' ? (
     <Suspense fallback={<p>Loading menus…</p>}>
       <ScriptMenusFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') ===
-    'code-completion' ? (
+  ) : fixtureName === 'code-completion' ? (
     <Suspense fallback={<p>Loading code editor…</p>}>
       <CodeCompletionFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') ===
-    'inline-source' ? (
+  ) : fixtureName === 'inline-source' ? (
     <Suspense fallback={<p>Loading editor…</p>}>
       <InlineSourceFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') ===
-    'account-security' ? (
+  ) : fixtureName === 'account-security' ? (
     <Suspense fallback={<p>Loading account settings…</p>}>
       <AccountSecurityFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') === 'empty-chat' ? (
+  ) : fixtureName === 'empty-chat' ? (
     <Suspense fallback={null}>
       <EmptyChatFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') ===
-    'session-folders' ? (
+  ) : fixtureName === 'session-folders' ? (
     <Suspense fallback={<p>Loading session folders…</p>}>
       <SessionFoldersFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') === 'skill-tools' ? (
+  ) : fixtureName === 'skill-tools' ? (
     <Suspense fallback={<p>Loading tool fixture…</p>}>
       <SkillToolsFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') === 'skill-source' ? (
+  ) : fixtureName === 'skill-source' ? (
     <Suspense fallback={<p>Loading source picker…</p>}>
       <SkillSourceFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') === 'skills' ? (
+  ) : fixtureName === 'skills' ? (
     <Suspense fallback={<p>Loading skills fixture…</p>}>
       <SkillsFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') === 'appearance' ? (
+  ) : fixtureName === 'appearance' ? (
     <Suspense fallback={<p>Loading appearance…</p>}>
       <AppearanceFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') === 'notes' ? (
+  ) : fixtureName === 'notes' ? (
     <Suspense fallback={<p>Loading notes…</p>}>
       <NotesFixture />
     </Suspense>
-  ) : new URLSearchParams(location.search).get('fixture') === 'checkbox' ? (
+  ) : fixtureName === 'checkbox' ? (
     <CheckboxFixture />
-  ) : new URLSearchParams(location.search).get('fixture') === 'scroll' ? (
+  ) : fixtureName === 'scroll' ? (
     <ScrollFixture />
   ) : (
     <PreviewFixture />
-  ),
+  )
+const userId = fixtureName === 'session-folders' ? 'fixture-owner' : 'owner'
+createRoot(document.getElementById('root')!).render(
+  <AccountScope userId={userId}>{fixture}</AccountScope>,
 )

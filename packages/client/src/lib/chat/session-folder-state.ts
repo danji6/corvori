@@ -1,7 +1,3 @@
-import { APP_ID } from '@cv/core/const'
-
-const STORAGE_KEY = `${APP_ID}-session-folder-collapse`
-
 /** Applies expansion choices in action order, including defaults for unloaded descendants. */
 export function isFolderCollapsed(
   state: Record<string, boolean>,
@@ -30,22 +26,4 @@ export function setFolderCollapsed(
   delete next[key]
   next[key] = value
   return next
-}
-
-/** Reads the saved folder expansion state. */
-export function readCollapsed(): Record<string, boolean> {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')
-  } catch {
-    return {}
-  }
-}
-
-/** Persists folder expansion state when browser storage is available. */
-export function saveCollapsed(value: Record<string, boolean>) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
-  } catch {
-    /* Storage may be unavailable. */
-  }
 }

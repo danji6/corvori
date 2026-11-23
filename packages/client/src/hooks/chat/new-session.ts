@@ -1,3 +1,4 @@
+import { useAccountId } from '@/hooks/account-scope'
 import {
   getSelectedSessionFolder,
   setSelectedSessionFolder,
@@ -8,7 +9,6 @@ import { useQuery } from 'convex/react'
 import { useEffect } from 'react'
 import { useLocation, useSearch } from 'wouter'
 
-import { useUserProfile } from './profile'
 import { useActiveSession } from './session'
 
 /** Remembers the current folder and opens its draft for the next session. */
@@ -18,30 +18,37 @@ export function useNewSession() {
   const params = new URLSearchParams(search)
   const draftFolderId = params.has('id') ? null : params.get('folder')
   const session = useActiveSession()
-  const userId = useUserProfile()?._id
-  const remembered = userId ? getSelectedSessionFolder(userId) : null
+  const userId = useAccountId()
+  const remembered = getSelectedSessionFolder(userId)
+
   const selectedFolder = useQuery(
     api.sessionFolders.get,
     remembered ? { folderId: remembered as Id<'sessionFolders'> } : 'skip',
   )
+  const draftFolder = useQuery(
+    api.sessionFolders.get,
+    draftFolderId && draftFolderId !== remembered
+      ? { folderId: draftFolderId as Id<'sessionFolders'> }
+      : 'skip',
+  )
+
   const sessionId = session?._id
   const ownerId = session?.ownerId
   const folderId = session?.folderId
 
   useEffect(() => {
-    if (!userId) return
     if (sessionId && ownerId === userId) {
       setSelectedSessionFolder(userId, folderId ?? null)
-    } else if (draftFolderId) {
-      setSelectedSessionFolder(userId, draftFolderId)
+    } else if (draftFolder) {
+      setSelectedSessionFolder(userId, draftFolder._id)
     }
-  }, [userId, sessionId, ownerId, folderId, draftFolderId])
+  }, [userId, sessionId, ownerId, folderId, draftFolder])
 
   return () => {
-    const selected = userId ? getSelectedSessionFolder(userId) : null
+    const selected = getSelectedSessionFolder(userId)
     const available =
       selected && (selected !== remembered || selectedFolder !== null)
-    if (userId && !available) setSelectedSessionFolder(userId, null)
+    if (!available) setSelectedSessionFolder(userId, null)
     navigate(available ? `/?folder=${selected}` : '/', { replace: true })
   }
 }

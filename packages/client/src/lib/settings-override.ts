@@ -1,22 +1,16 @@
-import type { ResolvedSettings } from '@cv/convex/model/defaults'
-import { APP_ID } from '@cv/core/const'
+import { type SettingsOverride, uiSettingsStore } from './ui-settings'
 
-import { createLocalStorageStore } from './local-storage-store'
+export type { SettingsOverride } from './ui-settings'
 
-const STORAGE_KEY = `${APP_ID}-settings-override`
+const EMPTY_OVERRIDE: SettingsOverride = {}
 
-export type SettingsOverride = Partial<ResolvedSettings>
-
-const store = createLocalStorageStore<SettingsOverride>(STORAGE_KEY)
-
-export function getSettingsOverride(): SettingsOverride {
-  return store.get()
+export function getSettingsOverride(userId: string): SettingsOverride {
+  return uiSettingsStore(userId).get().fonts ?? EMPTY_OVERRIDE
 }
 
-export function subscribeSettingsOverride(listener: () => void) {
-  return store.subscribe(listener)
-}
-
-export function setSettingsOverride(patch: SettingsOverride) {
-  store.set(patch)
+export function setSettingsOverride(
+  userId: string,
+  fonts: SettingsOverride | undefined,
+) {
+  uiSettingsStore(userId).set({ fonts })
 }

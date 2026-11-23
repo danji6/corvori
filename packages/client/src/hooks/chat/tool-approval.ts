@@ -1,4 +1,5 @@
 import type { ToolApprovalPickerProps } from '@/components/chat/workspace/tool-approval-picker'
+import { useAccountId } from '@/hooks/account-scope'
 import type { RememberScope } from '@/lib/chat'
 import { optimisticallyRespondApproval } from '@/lib/chat/approval-optimistic'
 import { createTextDraftStore } from '@/lib/chat/text-draft-store'
@@ -20,13 +21,13 @@ import type { PathApprovalStatus } from '@cv/core/workspace/path-policy'
 import type { Editor } from '@tiptap/react'
 import type { ToolUIPart } from 'ai'
 import { useMutation } from 'convex/react'
-import { useCallback, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 
 import { useChatMessage } from './messages'
 import { useActiveSession, useActiveSessionState } from './session'
 import { useStreamProcessingMessageId } from './stream'
 
-const notes = createTextDraftStore(`${APP_ID}-approval-note-drafts`)
+const accountNotes = createTextDraftStore(`${APP_ID}-approval-note-drafts`)
 
 export type PendingToolApproval = {
   key: string
@@ -67,6 +68,8 @@ export function useToolApprovalPicker({
   onAbort,
   childApproval,
 }: Pick<ToolApprovalPickerProps, 'request' | 'onAbort' | 'childApproval'>) {
+  const userId = useAccountId()
+  const notes = useMemo(() => accountNotes(userId), [userId])
   const session = useActiveSession()
   const state = useActiveSessionState()
   const { part, key } = request
@@ -134,7 +137,7 @@ export function useToolApprovalPicker({
         notes.write(key, serializeBlocksToMarkdown(editor))
       })
     },
-    [key],
+    [key, notes],
   )
 
   return {

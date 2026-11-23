@@ -1,28 +1,45 @@
 import type { FolderMenuActions } from '@/components/chat/sessions/folder-menu'
+import { useAccountId } from '@/hooks/account-scope'
 import { useFolderMoves } from '@/hooks/chat/folder-moves'
 import { useFolderPins } from '@/hooks/chat/folder-pins'
 import {
   isFolderCollapsed,
-  readCollapsed,
-  saveCollapsed,
   setFolderCollapsed,
 } from '@/lib/chat/session-folder-state'
+import { uiSettingsStore } from '@/lib/ui-settings'
 import type { FolderView } from '@cv/convex/model/session/types'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 
 type FolderHeaderActions = FolderMenuActions & {
   toggle: () => void
   onCollapseAll: () => void
 }
 
+type FolderCollapse = Record<string, boolean>
+
+const EMPTY_COLLAPSE: FolderCollapse = {}
+
 /** Keeps folder controls stable while session pages and expansion state change. */
 export function useFolderControls(serverFolders: FolderView[]) {
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(readCollapsed) // prettier-ignore
+  const store = uiSettingsStore(useAccountId())
+
+  const collapsed = useSyncExternalStore(
+    store.subscribe,
+    () => store.get().folderCollapse ?? EMPTY_COLLAPSE,
+  )
+
+  const setCollapsed = useCallback(
+    (update: (current: FolderCollapse) => FolderCollapse) => {
+      store.update(({ folderCollapse = EMPTY_COLLAPSE }) => ({
+        folderCollapse: update(folderCollapse),
+      }))
+    },
+    [store],
+  )
+
   const [editing, setEditing] = useState<FolderView | 'new' | null>(null)
   const [newParent, setNewParent] = useState<FolderView | undefined>(undefined)
   const [deleting, setDeleting] = useState<FolderView | null>(null)
-
-  useEffect(() => saveCollapsed(collapsed), [collapsed])
 
   const expandParent = useCallback(
     (parentId: string | null) => {
@@ -37,7 +54,7 @@ export function useFolderControls(serverFolders: FolderView[]) {
         return next
       })
     },
-    [serverFolders],
+    [serverFolders, setCollapsed],
   )
 
   const organizing = useFolderMoves(serverFolders, expandParent)
@@ -56,7 +73,7 @@ export function useFolderControls(serverFolders: FolderView[]) {
         ),
       )
     },
-    [folders],
+    [folders, setCollapsed],
   )
 
   const collapseAll = useCallback(
@@ -74,7 +91,7 @@ export function useFolderControls(serverFolders: FolderView[]) {
         return next
       })
     },
-    [folders],
+    [folders, setCollapsed],
   )
 
   const order = useCallback(

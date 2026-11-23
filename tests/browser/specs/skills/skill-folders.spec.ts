@@ -14,7 +14,7 @@ test('folder picker remembers confirmed selections across reloads, with no paren
   const picker = page.getByRole('dialog')
   const path = picker.getByPlaceholder('/path/to/project')
   const recent = () =>
-    page.evaluate(() => localStorage.getItem('corvori-recent-directories'))
+    page.evaluate(() => localStorage.getItem('corvori-ui-settings:owner'))
   await page.getByRole('button', { name: 'Files', exact: true }).click()
   await choose.click()
   await expect(
@@ -48,7 +48,7 @@ test('folder picker remembers confirmed selections across reloads, with no paren
     .click()
   await expect(picker).toHaveCount(0)
   expect(JSON.parse((await recent())!)).toEqual({
-    paths: ['/fixture/custom-home/project'],
+    recentDirectories: ['/fixture/custom-home/project'],
   })
 
   await expect(choose).toBeEnabled()
@@ -81,9 +81,9 @@ test('path bar fuzzy searches recent folders and keeps arbitrary paths navigable
 }) => {
   await page.evaluate(() => {
     localStorage.setItem(
-      'corvori-recent-directories',
+      'corvori-ui-settings:owner',
       JSON.stringify({
-        paths: [
+        recentDirectories: [
           '/fixture/custom-home/project',
           '/fixture/archives',
           '/fixture/research',
@@ -128,7 +128,8 @@ test('path bar fuzzy searches recent folders and keeps arbitrary paths navigable
   expect(
     await page.evaluate(
       () =>
-        JSON.parse(localStorage.getItem('corvori-recent-directories')!).paths,
+        JSON.parse(localStorage.getItem('corvori-ui-settings:owner')!)
+          .recentDirectories,
     ),
   ).toEqual([
     '/fixture/custom-home/project',

@@ -1,4 +1,5 @@
 import type { ScrollDeps } from '@/components/chat/messages/message-list/deps'
+import { AccountScope } from '@/hooks/account-scope'
 import { useScrollPersistence } from '@/hooks/chat/message-list/scroll-persistence'
 import type { SeekTargetOptions } from '@/hooks/chat/message-list/seek'
 import { createMessageStore } from '@/lib/chat/message-store'
@@ -37,7 +38,7 @@ afterEach(() => {
   act(() => root?.unmount())
   root = null
   document.body.replaceChildren()
-  clearSavedScroll(sessionId)
+  clearSavedScroll('owner', sessionId)
   store = createMessageStore()
   coordinator = new ScrollCoordinator()
   positioning = false
@@ -85,7 +86,11 @@ async function mount() {
 
 async function render() {
   await act(async () => {
-    root!.render(<Harness />)
+    root!.render(
+      <AccountScope userId="owner">
+        <Harness />
+      </AccountScope>,
+    )
   })
 }
 
@@ -97,7 +102,7 @@ test('saves a collapsed tool address on pagehide and restores its content offset
   await mount()
   expect(view.restore()).toBe(false)
   saveLeaving()
-  const saved = getSavedScroll(sessionId)!
+  const saved = getSavedScroll('owner', sessionId)!
   expect(saved.rowAddress).toEqual({
     kind: 'work',
     segmentIndex: 4,
@@ -108,7 +113,7 @@ test('saves a collapsed tool address on pagehide and restores its content offset
   expect(saved.contentOffset).toBe(true)
   expect(view.restore()).toBe(true)
   saveLeaving()
-  expect(getSavedScroll(sessionId)).toBe(saved)
+  expect(getSavedScroll('owner', sessionId)).toBe(saved)
   expect(request.mock.lastCall?.slice(0, 3)).toEqual(['m1', 1, 4])
   expect(request.mock.lastCall?.[3]).toMatchObject({
     rowAddress: saved.rowAddress,
@@ -121,32 +126,32 @@ test('keeps the last settled position while loading, positioning, or restoring',
   await mount()
   view.restore()
   saveLeaving()
-  const saved = getSavedScroll(sessionId)!
+  const saved = getSavedScroll('owner', sessionId)!
   deps.metaRef.current = { ...deps.metaRef.current, isLoadingOlder: true }
   saveLeaving()
-  expect(getSavedScroll(sessionId)).toBe(saved)
+  expect(getSavedScroll('owner', sessionId)).toBe(saved)
   deps.metaRef.current = {
     ...deps.metaRef.current,
     isLoadingOlder: false,
     isLoadingNewer: true,
   }
   saveLeaving()
-  expect(getSavedScroll(sessionId)).toBe(saved)
+  expect(getSavedScroll('owner', sessionId)).toBe(saved)
   deps.metaRef.current = { ...deps.metaRef.current, isLoadingNewer: false }
   positioning = true
   await render()
   saveLeaving()
-  expect(getSavedScroll(sessionId)).toBe(saved)
+  expect(getSavedScroll('owner', sessionId)).toBe(saved)
   positioning = false
   await render()
   coordinator.begin('restore')
   saveLeaving()
-  expect(getSavedScroll(sessionId)).toBe(saved)
+  expect(getSavedScroll('owner', sessionId)).toBe(saved)
 })
 
 test('preserves compatibility with saved row keys from before content addresses', async () => {
   await mount()
-  setSavedScroll(sessionId, {
+  setSavedScroll('owner', sessionId, {
     anchorId: 'm1',
     creationTime: 1,
     rowKey: 'h:m1',

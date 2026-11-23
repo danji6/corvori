@@ -8,6 +8,7 @@ import {
   type SortableHandleProps,
   SortableList,
 } from '@/components/ui/sortable-list'
+import { useAccountId } from '@/hooks/account-scope'
 import { usePromptClipboard } from '@/hooks/chat/prompt-clipboard'
 import { useOperationPromptEditorView } from '@/hooks/chat/prompt-editor'
 import type { Prompt } from '@/lib/chat'
@@ -41,6 +42,7 @@ export function OperationPromptList({
   kind,
   createDefaults,
 }: OperationPromptListProps) {
+  const userId = useAccountId()
   const view = useOperationPromptEditorView(kind)
   const [added, setAdded] = useState<Prompt | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -53,9 +55,9 @@ export function OperationPromptList({
     const stored = prompts.find((p) => p.id === editingId)
     if (stored) return stored
     if (added?.id === editingId) return added
-    const draft = getEditorDraft<unknown>(promptDraftKey(editingId))
+    const draft = getEditorDraft<unknown>(userId, promptDraftKey(editingId))
     return draft ? newPrompt({ name: 'New Prompt', id: editingId }) : null
-  }, [editingId, prompts, added])
+  }, [userId, editingId, prompts, added])
 
   function handleAdd() {
     const prompt = newPrompt({ name: 'New Prompt' })

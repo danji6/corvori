@@ -1,8 +1,7 @@
+import type { ResolvedSettings } from '@cv/convex/model/defaults'
 import { APP_ID } from '@cv/core/const'
 
-import { createLocalStorageStore } from './local-storage-store'
-
-const STORAGE_KEY = `${APP_ID}-ui-settings`
+import { createAccountLocalStorage } from './local-storage-store'
 
 export type SidebarSide = 'left' | 'right'
 
@@ -11,42 +10,54 @@ export type SidebarState = {
   collapsed?: boolean
 }
 
-export type SidebarSettings = {
-  left?: SidebarState
-  right?: SidebarState
+export type SettingsOverride = Partial<
+  Pick<ResolvedSettings, 'uiFont' | 'monoFont' | 'chatFont' | 'chatFontSize'>
+>
+
+export type AgentEditorSelection = {
+  agentId?: string
+  newAgent?: boolean
+  /** Retains a successful create when a later avatar upload needs retrying. */
+  createdAgentId?: string
 }
 
 export type UiSettings = {
-  sidebar?: SidebarSettings
-  sessionFolderByUser?: Record<string, string | null>
+  sidebar?: Partial<Record<SidebarSide, SidebarState>>
+  selectedSessionFolder?: string | null
+  folderCollapse?: Record<string, boolean>
+  fonts?: SettingsOverride
+  recentDirectories?: string[]
+  agentEditor?: AgentEditorSelection
 }
 
-const store = createLocalStorageStore<UiSettings>(STORAGE_KEY)
+export const uiSettingsStore = createAccountLocalStorage<UiSettings>(
+  `${APP_ID}-ui-settings`,
+)
 
 export function getSelectedSessionFolder(userId: string): string | null {
-  return store.get().sessionFolderByUser?.[userId] ?? null
+  return uiSettingsStore(userId).get().selectedSessionFolder ?? null
 }
 
 export function setSelectedSessionFolder(
   userId: string,
   folderId: string | null,
 ) {
-  if (getSelectedSessionFolder(userId) === folderId) return
-  store.set({
-    sessionFolderByUser: {
-      ...store.get().sessionFolderByUser,
-      [userId]: folderId,
-    },
-  })
+  uiSettingsStore(userId).set({ selectedSessionFolder: folderId })
 }
 
-export function getSidebarState(side: SidebarSide): SidebarState {
-  return store.get().sidebar?.[side] ?? {}
+export function getSidebarState(
+  userId: string,
+  side: SidebarSide,
+): SidebarState {
+  return uiSettingsStore(userId).get().sidebar?.[side] ?? {}
 }
 
-export function setSidebarState(side: SidebarSide, patch: SidebarState) {
-  const sidebar = store.get().sidebar
-  store.set({
+export function setSidebarState(
+  userId: string,
+  side: SidebarSide,
+  patch: SidebarState,
+) {
+  uiSettingsStore(userId).update(({ sidebar }) => ({
     sidebar: { ...sidebar, [side]: { ...sidebar?.[side], ...patch } },
-  })
+  }))
 }

@@ -16,6 +16,7 @@ import {
   SettingsTabs,
 } from '@/components/ui'
 import { getFontFamily } from '@/fonts'
+import { useAccountId } from '@/hooks/account-scope'
 import { useAccountSecurity } from '@/hooks/account-security'
 import {
   useMcpServers,
@@ -146,6 +147,7 @@ function ChatSettingsFallback({ error }: FallbackProps) {
 }
 
 function ChatSettingsDialog() {
+  const userId = useAccountId()
   const view = useView(USER_SETTINGS_VIEW)
   const open = view.active
   const openAgentEditor = useOpenAgentEditor(USER_SETTINGS_VIEW)
@@ -204,7 +206,7 @@ function ChatSettingsDialog() {
         libraryReminders,
         compactionPrompts,
         impersonationPrompts,
-        override: getSettingsOverride(),
+        override: getSettingsOverride(userId),
       }),
     )
     initialized.current = true

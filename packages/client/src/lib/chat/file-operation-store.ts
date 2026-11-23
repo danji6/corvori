@@ -15,8 +15,10 @@ const states = new Map<string, OperationState>()
 const listeners = new Map<string, Set<() => void>>()
 
 /** Shares submission and recovery state across every control for one home. */
-export function fileOperationStore(key: string) {
+export function fileOperationStore(userId: string, target: string) {
+  const key = `${userId}:${target}`
   const storageKey = `${APP_ID}-active-agent-files:${key}`
+
   if (!states.has(key)) {
     let id: Id<'agentFileOperations'> | undefined
     try {
@@ -26,6 +28,7 @@ export function fileOperationStore(key: string) {
     }
     states.set(key, { id, pending: !!id, restoring: !!id })
   }
+
   return {
     read: () => states.get(key)!,
     subscribe: (listener: () => void) => {

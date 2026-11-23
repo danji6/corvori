@@ -6,7 +6,7 @@ import {
   Tooltip,
   useOptionalSidebar,
 } from '@/components/ui'
-import { useUserProfile } from '@/hooks/chat/profile'
+import { useAccountId } from '@/hooks/account-scope'
 import { setSelectedSessionFolder } from '@/lib/ui-settings'
 import { cn } from '@/lib/utils'
 import type { FolderView } from '@cv/convex/model/session/types'
@@ -58,11 +58,11 @@ export const FolderHeader = memo(function FolderHeader({
 
   const [, navigate] = useLocation()
   const sidebar = useOptionalSidebar()
-  const userId = useUserProfile()?._id
+  const userId = useAccountId()
   const name = folder?.name ?? 'Pinned'
 
   function selectFolder() {
-    if (userId && folder) setSelectedSessionFolder(userId, folder._id)
+    if (folder) setSelectedSessionFolder(userId, folder._id)
   }
 
   function compose() {

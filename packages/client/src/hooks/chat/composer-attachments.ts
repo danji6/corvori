@@ -1,3 +1,4 @@
+import { useAccountId } from '@/hooks/account-scope'
 import type { FileItem } from '@/hooks/file-previews'
 import { normalizeBrowserUrl } from '@/lib/auth/site-url'
 import {
@@ -44,9 +45,11 @@ type UseComposerAttachmentsOptions = {
 
 /** Owns composer attachments, large-text pastes, and attachment draft effects. */
 export function useComposerAttachments({
-  draftKey,
+  draftKey: resourceKey,
   editorRef,
 }: UseComposerAttachmentsOptions) {
+  const userId = useAccountId()
+  const draftKey = resourceKey ? JSON.stringify([userId, resourceKey]) : undefined // prettier-ignore
   const [fileParts, setFileParts] = useState<PendingFilePart[]>([])
   const [originalFiles, setOriginalFiles] = useState<Record<string, File>>({})
   const [pastedText, setPastedText] = useState<PastedText>({})

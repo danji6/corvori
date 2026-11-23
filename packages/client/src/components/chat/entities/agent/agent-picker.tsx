@@ -6,6 +6,7 @@ import {
 import { FileOperationStatus } from '@/components/chat/skills/operation-status'
 import { Combobox, LabeledCheckbox } from '@/components/ui'
 import { useStableValue } from '@/hooks'
+import { useAccountId } from '@/hooks/account-scope'
 import { useEditingAgentId } from '@/hooks/chat'
 import { useNewAgent } from '@/hooks/chat/agent'
 import { useAgentFileOperation, useHomeOperation } from '@/hooks/chat/skills'
@@ -29,6 +30,7 @@ export type AgentPickerProps = {
 }
 
 export function AgentPicker({ className, confirmSwitch }: AgentPickerProps) {
+  const userId = useAccountId()
   const editingAgentId = useEditingAgentId()
   const newAgent = useNewAgent()
   const { home } = useHomeOperation(editingAgentId as Id<'agents'> | undefined)
@@ -55,12 +57,12 @@ export function AgentPicker({ className, confirmSwitch }: AgentPickerProps) {
 
   const select = (id: string | null) =>
     confirmSwitch
-      ? confirmSwitch(() => setEditingAgentId(id))
-      : setEditingAgentId(id)
+      ? confirmSwitch(() => setEditingAgentId(userId, id))
+      : setEditingAgentId(userId, id)
 
   const create = async () => {
-    if (confirmSwitch) confirmSwitch(startNewAgent)
-    else startNewAgent()
+    if (confirmSwitch) confirmSwitch(() => startNewAgent(userId))
+    else startNewAgent(userId)
   }
 
   const del = async (id: string) => {
@@ -68,7 +70,7 @@ export function AgentPicker({ className, confirmSwitch }: AgentPickerProps) {
     if (result.cleanupOperationId) setCleanupId(result.cleanupOperationId)
     if (id === editingAgentId) {
       // Point to a different agent after delete
-      setEditingAgentId(records.find((r) => r.id !== id)?.id ?? null)
+      setEditingAgentId(userId, records.find((r) => r.id !== id)?.id ?? null)
     }
   }
 

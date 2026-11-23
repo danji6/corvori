@@ -1,10 +1,11 @@
 import { RippleButton } from '@/components/ui'
 import { Input } from '@/components/ui/input'
+import { useAccountId } from '@/hooks/account-scope'
 import {
   clearRecentDirectories,
   getRecentDirectories,
-  subscribeRecentDirectories,
 } from '@/lib/chat/recent-directory-store'
+import { uiSettingsStore } from '@/lib/ui-settings'
 import { cn } from '@/lib/utils'
 import { useThemeScope } from '@/providers/theme-scope'
 import { Autocomplete } from '@base-ui/react/autocomplete'
@@ -25,9 +26,9 @@ export function WorkspacePathInput({
   onNavigate,
   errorId,
 }: WorkspacePathInputProps) {
-  const recent = useSyncExternalStore(
-    subscribeRecentDirectories,
-    getRecentDirectories,
+  const userId = useAccountId()
+  const recent = useSyncExternalStore(uiSettingsStore(userId).subscribe, () =>
+    getRecentDirectories(userId),
   )
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -58,7 +59,7 @@ export function WorkspacePathInput({
   function clearRecents() {
     inputRef.current?.focus()
     closeRecents()
-    clearRecentDirectories()
+    clearRecentDirectories(userId)
   }
 
   return (

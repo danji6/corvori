@@ -1,3 +1,4 @@
+import { AccountScope } from '@/hooks/account-scope'
 /// <reference types="bun-types" />
 import type { useComposerAttachments } from '@/hooks/chat/composer-attachments'
 import * as draftStore from '@/lib/chat/composer-attachment-draft-store'
@@ -65,7 +66,13 @@ async function mount(initialDraftKey?: string) {
   document.body.append(container)
   root = createRoot(container)
   const renderDraft = async (draftKey?: string) => {
-    await act(async () => root?.render(<Harness draftKey={draftKey} />))
+    await act(async () =>
+      root?.render(
+        <AccountScope userId="owner">
+          <Harness draftKey={draftKey} />
+        </AccountScope>,
+      ),
+    )
     if (!attachments.isRestored) {
       const { happyDOM } = window as unknown as {
         happyDOM: { waitUntilComplete: () => Promise<void> }

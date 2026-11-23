@@ -5,11 +5,11 @@ import {
   Tooltip,
   useOptionalSidebar,
 } from '@/components/ui'
+import { useAccountId } from '@/hooks/account-scope'
 import {
   useSession,
   useSessionIsActive,
   useSessionIsStreaming,
-  useUserProfile,
 } from '@/hooks/chat'
 import { useHoverScroll } from '@/hooks/hover-scroll'
 import { formatRelativeTime } from '@/lib'
@@ -61,7 +61,7 @@ export const SessionRow = memo(function SessionRow({
   const [moving, setMoving] = useState(false)
   const pin = useMutation(api.sessionFolders.pin)
   const item = useSession(id)
-  const userId = useUserProfile()?._id
+  const userId = useAccountId()
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const isActive = useSessionIsActive(id)
   const isStreaming = useSessionIsStreaming(id)
@@ -88,7 +88,7 @@ export const SessionRow = memo(function SessionRow({
   if (!item) return null
 
   function handleSelect() {
-    if (userId) setSelectedSessionFolder(userId, item?.folderId ?? null)
+    setSelectedSessionFolder(userId, item?.folderId ?? null)
     navigate(`/?id=${id}`, { replace: true })
     sidebar?.close()
   }

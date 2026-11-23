@@ -1,14 +1,11 @@
+import { useAccountId } from '@/hooks/account-scope'
 import { APP_ID } from '@cv/core/const'
 import { useEffect, useMemo } from 'react'
 
-import { createLocalStorageStore } from '../local-storage-store'
+import { createAccountLocalStorage } from '../local-storage-store'
 import { debounce } from '../utils'
-import {
-  isDraftPending,
-  keepDraftRestore,
-  releaseDraftRestore,
-  requestDraftRestore,
-} from './draft-restore'
+import { boundedEntryPatch } from './bounded-entries'
+import { draftRestoreFor } from './draft-restore'
 
 const STORAGE_KEY = `${APP_ID}-editor-drafts`
 
@@ -22,7 +19,7 @@ type Entry = { value: unknown; updatedAt: number }
 
 type Drafts = Record<string, Entry>
 
-const store = createLocalStorageStore<Drafts>(STORAGE_KEY)
+const store = createAccountLocalStorage<Drafts>(STORAGE_KEY)
 
 /** Draft key for a prompt editor. */
 export function promptDraftKey(promptId: string): string {
@@ -53,30 +50,19 @@ export const USER_SETTINGS_DRAFT_KEY = 'user-settings'
 /** Draft key for the agent being created, independent of database IDs. */
 export const NEW_AGENT_DRAFT_KEY = 'new-agent'
 
-export function getEditorDraft<T>(key: string): T | undefined {
-  return store.get()[key]?.value as T | undefined
+export function getEditorDraft<T>(userId: string, key: string): T | undefined {
+  return store(userId).get()[key]?.value as T | undefined
 }
 
-export function setEditorDraft<T>(key: string, value: T): void {
+export function setEditorDraft<T>(userId: string, key: string, value: T): void {
   const entry: Entry = { value, updatedAt: Date.now() }
-  const next: Drafts = { ...store.get(), [key]: entry }
-
-  const patch: Partial<Drafts> = { [key]: entry }
-  for (const stale of evictableKeys(next)) patch[stale] = undefined
-  store.set(patch)
+  store(userId).update((current) =>
+    boundedEntryPatch(current, key, entry, MAX_ENTRIES),
+  )
 }
 
-export function clearEditorDraft(key: string): void {
-  if (!(key in store.get())) return
-  store.set({ [key]: undefined } as Partial<Drafts>)
-}
-
-function evictableKeys(drafts: Drafts): string[] {
-  const keys = Object.keys(drafts)
-  if (keys.length <= MAX_ENTRIES) return []
-  return keys
-    .sort((a, b) => drafts[a].updatedAt - drafts[b].updatedAt)
-    .slice(0, keys.length - MAX_ENTRIES)
+export function clearEditorDraft(userId: string, key: string): void {
+  store(userId).set({ [key]: undefined } as Partial<Drafts>)
 }
 
 export type EditorDraft<T> = {
@@ -102,56 +88,58 @@ export function useEditorDraft<T>(
   /** Names the draft in the confirmation: "unsaved changes to <label>". */
   label: string,
 ): EditorDraft<T> {
+  const userId = useAccountId()
+  const restoreQueue = draftRestoreFor(userId)
   const debouncedSave = useMemo(
     () =>
       debounce(
-        (id: string, value: unknown) => setEditorDraft(id, value),
+        (id: string, value: unknown) => setEditorDraft(userId, id, value),
         SAVE_DEBOUNCE_MS,
       ),
-    [],
+    [userId],
   )
 
   useEffect(() => {
-    if (key) keepDraftRestore(key)
+    if (key) restoreQueue.keepDraftRestore(key)
     return () => {
       debouncedSave.cancel()
-      if (key) releaseDraftRestore(key)
+      if (key) restoreQueue.releaseDraftRestore(key)
     }
-  }, [key, debouncedSave])
+  }, [key, debouncedSave, restoreQueue])
 
   return useMemo(
     () => ({
-      read: () => (key ? getEditorDraft<T>(key) : undefined),
+      read: () => (key ? getEditorDraft<T>(userId, key) : undefined),
       save: (value) => {
         if (key) debouncedSave(key, value)
       },
       flush: (value) => {
         debouncedSave.cancel()
-        if (key) setEditorDraft(key, value)
+        if (key) setEditorDraft(userId, key, value)
       },
       clear: () => {
         debouncedSave.cancel()
-        if (key) clearEditorDraft(key)
+        if (key) clearEditorDraft(userId, key)
       },
       clearUnchanged: () => {
-        if (!key || isDraftPending(key)) return
+        if (!key || restoreQueue.isDraftPending(key)) return
         debouncedSave.cancel()
-        clearEditorDraft(key)
+        clearEditorDraft(userId, key)
       },
       restore: (apply) => {
-        const saved = key ? getEditorDraft<T>(key) : undefined
+        const saved = key ? getEditorDraft<T>(userId, key) : undefined
         if (!key || saved === undefined) return
-        requestDraftRestore({
+        restoreQueue.requestDraftRestore({
           key,
           label,
           apply: () => apply(saved),
           discard: () => {
             debouncedSave.cancel()
-            clearEditorDraft(key)
+            clearEditorDraft(userId, key)
           },
         })
       },
     }),
-    [key, label, debouncedSave],
+    [key, label, debouncedSave, restoreQueue, userId],
   )
 }

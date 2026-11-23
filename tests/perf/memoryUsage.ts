@@ -211,7 +211,7 @@ async function withMemoryPage(
           sidebar: { left: { collapsed: false, pinned: true } },
         }),
       )
-    }, `${APP_ID}-ui-settings`)
+    }, `${APP_ID}-ui-settings:${user.account.userId}`)
     const page = await context.newPage()
     page.setDefaultTimeout(20_000)
     await page.goto(frontend)

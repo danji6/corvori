@@ -1,3 +1,4 @@
+import { useAccountId } from '@/hooks/account-scope'
 import { type ViewHandle, useView } from '@/hooks/view'
 import {
   getEditingAgentId,
@@ -22,16 +23,18 @@ export function useAgentEditorOpen(): boolean {
 }
 
 export function useOpenAgentEditor(fromView = AGENT_EDITOR_VIEW): () => void {
+  const userId = useAccountId()
   const view = useView(fromView)
   const owned = useOwnedAgents()
   const activeAgent = useActiveAgent()
 
   return useCallback(() => {
-    const current = getEditingAgentId()
+    const current = getEditingAgentId(userId)
     const editable = owned?.some((agent) => agent._id === current)
     const fallback = owned?.find((agent) => agent._id === activeAgent?._id)
-    if (!isNewAgent() && !editable && fallback) setEditingAgentId(fallback._id)
+    if (!isNewAgent(userId) && !editable && fallback)
+      setEditingAgentId(userId, fallback._id)
 
     view.switchTo(AGENT_EDITOR_VIEW, AGENT_EDITOR_DEFAULT_TAB)
-  }, [view, owned, activeAgent])
+  }, [view, owned, activeAgent, userId])
 }

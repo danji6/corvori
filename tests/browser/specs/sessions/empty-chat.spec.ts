@@ -342,7 +342,7 @@ test('restored drafts disable task cards and delayed settings do not flash setup
           '@new-chat': { text: 'Recovered draft', updatedAt: Date.now() },
         }),
       ),
-    `${APP_ID}-composer-drafts`,
+    `${APP_ID}-composer-drafts:owner`,
   )
   await page.goto('/?fixture=empty-chat&slowWelcome')
   await expect(page.locator('[contenteditable="true"]').first()).toHaveText(

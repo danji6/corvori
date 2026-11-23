@@ -31,7 +31,7 @@ export async function browserScenario(scenario: BrowserScenario) {
           sidebar: { left: { collapsed: false, pinned: true } },
         }),
       )
-    }, `${APP_ID}-ui-settings`)
+    }, `${APP_ID}-ui-settings:${scenario.accounts[0].userId}`)
     page.setDefaultTimeout(10_000)
     await page.goto(scenario.frontend)
     const left = page.locator('[data-slot="sidebar-panel"][data-side="left"]')

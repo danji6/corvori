@@ -1,6 +1,7 @@
 import { APP_ID } from '@cv/core/const'
 
-import { createLocalStorageStore } from '../local-storage-store'
+import { createAccountLocalStorage } from '../local-storage-store'
+import { boundedEntryPatch } from './bounded-entries'
 
 const STORAGE_KEY = `${APP_ID}-question-drafts`
 const MAX_ENTRIES = 100
@@ -20,7 +21,7 @@ export type QuestionDraft = {
 type StoredDraft = QuestionDraft & { updatedAt: number }
 type StoredDrafts = Record<string, StoredDraft>
 
-const store = createLocalStorageStore<StoredDrafts>(STORAGE_KEY)
+const store = createAccountLocalStorage<StoredDrafts>(STORAGE_KEY)
 
 /** Namespaces a picker draft to one session and tool call. */
 export function questionDraftKey(sessionId: string, toolCallId: string) {
@@ -28,29 +29,28 @@ export function questionDraftKey(sessionId: string, toolCallId: string) {
 }
 
 /** Reads a persisted picker draft, ignoring malformed response containers. */
-export function getQuestionDraft(key: string): QuestionDraft | null {
-  const value = store.get()[key]
+export function getQuestionDraft(
+  userId: string,
+  key: string,
+): QuestionDraft | null {
+  const value = store(userId).get()[key]
   if (!value || !Array.isArray(value.answers)) return null
   return { questionIndex: value.questionIndex, answers: value.answers }
 }
 
 /** Persists a draft and evicts the oldest entries over the storage cap. */
-export function setQuestionDraft(key: string, draft: QuestionDraft) {
+export function setQuestionDraft(
+  userId: string,
+  key: string,
+  draft: QuestionDraft,
+) {
   const entry = { ...draft, updatedAt: Date.now() }
-  const next = { ...store.get(), [key]: entry }
-  const keys = Object.keys(next)
-  const patch: Partial<StoredDrafts> = { [key]: entry }
-  if (keys.length > MAX_ENTRIES) {
-    for (const stale of keys
-      .sort((a, b) => next[a]!.updatedAt - next[b]!.updatedAt)
-      .slice(0, keys.length - MAX_ENTRIES)) {
-      patch[stale] = undefined
-    }
-  }
-  store.set(patch)
+  store(userId).update((current) =>
+    boundedEntryPatch(current, key, entry, MAX_ENTRIES),
+  )
 }
 
 /** Removes a settled or aborted tool call's picker draft. */
-export function clearQuestionDraft(key: string) {
-  store.set({ [key]: undefined } as Partial<StoredDrafts>)
+export function clearQuestionDraft(userId: string, key: string) {
+  store(userId).set({ [key]: undefined } as Partial<StoredDrafts>)
 }

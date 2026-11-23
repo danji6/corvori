@@ -1,3 +1,4 @@
+import { useAccountId } from '@/hooks/account-scope'
 import {
   useActiveSession,
   useChatMessage,
@@ -104,6 +105,7 @@ function AnswerForm({
   viewportHeight,
   className,
 }: AnswerFormProps) {
+  const userId = useAccountId()
   const rootRef = useRef<HTMLDivElement>(null)
   const choicesRef = useRef<HTMLDivElement>(null)
   const textRef = useRef<HTMLTextAreaElement>(null)
@@ -143,7 +145,7 @@ function AnswerForm({
   })
 
   const abort = () => {
-    clearQuestionDraft(draftKey)
+    clearQuestionDraft(userId, draftKey)
     onAbort?.()
   }
 
@@ -199,7 +201,11 @@ function usePickerState(
   draftKey: string,
   choicesRef: RefObject<HTMLDivElement | null>,
 ) {
-  const saved = useMemo(() => getQuestionDraft(draftKey), [draftKey])
+  const userId = useAccountId()
+  const saved = useMemo(
+    () => getQuestionDraft(userId, draftKey),
+    [draftKey, userId],
+  )
   const [questionIndex, setQuestionIndex] = useState(() =>
     clampQuestionIndex(saved?.questionIndex ?? 0, questions.length),
   )
@@ -208,8 +214,8 @@ function usePickerState(
   )
 
   useEffect(() => {
-    setQuestionDraft(draftKey, { questionIndex, answers })
-  }, [answers, draftKey, questionIndex])
+    setQuestionDraft(userId, draftKey, { questionIndex, answers })
+  }, [answers, draftKey, questionIndex, userId])
 
   const goTo = useCallback(
     (index: number) => {
@@ -276,6 +282,7 @@ function useAnswerSubmission({
   draftKey,
   answers,
 }: SubmissionArgs) {
+  const userId = useAccountId()
   const [submitting, setSubmitting] = useState(false)
   const settings = useSettings()
   const answeredBy = toDisplayName(settings?.displayName)
@@ -295,13 +302,13 @@ function useAnswerSubmission({
         toolCallId: part.toolCallId,
         answers: toAnswerDrafts(answers),
       })
-      clearQuestionDraft(draftKey)
+      clearQuestionDraft(userId, draftKey)
     } catch (err) {
       // Convex rolls the optimistic part back to the accepted responder's data
       toastError(err)
       setSubmitting(false)
     }
-  }, [answerQuestions, draftKey, part.toolCallId, answers, sessionId, submitting]) // prettier-ignore
+  }, [answerQuestions, draftKey, part.toolCallId, answers, sessionId, submitting, userId]) // prettier-ignore
 
   return { submit, submitting }
 }
@@ -445,6 +452,7 @@ function useSettledDraftCleanup(
   draftKey: string | null,
   awaitingAnswer: boolean,
 ) {
+  const userId = useAccountId()
   const previous = useRef<{ sessionId: string; draftKey: string } | null>(null)
 
   useEffect(() => {
@@ -454,8 +462,8 @@ function useSettledDraftCleanup(
       sessionId === last.sessionId &&
       (!awaitingAnswer || (draftKey !== null && draftKey !== last.draftKey))
     ) {
-      clearQuestionDraft(last.draftKey)
+      clearQuestionDraft(userId, last.draftKey)
     }
     if (sessionId && draftKey) previous.current = { sessionId, draftKey }
-  }, [awaitingAnswer, draftKey, sessionId])
+  }, [awaitingAnswer, draftKey, sessionId, userId])
 }

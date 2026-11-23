@@ -18,7 +18,7 @@ setupDom()
 
 /** Mirrors the store's own cap; exceeding it must evict the oldest entries. */
 const MAX_ENTRIES = 50
-const STORAGE_KEY = `${APP_ID}-editor-drafts`
+const STORAGE_KEY = `${APP_ID}-editor-drafts:owner`
 
 type PromptDraft = { name: string; content?: string }
 
@@ -28,7 +28,7 @@ function keysInStorage(): string[] {
 }
 
 beforeEach(() => {
-  for (const key of keysInStorage()) clearEditorDraft(key)
+  for (const key of keysInStorage()) clearEditorDraft('owner', key)
 })
 
 describe('draft keys', () => {
@@ -67,21 +67,21 @@ describe('settings form drafts', () => {
       name: 'Agent',
       prompts: [{ id: 'p-new', name: 'Added', content: 'Typed.' }],
     }
-    setEditorDraft(agentSettingsDraftKey('a1'), values)
+    setEditorDraft('owner', agentSettingsDraftKey('a1'), values)
 
-    expect(getEditorDraft<typeof values>(agentSettingsDraftKey('a1'))).toEqual(
-      values,
-    )
+    expect(
+      getEditorDraft<typeof values>('owner', agentSettingsDraftKey('a1')),
+    ).toEqual(values)
   })
 
   test('keep each agent draft independent', () => {
-    setEditorDraft(agentSettingsDraftKey('a1'), { name: 'One' })
-    setEditorDraft(agentSettingsDraftKey('a2'), { name: 'Two' })
-    clearEditorDraft(agentSettingsDraftKey('a1'))
+    setEditorDraft('owner', agentSettingsDraftKey('a1'), { name: 'One' })
+    setEditorDraft('owner', agentSettingsDraftKey('a2'), { name: 'Two' })
+    clearEditorDraft('owner', agentSettingsDraftKey('a1'))
 
-    expect(getEditorDraft(agentSettingsDraftKey('a1'))).toBeUndefined()
+    expect(getEditorDraft('owner', agentSettingsDraftKey('a1'))).toBeUndefined()
     expect(
-      getEditorDraft<{ name: string }>(agentSettingsDraftKey('a2')),
+      getEditorDraft<{ name: string }>('owner', agentSettingsDraftKey('a2')),
     ).toEqual({ name: 'Two' })
   })
 })
@@ -89,42 +89,46 @@ describe('settings form drafts', () => {
 describe('get/set/clear', () => {
   test('round-trips an arbitrary draft value', () => {
     const draft: PromptDraft = { name: 'Rewrite', content: '# hello' }
-    setEditorDraft(promptDraftKey('p1'), draft)
-    expect(getEditorDraft<PromptDraft>(promptDraftKey('p1'))).toEqual(draft)
+    setEditorDraft('owner', promptDraftKey('p1'), draft)
+    expect(getEditorDraft<PromptDraft>('owner', promptDraftKey('p1'))).toEqual(
+      draft,
+    )
   })
 
   test('returns undefined for an unknown key', () => {
-    expect(getEditorDraft(promptDraftKey('missing'))).toBeUndefined()
+    expect(getEditorDraft('owner', promptDraftKey('missing'))).toBeUndefined()
   })
 
   test('overwrites rather than merging', () => {
-    setEditorDraft(promptDraftKey('p1'), { name: 'a', content: 'x' })
-    setEditorDraft(promptDraftKey('p1'), { name: 'b' })
-    expect(getEditorDraft<PromptDraft>(promptDraftKey('p1'))).toEqual({
+    setEditorDraft('owner', promptDraftKey('p1'), { name: 'a', content: 'x' })
+    setEditorDraft('owner', promptDraftKey('p1'), { name: 'b' })
+    expect(getEditorDraft<PromptDraft>('owner', promptDraftKey('p1'))).toEqual({
       name: 'b',
     })
   })
 
   test('clear removes only its own key', () => {
-    setEditorDraft(promptDraftKey('p1'), { name: 'a' })
-    setEditorDraft(promptDraftKey('p2'), { name: 'b' })
-    clearEditorDraft(promptDraftKey('p1'))
+    setEditorDraft('owner', promptDraftKey('p1'), { name: 'a' })
+    setEditorDraft('owner', promptDraftKey('p2'), { name: 'b' })
+    clearEditorDraft('owner', promptDraftKey('p1'))
 
-    expect(getEditorDraft(promptDraftKey('p1'))).toBeUndefined()
-    expect(getEditorDraft<PromptDraft>(promptDraftKey('p2'))).toEqual({
+    expect(getEditorDraft('owner', promptDraftKey('p1'))).toBeUndefined()
+    expect(getEditorDraft<PromptDraft>('owner', promptDraftKey('p2'))).toEqual({
       name: 'b',
     })
   })
 
   test('clearing an absent key does not write', () => {
-    setEditorDraft(promptDraftKey('p1'), { name: 'a' })
+    setEditorDraft('owner', promptDraftKey('p1'), { name: 'a' })
     const before = localStorage.getItem(STORAGE_KEY)
-    clearEditorDraft(promptDraftKey('never-stored'))
+    clearEditorDraft('owner', promptDraftKey('never-stored'))
     expect(localStorage.getItem(STORAGE_KEY)).toBe(before)
   })
 
   test('survives a reload, which is the point of the feature', () => {
-    setEditorDraft(SCRIPTS_DRAFT_KEY, { scripts: [{ id: 's1', code: 'x' }] })
+    setEditorDraft('owner', SCRIPTS_DRAFT_KEY, {
+      scripts: [{ id: 's1', code: 'x' }],
+    })
     const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY)!)
     expect(persisted[SCRIPTS_DRAFT_KEY].value).toEqual({
       scripts: [{ id: 's1', code: 'x' }],
@@ -135,19 +139,26 @@ describe('get/set/clear', () => {
 describe('eviction', () => {
   test('keeps the cap and drops the least recently touched', () => {
     for (let index = 0; index < MAX_ENTRIES; index++) {
-      setEditorDraft(promptDraftKey(`p${index}`), { name: `n${index}` })
+      setEditorDraft('owner', promptDraftKey(`p${index}`), {
+        name: `n${index}`,
+      })
     }
     expect(keysInStorage()).toHaveLength(MAX_ENTRIES)
 
-    setEditorDraft(promptDraftKey('newest'), { name: 'newest' })
+    setEditorDraft('owner', promptDraftKey('newest'), { name: 'newest' })
 
     expect(keysInStorage()).toHaveLength(MAX_ENTRIES)
-    expect(getEditorDraft<PromptDraft>(promptDraftKey('newest'))).toEqual({
+    expect(
+      getEditorDraft<PromptDraft>('owner', promptDraftKey('newest')),
+    ).toEqual({
       name: 'newest',
     })
-    expect(getEditorDraft(promptDraftKey('p0'))).toBeUndefined()
+    expect(getEditorDraft('owner', promptDraftKey('p0'))).toBeUndefined()
     expect(
-      getEditorDraft<PromptDraft>(promptDraftKey(`p${MAX_ENTRIES - 1}`)),
+      getEditorDraft<PromptDraft>(
+        'owner',
+        promptDraftKey(`p${MAX_ENTRIES - 1}`),
+      ),
     ).toEqual({
       name: `n${MAX_ENTRIES - 1}`,
     })

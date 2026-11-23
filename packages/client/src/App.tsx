@@ -33,13 +33,15 @@ export default function App() {
     <LightboxProvider>
       <Toaster />
       <AuthGate>
-        <ProfileGate>
-          <FontProvider>
-            <Router>
-              <AppRoutes />
-            </Router>
-          </FontProvider>
-        </ProfileGate>
+        {(subject) => (
+          <ProfileGate key={subject} subject={subject}>
+            <FontProvider>
+              <Router>
+                <AppRoutes />
+              </Router>
+            </FontProvider>
+          </ProfileGate>
+        )}
       </AuthGate>
     </LightboxProvider>
   )

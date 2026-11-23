@@ -1,3 +1,4 @@
+import { useAccountId } from '@/hooks/account-scope'
 import {
   registerNotificationWorker,
   supportsDesktopNotifications,
@@ -16,48 +17,68 @@ import { ConvexError } from 'convex/values'
 import { useCallback, useEffect } from 'react'
 import { useLocation } from 'wouter'
 
-/** Replays durable desktop clicks independently of whether delivery is enabled. */
+/** Replays durable desktop clicks for the authenticated account. */
 export function useNotificationWorker() {
+  const userId = useAccountId()
   const markManyRead = useMutation(api.notifications.markManyRead)
   const respond = useMutation(api.notifications.respondApproval)
   const [, navigate] = useLocation()
 
   const apply = useCallback(
-    async (action: NotificationWorkerAction) => {
+    async (action: NotificationWorkerAction, signal: AbortSignal) => {
+      if (signal.aborted || action.userId !== userId) return
       try {
         if (action.action === 'read' || action.action === 'show') {
           await markManyRead({
             notificationIds: [action.notificationId as Id<'notifications'>],
           })
-          if (action.action === 'show' && action.sessionId) {
-            navigate(`/?id=${action.sessionId}`)
-            window.focus()
-          }
         } else {
           await respond({
             notificationId: action.notificationId as Id<'notifications'>,
             action: action.action,
           })
         }
+        if (
+          !signal.aborted &&
+          (action.action === 'show' || action.openSession === true) &&
+          action.sessionId
+        ) {
+          navigate(`/?id=${encodeURIComponent(action.sessionId)}`)
+          window.focus()
+        }
       } catch (error) {
         const code = error instanceof ConvexError ? error.data?.code : undefined
         if (![403, 404, 409].includes(code)) throw error
-        toastError(error)
+        if (!signal.aborted) toastError(error)
       }
-      acknowledgeWorkerAction(action)
+      if (!signal.aborted) acknowledgeWorkerAction(action)
     },
-    [markManyRead, navigate, respond],
+    [markManyRead, navigate, respond, userId],
   )
 
   useEffect(() => {
     if (!supportsDesktopNotifications()) return
+    const controller = new AbortController()
+    const { signal } = controller
+    const inFlight = new Map<string, Promise<void>>()
+
+    function handle(action: NotificationWorkerAction) {
+      const key = action.requestId ?? action.notificationId
+      const pending = inFlight.get(key)
+      if (pending) return pending
+      const result = apply(action, signal).finally(() => inFlight.delete(key))
+      inFlight.set(key, result)
+      return result
+    }
 
     const onMessage = (event: MessageEvent<unknown>) => {
-      if (isWorkerAction(event.data)) void apply(event.data).catch(toastError)
+      if (isWorkerAction(event.data) && event.data.userId === userId) {
+        void handle(event.data).catch(toastError)
+      }
     }
     const drain = () => {
       void registerNotificationWorker()
-        .then(() => drainPendingWorkerActions(apply))
+        .then(() => drainPendingWorkerActions(userId, handle, signal))
         .catch(toastError)
     }
 
@@ -66,8 +87,9 @@ export function useNotificationWorker() {
     drain()
 
     return () => {
+      controller.abort()
       navigator.serviceWorker.removeEventListener('message', onMessage)
       window.removeEventListener('focus', drain)
     }
-  }, [apply])
+  }, [apply, userId])
 }

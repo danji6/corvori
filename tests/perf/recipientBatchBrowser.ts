@@ -48,7 +48,7 @@ export async function verifyNotificationNavigation(
             sidebar: { left: { collapsed: false, pinned: true } },
           }),
         )
-      }, `${APP_ID}-ui-settings`)
+      }, `${APP_ID}-ui-settings:${recipient.userId}`)
       const actions: string[] = []
       page.on('websocket', (socket) =>
         socket.on('framesent', ({ payload }) => {

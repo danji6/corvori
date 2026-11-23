@@ -21,7 +21,7 @@ type PresenceMessage = {
 type Peer = Omit<PresenceMessage, 'type'>
 
 /** Tracks live same origin tabs and arbitrates which one surfaces each alert. */
-export function useTabPresence(activeSessionId: string | null) {
+export function useTabPresence(userId: string, activeSessionId: string | null) {
   const [tabId] = useState(generateId)
   const [startedAt] = useState(Date.now)
   const [revision, setRevision] = useState(0)
@@ -52,7 +52,7 @@ export function useTabPresence(activeSessionId: string | null) {
   useEffect(() => {
     const next =
       'BroadcastChannel' in window
-        ? new BroadcastChannel(`${APP_ID}-notification-presence`)
+        ? new BroadcastChannel(`${APP_ID}-notification-presence:${userId}`)
         : null
     channel.current = next
 
@@ -107,7 +107,7 @@ export function useTabPresence(activeSessionId: string | null) {
       next?.close()
       channel.current = null
     }
-  }, [announce, tabId])
+  }, [announce, tabId, userId])
 
   useEffect(() => announce(), [activeSessionId, announce])
 

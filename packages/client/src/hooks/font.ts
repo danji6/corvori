@@ -1,10 +1,11 @@
 import { getFontFamily, getMonoFontFamily } from '@/fonts'
+import { useAccountId } from '@/hooks/account-scope'
 import { useSettings } from '@/hooks/chat/settings'
 import {
   type SettingsOverride,
   getSettingsOverride,
-  subscribeSettingsOverride,
 } from '@/lib/settings-override'
+import { uiSettingsStore } from '@/lib/ui-settings'
 import {
   DEFAULT_SETTINGS,
   type ResolvedSettings,
@@ -27,10 +28,9 @@ export const FONT_OVERRIDE_KEYS = [
 ] as const
 
 export function useSettingsOverride(): SettingsOverride {
-  return useSyncExternalStore(
-    subscribeSettingsOverride,
-    getSettingsOverride,
-    getSettingsOverride,
+  const userId = useAccountId()
+  return useSyncExternalStore(uiSettingsStore(userId).subscribe, () =>
+    getSettingsOverride(userId),
   )
 }
 
@@ -62,6 +62,9 @@ export function useFont(font: string) {
       '--font-sans',
       getFontFamily(font),
     )
+    return () => {
+      document.documentElement.style.removeProperty('--font-sans')
+    }
   }, [font])
 }
 
@@ -71,5 +74,8 @@ export function useMonoFont(font: string) {
       '--font-mono',
       getMonoFontFamily(font),
     )
+    return () => {
+      document.documentElement.style.removeProperty('--font-mono')
+    }
   }, [font])
 }

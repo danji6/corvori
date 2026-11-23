@@ -5,6 +5,7 @@ import {
   Switch,
   TooltipButton,
 } from '@/components/ui'
+import { useAccountId } from '@/hooks/account-scope'
 import { useReminderEditorView } from '@/hooks/chat/prompt-editor'
 import { useReminderClipboard } from '@/hooks/chat/reminder-clipboard'
 import { newReminderPrompt } from '@/lib/chat'
@@ -27,8 +28,11 @@ import { ReminderEditor } from './reminder-editor'
 type ReminderListItem = ReminderPrompt & { isLibrary?: boolean }
 
 /** Rebuilds a reminder from its local draft. */
-function restoreFromDraft(id: string): ReminderPrompt | null {
-  const saved = getEditorDraft<Partial<ReminderPrompt>>(reminderDraftKey(id))
+function restoreFromDraft(userId: string, id: string): ReminderPrompt | null {
+  const saved = getEditorDraft<Partial<ReminderPrompt>>(
+    userId,
+    reminderDraftKey(id),
+  )
   if (!saved) return null
   return { ...newReminderPrompt({ name: 'New Reminder' }), ...saved, id }
 }
@@ -52,6 +56,7 @@ export function ReminderPromptList({
   extraButtons,
   showEnabledSwitch = true,
 }: ReminderPromptListProps) {
+  const userId = useAccountId()
   const view = useReminderEditorView()
   const editingId = view.value ?? null
   const [added, setAdded] = useState<ReminderPrompt | null>(null)
@@ -67,8 +72,8 @@ export function ReminderPromptList({
     if (added?.id === editingId) return added
     // Library reminders are read-only here; never resurrect one from a draft
     if (libraryItems.some((r) => r.id === editingId)) return null
-    return restoreFromDraft(editingId)
-  }, [editingId, reminders, added, libraryItems])
+    return restoreFromDraft(userId, editingId)
+  }, [userId, editingId, reminders, added, libraryItems])
 
   const items: ReminderListItem[] = [
     ...libraryItems.map((r) => ({ ...r, isLibrary: true })),

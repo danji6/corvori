@@ -5,6 +5,7 @@ import {
   SearchableList,
   TooltipButton,
 } from '@/components/ui'
+import { useAccountId } from '@/hooks/account-scope'
 import { usePromptClipboard } from '@/hooks/chat/prompt-clipboard'
 import { useLibraryPromptEditorView } from '@/hooks/chat/prompt-editor'
 import { newPrompt } from '@/lib/chat'
@@ -27,8 +28,8 @@ type LibraryPromptListProps = {
 }
 
 /** Rebuilds a prompt from its local draft. */
-function restoreFromDraft(id: string): LibraryPrompt | null {
-  const saved = getEditorDraft<Partial<Prompt>>(promptDraftKey(id))
+function restoreFromDraft(userId: string, id: string): LibraryPrompt | null {
+  const saved = getEditorDraft<Partial<Prompt>>(userId, promptDraftKey(id))
   if (!saved) return null
   return {
     ...newPrompt({ name: 'New Prompt' }),
@@ -41,6 +42,7 @@ export function LibraryPromptList({
   prompts,
   onChange,
 }: LibraryPromptListProps) {
+  const userId = useAccountId()
   const view = useLibraryPromptEditorView()
   const editingId = view.value ?? null
   const [added, setAdded] = useState<LibraryPrompt | null>(null)
@@ -54,8 +56,8 @@ export function LibraryPromptList({
     const stored = prompts.find((p) => p.id === editingId)
     if (stored) return stored
     if (added?.id === editingId) return added
-    return restoreFromDraft(editingId)
-  }, [editingId, prompts, added])
+    return restoreFromDraft(userId, editingId)
+  }, [userId, editingId, prompts, added])
 
   function handleAdd() {
     const created = newPrompt({ name: 'New Prompt' })

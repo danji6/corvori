@@ -1,6 +1,7 @@
 import { APP_ID } from '@cv/core/const'
 
-import { createLocalStorageStore } from '../local-storage-store'
+import { createAccountLocalStorage } from '../local-storage-store'
+import { boundedEntryPatch } from './bounded-entries'
 import type { ScrollRowAddress } from './scroll-address'
 
 const STORAGE_KEY = `${APP_ID}-scroll-positions`
@@ -27,32 +28,26 @@ export type SavedScroll = {
 
 type ScrollPositions = Record<string, SavedScroll>
 
-const store = createLocalStorageStore<ScrollPositions>(STORAGE_KEY)
+const store = createAccountLocalStorage<ScrollPositions>(STORAGE_KEY)
 
-export function getSavedScroll(sessionId: string): SavedScroll | undefined {
-  return store.get()[sessionId]
+export function getSavedScroll(
+  userId: string,
+  sessionId: string,
+): SavedScroll | undefined {
+  return store(userId).get()[sessionId]
 }
 
 export function setSavedScroll(
+  userId: string,
   sessionId: string,
   position: Omit<SavedScroll, 'updatedAt'>,
 ): void {
   const entry: SavedScroll = { ...position, updatedAt: Date.now() }
-  const next: ScrollPositions = { ...store.get(), [sessionId]: entry }
-
-  const patch: Partial<ScrollPositions> = { [sessionId]: entry }
-  for (const key of evictableKeys(next)) patch[key] = undefined
-  store.set(patch)
+  store(userId).update((current) =>
+    boundedEntryPatch(current, sessionId, entry, MAX_ENTRIES),
+  )
 }
 
-export function clearSavedScroll(sessionId: string): void {
-  store.set({ [sessionId]: undefined } as Partial<ScrollPositions>)
-}
-
-function evictableKeys(positions: ScrollPositions): string[] {
-  const keys = Object.keys(positions)
-  if (keys.length <= MAX_ENTRIES) return []
-  return keys
-    .sort((a, b) => positions[a].updatedAt - positions[b].updatedAt)
-    .slice(0, keys.length - MAX_ENTRIES)
+export function clearSavedScroll(userId: string, sessionId: string): void {
+  store(userId).set({ [sessionId]: undefined } as Partial<ScrollPositions>)
 }

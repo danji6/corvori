@@ -16,6 +16,7 @@ import {
   SettingsTabs,
 } from '@/components/ui'
 import { useStableValue } from '@/hooks'
+import { useAccountId } from '@/hooks/account-scope'
 import {
   useAgentPromptSets,
   useEditingAgentId,
@@ -99,6 +100,7 @@ export function AgentSettings() {
 }
 
 function AgentSettingsFallback({ error }: FallbackProps) {
+  const userId = useAccountId()
   const view = useAgentEditorView()
 
   return (
@@ -116,7 +118,7 @@ function AgentSettingsFallback({ error }: FallbackProps) {
         <Dialog.Footer>
           <RippleButton
             variant="secondary"
-            onClick={() => setEditingAgentId(null)}
+            onClick={() => setEditingAgentId(userId, null)}
           >
             Choose another agent
           </RippleButton>
@@ -133,6 +135,7 @@ type PendingAction = {
 }
 
 function AgentSettingsDialog() {
+  const userId = useAccountId()
   const toolsScrollRef = useRef<HTMLDivElement>(null)
   const view = useAgentEditorView()
   const open = view.active
@@ -190,8 +193,8 @@ function AgentSettingsDialog() {
         ? agentToFormValues(editingAgent, promptSets ?? EMPTY_AGENT_PROMPT_SETS)
         : EMPTY_AGENT_FORM
     draft.sync(values)
-    if (newAgent && !getEditorDraft(NEW_AGENT_DRAFT_KEY)) {
-      setEditorDraft(NEW_AGENT_DRAFT_KEY, values)
+    if (newAgent && !getEditorDraft(userId, NEW_AGENT_DRAFT_KEY)) {
+      setEditorDraft(userId, NEW_AGENT_DRAFT_KEY, values)
     }
     // Sync from the live doc on agent switch or when (re)opening the editor
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -224,7 +227,7 @@ function AgentSettingsDialog() {
     draft.clear()
     setPendingAvatar(null)
     setAvatarCleared(false)
-    if (newAgent) setEditingAgentId(getCreatedAgentId() ?? null)
+    if (newAgent) setEditingAgentId(userId, getCreatedAgentId(userId) ?? null)
   }
 
   // Back must not silently drop unsaved agent settings
@@ -268,7 +271,7 @@ function AgentSettingsDialog() {
     draft.clear()
     setPendingAvatar(null)
     setAvatarCleared(false)
-    if (newAgent) setEditingAgentId(savedId)
+    if (newAgent) setEditingAgentId(userId, savedId)
   }
 
   // Apply persists but keeps the editor open; Save persists then closes.

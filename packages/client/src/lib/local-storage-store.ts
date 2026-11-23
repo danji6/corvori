@@ -1,59 +1,129 @@
 type LocalStorageObject = Record<string, unknown>
+type Update<T> = (current: T) => Partial<T>
 
-type LocalStorageStore<T extends LocalStorageObject> = {
-  get: () => T
-  subscribe: (listener: () => void) => () => boolean
-  set: (patch: Partial<T>) => void
-}
-
-function read<T extends LocalStorageObject>(key: string): T {
-  if (typeof localStorage === 'undefined') return {} as T
+function parseObject<T extends LocalStorageObject>(raw: string | null): T {
   try {
-    const raw = localStorage.getItem(key)
-    return raw ? (JSON.parse(raw) as T) : ({} as T)
+    const value: unknown = raw === null ? null : JSON.parse(raw)
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as T
+    }
   } catch {
-    return {} as T
+    // Treat invalid records as empty.
   }
+  return {} as T
 }
 
 export function createLocalStorageStore<T extends LocalStorageObject>(
   key: string,
-): LocalStorageStore<T> {
-  let cache = read<T>(key)
+) {
+  let cache = {} as T
+  let saved: string | null | undefined
+  let memoryOnly = false
   const listeners = new Set<() => void>()
 
   function emit() {
     listeners.forEach((listener) => listener())
   }
 
-  if (typeof window !== 'undefined') {
-    window.addEventListener('storage', (event) => {
-      if (event.key !== key) return
-      cache = read<T>(key)
-      emit()
-    })
+  function refresh() {
+    if (memoryOnly || typeof window === 'undefined') return
+    try {
+      const raw = window.localStorage.getItem(key)
+      if (raw === saved) return
+      const next = parseObject<T>(raw)
+      const fields = next as LocalStorageObject
+      for (const field of Object.keys(next)) {
+        if (JSON.stringify(cache[field]) === JSON.stringify(fields[field])) {
+          fields[field] = cache[field]
+        }
+      }
+      saved = raw
+      cache = next
+    } catch {
+      // Retain the last usable snapshot if storage is inaccessible.
+    }
+  }
+
+  function onStorage(event: StorageEvent) {
+    if (event.key !== key && event.key !== null) return
+    try {
+      if (event.storageArea && event.storageArea !== window.localStorage) return
+    } catch {
+      return
+    }
+    const previous = cache
+    refresh()
+    if (cache !== previous) emit()
+  }
+
+  function subscribe(listener: () => void) {
+    if (listeners.size === 0 && typeof window !== 'undefined') {
+      window.addEventListener('storage', onStorage)
+      refresh()
+    }
+    listeners.add(listener)
+    return () => {
+      listeners.delete(listener)
+      if (listeners.size === 0 && typeof window !== 'undefined') {
+        window.removeEventListener('storage', onStorage)
+      }
+    }
+  }
+
+  function persist(next: T) {
+    try {
+      const data = JSON.stringify(next)
+      if (data === saved && !memoryOnly) return
+      cache = next
+      window.localStorage.setItem(key, data)
+      saved = data
+      memoryOnly = false
+    } catch {
+      cache = next
+      memoryOnly = true
+    }
+  }
+
+  function update(change: Update<T>) {
+    const previous = cache
+    refresh()
+    const next = { ...cache }
+    let changed = false
+    for (const [field, value] of Object.entries(change(cache))) {
+      if (Object.is(cache[field], value)) continue
+      if (value === undefined) delete next[field]
+      else (next as LocalStorageObject)[field] = value
+      changed = true
+    }
+    if (changed) persist(next)
+    if (cache !== previous) emit()
   }
 
   return {
-    get: () => cache,
-    subscribe: (listener) => {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
+    get: () => {
+      if (listeners.size === 0) refresh()
+      return cache
     },
-    set: (patch) => {
-      const next: T = { ...cache }
-      const writable = next as Record<string, unknown>
-      for (const [patchKey, value] of Object.entries(patch)) {
-        if (value === undefined) delete writable[patchKey]
-        else writable[patchKey] = value
-      }
-      cache = next
-      try {
-        localStorage.setItem(key, JSON.stringify(cache))
-      } catch {
-        // Ignore storage write failures
-      }
-      emit()
-    },
+    subscribe,
+    update,
+    set: (patch: Partial<T>) => update(() => patch),
+  }
+}
+
+/** Returns a stable store for each account and storage key. */
+export function createAccountLocalStorage<T extends LocalStorageObject>(
+  key: string,
+) {
+  const stores = new Map<
+    string,
+    ReturnType<typeof createLocalStorageStore<T>>
+  >()
+  return (userId: string) => {
+    let store = stores.get(userId)
+    if (!store) {
+      store = createLocalStorageStore<T>(`${key}:${userId}`)
+      stores.set(userId, store)
+    }
+    return store
   }
 }

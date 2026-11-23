@@ -244,7 +244,9 @@ test('folder controls retain sibling collapse state and refresh pin actions afte
     .poll(() =>
       page.evaluate(
         (appId) =>
-          JSON.parse(localStorage.getItem(`${appId}-session-folder-collapse`)!),
+          JSON.parse(
+            localStorage.getItem(`${appId}-ui-settings:fixture-owner`)!,
+          ).folderCollapse,
         APP_ID,
       ),
     )

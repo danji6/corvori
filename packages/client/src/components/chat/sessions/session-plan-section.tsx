@@ -6,6 +6,7 @@ import {
   SettingsList,
   Sidebar,
 } from '@/components/ui'
+import { useAccountId } from '@/hooks/account-scope'
 import { useActiveSession, useMathMode } from '@/hooks/chat'
 import { useFullscreenView } from '@/hooks/fullscreen'
 import { useView } from '@/hooks/view'
@@ -34,6 +35,7 @@ const PLAN_VIEW = 'plan'
 const PLAN_FULLSCREEN_ID = 'plan'
 
 export function SessionPlanSection() {
+  const userId = useAccountId()
   const session = useActiveSession()
   const plan = useQuery(
     api.plans.get,
@@ -48,7 +50,7 @@ export function SessionPlanSection() {
     if (!session) return
     try {
       await removePlan({ sessionId: session._id })
-      clearEditorDraft(planDraftKey(session._id))
+      clearEditorDraft(userId, planDraftKey(session._id))
       toast('Plan deleted')
     } catch (err) {
       toastError(err)

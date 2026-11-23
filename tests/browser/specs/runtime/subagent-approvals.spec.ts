@@ -369,7 +369,7 @@ test('keeps the fullscreen draft open until the user chooses to review', async (
 }) => {
   await page.addInitScript(() => {
     localStorage.setItem(
-      'corvori-composer-drafts',
+      'corvori-composer-drafts:owner',
       JSON.stringify({
         parent: { text: 'Keep this draft', updatedAt: Date.now() },
       }),

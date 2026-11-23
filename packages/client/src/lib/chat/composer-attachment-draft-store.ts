@@ -29,16 +29,18 @@ type DraftRecord = {
 export async function readComposerAttachmentDraft(
   key: string,
 ): Promise<ComposerAttachmentDraft[]> {
+  let db: IDBDatabase | undefined
   try {
-    const db = await openDatabase()
+    db = await openDatabase()
     const transaction = db.transaction(STORE_NAME, 'readonly')
     const record = await request<DraftRecord | undefined>(
       transaction.objectStore(STORE_NAME).get(key),
     )
-    db.close()
     return record?.attachments ?? []
   } catch {
     return []
+  } finally {
+    db?.close()
   }
 }
 
@@ -46,17 +48,19 @@ export async function writeComposerAttachmentDraft(
   key: string,
   attachments: ComposerAttachmentDraft[],
 ): Promise<void> {
+  let db: IDBDatabase | undefined
   try {
-    const db = await openDatabase()
+    db = await openDatabase()
     const transaction = db.transaction(STORE_NAME, 'readwrite')
     const store = transaction.objectStore(STORE_NAME)
     if (attachments.length > 0)
       store.put({ key, attachments } satisfies DraftRecord)
     else store.delete(key)
     await transactionDone(transaction)
-    db.close()
   } catch {
     // Best effort
+  } finally {
+    db?.close()
   }
 }
 

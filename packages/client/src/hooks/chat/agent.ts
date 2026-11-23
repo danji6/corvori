@@ -1,3 +1,4 @@
+import { useAccountId } from '@/hooks/account-scope'
 import type { Prompt } from '@/lib/chat'
 import type {
   MathMode,
@@ -5,12 +6,9 @@ import type {
   ThemeSnapshot,
   UpdateAgentArgs,
 } from '@/lib/chat'
-import {
-  getEditingAgentId,
-  isNewAgent,
-  subscribeEditingAgent,
-} from '@/lib/chat/agent-editor-store'
+import { getEditingAgentId, isNewAgent } from '@/lib/chat/agent-editor-store'
 import { mergePrompts } from '@/lib/chat/prompts'
+import { uiSettingsStore } from '@/lib/ui-settings'
 import { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
 import type { EvalContext } from '@cv/core/interpreter/types'
@@ -229,13 +227,19 @@ export function useAgentPrompts(workDir?: string) {
 
 /** The id of the agent being edited. */
 export function useEditingAgentId(): Id<'agents'> | null {
-  const id = useSyncExternalStore(subscribeEditingAgent, getEditingAgentId)
+  const userId = useAccountId()
+  const id = useSyncExternalStore(uiSettingsStore(userId).subscribe, () =>
+    getEditingAgentId(userId),
+  )
   return id as Id<'agents'> | null
 }
 
 /** Whether the editor holds a new agent that has not finished saving. */
 export function useNewAgent(): boolean {
-  return useSyncExternalStore(subscribeEditingAgent, isNewAgent)
+  const userId = useAccountId()
+  return useSyncExternalStore(uiSettingsStore(userId).subscribe, () =>
+    isNewAgent(userId),
+  )
 }
 
 /** The picked agent that's being edited, `undefined` while it loads. */

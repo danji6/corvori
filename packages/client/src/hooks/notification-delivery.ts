@@ -1,4 +1,5 @@
 import { showNotificationToast } from '@/components/chat/notifications/notification-toast'
+import { useAccountId } from '@/hooks/account-scope'
 import {
   type NotificationItem,
   isPendingNotification,
@@ -37,9 +38,9 @@ type DeliveryOptions = {
 type StackPreference = { minimized: boolean; seen: string[] }
 const STACK_KEY = `${APP_ID}:notification-stack`
 
-function readStackPreference(): StackPreference {
+function readStackPreference(key: string): StackPreference {
   try {
-    const value = JSON.parse(sessionStorage.getItem(STACK_KEY) ?? 'null')
+    const value = JSON.parse(sessionStorage.getItem(key) ?? 'null')
     if (
       value &&
       typeof value.minimized === 'boolean' &&
@@ -54,9 +55,11 @@ function readStackPreference(): StackPreference {
 
 /** Projects the queue into Sonner without treating dismissal as resolution. */
 export function useNotificationDelivery(options: DeliveryOptions) {
-  const presence = useTabPresence(options.activeSessionId)
+  const userId = useAccountId()
+  const stackKey = `${STACK_KEY}:${userId}`
+  const presence = useTabPresence(userId, options.activeSessionId)
   const { probe, surfaceFor } = presence
-  const [stack, setStack] = useState(readStackPreference)
+  const [stack, setStack] = useState(() => readStackPreference(stackKey))
   const known = useRef<Set<string> | null>(null)
   const startupBoundary = useRef(0)
   const surfaced = useRef(new Map<string, NotificationItem>())
@@ -86,7 +89,7 @@ export function useNotificationDelivery(options: DeliveryOptions) {
     if (!options.recent) return
     try {
       sessionStorage.setItem(
-        STACK_KEY,
+        stackKey,
         JSON.stringify({
           minimized,
           seen: options.activeIds ?? [],
@@ -95,20 +98,29 @@ export function useNotificationDelivery(options: DeliveryOptions) {
     } catch {
       /* Queue durability does not depend on browser storage. */
     }
-  }, [minimized, options.recent, options.activeIds])
+  }, [stackKey, minimized, options.recent, options.activeIds])
 
   useEffect(() => {
     if (options.activeIds)
       void closeInactiveDesktopNotifications(
+        userId,
         options.activeIds,
         pageIsFocused() ? options.activeSessionId : null,
       ).catch(toastError)
-  }, [options.activeIds, options.activeSessionId, presence])
+  }, [userId, options.activeIds, options.activeSessionId, presence])
 
   useEffect(() => {
     if (options.desktopReady && !options.desktopEnabled)
-      void closeAllDesktopNotifications().catch(toastError)
-  }, [options.desktopEnabled, options.desktopReady])
+      void closeAllDesktopNotifications(userId).catch(toastError)
+  }, [userId, options.desktopEnabled, options.desktopReady])
+
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!options.recent || !options.unread) return
@@ -141,6 +153,7 @@ export function useNotificationDelivery(options: DeliveryOptions) {
     for (const item of added) {
       delivery.current = delivery.current
         .then(async () => {
+          if (!mounted.current) return
           const current = latest.current
           const exists = [
             ...(current.unread ?? []),
@@ -150,6 +163,7 @@ export function useNotificationDelivery(options: DeliveryOptions) {
 
           const important = isPendingNotification(item)
           await probe()
+          if (!mounted.current) return
           const surface = surfaceFor(item.sessionId)
 
           if (surface === 'discard' && !important) {
@@ -166,8 +180,10 @@ export function useNotificationDelivery(options: DeliveryOptions) {
           }
           if (surface === 'desktop' && current.desktopEnabled) {
             await showDesktopNotificationOnce(
+              userId,
               item,
               () =>
+                mounted.current &&
                 latest.current.desktopEnabled &&
                 surfaceFor(item.sessionId) === 'desktop' &&
                 [
@@ -179,7 +195,7 @@ export function useNotificationDelivery(options: DeliveryOptions) {
         })
         .catch(toastError)
     }
-  }, [options.unread, options.recent, probe, surfaceFor])
+  }, [userId, options.unread, options.recent, probe, surfaceFor])
 
   useEffect(() => {
     let cancelled = false

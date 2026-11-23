@@ -1,4 +1,5 @@
 import { Dialog, RippleButton } from '@/components/ui'
+import { useAccountId } from '@/hooks/account-scope'
 import { useWorkspaceBrowser } from '@/hooks/chat'
 import { rememberDirectory } from '@/lib/chat/recent-directory-store'
 import { cn } from '@/lib/utils'
@@ -32,6 +33,7 @@ export function WorkspacePickerDialog({
   initialPath,
   title = 'Choose a directory',
 }: WorkspacePickerDialogProps) {
+  const userId = useAccountId()
   const {
     path,
     setPath,
@@ -116,7 +118,7 @@ export function WorkspacePickerDialog({
     if (!selected) return
     if (version !== selectionVersion.current) return
     onSelect(selected.path)
-    rememberDirectory(selected.path)
+    rememberDirectory(userId, selected.path)
     onOpenChange(false)
   }
 

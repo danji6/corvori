@@ -1,10 +1,16 @@
 import { ConfirmDialog } from '@/components/ui'
-import { draftRestore, usePendingDraftRestore } from '@/lib/chat/draft-restore'
+import { useAccountId } from '@/hooks/account-scope'
+import {
+  draftRestoreFor,
+  usePendingDraftRestore,
+} from '@/lib/chat/draft-restore'
 import { useState } from 'react'
 
 /** Asks before an editor recovers an unsaved draft. */
 export function DraftRestoreDialog() {
-  const pending = usePendingDraftRestore()
+  const userId = useAccountId()
+  const draftRestore = draftRestoreFor(userId)
+  const pending = usePendingDraftRestore(userId)
 
   const [label, setLabel] = useState('')
   if (pending && pending.label !== label) setLabel(pending.label)

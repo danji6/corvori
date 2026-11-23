@@ -28,8 +28,8 @@ export function notificationToastId(notificationId: string) {
 }
 
 /** Returns the stable native notification tag for one notification. */
-export function notificationTag(notificationId: string) {
-  return `${APP_ID}:${notificationId}`
+export function notificationTag(userId: string, notificationId: string) {
+  return `${APP_ID}:${userId}:${notificationId}`
 }
 
 /** Identifies requests that must survive ordinary notification bookkeeping. */

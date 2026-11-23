@@ -1,5 +1,6 @@
+import { AccountScope } from '@/hooks/account-scope'
 import { api } from '@cv/convex/_generated/api'
-import { useMutation } from 'convex/react'
+import { useConvexAuth, useMutation } from 'convex/react'
 import { useEffect, useState } from 'react'
 
 /**
@@ -8,20 +9,30 @@ import { useEffect, useState } from 'react'
  * is missing; only a mutation creates it lazily, so we run `ensureProfile` once
  * on mount and render children only after it resolves.
  */
-export function ProfileGate({ children }: { children: React.ReactNode }) {
+export function ProfileGate({
+  subject,
+  children,
+}: {
+  subject: string
+  children: React.ReactNode
+}) {
+  const { isAuthenticated } = useConvexAuth()
   const ensureProfile = useMutation(api.users.ensureProfile)
-  const [ready, setReady] = useState(false)
+  const [userId, setUserId] = useState<string>()
 
   useEffect(() => {
+    if (!isAuthenticated) return
     let active = true
     ensureProfile()
-      .then(() => active && setReady(true))
+      .then((profile) => {
+        if (active && profile?.subject === subject) setUserId(profile._id)
+      })
       .catch(console.error)
     return () => {
       active = false
     }
-  }, [ensureProfile])
+  }, [ensureProfile, isAuthenticated, subject])
 
-  if (!ready) return null
-  return <>{children}</>
+  if (!isAuthenticated || !userId) return null
+  return <AccountScope userId={userId}>{children}</AccountScope>
 }

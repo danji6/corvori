@@ -1,44 +1,29 @@
-import { APP_ID } from '@cv/core/const'
+import { uiSettingsStore } from '../ui-settings'
 
-import { createLocalStorageStore } from '../local-storage-store'
-
-const STORAGE_KEY = `${APP_ID}-agent-editor-selection`
-
-type Selection = {
-  agentId?: string
-  newAgent?: boolean
-  /** Retains a successful create when a later avatar upload needs retrying. */
-  createdAgentId?: string
+export function getEditingAgentId(userId: string): string | null {
+  return uiSettingsStore(userId).get().agentEditor?.agentId ?? null
 }
 
-const store = createLocalStorageStore<Selection>(STORAGE_KEY)
-
-export const subscribeEditingAgent = store.subscribe
-
-export function getEditingAgentId(): string | null {
-  return store.get().agentId ?? null
-}
-
-export function setEditingAgentId(agentId: string | null): void {
-  store.set({
-    agentId: agentId ?? undefined,
-    newAgent: undefined,
-    createdAgentId: undefined,
+export function setEditingAgentId(userId: string, agentId: string | null) {
+  uiSettingsStore(userId).set({
+    agentEditor: agentId ? { agentId } : undefined,
   })
 }
 
-export function isNewAgent(): boolean {
-  return store.get().newAgent === true
+export function isNewAgent(userId: string): boolean {
+  return uiSettingsStore(userId).get().agentEditor?.newAgent === true
 }
 
-export function startNewAgent(): void {
-  store.set({ agentId: undefined, newAgent: true, createdAgentId: undefined })
+export function startNewAgent(userId: string) {
+  uiSettingsStore(userId).set({ agentEditor: { newAgent: true } })
 }
 
-export function getCreatedAgentId(): string | undefined {
-  return store.get().createdAgentId
+export function getCreatedAgentId(userId: string): string | undefined {
+  return uiSettingsStore(userId).get().agentEditor?.createdAgentId
 }
 
-export function setCreatedAgentId(id: string): void {
-  store.set({ createdAgentId: id })
+export function setCreatedAgentId(userId: string, createdAgentId: string) {
+  uiSettingsStore(userId).update(({ agentEditor }) => ({
+    agentEditor: { ...agentEditor, createdAgentId },
+  }))
 }

@@ -1,13 +1,15 @@
 /// <reference types="bun-types" />
 import type { DraftRestoreRequest } from '@/lib/chat/draft-restore'
-import {
-  draftRestore,
+import { draftRestoreFor } from '@/lib/chat/draft-restore'
+import { afterEach, describe, expect, test } from 'bun:test'
+
+const draftRestore = draftRestoreFor('owner')
+const {
   isDraftPending,
   keepDraftRestore,
   releaseDraftRestore,
   requestDraftRestore,
-} from '@/lib/chat/draft-restore'
-import { afterEach, describe, expect, test } from 'bun:test'
+} = draftRestore
 
 type Answered = { applied: string[]; discarded: string[] }
 

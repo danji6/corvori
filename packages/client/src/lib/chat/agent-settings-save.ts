@@ -27,19 +27,20 @@ export type AgentSaveActions = {
 
 /** Saves staged settings and reuses a created ID when an avatar upload is retried. */
 export async function persistAgentSettings(
+  userId: string,
   values: AgentFormValues,
   options: AgentSaveOptions,
   actions: AgentSaveActions,
 ): Promise<Id<'agents'>> {
   let id = options.newAgent
-    ? (getCreatedAgentId() as Id<'agents'> | undefined)
+    ? (getCreatedAgentId(userId) as Id<'agents'> | undefined)
     : options.agentId
 
   if (!options.newAgent && !id) throw new Error('Select an agent to save.')
 
   if (!id) {
     id = await actions.create(await formValuesToCreate(values))
-    setCreatedAgentId(id)
+    setCreatedAgentId(userId, id)
   } else {
     const { doc, sets } = splitAgentForm(values)
     await actions.update(await formValuesToPatch(id, doc))

@@ -34,7 +34,7 @@ test('desktop options contain the description and a session click responds in th
 }) => {
   await page.addInitScript(() => {
     const captures: Array<{
-      data: { notificationId: string; sessionId: string }
+      data: { userId: string; notificationId: string; sessionId: string }
       body: string
       actions: unknown[]
       tag: string
@@ -89,6 +89,24 @@ test('desktop options contain the description and a session click responds in th
     ])
   await page.evaluate(() => {
     const captures = Reflect.get(window, 'desktopNotifications')
+    const foreign = {
+      ...captures[0],
+      data: { ...captures[0].data, userId: 'other' },
+    }
+    captures.push(foreign)
+    navigator.serviceWorker.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          type: 'corvori:notification-action',
+          action: 'deny',
+          ...foreign.data,
+          requestId: 'other-account-click',
+        },
+      }),
+    )
+  })
+  await page.evaluate(() => {
+    const captures = Reflect.get(window, 'desktopNotifications')
     navigator.serviceWorker.dispatchEvent(
       new MessageEvent('message', {
         data: {
@@ -111,6 +129,14 @@ test('desktop options contain the description and a session click responds in th
       ),
     )
     .toBe(true)
+  expect(
+    await page.evaluate(
+      () => Reflect.get(window, 'desktopNotifications')[1]?.closed,
+    ),
+  ).toBeUndefined()
+  await expect(
+    page.getByRole('status', { name: 'Approval mutations' }),
+  ).not.toContainText('deny')
   await expect(page).toHaveURL(/id=other-chat/)
 })
 

@@ -8,7 +8,11 @@ type WorkerEvent = {
   waitUntil: (promise: Promise<unknown>) => void
 }
 
-type WorkerMessageEvent = { data: unknown; waitUntil: WorkerEvent['waitUntil'] }
+type WorkerMessageEvent = {
+  data: unknown
+  source?: { focus: () => Promise<unknown> }
+  waitUntil: WorkerEvent['waitUntil']
+}
 type WorkerListener = (event: WorkerEvent | WorkerMessageEvent) => void
 
 /** Loads the public worker with browser APIs replaced by focused test doubles. */
@@ -62,7 +66,7 @@ describe('notification service worker', () => {
         action,
         notification: {
           close: mock(() => undefined),
-          data: { notificationId: 'n', sessionId: 's' },
+          data: { userId: 'owner', notificationId: 'n', sessionId: 's' },
         },
         waitUntil,
       })
@@ -81,6 +85,7 @@ describe('notification service worker', () => {
         data: {
           type: 'corvori:notification-action-ack',
           requestId: `n:${action}`,
+          userId: 'owner',
         },
         waitUntil,
       })
@@ -96,14 +101,14 @@ describe('notification service worker', () => {
       action: 'allow-session',
       notification: {
         close: mock(() => undefined),
-        data: { notificationId: 'n', sessionId: 's' },
+        data: { userId: 'owner', notificationId: 'n', sessionId: 's' },
       },
       waitUntil: (promise) => {
         pending = promise
       },
     })
     await pending
-    expect(openWindow).toHaveBeenCalledWith('https://example.test/?id=s')
+    expect(openWindow).toHaveBeenCalledWith('https://example.test/')
     expect(await [...stored.values()][0].json()).toMatchObject({
       action: 'allow-session',
       notificationId: 'n',
@@ -117,7 +122,7 @@ describe('notification service worker', () => {
       action: 'dismiss',
       notification: {
         close: mock(() => undefined),
-        data: { notificationId: 'n', sessionId: 's' },
+        data: { userId: 'owner', notificationId: 'n', sessionId: 's' },
       },
       waitUntil: (promise) => {
         pending = promise
@@ -149,7 +154,11 @@ describe('notification service worker', () => {
       action: '',
       notification: {
         close: mock(() => undefined),
-        data: { notificationId: 'notification_1', sessionId: 'session_1' },
+        data: {
+          userId: 'owner',
+          notificationId: 'notification_1',
+          sessionId: 'session_1',
+        },
       },
       waitUntil: (promise) => {
         pending = promise
@@ -160,10 +169,25 @@ describe('notification service worker', () => {
     expect(postMessage).toHaveBeenCalledWith({
       type: 'corvori:notification-action',
       action: 'show',
+      userId: 'owner',
       notificationId: 'notification_1',
       sessionId: 'session_1',
       requestId: 'notification_1:show',
     })
+    expect(focus).not.toHaveBeenCalled()
+    listeners.get('message')?.({
+      data: {
+        type: 'corvori:notification-action-ack',
+        requestId: 'notification_1:show',
+        userId: 'owner',
+        focus: true,
+      },
+      source: { focus },
+      waitUntil: (promise) => {
+        pending = promise
+      },
+    })
+    await pending
     expect(focus).toHaveBeenCalledTimes(1)
     expect(navigate).not.toHaveBeenCalled()
     expect(openWindow).not.toHaveBeenCalled()

@@ -1,9 +1,9 @@
 import { ErrorFallback } from '@/components/ui'
 import { useKeyboardInset } from '@/hooks'
+import { useAccountId } from '@/hooks/account-scope'
 import {
   useIsAdmin,
   useSettings,
-  useUserProfile,
   useWorkspaceFileIndexByFolder,
 } from '@/hooks/chat'
 import { useOwnedAgent, useSelectAgent } from '@/hooks/chat/agent'
@@ -76,7 +76,7 @@ export function EmptyChat({
     [draftKey],
   )
 
-  const userId = useUserProfile()?._id
+  const userId = useAccountId()
   const isAdmin = useIsAdmin()
   const keyboardInset = useKeyboardInset()
   const fileIndex = useWorkspaceFileIndexByFolder(folder ?? undefined)
@@ -104,7 +104,7 @@ export function EmptyChat({
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>('ask')
   const handleWorkspaceChange = useCallback(
     (id: string | null) => {
-      if (userId) setSelectedSessionFolder(userId, id)
+      setSelectedSessionFolder(userId, id)
       setOrphanDraftKey(folderId && folder === null ? draftKey : null)
       navigate(id ? `/?folder=${id}` : '/', { replace: true })
       if (!id) setMode('normal')

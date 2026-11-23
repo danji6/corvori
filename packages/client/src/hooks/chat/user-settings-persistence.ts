@@ -1,6 +1,7 @@
 import { parseMcpLaunch } from '@/components/chat/entities/user/mcp-launch'
 import type { SettingsFormValues } from '@/components/chat/entities/user/settings-schema'
 import { normalizeWebSearchInstances } from '@/components/chat/entities/user/user-settings-values'
+import { useAccountId } from '@/hooks/account-scope'
 import {
   useClearProfileAvatar,
   useMcpServersSave,
@@ -8,12 +9,8 @@ import {
   useUploadProfileAvatar,
   useUserPromptSetsSave,
 } from '@/hooks/chat'
-import { FONT_OVERRIDE_KEYS } from '@/hooks/font'
 import { providerSaveInput } from '@/lib/provider-settings'
-import {
-  type SettingsOverride,
-  setSettingsOverride,
-} from '@/lib/settings-override'
+import { setSettingsOverride } from '@/lib/settings-override'
 import { snapshotTheme } from '@/lib/theme-worker'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
@@ -40,6 +37,7 @@ export function useUserSettingsPersistence({
   form,
   draft,
 }: PersistenceInput) {
+  const userId = useAccountId()
   const updateSettings = useSettingsUpdate()
   const removeSetting = useMutation(api.settings.remove)
   const uploadAvatar = useUploadProfileAvatar()
@@ -129,13 +127,7 @@ export function useUserSettingsPersistence({
 
     const { enabled, ...fontOverride } = values.override.fonts
 
-    if (enabled) {
-      setSettingsOverride(fontOverride)
-    } else {
-      const cleared: SettingsOverride = {}
-      for (const key of FONT_OVERRIDE_KEYS) cleared[key] = undefined
-      setSettingsOverride(cleared)
-    }
+    setSettingsOverride(userId, enabled ? fontOverride : undefined)
 
     const savedProviders = await saveProviders({
       connections,

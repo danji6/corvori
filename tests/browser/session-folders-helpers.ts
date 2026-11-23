@@ -89,8 +89,8 @@ export async function loadedPages(page: Page): Promise<Record<string, number>> {
 export async function seedExpandedFolders(page: Page) {
   await page.addInitScript((appId) => {
     localStorage.setItem(
-      `${appId}-session-folder-collapse`,
-      JSON.stringify({ '*': false }),
+      `${appId}-ui-settings:fixture-owner`,
+      JSON.stringify({ folderCollapse: { '*': false } }),
     )
   }, APP_ID)
 }

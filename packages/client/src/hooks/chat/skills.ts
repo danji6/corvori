@@ -1,3 +1,4 @@
+import { useAccountId } from '@/hooks/account-scope'
 import { fileOperationStore } from '@/lib/chat/file-operation-store'
 import { extractErrorMessage } from '@/lib/errors'
 import { api } from '@cv/convex/_generated/api'
@@ -70,8 +71,9 @@ export function useAgentFileOperation(
   key: string,
   activeId?: Id<'agentFileOperations'>,
 ) {
+  const userId = useAccountId()
   const admin = useIsAdmin()
-  const store = useMemo(() => fileOperationStore(key), [key])
+  const store = useMemo(() => fileOperationStore(userId, key), [userId, key])
   const state = useSyncExternalStore(store.subscribe, store.read)
   const start = useMutation(api.skills.start)
   const retry = useMutation(api.skills.retry)

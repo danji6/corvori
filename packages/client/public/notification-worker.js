@@ -2,7 +2,7 @@
 
 // This standalone worker shares its wire values with core/notification-actions.
 const APP_ID = 'corvori'
-const ACTION_CACHE = `${APP_ID}-notification-actions-v2`
+const ACTION_CACHE = `${APP_ID}-notification-actions-v3`
 const ACTION_PATH = '/__notification_actions__/'
 const APPROVAL_ACTIONS = new Set(['allow', 'allow-session', 'deny'])
 
@@ -17,8 +17,8 @@ self.addEventListener('activate', (event) => {
 // Retain the selected action until an authenticated page acknowledges it.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const { notificationId, sessionId } = event.notification.data || {}
-  if (!notificationId) return
+  const { userId, notificationId, sessionId } = event.notification.data || {}
+  if (typeof userId !== 'string' || !userId || !notificationId) return
   const action = event.action === 'dismiss' ? 'read' : event.action || 'show'
   if (action !== 'read' && action !== 'show' && !APPROVAL_ACTIONS.has(action))
     return
@@ -26,6 +26,7 @@ self.addEventListener('notificationclick', (event) => {
     deliverAction({
       type: `${APP_ID}:notification-action`,
       action,
+      userId,
       notificationId,
       sessionId,
       requestId: `${notificationId}:${action}`,
@@ -35,12 +36,14 @@ self.addEventListener('notificationclick', (event) => {
 
 self.addEventListener('message', (event) => {
   if (event.data?.type !== `${APP_ID}:notification-action-ack`) return
-  const requestId = event.data.requestId
-  if (typeof requestId !== 'string') return
+  const { requestId, userId, focus } = event.data
+  if (typeof requestId !== 'string' || typeof userId !== 'string') return
   event.waitUntil(
-    caches
-      .open(ACTION_CACHE)
-      .then((cache) => cache.delete(actionUrl(requestId))),
+    caches.open(`${ACTION_CACHE}:${userId}`).then(async (cache) => {
+      if ((await cache.delete(actionUrl(requestId))) && focus) {
+        await event.source?.focus?.()
+      }
+    }),
   )
 })
 
@@ -53,11 +56,6 @@ function actionUrl(requestId) {
 
 /** Chooses one page so background approvals do not run in every tab. */
 async function deliverAction(action) {
-  const cache = await caches.open(ACTION_CACHE)
-  await cache.put(
-    actionUrl(action.requestId),
-    new Response(JSON.stringify(action)),
-  )
   const windows = await self.clients.matchAll({
     type: 'window',
     includeUncontrolled: true,
@@ -66,17 +64,20 @@ async function deliverAction(action) {
     windows.find((window) => window.focused) ||
     windows.find((window) => window.visibilityState === 'visible') ||
     windows[0]
+  // If there is no page, mark the action so the owner can open its chat after auth.
+  const openSession = !client && action.action !== 'read' && !!action.sessionId
+  const cache = await caches.open(`${ACTION_CACHE}:${action.userId}`)
+  await cache.put(
+    actionUrl(action.requestId),
+    new Response(
+      JSON.stringify(openSession ? { ...action, openSession } : action),
+    ),
+  )
   if (client) {
     client.postMessage(action)
-    if (action.action === 'show') return client.focus()
     return
   }
   // Dismiss stays quiet; approval clicks open a page to authenticate and apply it.
   if (action.action === 'read' || !action.sessionId) return
-  return self.clients.openWindow(
-    new URL(
-      `/?id=${encodeURIComponent(action.sessionId)}`,
-      self.location.origin,
-    ).href,
-  )
+  return self.clients.openWindow(new URL('/', self.location.origin).href)
 }

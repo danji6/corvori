@@ -1,4 +1,5 @@
 import { Input, RippleButton } from '@/components/ui'
+import { useAccountId } from '@/hooks/account-scope'
 import { type AgentSummary, useSelectAgent } from '@/hooks/chat/agent'
 import { useAgentEditorView } from '@/hooks/chat/agent-editor'
 import { useAgentPage } from '@/hooks/chat/agent-page'
@@ -57,6 +58,7 @@ function AgentResults({
   search: string
   searching: boolean
 }) {
+  const userId = useAccountId()
   const { agents, loading, hasMore, expanded, loadMore } = useAgentPage(search)
   const select = useSelectAgent()
   const [selectingAgents, setSelectingAgents] = useState<AgentSummary[] | null>(null) // prettier-ignore
@@ -89,7 +91,7 @@ function AgentResults({
         {!search && (
           <RippleButton
             onClick={() => {
-              startNewAgent()
+              startNewAgent(userId)
               editor.open('profile')
             }}
           >

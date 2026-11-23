@@ -1,4 +1,5 @@
 import { Button, ContextMenu, QuickTooltip } from '@/components/ui'
+import { useAccountId } from '@/hooks/account-scope'
 import {
   useActiveSession,
   useLinkedAgents,
@@ -19,6 +20,7 @@ export function AgentsStrip({
   className,
   ...props
 }: React.ComponentProps<'div'>) {
+  const userId = useAccountId()
   const session = useActiveSession()
   const linked = useLinkedAgents()
   const activate = useActivateAgent()
@@ -60,7 +62,7 @@ export function AgentsStrip({
             </ContextMenu.Item>
             <ContextMenu.Item
               onSelect={() => {
-                setEditingAgentId(agent._id)
+                setEditingAgentId(userId, agent._id)
                 openAgentEditor()
               }}
             >

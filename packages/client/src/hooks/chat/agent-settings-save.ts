@@ -1,4 +1,5 @@
 import type { AgentFormValues } from '@/components/chat/entities/agent/agent-form'
+import { useAccountId } from '@/hooks/account-scope'
 import {
   type AgentSaveOptions,
   persistAgentSettings,
@@ -13,6 +14,7 @@ import { useAgentPromptSetsSave } from './prompts'
 
 /** Creates all settings atomically, retaining the ID if an avatar upload fails. */
 export function useAgentSettingsPersistence(options: AgentSaveOptions) {
+  const userId = useAccountId()
   const create = useMutation(api.agents.create)
   const update = useAgentUpdate()
   const savePromptSets = useAgentPromptSetsSave()
@@ -20,7 +22,7 @@ export function useAgentSettingsPersistence(options: AgentSaveOptions) {
   const uploadAvatar = useHttpAction<FormData, AvatarUploadResult>('/io/avatar/upload') // prettier-ignore
 
   return (values: AgentFormValues) =>
-    persistAgentSettings(values, options, {
+    persistAgentSettings(userId, values, options, {
       create,
       update,
       savePromptSets,

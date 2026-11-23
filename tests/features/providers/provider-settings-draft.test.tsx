@@ -2,9 +2,10 @@ import type {
   ProviderFormValues,
   SettingsFormValues,
 } from '@/components/chat/entities/user/settings-schema'
+import { AccountScope } from '@/hooks/account-scope'
 import { type FormDraft, useFormDraft } from '@/hooks/chat/form-draft'
 import { useProviderSettingsSync } from '@/hooks/chat/provider-settings'
-import { draftRestore } from '@/lib/chat/draft-restore'
+import { draftRestoreFor } from '@/lib/chat/draft-restore'
 import { clearEditorDraft, getEditorDraft } from '@/lib/chat/editor-draft-store'
 import { providerForm } from '@/lib/provider-settings'
 import type { Id } from '@cv/convex/_generated/dataModel'
@@ -19,6 +20,8 @@ import { type UseFormReturn, useForm } from 'react-hook-form'
 import { setupDom } from '~/tests/setup/dom'
 
 setupDom()
+
+const draftRestore = draftRestoreFor('owner')
 
 const KEY = 'provider-settings-draft-test'
 const CONNECTION: ModelProviderView = {
@@ -55,7 +58,7 @@ beforeAll(() => {
 afterEach(() => {
   act(() => root?.unmount())
   root = null
-  clearEditorDraft(KEY)
+  clearEditorDraft('owner', KEY)
   const pending = draftRestore.peek()
   if (pending?.key === KEY) draftRestore.dismiss(pending)
 })
@@ -85,7 +88,13 @@ function Harness() {
 
 async function mount() {
   root = createRoot(document.createElement('div'))
-  await act(async () => root?.render(<Harness />))
+  await act(async () =>
+    root?.render(
+      <AccountScope userId="owner">
+        <Harness />
+      </AccountScope>,
+    ),
+  )
 }
 
 function selectModel(model: DiscoveredModel) {
@@ -161,7 +170,7 @@ test.each(MODELS)(
     })
 
     expect(editor.isDirty).toBe(false)
-    expect(getEditorDraft(KEY)).toBeUndefined()
+    expect(getEditorDraft('owner', KEY)).toBeUndefined()
     act(() => editor.draft.sync(editor.form.getValues()))
     expect(draftRestore.peek()).toBeUndefined()
   },
@@ -179,7 +188,9 @@ test('preserves a real unsaved edit when provider metadata synchronizes', async 
 
   expect(editor.isDirty).toBe(true)
   expect(editor.form.getValues('displayName')).toBe('Edited')
-  expect(getEditorDraft<SettingsFormValues>(KEY)?.displayName).toBe('Edited')
+  expect(getEditorDraft<SettingsFormValues>('owner', KEY)?.displayName).toBe(
+    'Edited',
+  )
   act(() =>
     editor.draft.sync({
       displayName: 'User',

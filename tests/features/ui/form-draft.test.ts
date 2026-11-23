@@ -1,9 +1,5 @@
 /// <reference types="bun-types" />
-import {
-  draftRestore,
-  isDraftPending,
-  requestDraftRestore,
-} from '@/lib/chat/draft-restore'
+import { draftRestoreFor } from '@/lib/chat/draft-restore'
 import {
   agentSettingsDraftKey,
   clearEditorDraft,
@@ -15,6 +11,9 @@ import { createFormControl } from 'react-hook-form'
 import { setupDom } from '~/tests/setup/dom'
 
 setupDom()
+
+const draftRestore = draftRestoreFor('owner')
+const { isDraftPending, requestDraftRestore } = draftRestore
 
 type Prompt = { id: string; name: string }
 type Values = { name: string; prompts: Prompt[] }
@@ -133,7 +132,7 @@ describe('form draft autosave contract', () => {
 const KEY = agentSettingsDraftKey('a1')
 
 afterEach(() => {
-  clearEditorDraft(KEY)
+  clearEditorDraft('owner', KEY)
   let pending = draftRestore.peek()
   while (pending) {
     draftRestore.dismiss(pending)
@@ -150,21 +149,21 @@ function mountDraft(form: ReturnType<typeof makeForm>) {
   const unsubscribe = form.subscribe({
     formState: { values: true, isDirty: true },
     callback: ({ values, isDirty }) => {
-      if (isDirty) setEditorDraft(KEY, values)
-      else if (!isDraftPending(KEY)) clearEditorDraft(KEY)
+      if (isDirty) setEditorDraft('owner', KEY, values)
+      else if (!isDraftPending(KEY)) clearEditorDraft('owner', KEY)
     },
   })
 
   return {
     unsubscribe,
     sync: (values: Values) => {
-      const saved = getEditorDraft<Values>(KEY)
+      const saved = getEditorDraft<Values>('owner', KEY)
       if (saved !== undefined)
         requestDraftRestore({
           key: KEY,
           label: 'these agent settings',
           apply: () => form.reset(saved, { keepDefaultValues: true }),
-          discard: () => clearEditorDraft(KEY),
+          discard: () => clearEditorDraft('owner', KEY),
         })
       form.reset(values)
     },
@@ -183,31 +182,37 @@ describe('form draft lifecycle', () => {
     draft.sync(STORED)
 
     form.setValue('name', 'Edited', { shouldDirty: true })
-    expect(getEditorDraft<Values>(KEY)).toEqual({ ...STORED, name: 'Edited' })
+    expect(getEditorDraft<Values>('owner', KEY)).toEqual({
+      ...STORED,
+      name: 'Edited',
+    })
 
     form.setValue('name', 'Agent', { shouldDirty: true })
     draft.unsubscribe()
 
-    expect(getEditorDraft(KEY)).toBeUndefined()
+    expect(getEditorDraft('owner', KEY)).toBeUndefined()
   })
 
   test('keeps the draft through the reset that opening performs', () => {
     // `sync` queues the question first: the subscription runs inside
     // `form.reset`, where the form is clean and the draft would otherwise read
     // as a revert and be cleared before anyone could be asked about it.
-    setEditorDraft(KEY, { ...STORED, name: 'Edited' })
+    setEditorDraft('owner', KEY, { ...STORED, name: 'Edited' })
     const form = makeForm()
     const draft = mountDraft(form)
 
     draft.sync(STORED)
     draft.unsubscribe()
 
-    expect(getEditorDraft<Values>(KEY)).toEqual({ ...STORED, name: 'Edited' })
+    expect(getEditorDraft<Values>('owner', KEY)).toEqual({
+      ...STORED,
+      name: 'Edited',
+    })
     expect(draftRestore.peek()?.key).toBe(KEY)
   })
 
   test('restores onto the stored values, leaving them as the baseline', () => {
-    setEditorDraft(KEY, { ...STORED, name: 'Edited' })
+    setEditorDraft('owner', KEY, { ...STORED, name: 'Edited' })
     const form = makeForm()
     const draft = mountDraft(form)
     draft.sync(STORED)
@@ -226,7 +231,7 @@ describe('form draft lifecycle', () => {
   })
 
   test('discarding the offer drops the draft for good', () => {
-    setEditorDraft(KEY, { ...STORED, name: 'Edited' })
+    setEditorDraft('owner', KEY, { ...STORED, name: 'Edited' })
     const form = makeForm()
     const draft = mountDraft(form)
     draft.sync(STORED)
@@ -234,6 +239,6 @@ describe('form draft lifecycle', () => {
     draftRestore.discard(draftRestore.peek()!)
     draft.unsubscribe()
 
-    expect(getEditorDraft(KEY)).toBeUndefined()
+    expect(getEditorDraft('owner', KEY)).toBeUndefined()
   })
 })
