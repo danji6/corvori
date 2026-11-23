@@ -303,9 +303,12 @@ import type * as model_stream_engineCompaction from "../model/stream/engineCompa
 import type * as model_stream_engineLog from "../model/stream/engineLog.js";
 import type * as model_stream_engineOutput from "../model/stream/engineOutput.js";
 import type * as model_stream_enginePatches from "../model/stream/enginePatches.js";
+import type * as model_stream_enginePrompts from "../model/stream/enginePrompts.js";
+import type * as model_stream_engineRequest from "../model/stream/engineRequest.js";
 import type * as model_stream_engineSetup from "../model/stream/engineSetup.js";
 import type * as model_stream_engineShellWait from "../model/stream/engineShellWait.js";
 import type * as model_stream_engineStep from "../model/stream/engineStep.js";
+import type * as model_stream_engineTools from "../model/stream/engineTools.js";
 import type * as model_stream_engineWatchdog from "../model/stream/engineWatchdog.js";
 import type * as model_stream_evalContext from "../model/stream/evalContext.js";
 import type * as model_stream_execution from "../model/stream/execution.js";
@@ -792,9 +795,12 @@ declare const fullApi: ApiFromModules<{
   "model/stream/engineLog": typeof model_stream_engineLog;
   "model/stream/engineOutput": typeof model_stream_engineOutput;
   "model/stream/enginePatches": typeof model_stream_enginePatches;
+  "model/stream/enginePrompts": typeof model_stream_enginePrompts;
+  "model/stream/engineRequest": typeof model_stream_engineRequest;
   "model/stream/engineSetup": typeof model_stream_engineSetup;
   "model/stream/engineShellWait": typeof model_stream_engineShellWait;
   "model/stream/engineStep": typeof model_stream_engineStep;
+  "model/stream/engineTools": typeof model_stream_engineTools;
   "model/stream/engineWatchdog": typeof model_stream_engineWatchdog;
   "model/stream/evalContext": typeof model_stream_evalContext;
   "model/stream/execution": typeof model_stream_execution;
