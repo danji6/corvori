@@ -5,6 +5,13 @@ import { internal } from './_generated/api'
 const crons = cronJobs()
 
 crons.daily(
+  'prune abandoned join avatar uploads',
+  { hourUTC: 2, minuteUTC: 30 },
+  internal.avatars._sweepJoinFiles,
+  {},
+)
+
+crons.daily(
   'prune orphaned MCP definitions',
   { hourUTC: 4, minuteUTC: 0 },
   internal.mcpCatalogs._sweepOrphans,

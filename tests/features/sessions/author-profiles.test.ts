@@ -62,6 +62,42 @@ function fixture() {
 }
 
 describe('session author profiles', () => {
+  test('keeps a blank session name after avatar and account profile changes', async () => {
+    const { ctx, db } = fixture()
+    const target = { sessionId, sender: owner }
+    await updateProfile(ctx, { ...target, name: '  ' })
+    await db.patch('settings', { displayName: 'Renamed' })
+    const avatarId = await confirmProfileAvatar(ctx, {
+      ...target,
+      subject: 'owner',
+      originalStorageId: 'original' as Id<'_storage'>,
+      thumbStorageId: 'thumbnail' as Id<'_storage'>,
+    })
+    expect(await getEditableProfile(ctx, target)).toMatchObject({
+      name: '',
+      avatarId,
+      inherited: { name: 'Renamed' },
+    })
+    expect(await getProfile(ctx, target)).toMatchObject({ name: 'Anonymous' })
+  })
+
+  test('keeps an explicitly cleared avatar across account updates and duplication', async () => {
+    const { ctx, db, rows } = fixture()
+    const target = { sessionId, sender: owner }
+    await updateProfile(ctx, { ...target, avatar: 'clear' })
+    expect(rows('sessionProfiles')[0]?.avatarId).toBeNull()
+    await db.patch('settings', { avatarId: updatedGlobalAvatar })
+    await duplicateAuthorProfiles(ctx, sessionId, otherSession)
+
+    expect((await getProfile(ctx, target))?.avatarId).toBeUndefined()
+    expect(
+      (await getProfile(ctx, { ...target, sessionId: otherSession }))?.avatarId,
+    ).toBeUndefined()
+    await updateProfile(ctx, { ...target, avatar: 'inherit' })
+    expect((await getProfile(ctx, target))?.avatarId).toBe(updatedGlobalAvatar)
+    expect(rows('sessionProfiles')).toHaveLength(1)
+  })
+
   test('inherits live fields independently and resets only the requested field', async () => {
     const { ctx, db, rows, deleted } = fixture()
     const target = { sessionId, sender: owner }
@@ -94,7 +130,7 @@ describe('session author profiles', () => {
       name: 'Renamed',
       avatarId,
     })
-    await updateProfile(ctx, { ...target, resetAvatar: true })
+    await updateProfile(ctx, { ...target, avatar: 'inherit' })
     expect(await getProfile(ctx, target)).toMatchObject({
       name: 'Renamed',
       avatarId: updatedGlobalAvatar,

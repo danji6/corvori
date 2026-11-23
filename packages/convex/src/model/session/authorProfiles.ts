@@ -1,4 +1,4 @@
-import { toOptionalName } from '@cv/core/utils/names'
+import { toDisplayName, toOptionalName } from '@cv/core/utils/names'
 
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
@@ -7,6 +7,7 @@ import type { AuthMutationCtx, AuthQueryCtx } from '../../functions'
 import { type MessageSender, authorKey } from '../../validators/messages'
 import type {
   ConfirmSessionProfileAvatar,
+  SessionProfileChanges,
   SessionProfileTarget,
   UpdateSessionProfile,
 } from '../../validators/sessionAuthors'
@@ -48,7 +49,11 @@ export async function resolveAuthor(
   if (sender.type === 'archived') {
     const author = await ctx.db.get(sender.id)
     if (author?.sessionId !== sessionId) return null
-    return { kind: author.kind, name: author.name, avatarId: author.avatarId }
+    return {
+      kind: author.kind,
+      name: resolveName(author.name),
+      avatarId: author.avatarId,
+    }
   }
 
   const [override, profile] = await Promise.all([
@@ -58,9 +63,16 @@ export async function resolveAuthor(
 
   return {
     kind: sender.type,
-    name: override?.name ?? profile.name,
-    avatarId: override?.avatarId ?? profile.avatarId,
+    name: resolveName(override?.name) ?? profile.name,
+    avatarId:
+      override?.avatarId === null
+        ? undefined
+        : (override?.avatarId ?? profile.avatarId),
   }
+}
+
+function resolveName(name: string | undefined) {
+  return name === undefined ? undefined : toDisplayName(name)
 }
 
 async function readLiveProfile(ctx: QueryCtx, sender: LiveSender) {
@@ -158,13 +170,33 @@ export async function getEditableProfile(
 ) {
   const editable = await editableProfile(ctx, target)
   if (!editable) return null
+  return describeProfile(ctx, target.sender, editable.record)
+}
+
+/** Reads the caller's saved identity after the invite has been authorized. */
+export async function getJoiningProfile(
+  ctx: QueryCtx,
+  sessionId: Id<'sessions'>,
+  userId: Id<'users'>,
+) {
+  const sender = { type: 'user', id: userId } as const
+  return describeProfile(
+    ctx,
+    sender,
+    await findOverride(ctx, sessionId, sender),
+  )
+}
+
+async function describeProfile(
+  ctx: QueryCtx,
+  sender: MessageSender,
+  record: ProfileRecord,
+) {
   const inherited =
-    target.sender.type === 'archived'
-      ? undefined
-      : await readLiveProfile(ctx, target.sender)
+    sender.type === 'archived' ? undefined : await readLiveProfile(ctx, sender)
   return {
-    name: editable.record?.name,
-    avatarId: editable.record?.avatarId,
+    name: record?.name,
+    avatarId: record?.avatarId,
     inherited,
   }
 }
@@ -225,9 +257,41 @@ export async function updateProfile(
   args: UpdateSessionProfile,
 ) {
   const record = await requireEditableProfile(ctx, args)
-  const name = args.name === undefined ? record?.name : toOptionalName(args.name) // prettier-ignore
-  const avatarId = args.resetAvatar ? undefined : record?.avatarId
-  await saveProfile(ctx, args, record, { name, avatarId })
+  await saveProfile(ctx, args, record, applyChanges(record, args))
+}
+
+export async function saveJoiningProfile(
+  ctx: MutationCtx,
+  target: {
+    sessionId: Id<'sessions'>
+    sender: { type: 'user'; id: Id<'users'> }
+  },
+  changes: SessionProfileChanges,
+  avatarId?: Id<'avatars'>,
+) {
+  const record = await findOverride(ctx, target.sessionId, target.sender)
+  const fields = applyChanges(record, changes)
+  if (avatarId) fields.avatarId = avatarId
+  await saveProfile(ctx, target, record, fields)
+}
+
+function applyChanges(
+  record: ProfileRecord,
+  changes: SessionProfileChanges,
+): ProfileFields {
+  const name = applyNameChange(record, changes.name)
+  let avatarId = record?.avatarId
+  if (changes.avatar === 'inherit') avatarId = undefined
+  if (changes.avatar === 'clear') avatarId = null
+  return { name, avatarId }
+}
+
+/** Keeps an empty name as an explicit override. Null restores inheritance. */
+function applyNameChange(
+  record: ProfileRecord,
+  name: SessionProfileChanges['name'],
+) {
+  return name === undefined ? record?.name : name?.trim()
 }
 
 export async function confirmProfileAvatar(
@@ -238,7 +302,7 @@ export async function confirmProfileAvatar(
   if (!user) error('Profile not initialized', 409)
 
   const record = await requireEditableProfile({ ...ctx, userId: user._id }, args) // prettier-ignore
-  const name = args.name === undefined ? record?.name : toOptionalName(args.name) // prettier-ignore
+  const name = applyNameChange(record, args.name)
   const avatarId = await createAvatar(ctx, {
     storageId: args.originalStorageId,
     thumbStorageId: args.thumbStorageId,
@@ -249,7 +313,7 @@ export async function confirmProfileAvatar(
 }
 
 type ProfileRecord = Doc<'sessionProfiles'> | Doc<'sessionAuthors'> | null
-type ProfileFields = Pick<AuthorProfile, 'name' | 'avatarId'>
+type ProfileFields = Pick<Doc<'sessionProfiles'>, 'name' | 'avatarId'>
 
 async function saveProfile(
   ctx: MutationCtx,
@@ -257,12 +321,16 @@ async function saveProfile(
   record: ProfileRecord,
   fields: ProfileFields,
 ) {
+  const hasOverride = fields.name !== undefined || fields.avatarId !== undefined
   if (sender.type === 'archived') {
-    await ctx.db.patch(sender.id, fields)
+    await ctx.db.patch(sender.id, {
+      ...fields,
+      avatarId: fields.avatarId ?? undefined,
+    })
   } else if (record) {
-    if (fields.name || fields.avatarId) await ctx.db.patch(record._id, fields)
+    if (hasOverride) await ctx.db.patch(record._id, fields)
     else await ctx.db.delete(record._id)
-  } else if (fields.name || fields.avatarId) {
+  } else if (hasOverride) {
     await ctx.db.insert('sessionProfiles', { sessionId, sender, ...fields })
   }
 

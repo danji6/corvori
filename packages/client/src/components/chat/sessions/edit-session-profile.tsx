@@ -1,5 +1,4 @@
-import { AvatarPicker } from '@/components/chat/entities/avatar-picker'
-import { Dialog, Input, Label, RippleButton } from '@/components/ui'
+import { Dialog, RippleButton } from '@/components/ui'
 import { useHttpAction } from '@/hooks/http'
 import {
   type AvatarUploadResult,
@@ -11,6 +10,11 @@ import type { SessionProfileTarget } from '@cv/convex/validators/sessionAuthors'
 import { useMutation, useQuery } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { useState } from 'react'
+
+import {
+  type SessionProfileDraft,
+  SessionProfileFields,
+} from './session-profile-fields'
 
 type ProfileDialogProps = {
   target: SessionProfileTarget
@@ -63,21 +67,19 @@ function ProfileForm({
   const { call: upload } = useHttpAction<FormData, AvatarUploadResult>(
     '/io/avatar/upload',
   )
-  const [name, setName] = useState<string>()
-  const [pendingAvatar, setPendingAvatar] = useState<File | null>(null)
-  const [resetAvatar, setResetAvatar] = useState(false)
-  const isImported = target.sender.type === 'archived'
-  const canSave = name !== undefined || pendingAvatar || resetAvatar
+  const [draft, setDraft] = useState<SessionProfileDraft>({})
+  const { name, avatar, file } = draft
+  const canSave = name !== undefined || file || avatar
 
   async function save(event: React.SyntheticEvent) {
     event.preventDefault()
     if (busy || !canSave) return
     setBusy(true)
     try {
-      if (pendingAvatar) {
-        await upload(await sessionAvatarUploadForm(target, pendingAvatar, name))
+      if (file) {
+        await upload(await sessionAvatarUploadForm(target, file, name))
       } else {
-        await update({ ...target, name, resetAvatar })
+        await update({ ...target, name, avatar })
       }
       onClose()
     } catch (err) {
@@ -87,51 +89,18 @@ function ProfileForm({
     }
   }
 
-  const nameValue = name ?? profile.name ?? ''
-  const avatarId = resetAvatar
-    ? profile.inherited?.avatarId
-    : (profile.avatarId ?? profile.inherited?.avatarId)
-
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(event) => void save(event)}
     >
-      <fieldset className="flex items-center gap-3" disabled={busy}>
-        <AvatarPicker
-          avatarId={avatarId}
-          pendingAvatar={pendingAvatar}
-          avatarCleared={resetAvatar && !avatarId}
-          clearLabel={isImported ? 'Remove avatar' : 'Use profile avatar'}
-          canClear={Boolean(profile.avatarId) && !resetAvatar}
-          onStageAvatar={setPendingAvatar}
-          onClearAvatar={() => setResetAvatar(true)}
-        />
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <Label htmlFor="session-profile-name">Name</Label>
-          <Input
-            id="session-profile-name"
-            autoFocus
-            value={nameValue}
-            placeholder={
-              profile.inherited?.name ??
-              (isImported ? 'Display name' : 'Use profile name')
-            }
-            onValueChange={setName}
-          />
-          {!isImported && nameValue && (
-            <RippleButton
-              type="button"
-              variant="stealth"
-              size="sm"
-              className="self-start"
-              onClick={() => setName('')}
-            >
-              Use profile name
-            </RippleButton>
-          )}
-        </div>
-      </fieldset>
+      <SessionProfileFields
+        profile={profile}
+        draft={draft}
+        setDraft={setDraft}
+        disabled={busy}
+        autoFocus
+      />
       <Dialog.Footer>
         <RippleButton
           type="button"

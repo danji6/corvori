@@ -5,10 +5,10 @@ import type { MutationCtx } from '../_generated/server'
 import { error } from '../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../functions'
 import * as Notifications from './notifications/records'
+import { resolveAuthor } from './session/authorProfiles'
 import { getMember, getMembership, requireOwner } from './session/memberships'
 import { announcePresence } from './session/presence'
 import type { SessionMember } from './session/types'
-import { getByOwnerId as getSettings } from './settings'
 import { stopForUser } from './stream/lifecycle'
 
 /** Keeps each member's denormalized title in sync with the session title. */
@@ -40,11 +40,14 @@ export async function list(
 
   return Promise.all(
     userSessions.map(async (membership): Promise<SessionMember> => {
-      const settings = await getSettings(ctx, membership.userId)
+      const profile = await resolveAuthor(ctx, sessionId, {
+        type: 'user',
+        id: membership.userId,
+      })
       return {
         membership,
-        name: toDisplayName(settings?.displayName),
-        avatarId: settings?.avatarId,
+        name: toDisplayName(profile?.name),
+        avatarId: profile?.avatarId,
       }
     }),
   )

@@ -1,19 +1,23 @@
 import { Chat } from '@/components/chat/chat'
 import { ChatSidebars } from '@/components/chat/chat-sidebars'
+import { ChatComposer } from '@/components/chat/composer/chat-composer'
 import { EmptyChat } from '@/components/chat/empty-chat'
 import { NotificationProvider } from '@/components/chat/notifications/notification-provider'
 import { ChatSearchProvider } from '@/components/chat/search'
+import { JoinSessionButton } from '@/components/chat/sessions/join-session'
 import { LightboxProvider } from '@/components/ui/lightbox'
 import '@/globals.css'
+import { AvatarUrlProvider } from '@/hooks/chat/avatars'
 import { useActiveSessionId } from '@/hooks/chat/session'
 import { StreamStoreProvider } from '@/hooks/chat/stream'
 import { applyTheme, exportSchemeCss } from '@/lib/theme'
 import { generateThemeCss } from '@/lib/theme-worker'
 import { ConvexQueryCacheProvider } from 'convex-helpers/react/cache'
 import { ConvexProviderWithAuth } from 'convex/react'
+import { useState } from 'react'
 import { Link } from 'wouter'
 
-import { emptyChatClient } from './empty-chat-client'
+import { emptyChatClient, sentMessages } from './empty-chat-client'
 
 const shellTheme = new URLSearchParams(location.search).has('shellTheme')
 if (!shellTheme) {
@@ -59,7 +63,34 @@ function SessionThemeFixture() {
   )
 }
 
+function CreateSessionFixture() {
+  const sessionId = useActiveSessionId()
+  const [firstMessage, setFirstMessage] = useState('')
+  if (!sessionId) {
+    return (
+      <EmptyChat
+        onFirstMessage={(message) => setFirstMessage(message.content)}
+      />
+    )
+  }
+  return (
+    <div className="w-full">
+      <output aria-label="Opening message">{firstMessage || 'None'}</output>
+      <output aria-label="Session create calls">
+        {JSON.stringify(sentMessages)}
+      </output>
+      <ChatComposer
+        status="ready"
+        hideTokenWidget
+        draftKey={sessionId}
+        onSubmit={() => {}}
+      />
+    </div>
+  )
+}
+
 export function EmptyChatFixture() {
+  const params = new URLSearchParams(location.search)
   const chat = (
     <LightboxProvider>
       <EmptyChat onFirstMessage={() => {}} />
@@ -72,7 +103,16 @@ export function EmptyChatFixture() {
           <main className="bg-background text-foreground flex min-h-dvh w-full">
             {shellTheme ? (
               <SessionThemeFixture />
-            ) : new URLSearchParams(location.search).has('withNavigation') ? (
+            ) : params.has('createSession') ? (
+              <LightboxProvider>
+                <CreateSessionFixture />
+              </LightboxProvider>
+            ) : params.has('joinSession') ? (
+              <>
+                <AvatarUrlProvider />
+                <JoinSessionButton />
+              </>
+            ) : params.has('withNavigation') ? (
               <ChatSearchProvider>
                 <NotificationProvider>
                   <ChatSidebars className="min-w-0 flex-1">{chat}</ChatSidebars>

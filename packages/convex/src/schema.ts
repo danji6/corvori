@@ -87,7 +87,9 @@ export default defineSchema({
   users: defineTable(V.userSchema)
     .index('by_subject', ['subject']),
 
-  avatars: defineTable(V.avatarSchema),
+  avatars: defineTable(V.avatarSchema)
+    .index('by_storageId', ['storageId'])
+    .index('by_thumbStorageId', ['thumbStorageId']),
 
   settings: defineTable(V.settingsSchema)
     .index('by_ownerId', ['ownerId'])

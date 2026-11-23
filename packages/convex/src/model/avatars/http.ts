@@ -1,3 +1,5 @@
+import { ConvexError } from 'convex/values'
+
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { extractErrorMessage } from '../../errors'
@@ -7,7 +9,7 @@ import {
   preflightResponse,
 } from '../../lib/httpResponses'
 import type { MessageSender } from '../../validators/messages'
-import { uploadAvatar } from './actions'
+import { joinWithAvatar, uploadAvatar } from './actions'
 
 export async function avatarUploadHandler(ctx: ActionCtx, req: Request) {
   const origin = allowedOrigin(req)
@@ -30,6 +32,20 @@ export async function avatarUploadHandler(ctx: ActionCtx, req: Request) {
   }
 
   try {
+    if (target === 'join') {
+      const token = form.get('token')
+      const name = form.get('name')
+      if (typeof token !== 'string' || !token.trim()) {
+        return jsonResponse({ error: 'Missing invite token' }, 400, origin)
+      }
+      const result = await joinWithAvatar(ctx, {
+        token,
+        file,
+        name: typeof name === 'string' ? name : undefined,
+      })
+      return jsonResponse(result, 200, origin)
+    }
+
     if (target === 'profile') {
       const result = await uploadAvatar(ctx, { target: 'profile', file })
       return jsonResponse(result, 200, origin)
@@ -64,7 +80,10 @@ export async function avatarUploadHandler(ctx: ActionCtx, req: Request) {
     })
     return jsonResponse(result, 200, origin)
   } catch (error) {
-    return jsonResponse({ error: extractErrorMessage(error) }, 500, origin)
+    const code = error instanceof ConvexError ? error.data?.code : undefined
+    const status =
+      typeof code === 'number' && code >= 400 && code < 500 ? code : 500
+    return jsonResponse({ error: extractErrorMessage(error) }, status, origin)
   }
 }
 

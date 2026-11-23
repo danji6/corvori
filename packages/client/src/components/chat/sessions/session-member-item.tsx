@@ -1,4 +1,3 @@
-import { useAuthorProfile } from '@/hooks/chat/author-profile'
 import type { SessionMember } from '@/lib/chat'
 import { capitalize } from '@cv/core/utils/strings'
 import { UserIcon } from 'lucide-react'
@@ -20,12 +19,10 @@ export function SessionMemberItem({
 }: SessionMemberItemProps) {
   const { membership } = member
   const sender = { type: 'user' as const, id: membership.userId }
-  const profile = useAuthorProfile(sender)
-  const name = profile?.name ?? member.name
   return (
     <ParticipantRow
-      name={name}
-      avatarId={profile?.avatarId ?? member.avatarId}
+      name={member.name}
+      avatarId={member.avatarId}
       editSender={canEdit ? sender : undefined}
       onRemove={canRemove ? onRemove : undefined}
       fallbackIcon={<UserIcon className="size-full" />}

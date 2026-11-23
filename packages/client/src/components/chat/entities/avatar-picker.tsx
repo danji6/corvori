@@ -1,8 +1,9 @@
 import { Avatar } from '@/components/ui'
 import { DropZone, type DropZoneHandle } from '@/components/ui/file-picker'
 import { useAvatarThumbnail } from '@/hooks/chat'
+import { cn } from '@/lib/utils'
 import type { Id } from '@cv/convex/_generated/dataModel'
-import { XIcon } from 'lucide-react'
+import { RotateCcwIcon, XIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 export type AvatarPickerProps = {
@@ -11,9 +12,14 @@ export type AvatarPickerProps = {
   avatarCleared: boolean
   onStageAvatar: (file: File | null) => void
   onClearAvatar: () => void
+  onResetAvatar?: () => void
   clearLabel?: string
   canClear?: boolean
+  disabled?: boolean
 }
+
+const avatarActionClassName =
+  'bg-m3-surface-container-highest text-muted-foreground hover:text-foreground focus-visible:border-ring focus-visible:ring-ring absolute -right-1 flex size-5 items-center justify-center rounded-full border shadow-sm outline-0 transition-colors focus-visible:ring-1'
 
 export function AvatarPicker({
   avatarId,
@@ -21,8 +27,10 @@ export function AvatarPicker({
   avatarCleared,
   onStageAvatar,
   onClearAvatar,
+  onResetAvatar,
   clearLabel = 'Remove avatar',
   canClear = true,
+  disabled,
 }: AvatarPickerProps) {
   const dropZoneRef = useRef<DropZoneHandle | null>(null)
   const savedAvatarUrl = useAvatarThumbnail(avatarId)
@@ -86,7 +94,7 @@ export function AvatarPicker({
     <div className="relative shrink-0">
       <DropZone
         ref={dropZoneRef}
-        onDrop={(files) => files[0] && handleDrop(files[0])}
+        onDrop={(files) => !disabled && files[0] && handleDrop(files[0])}
         accept={{ 'image/*': [] }}
         maxFiles={1}
         noFocus
@@ -96,18 +104,33 @@ export function AvatarPicker({
         <Avatar
           src={avatarUrl}
           size="md"
-          onClick={() => dropZoneRef.current?.open()}
-          className="cursor-pointer"
+          onClick={disabled ? undefined : () => dropZoneRef.current?.open()}
+          label="Choose avatar"
         />
       </DropZone>
       {hasAvatar && (pendingAvatar || canClear) && (
         <button
           type="button"
-          className="bg-m3-surface-container-highest text-muted-foreground hover:text-foreground focus-visible:border-ring focus-visible:ring-ring absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full border shadow-sm outline-0 transition-colors focus-visible:ring-1"
+          disabled={disabled}
+          className={cn(avatarActionClassName, '-top-1')}
           onClick={handleRemove}
           title={pendingAvatar ? 'Cancel avatar change' : clearLabel}
         >
           <XIcon className="size-3" />
+        </button>
+      )}
+      {onResetAvatar && (
+        <button
+          type="button"
+          disabled={disabled}
+          className={cn(avatarActionClassName, '-bottom-1')}
+          onClick={() => {
+            setPreviewUrl(null)
+            onResetAvatar()
+          }}
+          title="Reset to profile avatar"
+        >
+          <RotateCcwIcon className="size-3" />
         </button>
       )}
     </div>

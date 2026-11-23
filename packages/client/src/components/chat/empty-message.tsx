@@ -24,7 +24,7 @@ export function EmptyMessage({
           {folderName}
         </span>
       ) : (
-        'Send a message to start a new session'
+        'Send a message to begin'
       )}
     </div>
   )

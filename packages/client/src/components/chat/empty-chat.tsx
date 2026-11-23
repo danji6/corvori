@@ -1,4 +1,4 @@
-import { ErrorFallback } from '@/components/ui'
+import { ErrorFallback, RippleButton } from '@/components/ui'
 import { useKeyboardInset } from '@/hooks'
 import { useAccountId } from '@/hooks/account-scope'
 import {
@@ -18,6 +18,7 @@ import type { ApprovalMode } from '@cv/convex/validators/approvals'
 import { selectedBuiltinTools } from '@cv/core/tool-capabilities'
 import { useQuery } from 'convex-helpers/react/cache/hooks'
 import { useAction } from 'convex/react'
+import { PlusIcon } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
 import { ErrorBoundary } from 'react-error-boundary'
 import { useLocation, useSearch } from 'wouter'
@@ -62,6 +63,9 @@ export function EmptyChat({
   const selectAgent = useSelectAgent()
   const composerRef = useRef<ComposerHandle>(null)
   const [switching, setSwitching] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [movingDraft, setMovingDraft] = useState(false)
+  const creationInFlight = useRef(false)
 
   const [composerState, setComposerState] = useState({
     key: draftKey,
@@ -112,18 +116,27 @@ export function EmptyChat({
     [navigate, folderId, folder, draftKey, userId],
   )
 
-  const handleSubmit = useCallback(
-    async (message: PendingMessage) => {
+  const createAndOpen = useCallback(
+    async (prepare: (sessionId: string) => void | Promise<void>) => {
+      if (creationInFlight.current)
+        throw new Error('A session is already being created')
       if (folderId && !folder)
-        throw new Error('Choose an available folder before sending')
-      const { sessionId } = await createSession({
-        activeAgentId: settings?.recentAgentId ?? undefined,
-        folderId: folderId ?? undefined,
-        mode: mode === 'normal' ? undefined : mode,
-        approvalMode: approvalMode === 'ask' ? undefined : approvalMode,
-      })
-      onFirstMessage(message, sessionId)
-      navigate(`/?id=${sessionId}`, { replace: true })
+        throw new Error('Choose an available folder before creating a session')
+      creationInFlight.current = true
+      setCreating(true)
+      try {
+        const { sessionId } = await createSession({
+          activeAgentId: settings?.recentAgentId ?? undefined,
+          folderId: folderId ?? undefined,
+          mode: mode === 'normal' ? undefined : mode,
+          approvalMode: approvalMode === 'ask' ? undefined : approvalMode,
+        })
+        await prepare(sessionId)
+        navigate(`/?id=${sessionId}`, { replace: true })
+      } finally {
+        creationInFlight.current = false
+        setCreating(false)
+      }
     },
     [
       createSession,
@@ -131,11 +144,30 @@ export function EmptyChat({
       folder,
       mode,
       approvalMode,
-      onFirstMessage,
       navigate,
       settings?.recentAgentId,
     ],
   )
+
+  const handleSubmit = useCallback(
+    (message: PendingMessage) =>
+      createAndOpen((sessionId) => onFirstMessage(message, sessionId)),
+    [createAndOpen, onFirstMessage],
+  )
+
+  async function handleCreate() {
+    if (creationInFlight.current) return
+    const moveDraft = composerRef.current?.prepareDraftMove()
+    if (!moveDraft) return
+    setMovingDraft(true)
+    try {
+      await createAndOpen(moveDraft)
+    } catch (error) {
+      toastError(error, 'Could not create session')
+    } finally {
+      setMovingDraft(false)
+    }
+  }
 
   const handleRunCommand = useCallback(
     async (name: string, argument: string, silent: boolean) => {
@@ -147,7 +179,7 @@ export function EmptyChat({
         files: [],
         role: name,
         ...(silent && { silent: true }),
-      })
+      }).catch((error: unknown) => toastError(error, 'Failed to send message'))
     },
     [handleSubmit],
   )
@@ -183,6 +215,7 @@ export function EmptyChat({
                   workDir={workspaceRoot ?? undefined}
                   canReadProject={canReadProject}
                   startersDisabled={
+                    movingDraft ||
                     composerState.key !== draftKey ||
                     !composerState.ready ||
                     composerState.hasContent
@@ -200,16 +233,36 @@ export function EmptyChat({
       dock={
         <ChatDock width={chatBoxWidth}>
           <div className="pointer-events-auto mb-1.5 flex flex-wrap items-center justify-between gap-2 px-1">
-            <FolderPicker
-              value={folderId}
-              onChange={handleWorkspaceChange}
-              showPath={false}
-            />
+            <div inert={creating}>
+              <FolderPicker
+                value={folderId}
+                onChange={handleWorkspaceChange}
+                showPath={false}
+              />
+            </div>
+            <RippleButton
+              type="button"
+              variant="input"
+              className="ml-auto"
+              disabled={
+                creating ||
+                settings === undefined ||
+                switching ||
+                Boolean(folderId && !folder) ||
+                composerState.key !== draftKey ||
+                !composerState.ready
+              }
+              onClick={() => void handleCreate()}
+            >
+              <PlusIcon /> {creating ? 'Creating session…' : 'Create session'}
+            </RippleButton>
           </div>
           <ChatComposer
             onSubmit={handleSubmit}
             onRunCommand={handleRunCommand}
             status="ready"
+            inert={movingDraft}
+            fileDropDisabled={movingDraft}
             key={draftKey}
             draftKey={draftKey}
             inputRef={composerRef}

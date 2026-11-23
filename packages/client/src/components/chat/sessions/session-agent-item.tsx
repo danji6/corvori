@@ -26,7 +26,7 @@ export function SessionAgentItem({
   return (
     <ParticipantRow
       name={name}
-      avatarId={profile?.avatarId ?? agent.avatarId}
+      avatarId={profile ? profile.avatarId : agent.avatarId}
       editSender={canEdit ? sender : undefined}
       onRemove={canUnlink ? onUnlink : undefined}
       active={isActive}

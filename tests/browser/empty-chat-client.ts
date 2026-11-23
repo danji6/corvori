@@ -84,6 +84,21 @@ window.addEventListener('load-agent-page', () => {
 })
 
 function query(name: string, args: Record<string, unknown>): unknown {
+  if (name === 'sessionShares:preview') {
+    if (args.token === 'member')
+      return { isMember: true, sessionId: 'shared-session' }
+    if (args.token !== 'invite' && args.token !== 'returning') return null
+    return {
+      isMember: false,
+      profile: {
+        ...(args.token === 'returning' && {
+          name: 'Last session name',
+          avatarId: null,
+        }),
+        inherited: { name: 'Account name', avatarId: 'account-avatar' },
+      },
+    }
+  }
   if (
     !resolved &&
     ['providers:list', 'settings:get', 'prompts:list'].includes(name)
@@ -173,6 +188,10 @@ function query(name: string, args: Record<string, unknown>): unknown {
   if (args.paginationOpts) return { page: [], isDone: true, continueCursor: '' }
   if (name === 'tools:list') return [{ name: 'shell' }, { name: 'read_file' }]
   if (name === 'skills:getHome') return null
+  if (name === 'avatars:getUrlMap') {
+    const image = 'https://example.test/account-avatar.svg'
+    return { 'account-avatar': { original: image, thumbnail: image } }
+  }
   if (name === 'avatars:thumbnail') return null
   return []
 }
@@ -209,6 +228,7 @@ const client = {
     args: Record<string, unknown>,
   ) {
     const name = getFunctionName(reference)
+    if (name === 'sessionShares:redeem') return 'shared-session'
     if (name === 'agents:select') {
       if (flags.has('failSelection')) throw new Error('Selection failed')
       const agent = agents.find((entry) => entry._id === args.agentId)
@@ -232,6 +252,8 @@ const client = {
     args: Record<string, unknown>,
   ) {
     sentMessages.push({ name: getFunctionName(reference), args })
+    if (flags.has('failCreate') && sentMessages.length === 1)
+      throw new Error('Fixture creation failed')
     return { sessionId: 'created-session' }
   },
 }

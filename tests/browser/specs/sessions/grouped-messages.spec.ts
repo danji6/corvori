@@ -35,6 +35,8 @@ test('keeps old names in the transcript and search while avatars update', async 
     /avatar-after\.svg$/,
   )
   await page.keyboard.press('Escape')
+  const composer = page.locator('[data-slot="editor"]')
+  await expect(composer).toBeFocused()
 
   await expect(header.locator('img')).toHaveAttribute(
     'src',
@@ -45,11 +47,14 @@ test('keeps old names in the transcript and search while avatars update', async 
   const options = (name: string) =>
     page.getByRole('button', { name: `Options for ${name}` })
   const edit = page.getByRole('menuitem', { name: 'Edit...', exact: true })
-  await options('Renamed author').press('Enter')
+  await options('Renamed author').click()
   await edit.click()
   const editor = page.getByRole('dialog', { name: 'Edit session profile' })
-  await editor.getByLabel('Name').fill('Only in this session')
+  const name = editor.getByRole('textbox', { name: 'Name' })
+  await expect(name).toHaveValue('Renamed author')
+  await name.fill('Only in this session')
   await editor.getByRole('button', { name: 'Save' }).click()
+  await expect(composer).toBeFocused()
   await options('Only in this session').waitFor()
   await page.evaluate(() =>
     window.dispatchEvent(new Event('send-fixture-author-message')),
@@ -61,9 +66,16 @@ test('keeps old names in the transcript and search while avatars update', async 
   await expect(header).toBeVisible()
   await options('Only in this session').click()
   await edit.click()
-  await editor.getByRole('button', { name: 'Use profile name' }).click()
+  await expect(name).toHaveValue('Only in this session')
+  await name.clear()
+  await expect(name).toHaveAttribute('placeholder', 'Anonymous')
   await editor.getByRole('button', { name: 'Save' }).click()
-  await expect(options('Renamed author')).toBeVisible()
+  await expect(composer).toBeFocused()
+  await options('Anonymous').click()
+  await edit.click()
+  await expect(name).toHaveValue('')
+  await expect(name).toHaveAttribute('placeholder', 'Anonymous')
+  await editor.getByRole('button', { name: 'Cancel' }).click()
   await expect(newHeader).toBeVisible()
   await expect(quote).toContainText('Original author')
 })

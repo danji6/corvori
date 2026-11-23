@@ -27,7 +27,7 @@ export async function exportOne(
 
         return {
           key: avatar.key,
-          mediaType: blob.type || 'image/png',
+          mediaType: blob.type.split(';', 1)[0] || 'image/png',
           data: encodeBase64(new Uint8Array(await blob.arrayBuffer())),
         }
       }),

@@ -30,6 +30,7 @@ export type ComposerHandle = {
   /** Inserts a starter only while the composer is empty and restored. */
   insertStarter: (markdown: string) => void
   openAttachments: () => void
+  prepareDraftMove: () => ((destination: string) => Promise<void>) | null
 }
 
 type UseComposerEditorOptions = {
@@ -40,6 +41,7 @@ type UseComposerEditorOptions = {
   onTyping?: () => void
   canInsertStarter?: boolean
   onAddFiles?: () => void
+  prepareAttachmentMove?: () => ((destination: string) => Promise<void>) | null
 }
 
 /** Owns composer editor state, draft restoration, and editor lifecycle effects. */
@@ -51,6 +53,7 @@ export function useComposerEditor({
   onTyping,
   canInsertStarter = false,
   onAddFiles,
+  prepareAttachmentMove,
 }: UseComposerEditorOptions) {
   useComposerCloseGuard(editorRef)
   const draft = useComposerDraft(draftKey)
@@ -112,8 +115,26 @@ export function useComposerEditor({
         editor.commands.focus('end')
       },
       openAttachments: () => onAddFiles?.(),
+      prepareDraftMove: () => {
+        const editor = editorRef.current
+        const moveAttachments = prepareAttachmentMove?.()
+        if (!editor || !moveAttachments) return null
+        const text = serializeComposerContent(editor)
+        const currentDraft = draft
+        return async (destination) => {
+          await moveAttachments(destination)
+          currentDraft.moveTo(destination, text)
+        }
+      },
     }),
-    [applyContent, canInsertStarter, editorRef, onAddFiles],
+    [
+      applyContent,
+      canInsertStarter,
+      draft,
+      editorRef,
+      onAddFiles,
+      prepareAttachmentMove,
+    ],
   )
 
   useEffect(

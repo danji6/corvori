@@ -22,6 +22,8 @@ type ComposerDraft = {
   save: (text: string) => void
   /** Drop the draft and cancel any pending autosave. */
   clear: () => void
+  /** Persists the latest editor contents under the destination key. */
+  moveTo: (destination: string, text: string) => void
 }
 
 /** Provides draft accessors for a session or the new-chat composer. */
@@ -44,6 +46,11 @@ export function useComposerDraft(key: string | undefined): ComposerDraft {
       clear: () => {
         debouncedSave.cancel()
         if (key) store.clear(key)
+      },
+      moveTo: (destination, text) => {
+        debouncedSave.cancel()
+        store.write(destination, text)
+        if (key && key !== destination) store.clear(key)
       },
     }),
     [key, debouncedSave, store],

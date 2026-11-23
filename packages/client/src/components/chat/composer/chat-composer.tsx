@@ -172,6 +172,9 @@ export function ChatComposer({
     canInsertStarter:
       attachments.isRestored && attachments.fileParts.length === 0,
     onAddFiles: () => dropZoneRef.current?.open(),
+    prepareAttachmentMove: shares.isResolving
+      ? undefined
+      : attachments.prepareAttachmentMove,
   })
 
   const isProcessing = status === 'submitted' || status === 'streaming'
@@ -179,8 +182,21 @@ export function ChatComposer({
     message.trim().length > 0 || attachments.fileParts.length > 0
 
   useEffect(() => {
-    onContentChange?.(hasContent, isReady && attachments.isRestored)
-  }, [hasContent, isReady, attachments.isRestored, onContentChange])
+    onContentChange?.(
+      hasContent,
+      isReady &&
+        attachments.isRestored &&
+        !attachments.processing &&
+        !shares.isResolving,
+    )
+  }, [
+    hasContent,
+    isReady,
+    attachments.isRestored,
+    attachments.processing,
+    shares.isResolving,
+    onContentChange,
+  ])
 
   useEffect(() => {
     if (
@@ -238,7 +254,7 @@ export function ChatComposer({
   })
 
   function handleSubmit(silent = false) {
-    if (isSending() || shares.isResolving) return
+    if (props.inert || isSending() || shares.isResolving) return
     if (!hasContent) {
       if (canContinue) onContinueAgent?.()
       return
@@ -275,7 +291,7 @@ export function ChatComposer({
   }
 
   function handleCommandSelect(command: CommandDefinition, silent = false) {
-    if (isSending()) return
+    if (props.inert || isSending()) return
     if (!onRunCommand) return
     if (command.requiresArgument && !commandArgument) {
       handleCommandAutocomplete(command)
@@ -378,6 +394,7 @@ export function ChatComposer({
   }
 
   async function handleFilePick(picked: ComposerFileBatch) {
+    if (props.inert) return
     if (!(await attachments.addFiles(picked))) return
     dropZoneRef.current?.clear()
     const editor = editorRef.current

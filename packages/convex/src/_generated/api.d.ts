@@ -90,6 +90,7 @@ import type * as model_auth_http from "../model/auth/http.js";
 import type * as model_avatars from "../model/avatars.js";
 import type * as model_avatars_actions from "../model/avatars/actions.js";
 import type * as model_avatars_http from "../model/avatars/http.js";
+import type * as model_avatars_joinStorage from "../model/avatars/joinStorage.js";
 import type * as model_caps from "../model/caps.js";
 import type * as model_changes_actions from "../model/changes/actions.js";
 import type * as model_changes_locations from "../model/changes/locations.js";
@@ -588,6 +589,7 @@ declare const fullApi: ApiFromModules<{
   "model/avatars": typeof model_avatars;
   "model/avatars/actions": typeof model_avatars_actions;
   "model/avatars/http": typeof model_avatars_http;
+  "model/avatars/joinStorage": typeof model_avatars_joinStorage;
   "model/caps": typeof model_caps;
   "model/changes/actions": typeof model_changes_actions;
   "model/changes/locations": typeof model_changes_locations;

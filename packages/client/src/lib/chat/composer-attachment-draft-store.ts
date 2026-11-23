@@ -5,7 +5,7 @@ import type { PendingFilePart, SharedAttachment } from './types'
 const DATABASE_NAME = `${APP_ID}-composer-drafts`
 const STORE_NAME = 'attachments'
 
-/** Retains converted text and pasted attachment links with the draft. */
+/** Retains pasted attachments and files moved into a new session. */
 export type ComposerAttachmentDraft =
   | { id?: string; file: File; pastePosition?: number }
   | { id: string; share: SharedAttachment; pastePosition?: never }
@@ -26,9 +26,13 @@ type DraftRecord = {
   attachments: ComposerAttachmentDraft[]
 }
 
+const unsavedMoves = new Map<string, ComposerAttachmentDraft[]>()
+
 export async function readComposerAttachmentDraft(
   key: string,
 ): Promise<ComposerAttachmentDraft[]> {
+  const moved = unsavedMoves.get(key)
+  if (moved) return moved
   let db: IDBDatabase | undefined
   try {
     db = await openDatabase()
@@ -47,6 +51,7 @@ export async function readComposerAttachmentDraft(
 export async function writeComposerAttachmentDraft(
   key: string,
   attachments: ComposerAttachmentDraft[],
+  options?: { retainOnFailure: boolean },
 ): Promise<void> {
   let db: IDBDatabase | undefined
   try {
@@ -57,8 +62,16 @@ export async function writeComposerAttachmentDraft(
       store.put({ key, attachments } satisfies DraftRecord)
     else store.delete(key)
     await transactionDone(transaction)
+    unsavedMoves.delete(key)
   } catch {
-    // Best effort
+    if (!attachments.length) unsavedMoves.delete(key)
+    else if (options?.retainOnFailure || unsavedMoves.has(key)) {
+      unsavedMoves.set(key, attachments)
+      if (unsavedMoves.size > 20) {
+        const oldest = unsavedMoves.keys().next().value
+        if (oldest) unsavedMoves.delete(oldest)
+      }
+    }
   } finally {
     db?.close()
   }

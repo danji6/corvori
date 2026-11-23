@@ -1,6 +1,7 @@
 import type { MessageRow } from '@/lib/chat/rows'
 import { DEFAULT_SETTINGS } from '@cv/convex/model/defaults'
 import { parseShellCommand } from '@cv/core/shell/command'
+import { toDisplayName } from '@cv/core/utils/names'
 import type { UIMessage } from 'ai'
 import type { ConvexReactClient } from 'convex/react'
 import { type FunctionReference, getFunctionName } from 'convex/server'
@@ -77,6 +78,7 @@ let liveAuthor = {
   avatarId: 'avatar-before',
 }
 let overrideName: string | undefined
+const currentAuthorName = () => toDisplayName(overrideName ?? liveAuthor.name)
 const fixtureAgent = { _id: 'agent', name: 'Fixture agent' }
 let linkedAgents = [fixtureAgent]
 let members = [
@@ -105,7 +107,7 @@ if (params.has('liveAuthors')) {
       {
         ...message('new', 1.5),
         role: 'assistant',
-        senderName: overrideName ?? liveAuthor.name,
+        senderName: currentAuthorName(),
       },
       ...messages.slice(1),
     ]
@@ -471,7 +473,7 @@ function query(name: string, args: Record<string, unknown>) {
     if (name === 'sessions:authorProfile') {
       const sender = args.sender as { type: string; id: string }
       return sender.type === 'agent'
-        ? { ...liveAuthor, name: overrideName ?? liveAuthor.name }
+        ? { ...liveAuthor, name: currentAuthorName() }
         : { kind: 'user', name: sender.id === 'owner' ? 'Viewer' : 'Guest' }
     }
     if (name === 'avatars:getUrlMap') {
@@ -638,7 +640,7 @@ export const notesClient = {
   ) {
     const name = getFunctionName(reference)
     if (name === 'sessions:updateAuthorProfile' && params.has('liveAuthors')) {
-      overrideName = args.name?.trim() || undefined
+      if (args.name !== undefined) overrideName = args.name.trim()
       refresh()
       return
     }

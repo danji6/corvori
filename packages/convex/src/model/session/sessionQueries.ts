@@ -6,7 +6,7 @@ import type { QueryCtx } from '../../_generated/server'
 import { type AuthQueryCtx } from '../../functions'
 import type { SessionMode } from '../../validators/sessionModes'
 import type { ListSessionsArgs } from '../../validators/sessions'
-import { getByOwnerId as getSettings } from '../settings'
+import { resolveAuthor } from './authorProfiles'
 import { readFolderTrail } from './folderTree'
 import { getMember } from './memberships'
 import { sessionListQuery, sessionSearchMatcher } from './sessionSearch'
@@ -64,12 +64,15 @@ export async function toListItem(
 
   const users = await Promise.all(
     members.map(async (member): Promise<SessionParticipant> => {
-      const settings = await getSettings(ctx, member.userId)
+      const profile = await resolveAuthor(ctx, session._id, {
+        type: 'user',
+        id: member.userId,
+      })
       return {
         id: member.userId,
         kind: 'user',
-        name: toDisplayName(settings?.displayName),
-        avatarId: settings?.avatarId,
+        name: toDisplayName(profile?.name),
+        avatarId: profile?.avatarId,
       }
     }),
   )
@@ -82,14 +85,17 @@ export async function toListItem(
   const agents = await Promise.all(
     links.map(async (link): Promise<SessionParticipant | null> => {
       const agent = await ctx.db.get(link.agentId)
-      return agent
-        ? {
-            id: agent._id,
-            kind: 'agent',
-            name: agent.name,
-            avatarId: agent.avatarId,
-          }
-        : null
+      if (!agent) return null
+      const profile = await resolveAuthor(ctx, session._id, {
+        type: 'agent',
+        id: agent._id,
+      })
+      return {
+        id: agent._id,
+        kind: 'agent',
+        name: toDisplayName(profile?.name),
+        avatarId: profile?.avatarId,
+      }
     }),
   )
 

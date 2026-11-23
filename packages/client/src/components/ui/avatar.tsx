@@ -6,6 +6,7 @@ export type AvatarProps = {
   ref?: React.Ref<HTMLDivElement>
   src?: string | null
   alt?: string
+  label?: string
   fallbackIcon?: React.ReactNode
   size?: 'xs' | 'sm' | 'md' | 'lg'
   onClick?: () => void
@@ -31,6 +32,7 @@ export function Avatar({
   ref,
   src,
   alt,
+  label,
   fallbackIcon,
   size = 'md',
   onClick,
@@ -59,6 +61,7 @@ export function Avatar({
       )}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
+      aria-label={onClick ? label : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={
         onClick

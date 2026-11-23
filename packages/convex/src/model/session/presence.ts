@@ -6,7 +6,7 @@ import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import type { MessageExtra } from '../chat/types'
 import { insertMessage } from '../messageContents'
-import { getByOwnerId as getSettings } from '../settings'
+import { resolveAuthor } from './authorProfiles'
 
 type Participant = Exclude<Doc<'messages'>['sender'], { type: 'archived' }>
 
@@ -24,7 +24,8 @@ export async function announcePresence(
   ctx: MutationCtx,
   { sessionId, participant, event }: AnnounceArgs,
 ) {
-  const name = await participantName(ctx, participant)
+  const profile = await resolveAuthor(ctx, sessionId, participant)
+  const name = toDisplayName(profile?.name)
   const extra: MessageExtra['presence'] = { event, participant, name }
   const parts = [{ type: 'text', text: systemNote(presenceText(name, event)) }]
 
@@ -41,15 +42,4 @@ export async function announcePresence(
     },
     parts,
   )
-}
-
-/** Resolves a participant's current display name. */
-async function participantName(ctx: MutationCtx, participant: Participant) {
-  if (participant.type === 'agent') {
-    const agent = await ctx.db.get(participant.id)
-    return toDisplayName(agent?.name)
-  }
-
-  const settings = await getSettings(ctx, participant.id)
-  return toDisplayName(settings?.displayName)
 }

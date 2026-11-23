@@ -36,7 +36,11 @@ type PastedText = NonNullable<PendingMessage['pastedText']>
 
 export type ComposerFileBatch = File[] | Promise<File[]>
 
-type AttachmentQueue = { signal: AbortSignal; tail: Promise<unknown> }
+type AttachmentQueue = {
+  signal: AbortSignal
+  tail: Promise<unknown>
+  pending: number
+}
 
 type UseComposerAttachmentsOptions = {
   draftKey?: string
@@ -57,13 +61,18 @@ export function useComposerAttachments({
   const revision = useRef(0)
   const filePartsRef = useRef(fileParts)
   const attachmentQueue = useRef<AttachmentQueue | null>(null)
+  const retainedFiles = useRef<Set<string>>(new Set())
+  const saveTimeout = useRef<number | undefined>(undefined)
+  const [processingKey, setProcessingKey] = useState<string | null>()
 
   useLayoutEffect(() => {
     const controller = new AbortController()
     attachmentQueue.current = {
       signal: controller.signal,
       tail: Promise.resolve(),
+      pending: 0,
     }
+    retainedFiles.current.clear()
     return () => controller.abort()
   }, [draftKey])
 
@@ -82,6 +91,7 @@ export function useComposerAttachments({
         setFileParts(restored.fileParts)
         setOriginalFiles(restored.originalFiles)
         setPastedText(restored.pastedText)
+        retainedFiles.current = new Set(Object.keys(restored.originalFiles))
       }
       setRestoredDraftKey(draftKey)
     })
@@ -93,21 +103,34 @@ export function useComposerAttachments({
 
   useEffect(() => {
     if (!draftKey || restoredDraftKey !== draftKey) return
-    const timeout = window.setTimeout(() => {
-      const attachments = fileParts.flatMap(
-        (part): ComposerAttachmentDraft[] => {
-          if (part.share) return [{ id: part.id, share: part.share }]
-          const file = originalFiles[part.id]
-          const pasted = pastedText[part.id]
-          return file && pasted
-            ? [{ id: part.id, file, pastePosition: pasted.position }]
-            : []
-        },
+    saveTimeout.current = window.setTimeout(() => {
+      const attachments = attachmentDraft(
+        fileParts,
+        originalFiles,
+        pastedText,
+        retainedFiles.current,
       )
       void writeComposerAttachmentDraft(draftKey, attachments)
     }, 300)
-    return () => window.clearTimeout(timeout)
+    return () => window.clearTimeout(saveTimeout.current)
   }, [draftKey, fileParts, originalFiles, pastedText, restoredDraftKey])
+
+  function prepareAttachmentMove() {
+    if (draftKey && restoredDraftKey !== draftKey) return null
+    if (attachmentQueue.current?.pending) return null
+    const attachments = attachmentDraft(fileParts, originalFiles, pastedText)
+    return async (destination: string) => {
+      if (attachments.length) {
+        await writeComposerAttachmentDraft(
+          JSON.stringify([userId, destination]),
+          attachments,
+          { retainOnFailure: true },
+        )
+      }
+      window.clearTimeout(saveTimeout.current)
+      if (draftKey) await clearComposerAttachmentDraft(draftKey)
+    }
+  }
 
   const files = useMemo<FileItem[]>(
     () =>
@@ -141,13 +164,19 @@ export function useComposerAttachments({
       const queue = attachmentQueue.current
       if (!queue) return Promise.resolve(canceled)
       const { signal } = queue
-      const result = queue.tail.then(() =>
-        signal.aborted ? canceled : add(signal),
-      )
+      queue.pending++
+      setProcessingKey(draftKey ?? null)
+      const result = queue.tail
+        .then(() => (signal.aborted ? canceled : add(signal)))
+        .finally(() => {
+          queue.pending--
+          if (attachmentQueue.current === queue && !queue.pending)
+            setProcessingKey(undefined)
+        })
       queue.tail = result.catch(() => undefined)
       return result
     },
-    [],
+    [draftKey],
   )
 
   const addFiles = useCallback(
@@ -264,8 +293,25 @@ export function useComposerAttachments({
     removeFile,
     resetAttachments,
     restoreAttachments,
+    prepareAttachmentMove,
+    processing: processingKey === (draftKey ?? null),
     isRestored: !draftKey || restoredDraftKey === draftKey,
   }
+}
+
+function attachmentDraft(
+  parts: PendingFilePart[],
+  originals: Record<string, File>,
+  pastedText: PastedText,
+  retained?: Set<string>,
+) {
+  return parts.flatMap((part): ComposerAttachmentDraft[] => {
+    if (part.share) return [{ id: part.id, share: part.share }]
+    const file = originals[part.id]
+    const pasted = pastedText[part.id]
+    if (!file || (retained && !pasted && !retained.has(part.id))) return []
+    return [{ id: part.id, file, pastePosition: pasted?.position }]
+  })
 }
 
 type RestoredAttachmentDraft = {

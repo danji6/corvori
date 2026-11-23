@@ -19,8 +19,17 @@ export const sessionProfileSchema = v.object({
   sessionId: v.id('sessions'),
   sender: senderValidator,
   name: v.optional(v.string()),
-  avatarId: v.optional(v.id('avatars')),
+  avatarId: v.optional(v.union(v.id('avatars'), v.null())),
 })
+
+const avatarChoiceValidator = v.union(v.literal('inherit'), v.literal('clear'))
+
+export const sessionProfileChangesValidator = v.object({
+  name: v.optional(v.union(v.string(), v.null())),
+  avatar: v.optional(avatarChoiceValidator),
+})
+
+export type SessionProfileChanges = Infer<typeof sessionProfileChangesValidator>
 
 export const sessionProfileTargetValidator = v.object({
   sessionId: v.id('sessions'),
@@ -28,10 +37,7 @@ export const sessionProfileTargetValidator = v.object({
 })
 
 export const updateSessionProfileValidator =
-  sessionProfileTargetValidator.extend({
-    name: v.optional(v.union(v.string(), v.null())),
-    resetAvatar: v.optional(v.boolean()),
-  })
+  sessionProfileTargetValidator.extend(sessionProfileChangesValidator.fields)
 
 export const confirmSessionProfileAvatarValidator =
   sessionProfileTargetValidator.extend({

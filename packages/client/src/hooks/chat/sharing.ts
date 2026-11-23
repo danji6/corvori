@@ -1,5 +1,6 @@
 import { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
+import type { SessionProfileChanges } from '@cv/convex/validators/sessionAuthors'
 import type { OptimisticLocalStore } from 'convex/browser'
 import { useMutation, useQuery } from 'convex/react'
 import { useCallback } from 'react'
@@ -50,7 +51,8 @@ export function useRevokeToken() {
 export function useRedeemToken() {
   const redeem = useMutation(api.sessionShares.redeem)
   return useCallback(
-    (token: string) => redeem({ token: token.trim() }),
+    (token: string, profile?: SessionProfileChanges) =>
+      redeem({ token: token.trim(), profile }),
     [redeem],
   )
 }

@@ -36,6 +36,18 @@ export async function sessionAvatarUploadForm(
   return form
 }
 
+export async function joinAvatarUploadForm(
+  token: string,
+  file: File,
+  name?: string,
+) {
+  const form = await prepareAvatarUploadForm(file)
+  form.set('target', 'join')
+  form.set('token', token)
+  if (name !== undefined) form.set('name', name)
+  return form
+}
+
 /** Shrink avatars before sending them through the HTTP upload endpoint. */
 async function prepareAvatarUploadForm(file: File) {
   const image = await new ImageTool(file)

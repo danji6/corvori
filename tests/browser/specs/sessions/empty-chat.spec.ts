@@ -384,6 +384,159 @@ test('file starter appends attachments in selection order and disables task card
   await expect(files).toHaveText(['notes.txt', 'plan.txt', 'draft.txt'])
 })
 
+test('creates an empty session with the selected settings and carries its unsent draft', async ({
+  page,
+}) => {
+  await page.goto(
+    '/?fixture=empty-chat&createSession&folder=workspace&failCreate',
+  )
+  const editor = page.locator('[data-slot="editor"]')
+  await page.getByRole('button', { name: 'Plan a change' }).click()
+  await page.getByRole('button', { name: /allow unrestricted access/ }).click()
+  await editor.fill('Keep this as a draft')
+  await page.locator('input[type="file"][name="attachment"]').setInputFiles({
+    name: 'notes.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Local attachment'),
+  })
+  const create = page.getByRole('button', {
+    name: 'Create session',
+    exact: true,
+  })
+  await expect(page.getByText('notes.txt', { exact: true })).toBeVisible()
+  await create.click()
+  await expect(create).toBeEnabled()
+  await expect(editor).toHaveText('Keep this as a draft')
+  await expect(page.getByText('notes.txt', { exact: true })).toBeVisible()
+  await create.click()
+  await expect(page).toHaveURL(/\?id=created-session$/)
+  await expect(page.getByLabel('Opening message')).toHaveText('None')
+  await expect(editor).toHaveText('Keep this as a draft')
+  await expect(page.getByText('notes.txt', { exact: true })).toBeVisible()
+  const calls = JSON.parse(
+    await page.getByLabel('Session create calls').innerText(),
+  )
+  expect(calls).toHaveLength(2)
+  expect(calls[1].args).toMatchObject({
+    folderId: 'workspace',
+    activeAgentId: 'agent-0',
+    mode: 'plan',
+    approvalMode: 'unrestricted',
+  })
+})
+
+test('sending the first message still creates a session and hands it off for sending', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=empty-chat&createSession')
+  const editor = page.locator('[data-slot="editor"]')
+  await editor.fill('Send this now')
+  await editor.press('Enter')
+  await expect(page).toHaveURL(/\?id=created-session$/)
+  await expect(page.getByLabel('Opening message')).toHaveText('Send this now')
+})
+
+test('previews the returning profile and resets edits when the invite changes', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=empty-chat&joinSession')
+  await page.getByRole('button', { name: 'Join session' }).click()
+  const dialog = page.getByRole('dialog')
+  const token = dialog.getByRole('textbox', { name: 'Invite token' })
+  const name = dialog.getByRole('textbox', { name: 'Name' })
+  await token.fill('returning')
+  await expect(name).toHaveValue('Last session name')
+  const reset = dialog.getByRole('button', { name: 'Reset to profile avatar' })
+  const remove = dialog.getByRole('button', { name: 'Remove avatar' })
+  await dialog.locator('input[type="file"]').setInputFiles({
+    name: 'avatar.svg',
+    mimeType: 'image/svg+xml',
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+  })
+  await expect(
+    dialog.getByRole('button', { name: 'Cancel avatar change' }),
+  ).toBeVisible()
+  await reset.click()
+  await expect(reset).toHaveCount(0)
+  await expect(
+    dialog.getByRole('button', { name: 'Choose avatar' }).locator('img'),
+  ).toHaveAttribute('src', /account-avatar\.svg$/)
+  await remove.click()
+  await expect(reset).toBeVisible()
+  await name.fill('Unsaved')
+  await token.fill('wrong')
+  await expect(dialog.getByRole('alert')).toContainText('invalid')
+  await expect(
+    dialog.getByRole('button', { name: 'Join', exact: true }),
+  ).toBeDisabled()
+  await token.fill('invite')
+  await expect(name).toHaveValue('Account name')
+  await expect(name).toHaveAttribute('placeholder', 'Anonymous')
+  await token.fill('member')
+  await expect(name).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Open session' }).click()
+  await expect(page).toHaveURL(/\?id=shared-session$/)
+})
+
+test('keeps the selected join avatar after a lost response and retries on demand', async ({
+  page,
+}) => {
+  let submits = 0
+  const cors = {
+    'access-control-allow-origin': 'http://127.0.0.1:4178',
+    'access-control-allow-credentials': 'true',
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    'access-control-allow-headers': 'authorization, content-type',
+  }
+  await page.route('**/api/auth/convex/token', (route) =>
+    route.fulfill({ headers: cors, json: { token: 'fixture-token' } }),
+  )
+  await page.route('**/io/avatar/upload', async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers: cors })
+    } else if (++submits === 1) {
+      await route.abort('connectionreset')
+    } else {
+      await route.fulfill({
+        headers: cors,
+        json: { sessionId: 'shared-session' },
+      })
+    }
+  })
+
+  await page.goto('/?fixture=empty-chat&joinSession')
+  await page.getByRole('button', { name: 'Join session' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('textbox', { name: 'Invite token' }).fill('invite')
+  const name = dialog.getByRole('textbox', { name: 'Name' })
+  await name.fill('Alex')
+  await dialog.locator('input[type="file"]').setInputFiles({
+    name: 'avatar.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  })
+  await expect(
+    dialog.getByRole('button', { name: 'Cancel avatar change' }),
+  ).toBeVisible()
+  expect(submits).toBe(0)
+
+  const join = dialog.getByRole('button', { name: 'Join', exact: true })
+  await join.click()
+  await expect(dialog.getByRole('alert')).toContainText(
+    'Could not confirm whether you joined',
+  )
+  await expect(name).toHaveValue('Alex')
+  await expect(
+    dialog.getByRole('button', { name: 'Cancel avatar change' }),
+  ).toBeVisible()
+  await join.click()
+  await expect(page).toHaveURL(/\?id=shared-session$/)
+  expect(submits).toBe(2)
+})
+
 test('empty and unmatched agent libraries offer useful next steps', async ({
   page,
 }) => {
