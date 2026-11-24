@@ -3,9 +3,9 @@ import { useActiveSession, useActiveSessionState } from '@/hooks/chat'
 import { useRequestLogSnapshot } from '@/hooks/chat/request-log'
 import { normalizeBrowserUrl } from '@/lib/auth/site-url'
 import { extractErrorMessage } from '@/lib/errors'
+import { buildRequestLogBody } from '@/lib/request-log'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
-import type { CacheDiagnostic } from '@cv/convex/validators/providerRequests'
 import { useQuery } from 'convex/react'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -145,33 +145,5 @@ function parseStoredLogBody(body: string | undefined) {
     }
   } catch {
     return { requestBody: body }
-  }
-}
-
-function buildRequestLogBody(
-  requestBody?: string,
-  responseBody?: string,
-  cacheDiagnostics?: CacheDiagnostic[],
-) {
-  if (!requestBody && !responseBody && !cacheDiagnostics?.length) return null
-
-  return JSON.stringify(
-    {
-      request: requestBody ? parseJsonBody(requestBody) : 'Not captured yet.',
-      response: responseBody
-        ? parseJsonBody(responseBody)
-        : 'Awaiting response…',
-      ...(cacheDiagnostics?.length ? { cacheDiagnostics } : {}),
-    },
-    null,
-    2,
-  )
-}
-
-function parseJsonBody(body: string): unknown {
-  try {
-    return JSON.parse(body)
-  } catch {
-    return body
   }
 }
