@@ -94,7 +94,7 @@ export function ChangesSummary({
   return (
     <section
       aria-label="Agent changes"
-      className="bg-m3-surface-container-low border-input/50 my-3 mt-5 w-full min-w-0 rounded-lg border p-4 pb-2 text-sm sm:p-5 sm:pb-3"
+      className="bg-m3-surface-container-low my-3 mt-5 w-full min-w-0 rounded-lg border p-4 pb-2 text-sm sm:p-5 sm:pb-3"
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
@@ -186,7 +186,7 @@ export function ChangesSummary({
                 : `Show ${remaining} more ${remaining === 1 ? 'file' : 'files'}`}
               <ChevronDownIcon
                 aria-hidden
-                className={`size-4 ${showAll ? 'rotate-180' : ''}`}
+                className={`chat-collapsible-chevron size-4 ${showAll ? 'rotate-180' : ''}`}
               />
             </RippleButton>
           )}
@@ -201,9 +201,15 @@ export function ChangesSummary({
             >
               {hasExpandedFiles ? 'Collapse all' : 'Expand all'}
               {hasExpandedFiles ? (
-                <ChevronsUpIcon aria-hidden className="size-4" />
+                <ChevronsUpIcon
+                  aria-hidden
+                  className="chat-collapsible-chevron size-4"
+                />
               ) : (
-                <ChevronsDownIcon aria-hidden className="size-4" />
+                <ChevronsDownIcon
+                  aria-hidden
+                  className="chat-collapsible-chevron size-4"
+                />
               )}
             </RippleButton>
           )}
@@ -341,7 +347,7 @@ function ExpandableFileRow({
             <LineCounts additions={file.additions} deletions={file.deletions} />
             <ChevronRightIcon
               aria-hidden
-              className="text-muted-foreground size-4 transition-transform group-data-open/accordion-item:rotate-90 motion-reduce:transition-none"
+              className="chat-collapsible-chevron text-muted-foreground size-4 group-data-open/accordion-item:rotate-90"
             />
           </Accordion.Trigger>
         </Popover.Trigger>

@@ -84,6 +84,7 @@ export const DEFAULT_SETTINGS = {
   desktopNotifications: true,
   invertSend: false,
   groupBySender: true,
+  messageBackgrounds: true,
   followAgentThemeColor: true,
   avatarSize: 48,
   webSearchInstances: [] as WebSearchInstance[],

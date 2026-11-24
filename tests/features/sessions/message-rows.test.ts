@@ -543,7 +543,7 @@ describe('sender grouping', () => {
     expect(rows.map((row) => row.key)).toContain('h:message-3')
   })
 
-  test('a summary breaks the group on both sides', () => {
+  test('a summary breaks the group on both sides without adding a footer', () => {
     const rows = rowsFor(
       {
         'message-1': agentMeta,
@@ -556,9 +556,10 @@ describe('sender grouping', () => {
     // The summary itself never groups, and the message after it starts fresh
     expect(rows.map((row) => row.key)).toContain('h:message-3')
     expect(rows.some((row) => row.key.endsWith(':grp'))).toBe(false)
-    expect(
-      rows.filter((row) => row.kind === 'footer').map((row) => row.duration),
-    ).toEqual([1, 1, 1])
+    expect(rows.filter((row) => row.kind === 'footer')).toMatchObject([
+      { messageId: 'message-1', duration: 1 },
+      { messageId: 'message-3', duration: 1 },
+    ])
   })
 })
 

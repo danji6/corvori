@@ -63,6 +63,7 @@ export const settingsMutableFields = {
   titleSystemPrompt: v.optional(v.string()),
   invertSend: v.optional(v.boolean()),
   groupBySender: v.optional(v.boolean()),
+  messageBackgrounds: v.optional(v.boolean()),
   followAgentThemeColor: v.optional(v.boolean()),
   avatarSize: v.optional(v.number()),
   webSearchInstances: v.optional(v.array(webSearchInstanceValidator)),

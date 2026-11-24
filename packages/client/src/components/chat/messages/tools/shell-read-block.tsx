@@ -48,6 +48,7 @@ export function ShellReadBlock(props: ShellReadProps) {
     <ToolShell
       {...props}
       data-slot="shell-block"
+      className="overflow-visible"
       surface="inset-row"
       fullWidth
       title={part.state === 'output-error' ? part.errorText : undefined}
@@ -77,6 +78,7 @@ function SavedShellRead({
     <ToolShell
       {...props}
       data-slot="shell-block"
+      className="overflow-visible"
       surface="inset-row"
       fullWidth
       label={label}

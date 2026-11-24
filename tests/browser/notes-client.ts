@@ -1,4 +1,5 @@
 import type { MessageRow } from '@/lib/chat/rows'
+import { exportSchemeCss } from '@/lib/theme'
 import { DEFAULT_SETTINGS } from '@cv/convex/model/defaults'
 import { parseShellCommand } from '@cv/core/shell/command'
 import { toDisplayName } from '@cv/core/utils/names'
@@ -69,7 +70,6 @@ function noteExtra(type?: NoteType) {
 
 const params = new URLSearchParams(location.search)
 let continuationActive = params.has('continuation')
-let messages = initialMessages()
 let planContent = 'Original plan'
 let submittedShell: ReturnType<typeof message> | undefined
 let liveAuthor = {
@@ -80,6 +80,30 @@ let liveAuthor = {
 let overrideName: string | undefined
 const currentAuthorName = () => toDisplayName(overrideName ?? liveAuthor.name)
 const fixtureAgent = { _id: 'agent', name: 'Fixture agent' }
+const backgrounds = params.has('backgrounds')
+const backgroundsKey = 'fixture-message-backgrounds'
+const agentColor = '#176b46'
+let messages = initialMessages()
+
+if (backgrounds) {
+  window.addEventListener('stream-fixture-text', () => {
+    messages = messages.map((entry) => {
+      if (entry._id !== 'work' || entry.type === 'summary') return entry
+      const [segment] = entry.segments
+      const parts = segment.parts.map((part): UIMessage['parts'][number] =>
+        part.type === 'text'
+          ? {
+              ...part,
+              state: 'streaming',
+              text: part.text + '\n\nStreaming more text.\n\n'.repeat(20),
+            }
+          : part,
+      )
+      return { ...entry, segments: [{ ...segment, parts }] }
+    })
+    refresh()
+  })
+}
 let linkedAgents = [fixtureAgent]
 let members = [
   {
@@ -171,9 +195,10 @@ function initialMessages() {
     )
   }
   if (params.has('compaction')) return compactionMessages()
+  if (params.has('todoWork')) return todoWorkMessages()
   if (params.has('fileChanges')) return fileChangeMessages()
   if (params.has('shellReports')) return shellMessages()
-  if (params.has('tailWork')) return tailWorkMessages()
+  if (params.has('tailWork') || backgrounds) return tailWorkMessages()
   if (params.has('groupedWork')) return groupedWorkMessages()
   return [
     ...Array.from({ length: 35 }, (_, i) => message(`before${i}`, i)),
@@ -234,6 +259,7 @@ function compactionMessages() {
     ...message('summary', 1),
     role: 'assistant',
     type: 'summary' as const,
+    metadata: { duration: 12900 },
     segments: [
       {
         segmentIndex: 0,
@@ -255,6 +281,21 @@ function compactionMessages() {
     message(`before${index}`, index - 16),
   )
   return [...history, command, summary]
+}
+
+function todoWorkMessages() {
+  const work = message('work', 0)
+  work.segments[0].parts = [
+    {
+      type: 'tool-edit_todo',
+      toolCallId: 'update-todo',
+      state: 'output-available',
+      input: { edits: [{ task: 'Review the changes', status: 'todo' }] },
+      output: 'Updated todos.',
+    },
+    { type: 'text', text: 'Todos updated.' },
+  ]
+  return [work]
 }
 
 function fileChangeMessages(waitingForInput = false, extraOutput = '') {
@@ -338,6 +379,19 @@ function tailWorkMessages() {
     type: 'text',
     text: 'Regression checks passed.\n\n'.repeat(10),
   })
+  if (backgrounds) {
+    return [
+      { ...work, metadata: { duration: 8300 } },
+      ...(params.has('backgroundNotes')
+        ? [
+            message('mcp', 45.1, 'mcp'),
+            message('skills', 45.2, 'skills'),
+            { ...message('continued', 45.3), role: 'assistant' },
+          ]
+        : []),
+      { ...message('next', 46), sender: { type: 'user', id: 'owner' } },
+    ]
+  }
   return [
     ...Array.from({ length: 35 }, (_, index) =>
       message(`before${index}`, index),
@@ -517,11 +571,23 @@ function query(name: string, args: Record<string, unknown>) {
   if (name === 'settings:get')
     return {
       ...DEFAULT_SETTINGS,
+      ...(backgrounds && {
+        messageBackgrounds: localStorage.getItem(backgroundsKey) !== 'false',
+      }),
       ...(params.has('intoView') && { scrollMode: 'into-view' }),
       groupBySender: params.has('ungrouped')
         ? false
         : DEFAULT_SETTINGS.groupBySender,
     }
+  if (backgrounds && name === 'appearances:get') {
+    return {
+      theme: {
+        source: agentColor,
+        light: exportSchemeCss(agentColor, false, 0).css,
+        dark: exportSchemeCss(agentColor, true, 0).css,
+      },
+    }
+  }
   if (name === 'users:getProfile')
     return {
       _id: readOnly ? 'viewer' : 'owner',
@@ -636,9 +702,18 @@ export const notesClient = {
       name?: string
       agentId?: string
       userId?: string
+      patch?: { messageBackgrounds?: boolean }
     },
   ) {
     const name = getFunctionName(reference)
+    if (backgrounds && name === 'settings:update') {
+      localStorage.setItem(
+        backgroundsKey,
+        String(args.patch?.messageBackgrounds),
+      )
+      refresh()
+      return
+    }
     if (name === 'sessions:updateAuthorProfile' && params.has('liveAuthors')) {
       if (args.name !== undefined) overrideName = args.name.trim()
       refresh()

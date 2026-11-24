@@ -79,7 +79,9 @@ function TodoToolShell({
         </span>
       }
     >
-      {items.length > 0 && <TodoList items={items} />}
+      {items.length > 0 && (
+        <TodoList items={items} className="chat-tool-list" />
+      )}
     </ToolShell>
   )
 }

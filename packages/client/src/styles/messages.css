@@ -1,4 +1,28 @@
 /* --- Message layout: row gaps live in VirtualizedItem; block insets live in CollapsibleBlock. --- */
+@property --message-gutter {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
+@property --gutter-inset {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
+@property --message-surface-outset {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
+@property --work-surface-expansion {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
 @layer components {
   :root {
     --work-row-gap: --spacing(1);
@@ -13,33 +37,114 @@
       0px,
       var(--work-surface-radius) - var(--work-surface-padding) - 1px
     );
+    --message-background-padding-block-start: --spacing(6);
+    --message-background-padding-block-end: --spacing(6);
+    --message-background-padding-inline: --spacing(5);
+    --message-background-edge-inset: --spacing(2);
     --message-block-gap: --spacing(4);
     --message-compact-block-gap: calc(var(--message-block-gap) / 2);
-    --message-sender-gap: --spacing(10);
-    --message-compaction-gap: calc(var(--message-sender-gap) / 2);
     --message-group-inset: --spacing(3);
     --message-summary-height: --spacing(9);
     --message-summary-padding-y: --spacing(2.5);
   }
 
-  .chat-message-header-gap {
-    height: max(
+  .chat-transcript-column {
+    --message-surface-outset: 0px;
+    --message-surface-edge-inset: 0px;
+    --message-gutter-headroom: calc(
+      max(4rem, var(--avatar-gutter-size, 0px)) +
+        var(--message-surface-edge-inset)
+    );
+    --message-gutter: clamp(
+      0px,
+      (
+          var(--message-column-margin, 0px) - var(--message-surface-outset) -
+            var(--message-gutter-headroom)
+        ) *
+        1000,
+      var(--avatar-gutter-size, 0px)
+    );
+    --message-avatar-outset: min(
+      var(--message-gutter),
+      var(--message-surface-outset)
+    );
+    --message-header-gutter: calc(
+      var(--message-gutter) + var(--message-avatar-outset)
+    );
+    --message-sender-gap: --spacing(10);
+    --message-note-gap: --spacing(6);
+    --message-compaction-gap: calc(var(--message-sender-gap) / 2);
+    --message-header-gap: max(
       var(--message-compact-block-gap),
       calc(var(--message-block-gap) - var(--message-gutter, 0px))
     );
+  }
+
+  .chat-transcript-column[data-message-backgrounds] {
+    --message-surface-edge-inset: var(--message-background-edge-inset);
+    --message-surface-outset: clamp(
+      0px,
+      var(--message-column-margin, 0px) - var(--message-surface-edge-inset),
+      var(--message-background-padding-inline)
+    );
+    --message-sender-gap: --spacing(12);
+    --message-note-gap: var(--message-compact-block-gap);
+  }
+
+  .chat-transcript-full-width {
+    width: calc(100% + 2 * var(--message-surface-outset, 0px));
+    margin-inline: calc(-1 * var(--message-surface-outset, 0px));
+  }
+
+  .chat-message-header-row {
+    width: calc(100% + var(--message-header-gutter, 0px));
+    margin-left: calc(-1 * var(--message-header-gutter, 0px));
+    padding-left: var(--message-header-gutter, 0px);
+  }
+
+  .chat-message-gutter-avatar {
+    --gutter-pull: calc(
+      min(var(--gutter-inset, 0px), var(--message-gutter, 0px)) +
+        var(--message-avatar-outset, 0px)
+    );
+  }
+
+  .chat-message-background {
+    inset-inline: calc(-1 * var(--message-surface-outset));
+    background: var(--surface-container-low);
+  }
+
+  [data-slot='message-background-tint'] {
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--base-border);
+    border-radius: inherit;
+    background: color-mix(in oklab, var(--surface-container-low) 50%, var(--surface));
   }
 
   .chat-work-header {
     padding-block: var(--work-header-padding-y);
   }
 
-  .chat-block-header-expanded {
-    padding-block: calc(var(--work-header-padding-y) * 1.5);
-  }
-
   .chat-block-body {
     padding-inline: var(--work-body-padding);
     padding-bottom: var(--work-body-padding);
+  }
+
+  @media (hover: hover) {
+    .chat-collapsible-chevron {
+      opacity: 0;
+    }
+
+    :is(:hover, :focus-visible) > .chat-collapsible-chevron {
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .chat-collapsible-chevron {
+      transition: opacity 150ms ease-out, rotate 150ms ease-out;
+    }
   }
 
   .chat-header-focus {
@@ -53,47 +158,51 @@
     content: '';
     position: absolute;
     inset: var(--chat-header-focus-inset, 0);
-    border-radius: inherit;
+    border-radius: var(--chat-header-focus-radius, inherit);
     outline: 1px solid var(--base-ring);
     outline-offset: -1px;
     pointer-events: none;
   }
 
-  .chat-block-inset-row[data-open='false'] > .chat-header-focus {
+  .chat-block-inset-row > .chat-header-focus {
     --chat-header-focus-inset: 0 calc(-1 * var(--work-body-padding));
   }
 
-  .chat-block-inset,
-  .chat-block-inset > .chat-header-focus {
-    transition-duration: 200ms;
-    transition-timing-function: ease-in-out;
+  :is([data-slot='shell-block'], [data-slot='shell-report-block'])
+    > .chat-header-focus {
+    --chat-header-focus-inset: calc(-1 * --spacing(1));
+    --chat-header-focus-radius: var(--radius-md);
   }
 
-  .chat-block-inset > .chat-header-focus {
-    transition-property: padding;
+  /* Share the transition with the body so its inline inset stays aligned. */
+  .chat-block-inset {
+    --work-surface-expansion: 0;
+    --work-surface-closed-inline-inset: 0px;
+    --work-surface-inline-inset: calc(
+      var(--work-surface-closed-inline-inset) +
+        (
+          var(--work-surface-padding) - var(--work-surface-closed-inline-inset)
+        ) *
+        var(--work-surface-expansion)
+    );
+    padding-block-start: calc(
+      var(--work-surface-padding) * var(--work-surface-expansion)
+    );
+    padding-inline: var(--work-surface-inline-inset);
   }
 
   .chat-block-inset-row {
-    padding-inline: var(--work-body-padding);
+    --work-surface-closed-inline-inset: var(--work-body-padding);
   }
 
   .chat-block-inset[data-open='true'] {
-    padding: var(--work-surface-padding);
-  }
-
-  .chat-block-inset[data-open='true'] > .chat-header-focus {
-    padding: --spacing(1.5) --spacing(2);
+    --work-surface-expansion: 1;
   }
 
   .chat-block-body-inset {
-    padding: var(--work-surface-gap) 0 0;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .chat-block-inset,
-    .chat-block-inset > .chat-header-focus {
-      transition: none;
-    }
+    padding: var(--work-surface-gap)
+      calc(var(--work-surface-padding) - var(--work-surface-inline-inset))
+      var(--work-surface-padding);
   }
 
   /* List bodies end with the same inset as a compact header. */
@@ -105,15 +214,16 @@
   }
 
   .chat-tool-list {
+    --tool-list-gap: var(--work-row-gap);
     --tool-list-indent: --spacing(3);
     display: flex;
     flex-direction: column;
-    gap: var(--work-row-gap);
+    gap: var(--tool-list-gap);
     margin-left: --spacing(4);
     padding-left: var(--tool-list-indent);
   }
 
-  .chat-tool-list .chat-block-inset[data-open='false'] > .chat-header-focus {
+  .chat-tool-list .chat-block-inset > .chat-header-focus {
     padding-inline: --spacing(2);
   }
 
@@ -128,7 +238,7 @@
   /* Each stem spans its row and the gap, except where the last branch ends it. */
   .chat-tool-list-item:not(:last-child)::before {
     content: '';
-    bottom: calc(-1 * var(--work-row-gap));
+    bottom: calc(-1 * var(--tool-list-gap));
     width: 1px;
     background: var(--base-border);
   }
@@ -179,12 +289,6 @@
     --chat-header-focus-inset: 0 calc(-1 * var(--message-summary-padding-y));
     min-height: var(--message-summary-height);
     padding-block: var(--message-summary-padding-y);
-  }
-
-  /* The first note's spacer supplies the gap below the expanded header. */
-  .chat-note-group-header[data-open='true'] {
-    min-height: 0;
-    padding-block-end: 0;
   }
 }
 

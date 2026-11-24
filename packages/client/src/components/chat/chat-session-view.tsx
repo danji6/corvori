@@ -8,6 +8,7 @@ import {
   useSendCooldownUntil,
   useSessionApprovalMode,
   useSessionMode,
+  useSettings,
   useStreamAwaitingAnswer,
   useStreamAwaitingApproval,
   useStreamRawStatus,
@@ -24,13 +25,14 @@ import { useAtBottomSticky } from '@/hooks/scroll'
 import type { PendingMessage } from '@/lib/chat'
 import { ChatWarning } from '@/lib/chat/errors'
 import {
-  avatarGutter,
   avatarVars,
+  columnMargin,
   columnWidth,
 } from '@/lib/chat/message-geometry'
 import { isOngoingStream } from '@/lib/chat/stream'
 import { cn } from '@/lib/utils'
 import { api } from '@cv/convex/_generated/api'
+import { DEFAULT_SETTINGS } from '@cv/convex/model/defaults'
 import { parseShellCommand } from '@cv/core/shell/command'
 import { useQuery } from 'convex/react'
 import {
@@ -160,9 +162,11 @@ export function ChatSessionView({
   const keyboardInset = keyboardViewport.bottomInset
   const chatWidth = useChatWidth()
   const avatarSize = useAvatarSize()
+  const showBackgrounds =
+    useSettings()?.messageBackgrounds ?? DEFAULT_SETTINGS.messageBackgrounds
   const messageStyle = {
     width: columnWidth(chatWidth, '%'),
-    '--message-gutter': avatarGutter(chatWidth, avatarSize),
+    '--message-column-margin': columnMargin(chatWidth),
     ...avatarVars(avatarSize),
   } as React.CSSProperties
 
@@ -363,6 +367,7 @@ export function ChatSessionView({
                 ref={messageListRef}
                 className="mx-auto w-full flex-1"
                 innerStyle={messageStyle}
+                showBackgrounds={showBackgrounds}
                 topPadding={topPadding}
                 bottomPadding={bottomPadding}
                 // The approval and composer reserve different amounts of space.

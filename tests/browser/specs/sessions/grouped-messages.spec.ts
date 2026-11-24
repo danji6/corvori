@@ -258,6 +258,84 @@ for (const mixed of [false, true]) {
   })
 }
 
+function headerGeometry(trigger: Locator) {
+  return trigger.evaluate((button) => {
+    const header = button.parentElement!.getBoundingClientRect()
+    const block = button.closest('[data-open]')!.getBoundingClientRect()
+    const { top, left } = button.getBoundingClientRect()
+    return {
+      height: header.height,
+      top: top - block.top,
+      left: left - block.left,
+    }
+  })
+}
+
+test('expanding and collapsing todos keeps the header in place', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=notes&id=notes&todoWork')
+  await page.locator('[data-slot="work-block"]').click()
+  const trigger = page.getByRole('button', { name: /^Update todos/ })
+  const task = page.getByText('Review the changes', { exact: true })
+  await expect(trigger).toBeVisible()
+  const collapsed = await headerGeometry(trigger)
+  await trigger.click()
+  await expect(task).toBeVisible()
+  expect(await headerGeometry(trigger)).toEqual(collapsed)
+  const item = await page.getByRole('listitem').boundingBox()
+  expect(item!.x).toBeGreaterThan((await trigger.boundingBox())!.x + 20)
+  await trigger.click()
+  await expect(task).toBeHidden()
+  expect(await headerGeometry(trigger)).toEqual(collapsed)
+})
+
+test('transcript chevrons reveal on hover and keyboard focus', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=notes&id=notes&fileChanges')
+  const work = page.locator('[data-slot="work-block"]')
+  const chevron = (trigger: Locator) =>
+    trigger.locator('.chat-collapsible-chevron')
+  await expect(chevron(work)).toHaveCSS('opacity', '0')
+  await expect(chevron(work)).toHaveCSS('transition-property', /opacity/)
+  await work.hover()
+  await expect(chevron(work)).toHaveCSS('opacity', '1')
+  await work.click()
+
+  const first = page.getByRole('button', { name: 'first.ts', expanded: false })
+  const second = page.getByRole('button', { name: 'second.ts' })
+  await first.hover()
+  await expect(chevron(work)).toHaveCSS('opacity', '0')
+  await expect(chevron(first)).toHaveCSS('opacity', '1')
+  await expect(chevron(second)).toHaveCSS('opacity', '0')
+
+  await page.mouse.move(0, 0)
+  await first.focus()
+  await page.keyboard.press('Tab')
+  await expect(second).toBeFocused()
+  await expect(chevron(first)).toHaveCSS('opacity', '0')
+  await expect(chevron(second)).toHaveCSS('opacity', '1')
+
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await expect(chevron(second)).toHaveCSS('transition-duration', '0s')
+})
+
+test.describe('touch transcript', () => {
+  test.use({ hasTouch: true })
+
+  test('keeps disclosure chevrons visible without hover', async ({ page }) => {
+    await page.goto('/?fixture=notes&id=notes&fileChanges')
+    const work = page.locator('[data-slot="work-block"]')
+    await expect(work.locator('.chat-collapsible-chevron')).toHaveCSS(
+      'opacity',
+      '1',
+    )
+    await work.tap()
+    await expect(work).toHaveAttribute('aria-expanded', 'true')
+  })
+})
+
 test('file changes share a list with independent, persistent diff toggles', async ({
   page,
 }) => {
@@ -273,14 +351,20 @@ test('file changes share a list with independent, persistent diff toggles', asyn
   await expect(rows).toHaveCount(3)
   const first = rows.nth(0)
   const second = rows.nth(1)
+  const firstTrigger = first.getByRole('button', { name: 'first.ts' })
   await expect(first.locator('[data-slot="code-container"]')).toBeHidden()
   await expect(second.locator('[data-slot="code-container"]')).toBeHidden()
   await expect(rows.nth(2)).toContainText('Original text was not found')
 
-  await first.getByRole('button', { name: 'first.ts' }).focus()
+  const collapsed = await headerGeometry(firstTrigger)
+  await firstTrigger.focus()
   await page.keyboard.press('Enter')
   await expect(first.locator('[data-slot="code-container"]')).toBeVisible()
   await expect(first).toContainText('newFirst')
+  await expect
+    .poll(async () => (await headerGeometry(firstTrigger)).top)
+    .toBeGreaterThan(collapsed.top)
+  expect((await headerGeometry(firstTrigger)).height).toBe(collapsed.height)
   await expect(second.getByRole('button')).toHaveAttribute(
     'aria-expanded',
     'false',
@@ -288,7 +372,7 @@ test('file changes share a list with independent, persistent diff toggles', asyn
   await second.getByRole('button', { name: 'second.ts' }).click()
   await expect(second.locator('[data-slot="code-container"]')).toBeVisible()
   await expect(second).toContainText('newSecond')
-  await first.getByRole('button', { name: 'first.ts' }).click()
+  await firstTrigger.click()
   await expect(first.locator('[data-slot="code-container"]')).toBeHidden()
   await expect(first.getByRole('button')).toHaveAttribute(
     'aria-expanded',
@@ -478,6 +562,45 @@ async function collapseWorkAtPhase(
     }
     return { originalY, positions }
   }, phase)
+}
+
+test('the gap above the next work summary shrinks with the closing details', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=notes&id=notes&groupedWork')
+  const first = page.locator('[data-slot="work-block"]').first()
+  const detail = page.locator('[data-work-id]')
+  const closing = detail.locator('[data-state="closing"]')
+  const gap = () => gapAfterWorkSummary(first)
+  const collapsedGap = await gap()
+
+  await first.click()
+  await expect(detail).toHaveCount(1)
+  await expect(detail.locator('[data-state]')).toHaveCount(0)
+  expect(await gap()).toBeGreaterThan(collapsedGap)
+
+  await first.click()
+  await closing.evaluate((row) => {
+    for (const animation of row.getAnimations() as CSSTransition[]) {
+      if (animation.transitionProperty === 'opacity') animation.pause()
+      else animation.finish()
+    }
+  })
+  await expect.poll(gap).toBeCloseTo(collapsedGap, 0)
+  await closing.evaluate((row) => {
+    for (const animation of row.getAnimations()) animation.finish()
+  })
+  await expect(detail).toHaveCount(0)
+})
+
+function gapAfterWorkSummary(summary: Locator) {
+  return summary.evaluate((button) => {
+    const list = button.closest('[data-row-key]')!.parentElement!
+    const next = list.querySelectorAll('[data-slot="work-block"]')[1]!
+    return (
+      next.getBoundingClientRect().top - button.getBoundingClientRect().bottom
+    )
+  })
 }
 
 test('closing work at the expanded bottom waits for rows without a scroll jump', async ({

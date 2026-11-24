@@ -1,6 +1,7 @@
 import type { UIMessage } from 'ai'
 
 import { isShellReportPart } from './parts'
+import type { MessageRow } from './rows'
 import type { MessageRecord, PartMetadata } from './types'
 
 /** Presents background shell reports as activity from their owning agent. */
@@ -18,6 +19,11 @@ export function messageDisplayRole(
 /** Context resets and join/leave notices divide the transcript. */
 export function isTranscriptDivider(record: MessageRecord | undefined) {
   return record?.type === 'contextReset' || record?.type === 'presence'
+}
+
+/** Identifies rows rendered as full-width transcript dividers. */
+export function isTranscriptDividerRow(row?: MessageRow) {
+  return row?.kind === 'context-reset' || row?.kind === 'presence'
 }
 
 /** Identifies messages that can share a sender header. */

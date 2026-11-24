@@ -241,6 +241,7 @@ export const settingsFormSchema = z.object({
   mathMode: z.enum(['off', 'single', 'double']),
   invertSend: z.boolean(),
   groupBySender: z.boolean(),
+  messageBackgrounds: z.boolean(),
   followAgentThemeColor: z.boolean(),
   avatarSize: z.number(),
   titleModel: z.string().nullable(),

@@ -66,6 +66,7 @@ const REVEAL_TIMEOUT_MS = 5000
 export type MessageListProps = Omit<React.ComponentProps<'div'>, 'ref'> & {
   ref?: React.Ref<MessageListHandle>
   innerStyle?: React.CSSProperties
+  showBackgrounds: boolean
   topPadding?: number
   bottomPadding?: number
   /** Extra dock padding that should be ignored for sticky bottom state. */
@@ -89,6 +90,7 @@ export function MessageList({
   ref,
   className,
   innerStyle,
+  showBackgrounds,
   topPadding,
   bottomPadding,
   extraBottomInset,
@@ -509,6 +511,7 @@ export function MessageList({
             emptyStyle={innerStyle}
             messages={{
               rows,
+              showBackgrounds,
               hasHeaderContainer,
               innerStyle,
               topPadding,

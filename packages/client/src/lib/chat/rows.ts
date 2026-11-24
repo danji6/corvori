@@ -49,8 +49,6 @@ type MessageRowKind =
       messageId: string
       segmentIndex: number
       groupIndex: number
-      /** Uses compaction spacing for all groups, including its thinking. */
-      summary?: boolean
       workId?: string
       promotedToolCallIds?: string[]
       grouped?: boolean
@@ -94,6 +92,8 @@ type MessageRowKind =
 export type MessageRow = MessageRowKind & {
   /** The message ID of the shared sender header for a grouped message. */
   senderGroupId?: string
+  /** This row belongs to a compaction summary. */
+  summary?: boolean
 }
 
 /** One loaded segment's part slice with its cached part groups. */
@@ -228,6 +228,7 @@ export function buildRows(
     previousSenderKey = senderKey
 
     const hasHeader = (!meta?.type || message.role === 'system') && !grouped
+    const summary = meta?.type === 'summary' ? { summary: true } : undefined
 
     const slices = segmentGroupsFor(message, meta)
     const reasoning = !meta?.type ? latestReasoning(id, slices) : undefined
@@ -255,6 +256,7 @@ export function buildRows(
         key: `h:${id}`,
         messageId: id,
         reasoning,
+        ...summary,
       }
       rows.push(senderHeader)
       first = false
@@ -266,6 +268,7 @@ export function buildRows(
         key: firstKey(`r:${id}`),
         messageId: id,
         ...senderGroup,
+        ...summary,
         ...(first && grouped && { grouped }),
       })
       first = false
@@ -281,6 +284,7 @@ export function buildRows(
           messageId: id,
           work,
           ...senderGroup,
+          ...summary,
           ...(first && grouped && { grouped }),
         })
         emitted.add(work.id)
@@ -295,21 +299,22 @@ export function buildRows(
         segmentIndex: entry.segmentIndex,
         groupIndex: entry.groupIndex,
         ...senderGroup,
-        ...(meta?.type === 'summary' && { summary: true }),
+        ...summary,
         ...(work && { workId: work.id }),
         ...(first && grouped && { grouped }),
       })
       first = false
     }
 
-    // Only render a footer if it has something to show or is the first row
-    const duration = durations.get(id)
-    if (first || hasFooterContent(message, meta, duration)) {
+    // Keep an anchor for empty messages, including compactions before they stream.
+    const duration = summary ? undefined : durations.get(id)
+    if (first || (!summary && hasFooterContent(message, meta, duration))) {
       rows.push({
         kind: 'footer',
         key: firstKey(`f:${id}`),
         messageId: id,
         ...senderGroup,
+        ...summary,
         ...(duration !== undefined && { duration }),
         ...(first && grouped && { grouped }),
       })

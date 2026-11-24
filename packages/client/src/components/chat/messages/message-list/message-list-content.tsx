@@ -1,8 +1,11 @@
 import { RippleButton, WavyProgressCircle } from '@/components/ui'
 import { useVirtualizedLayout } from '@/hooks/chat/message-list/virtualized-layout'
+import { messageBackgroundGroup } from '@/lib/chat/message-backgrounds'
+import { isNoteBoundaryRow } from '@/lib/chat/note-rows'
 import { noteExpansion } from '@/lib/chat/note-state'
 import type { RowTransition } from '@/lib/chat/row-expansion-state'
 import type { MessageRow } from '@/lib/chat/rows'
+import { isTranscriptDividerRow } from '@/lib/chat/sender-groups'
 import { workExpansion } from '@/lib/chat/work-state'
 import { cn } from '@/lib/utils'
 import { AnimatePresence, motion } from 'motion/react'
@@ -25,11 +28,16 @@ import {
   VirtualizedRowTransition,
   useRowTransitions,
 } from '../virtualized-row-transition'
+import { getRowSpacing, getWorkDetailTrailingSpacing } from './row-spacing'
 import { TranscriptWindow } from './transcript-window'
 
 const CONTENT_FADE_TRANSITION = { duration: 0.18, ease: 'easeOut' } as const
 
-const VirtualizedRowsContext = createContext<readonly MessageRow[]>([])
+const VirtualizedRowsContext = createContext<{
+  rows: readonly MessageRow[]
+  showBackgrounds: boolean
+}>({ rows: [], showBackgrounds: false })
+
 const RowTransitionsContext = createContext<ReadonlyMap<string, RowTransition>>(
   new Map(),
 )
@@ -157,6 +165,7 @@ function LoadingOverlay({ showIndicator, inset }: LoadingOverlayProps) {
 
 type MessageRowsProps = {
   rows: readonly MessageRow[]
+  showBackgrounds?: boolean
   hasHeaderContainer: boolean
   innerStyle?: CSSProperties
   topPadding?: number
@@ -175,6 +184,7 @@ type MessageRowsProps = {
 
 function MessageRows({
   rows,
+  showBackgrounds = false,
   hasHeaderContainer,
   innerStyle,
   topPadding,
@@ -199,6 +209,10 @@ function MessageRows({
     [workTransitions, noteTransitions],
   )
 
+  const rowOptions = useMemo(
+    () => ({ rows, showBackgrounds }),
+    [rows, showBackgrounds],
+  )
   const layout = useVirtualizedLayout({
     rows,
     transitions,
@@ -230,18 +244,20 @@ function MessageRows({
       <div
         ref={root}
         // The minimum reserves row height. Top padding is additional.
-        className="mx-auto box-content"
+        className="chat-transcript-column mx-auto box-content motion-safe:transition-[--message-gutter]"
+        data-message-backgrounds={showBackgrounds ? '' : undefined}
         style={
           hasHeaderContainer
             ? { ...innerStyle, minHeight: layout.minHeight }
             : { ...innerStyle, ...topPaddingStyle, minHeight: layout.minHeight }
         }
       >
-        <VirtualizedRowsContext value={rows}>
+        <VirtualizedRowsContext value={rowOptions}>
           <RowTransitionsContext value={transitions}>
             <TranscriptWindow
               ref={virtuaRef}
               rows={rows}
+              showBackgrounds={showBackgrounds}
               transitions={transitions}
               item={VirtualizedItem}
               shift={shiftItems || layout.shift}
@@ -285,72 +301,46 @@ function LoadWindowButton({
   )
 }
 
-/** Full-width rows that separate the transcript (resets, join/leave notices). */
-function isDividerRow(row?: MessageRow) {
-  return row?.kind === 'context-reset' || row?.kind === 'presence'
-}
-
-/** Chooses gaps whose values live in styles/messages.css. */
-function getRowSpacing(row?: MessageRow, previousRow?: MessageRow) {
-  if (!row || row.kind === 'footer') return
-
-  if (previousRow && (isDividerRow(row) || isDividerRow(previousRow))) {
-    return 'h-(--message-sender-gap)'
-  }
-
-  if (row.kind === 'hidden' && row.noteGroupId) {
-    return 'h-(--note-group-row-gap)'
-  }
-
-  const startsSenderGroup =
-    previousRow && !row.grouped && previousRow.messageId !== row.messageId
-  const isSummary = row.kind === 'group' && row.summary
-  if (startsSenderGroup) {
-    return isSummary
-      ? 'h-(--message-compaction-gap)'
-      : 'h-(--message-sender-gap)'
-  }
-
-  const isWorkRow =
-    row.kind === 'group' && row.workId && !row.promotedToolCallIds
-  if (isWorkRow) return 'h-(--work-row-gap)'
-  if (!previousRow) return
-  const bordersNote = isNoteBoundaryRow(row) || isNoteBoundaryRow(previousRow)
-  if (isSummary || bordersNote) return 'h-(--message-compact-block-gap)'
-
-  // Adjacent work summaries already provide their own header padding.
-  const stacksWorkSummaries =
-    row.kind === 'work' &&
-    (previousRow.kind === 'work' || previousRow.kind === 'footer')
-  if (stacksWorkSummaries) return
-
-  if (previousRow.kind === 'header') return 'chat-message-header-gap'
-
-  return 'h-(--message-block-gap)'
-}
-
-function isNoteBoundaryRow(row?: MessageRow) {
-  return row?.kind === 'hidden' || row?.kind === 'note-group'
-}
-
 function VirtualizedItem({
   style,
   index,
   children,
   ref,
 }: CustomItemComponentProps) {
-  const rows = useContext(VirtualizedRowsContext)
+  const { rows, showBackgrounds } = useContext(VirtualizedRowsContext)
   const transitions = useContext(RowTransitionsContext)
   const row = rows[index]
   const previousRow = rows[index - 1]
   const nextRow = rows[index + 1]
   const precedesNote = isNoteBoundaryRow(nextRow)
-  const footerBeforeReset = row?.kind === 'footer' && isDividerRow(nextRow)
+  const precedesDivider = isTranscriptDividerRow(nextRow)
   const spacing = getRowSpacing(row, previousRow)
+  const workDetailTrailingSpacing = getWorkDetailTrailingSpacing(row, nextRow)
+
+  const backgroundGroup = showBackgrounds
+    ? messageBackgroundGroup(row)
+    : undefined
+  const startsBackground =
+    backgroundGroup && messageBackgroundGroup(previousRow) !== backgroundGroup
+  const endsBackground =
+    backgroundGroup && messageBackgroundGroup(nextRow) !== backgroundGroup
+
   const content = (
     <>
-      {spacing && <div aria-hidden className={spacing} />}
+      {spacing && <div aria-hidden style={{ height: spacing }} />}
+      {startsBackground && (
+        <div
+          aria-hidden
+          className="h-(--message-background-padding-block-start)"
+        />
+      )}
       {children}
+      {endsBackground && (
+        <div
+          aria-hidden
+          className="h-(--message-background-padding-block-end)"
+        />
+      )}
     </>
   )
 
@@ -367,7 +357,6 @@ function VirtualizedItem({
       data-message-id={row?.messageId}
       data-sender-group-id={row?.senderGroupId ?? row?.messageId}
       data-row-key={row?.key}
-      data-footer-before-reset={footerBeforeReset ? '' : undefined}
       data-note-group-id={row?.kind === 'hidden' ? row.noteGroupId : undefined}
       data-work-id={row?.kind === 'group' ? row.workId : undefined}
       data-segment-index={row?.kind === 'group' ? row.segmentIndex : undefined}
@@ -393,6 +382,9 @@ function VirtualizedItem({
               {content}
             </div>
           )}
+          {workDetailTrailingSpacing && (
+            <div aria-hidden style={{ height: workDetailTrailingSpacing }} />
+          )}
         </VirtualizedRowTransition>
       ) : row?.kind === 'hidden' && row.noteGroupId ? (
         <VirtualizedRowTransition
@@ -401,6 +393,9 @@ function VirtualizedItem({
           <div className="border-border/60 border-l pl-(--message-group-inset)">
             {content}
           </div>
+          {nextRow && !precedesNote && !precedesDivider && (
+            <div aria-hidden className="h-(--message-compact-block-gap)" />
+          )}
         </VirtualizedRowTransition>
       ) : (
         content

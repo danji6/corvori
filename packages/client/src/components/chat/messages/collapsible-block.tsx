@@ -23,7 +23,7 @@ export type CollapsibleBlockProps = React.ComponentPropsWithoutRef<'div'> & {
   revealComposerMessageId?: string
   /** Reveal on every open by default, or use 'manual' for header toggles only. */
   revealOnOpen?: boolean | 'manual'
-  /** Inset surfaces pad header and body together; inset-row keeps collapsed row alignment. */
+  /** The bordered surface expands its padding. Inset rows start indented. */
   surface?: boolean | 'inset' | 'inset-row'
   /** Compact header height and no outer margin, for stacking inside a group. */
   dense?: boolean
@@ -91,7 +91,7 @@ export function CollapsibleBlock({
     revealComposerMessageId,
   })
 
-  const insetRow = surface === 'inset-row'
+  const insetRow = surface === 'inset-row' || surface === true
   const insetSurface = surface === 'inset' || insetRow
   const rowMinH = dense ? undefined : 'min-h-9'
   const body = children && (
@@ -107,13 +107,15 @@ export function CollapsibleBlock({
   )
 
   const shellClassName = cn(
-    'group overflow-x-auto rounded-none border border-transparent motion-safe:transition-[padding,background-color,border-color,border-radius]',
+    'group overflow-x-auto rounded-none border border-transparent motion-safe:transition-[background-color,border-color,border-radius,box-shadow]',
     fullWidth ? 'w-full' : 'w-fit max-w-full',
     surface &&
       'data-[open=true]:bg-m3-surface-container-low data-[open=true]:border-border rounded-2xl',
     insetSurface &&
-      'chat-block-inset rounded-none data-[open=true]:rounded-(--work-surface-radius)',
-    surface === 'inset' && 'border-0 data-[open=true]:border',
+      'chat-block-inset data-[open=true]:rounded-(--work-surface-radius) motion-safe:transition-[--work-surface-expansion,background-color,border-color,border-radius,box-shadow] motion-safe:duration-200 motion-safe:ease-in-out',
+    insetSurface &&
+      surface !== true &&
+      'data-[open=true]:inset-ring-border rounded-none border-0 data-[open=true]:inset-ring',
     insetRow && 'chat-block-inset-row',
     className,
   )
@@ -173,7 +175,6 @@ export function CollapsibleBlock({
               'chat-header-focus flex items-center rounded-3xl',
               !insetSurface && 'px-(--work-body-padding)',
               rowMinH,
-              open && 'chat-block-header-expanded',
               headerClassName,
             )}
           >
@@ -314,9 +315,10 @@ function Trigger({
       />
       {showChevron && (
         <Accordion.Icon
+          aria-hidden
           isExpanded={isOpen}
           className={cn(
-            'text-muted-foreground shrink-0',
+            'chat-collapsible-chevron text-muted-foreground shrink-0',
             floatingChevron && 'absolute right-1',
           )}
         />
@@ -346,7 +348,7 @@ function Content({
     if (isOpen || !present) return
     const finishShrink = beginShrink?.()
     let cancelled = false
-    const animations = contentRef.current?.getAnimations() ?? []
+    const animations = getCollapseAnimations(contentRef.current)
     void Promise.allSettled(
       animations.map((animation) => animation.finished),
     ).then(() => {
@@ -389,4 +391,17 @@ function Content({
       <div className="min-h-0 overflow-hidden">{children}</div>
     </div>
   )
+}
+
+/** Keep the row free to shrink until the body and its surrounding padding settle. */
+function getCollapseAnimations(content: HTMLElement | null) {
+  if (!content) return []
+  const padding =
+    content.parentElement?.getAnimations().filter((animation) => {
+      return (
+        animation instanceof CSSTransition &&
+        animation.transitionProperty === '--work-surface-expansion'
+      )
+    }) ?? []
+  return [...content.getAnimations(), ...padding]
 }

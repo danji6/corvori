@@ -13,14 +13,16 @@ import { useActiveAgent } from './agent'
 import { useActiveSessionId } from './session'
 import { useSettings } from './settings'
 
-/** Resolves the sending agent's current styling, shared across its message rows. */
-export function useMessageAppearance(
-  role: string,
-  record?: Pick<MessageRecord, 'sender'>,
-) {
+type AppearanceRecord = Pick<MessageRecord, 'sender' | 'type'>
+
+/** Resolves sender styling for message rows. */
+export function useMessageAppearance(role: string, record?: AppearanceRecord) {
   const settings = useSettings()
   const { agent, activeAgent, fromAgent } = useMessageAgent(role, record)
   const isDark = useIsDarkMode()
+  // Summaries inherit the chat theme.
+  const inheritsTheme = record?.type === 'summary'
+
   const theme = resolveMessageTheme({
     fromAgent,
     followAgentThemeColor: settings?.followAgentThemeColor ?? false,
@@ -29,37 +31,43 @@ export function useMessageAppearance(
   })
 
   const vars = useMemo(() => {
+    if (inheritsTheme) return
     const scheme = theme && (isDark ? theme.dark : theme.light)
     if (scheme) return schemeToCssVars(scheme)
     return themeVars(SOURCE_COLOR, isDark)
-  }, [theme, isDark])
+  }, [inheritsTheme, theme, isDark])
 
   const look: Look = {
     css: [settings?.customCss, agent?.customCss],
     vars,
     isDark,
   }
-  const code = {
-    highlighting:
-      agent?.codeBlockHighlighting ??
-      settings?.codeBlockHighlighting ??
-      DEFAULT_SETTINGS.codeBlockHighlighting,
-    lineNumbers:
-      agent?.codeBlockLineNumbers ??
-      settings?.codeBlockLineNumbers ??
-      DEFAULT_SETTINGS.codeBlockLineNumbers,
-  }
+  const code = inheritsTheme
+    ? undefined
+    : {
+        highlighting:
+          agent?.codeBlockHighlighting ??
+          settings?.codeBlockHighlighting ??
+          DEFAULT_SETTINGS.codeBlockHighlighting,
+        lineNumbers:
+          agent?.codeBlockLineNumbers ??
+          settings?.codeBlockLineNumbers ??
+          DEFAULT_SETTINGS.codeBlockLineNumbers,
+      }
   return { look, code }
 }
 
 /** Uses the active agent only for previews without a saved sender. */
-function useMessageAgent(role: string, record?: Pick<MessageRecord, 'sender'>) {
+function useMessageAgent(role: string, record?: AppearanceRecord) {
   const activeAgent = useActiveAgent()
   const sessionId = useActiveSessionId()
   const fromAgent = record
     ? record.sender.type === 'agent'
     : role === 'assistant'
-  const agentId = record?.sender.type === 'agent' ? record.sender.id : undefined
+  const agentId =
+    record?.type !== 'summary' && record?.sender.type === 'agent'
+      ? record.sender.id
+      : undefined
   const appearance = useQuery(
     api.appearances.get,
     agentId

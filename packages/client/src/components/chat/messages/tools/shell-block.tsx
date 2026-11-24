@@ -215,6 +215,7 @@ function ShellCommandBlock({
   const block = (
     <ToolShell
       data-slot="shell-block"
+      className="overflow-visible"
       part={part}
       messageId={messageId}
       forceError={forceError}

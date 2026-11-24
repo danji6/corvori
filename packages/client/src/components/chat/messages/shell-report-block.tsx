@@ -19,6 +19,7 @@ export function ShellReportBlock({ part }: { part: ShellReportPart }) {
   return (
     <CollapsibleBlock
       data-slot="shell-report-block"
+      className="overflow-visible"
       open={open}
       onOpenChange={onOpenChange}
       surface="inset"

@@ -96,7 +96,11 @@ export function WorkBlock({
         {summary.label}
         {row.work.partial && ' · loaded portion'}
       </span>
-      <Accordion.Icon isExpanded={open} className="shrink-0" />
+      <Accordion.Icon
+        aria-hidden
+        isExpanded={open}
+        className="chat-collapsible-chevron shrink-0"
+      />
     </Button>
   )
 }

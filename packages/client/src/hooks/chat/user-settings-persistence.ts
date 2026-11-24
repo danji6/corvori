@@ -66,6 +66,7 @@ export function useUserSettingsPersistence({
         mathMode: values.mathMode,
         invertSend: values.invertSend,
         groupBySender: values.groupBySender,
+        messageBackgrounds: values.messageBackgrounds,
         followAgentThemeColor: values.followAgentThemeColor,
         avatarSize: values.avatarSize,
         titleModel: values.titleModel ?? undefined,

@@ -138,7 +138,11 @@ const SettingsListSwitch = ({
       disabled={disabled}
       {...props}
     >
-      <Switch checked={checked} disabled={disabled} />
+      <Switch
+        aria-label={typeof label === 'string' ? label : undefined}
+        checked={checked}
+        disabled={disabled}
+      />
     </SettingsListItem>
   )
 }

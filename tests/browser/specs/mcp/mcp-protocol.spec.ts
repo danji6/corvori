@@ -86,7 +86,7 @@ for (const tool of ['call_mcp_tool', 'mcp_protocol']) {
     await page.goto(`/?fixture=mcp-protocol&view=tool&tool=${tool}`)
     await page
       .getByRole('button', {
-        name: `${tool === 'call_mcp_tool' ? 'binary_session' : tool} Expand`,
+        name: tool === 'call_mcp_tool' ? 'binary_session' : tool,
         exact: true,
       })
       .click()
@@ -124,7 +124,7 @@ test('small MCP results need neither a download nor a full-output button', async
 }) => {
   await page.goto('/?fixture=mcp-protocol&view=tool&inline=1')
   await page
-    .getByRole('button', { name: 'binary_session Expand', exact: true })
+    .getByRole('button', { name: 'binary_session', exact: true })
     .click()
   await expect(page.getByText('Retained output', { exact: true })).toBeVisible()
   await expect(

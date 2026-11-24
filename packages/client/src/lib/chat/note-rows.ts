@@ -61,3 +61,7 @@ export function projectNoteRows(
     )
   })
 }
+
+export function isNoteBoundaryRow(row?: MessageRow) {
+  return row?.kind === 'hidden' || row?.kind === 'note-group'
+}

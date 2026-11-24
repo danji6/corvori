@@ -98,6 +98,52 @@ test('groups notes, expands independently with keyboard, and keeps state across 
   await expect(note(page, 'extra')).toContainText('No content.')
 })
 
+test('animates the padding around a note as its panel opens and closes', async ({
+  page,
+}) => {
+  await showGroup(page)
+  await group(page).click()
+  await waitForGroupAnimation(page)
+  const trigger = note(page, 'mcp').getByRole('button')
+
+  const opening = await sampleNotePadding(trigger)
+  expect(opening.after).toBeGreaterThan(opening.before)
+  expect(opening.animated, `Opening offsets: ${opening.samples}`).toBe(true)
+  await expect(note(page, 'mcp')).toContainText('Content for mcp')
+
+  const closing = await sampleNotePadding(trigger)
+  expect(closing.before).toBeGreaterThan(closing.after)
+  expect(closing.animated, `Closing offsets: ${closing.samples}`).toBe(true)
+  expect(closing.after).toBe(opening.before)
+  await expect(note(page, 'mcp')).not.toContainText('Content for mcp')
+})
+
+function sampleNotePadding(trigger: Locator) {
+  return trigger.evaluate(async (button) => {
+    const surface = button.closest('[data-open]')!
+    const measure = () =>
+      button.getBoundingClientRect().top - surface.getBoundingClientRect().top
+    const samples = [measure()]
+    ;(button as HTMLButtonElement).click()
+    do {
+      await new Promise(requestAnimationFrame)
+      samples.push(measure())
+    } while (
+      surface
+        .getAnimations()
+        .some((animation) => animation.playState === 'running')
+    )
+    const before = samples[0]!
+    const after = samples.at(-1)!
+    const min = Math.min(before, after)
+    const max = Math.max(before, after)
+    const animated = samples.some(
+      (position) => position > min && position < max,
+    )
+    return { before, after, animated, samples }
+  })
+}
+
 test('seeks a non-first note, restores its position after reload, and can target the first note', async ({
   page,
 }) => {
@@ -243,7 +289,7 @@ test('Delete all removes later messages and leaves the earlier note as a singlet
   page,
 }) => {
   await showGroup(page)
-  await group(page).click()
+  await group(page).press('Enter')
   await waitForGroupAnimation(page)
   await note(page, 'workspace').click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
@@ -305,7 +351,7 @@ test('defers the live work duration while an empty continuation is active', asyn
 
   await page
     .locator('[data-slot="chat-box"]')
-    .getByRole('button', { name: 'Send', exact: true })
+    .getByRole('button', { name: 'Stop', exact: true })
     .click()
   await expect(liveDuration).toBeVisible()
   await expect(activity).toHaveCount(0)

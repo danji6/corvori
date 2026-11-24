@@ -95,6 +95,18 @@ export function AppearanceSettings({
       />
       <Controller
         control={control}
+        name="messageBackgrounds"
+        render={({ field }) => (
+          <SettingsList.Switch
+            label="Message backgrounds"
+            description="Show a theme-colored background behind messages."
+            checked={field.value}
+            onCheckedChange={field.onChange}
+          />
+        )}
+      />
+      <Controller
+        control={control}
         name="chatWidth"
         render={({ field }) => (
           <SettingsList.Slider

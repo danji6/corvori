@@ -51,7 +51,7 @@ export type MessageRowViewProps = {
 export const MessageRowView = memo(function MessageRowView({
   row,
 }: MessageRowViewProps) {
-  const { message, isLast, messageMeta, partMeta } = useChatMessage(
+  const { message, messageMeta, partMeta } = useChatMessage(
     row.kind === 'header'
       ? (row.reasoning?.messageId ?? row.messageId)
       : row.messageId,
@@ -99,12 +99,11 @@ export const MessageRowView = memo(function MessageRowView({
           record={messageMeta}
           toolErrors={partMeta?.toolErrors}
         />
-      ) : row.kind === 'footer' ? (
+      ) : row.kind === 'footer' && !row.summary ? (
         <FooterRow
           duration={row.duration}
           message={message}
           messageMeta={messageMeta}
-          isLast={isLast}
         />
       ) : null}
     </RowShell>
@@ -119,7 +118,7 @@ function ContextResetRow({ messageId }: { messageId: string }) {
       ref={ref}
       data-slot="context-reset"
       data-message-id={messageId}
-      className="w-full"
+      className="chat-transcript-full-width"
     >
       <ContextDivider label="Context reset" />
     </div>
@@ -198,8 +197,7 @@ function RowShell({ message, messageMeta, row, children }: RowShellProps) {
         data-message-id={message.id}
         className={cn(
           'relative z-10 flex min-w-0 flex-col items-start',
-          // Grow leftwards into the gutter when there is one
-          '-ml-(--message-gutter,0px) w-[calc(100%+var(--message-gutter,0px))] pl-(--message-gutter,0px)',
+          row.kind === 'header' ? 'chat-message-header-row' : 'w-full',
           // Keep long presses from selecting transcript text on mobile
           isTouchDevice() && 'select-none',
           roleClass,
@@ -216,17 +214,23 @@ function RowShell({ message, messageMeta, row, children }: RowShellProps) {
     </MessageContextMenu>
   )
 
+  const scoped = appearanceClass ? (
+    <div data-slot="appearance-scope" className={appearanceClass}>
+      {inner}
+    </div>
+  ) : (
+    inner
+  )
+
   return (
     <MessageContext.Provider value={messageCtx}>
-      <CodeAppearanceContext.Provider value={code}>
-        {appearanceClass ? (
-          <div data-slot="appearance-scope" className={appearanceClass}>
-            {inner}
-          </div>
-        ) : (
-          inner
-        )}
-      </CodeAppearanceContext.Provider>
+      {code ? (
+        <CodeAppearanceContext.Provider value={code}>
+          {scoped}
+        </CodeAppearanceContext.Provider>
+      ) : (
+        scoped
+      )}
     </MessageContext.Provider>
   )
 }
@@ -372,10 +376,9 @@ type FooterRowProps = {
   duration?: number
   message: UIMessage
   messageMeta?: MessageRecord
-  isLast: boolean
 }
 
-function FooterRow({ duration, message, messageMeta, isLast }: FooterRowProps) {
+function FooterRow({ duration, message, messageMeta }: FooterRowProps) {
   const highlightRef = useMessageHighlightRef(message.id)
   const isStreaming = useIsMessageStreaming(message.id)
   const awaitingContinuation = useIsAwaitingVisibleContinuation(message.id)
@@ -399,10 +402,7 @@ function FooterRow({ duration, message, messageMeta, isLast }: FooterRowProps) {
     <div
       ref={highlightRef}
       data-slow="message-footer"
-      className={cn(
-        'flex w-full flex-col empty:hidden',
-        !isLast && 'pb-4 in-data-footer-before-reset:pb-0',
-      )}
+      className="flex w-full flex-col empty:hidden"
     >
       {error && (
         <div className="px-4 pt-3">

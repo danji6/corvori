@@ -21,12 +21,14 @@ import type { CustomItemComponentProps, WindowVirtualizerHandle } from 'virtua'
 import { UPDATE_SIZE_EVENT, UPDATE_VIRTUAL_STATE } from 'virtua/unstable_core'
 
 import { MessageHighlightLayer } from '../message-highlight-context'
+import { MessageBackgroundLayer } from './message-background-layer'
 
 type ItemComponent = ComponentType<CustomItemComponentProps>
 
 type TranscriptWindowProps = {
   ref: RefObject<WindowVirtualizerHandle | null>
   rows: readonly MessageRow[]
+  showBackgrounds: boolean
   transitions: ReadonlyMap<string, RowTransition>
   shift: boolean
   item: ItemComponent
@@ -38,6 +40,7 @@ type TranscriptWindowProps = {
 export function TranscriptWindow({
   ref,
   rows,
+  showBackgrounds,
   transitions,
   shift,
   item,
@@ -97,9 +100,12 @@ export function TranscriptWindow({
     [driver, layout, store],
   )
 
+  const visibleIndices = transcript.visibleIndices(entries)
+
   return (
     <div
       ref={root}
+      data-slot="transcript-window"
       style={{
         contain: 'size style',
         overflowAnchor: 'none',
@@ -110,8 +116,16 @@ export function TranscriptWindow({
         pointerEvents: store.$isScrolling() ? 'none' : undefined,
       }}
     >
+      {showBackgrounds && (
+        <MessageBackgroundLayer
+          rows={rows}
+          visibleIndices={visibleIndices}
+          getOffset={store.$getItemOffset}
+          getSize={layout.$getItemSize}
+        />
+      )}
       <MessageHighlightLayer root={root} rows={rows} layoutVersion={version} />
-      {transcript.visibleIndices(entries).map((index) => (
+      {visibleIndices.map((index) => (
         <TranscriptItem
           key={rows[index]!.key}
           item={item}

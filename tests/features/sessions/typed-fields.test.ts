@@ -63,6 +63,7 @@ describe('settings args', () => {
       codeBlockHighlighting: false,
       codeBlockLineNumbers: true,
       followAgentThemeColor: true,
+      messageBackgrounds: false,
       recentWorkspaces: ['/tmp'],
     }
 

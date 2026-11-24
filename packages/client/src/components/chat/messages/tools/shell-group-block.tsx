@@ -55,6 +55,7 @@ export function ShellGroupBlock({
     <ShellGroupContext.Provider value={state}>
       <CollapsibleBlock
         data-slot="shell-group"
+        className="overflow-visible"
         collapsible={false}
         dense
         fullWidth
@@ -69,7 +70,7 @@ export function ShellGroupBlock({
           </>
         }
       >
-        <ToolList>
+        <ToolList className="[--tool-list-gap:--spacing(3)]">
           {parts.map((part) => (
             <ToolListItem
               key={isShellReportPart(part) ? part.jobId : part.toolCallId}

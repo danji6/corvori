@@ -1,5 +1,8 @@
 import { ChatSession } from '@/components/chat/chat-session'
 import { ChatSessionView } from '@/components/chat/chat-session-view'
+import { AppearanceSettings } from '@/components/chat/entities/user/appearance-settings'
+import { settingsFormSchema } from '@/components/chat/entities/user/settings-schema'
+import { defaultSettingsValues } from '@/components/chat/entities/user/user-settings-values'
 import { HiddenChip } from '@/components/chat/messages/hidden-chip'
 import { MessageHighlightProvider } from '@/components/chat/messages/message-highlight-context'
 import type { ScrollDeps } from '@/components/chat/messages/message-list/deps'
@@ -25,13 +28,17 @@ import {
   useWindowControls,
 } from '@/hooks/chat/messages'
 import { useSendMessage } from '@/hooks/chat/send'
+import { useSettings } from '@/hooks/chat/settings'
 import { StreamStoreProvider, useChatStatus } from '@/hooks/chat/stream'
+import { useUserSettingsPersistence } from '@/hooks/chat/user-settings-persistence'
 import { useWorkspaceFileIndex } from '@/hooks/chat/workspace'
 import { useScroller } from '@/hooks/scroller'
+import { useTheme } from '@/hooks/theme'
 import type { MessageRow } from '@/lib/chat/rows'
 import { ConvexQueryCacheProvider } from 'convex-helpers/react/cache'
 import { ConvexProvider } from 'convex/react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import type { WindowVirtualizerHandle } from 'virtua'
 
 import {
@@ -51,11 +58,14 @@ const groupedReply = new URLSearchParams(location.search).has('groupedReply')
 const tailWork = new URLSearchParams(location.search).has('tailWork')
 const shellReports = new URLSearchParams(location.search).has('shellReports')
 const fileChanges = new URLSearchParams(location.search).has('fileChanges')
+const todoWork = new URLSearchParams(location.search).has('todoWork')
 const longShell = new URLSearchParams(location.search).has('longShell')
 const compaction = new URLSearchParams(location.search).has('compaction')
 const thinkingWork = new URLSearchParams(location.search).has('thinkingWork')
 const composerParams = new URLSearchParams(location.search)
+const backgrounds = composerParams.has('backgrounds')
 const showComposer =
+  backgrounds ||
   composerParams.has('shellComposer') ||
   composerParams.has('composer') ||
   composerParams.has('liveAuthors')
@@ -199,6 +209,7 @@ function Transcript() {
               tailWork ||
               shellReports ||
               fileChanges ||
+              todoWork ||
               compaction ||
               thinkingWork ? (
                 <MessageRowView row={row} />
@@ -222,6 +233,40 @@ function Transcript() {
     >
       <MessageHighlightProvider>{transcript}</MessageHighlightProvider>
     </MessageSeekContext>
+  )
+}
+
+function BackgroundSettings() {
+  const settings = useSettings()
+  useTheme(null, 'you', 'system')
+  const defaultValues = settingsFormSchema.parse(defaultSettingsValues())
+  const form = useForm({
+    defaultValues,
+    values: {
+      ...defaultValues,
+      messageBackgrounds:
+        settings?.messageBackgrounds ?? defaultValues.messageBackgrounds,
+    },
+  })
+  const persist = useUserSettingsPersistence({
+    pendingAvatar: null,
+    avatarCleared: false,
+    setPendingAvatar: noop,
+    setAvatarCleared: noop,
+    form,
+    draft: { clear: noop },
+  })
+  return (
+    <details className="bg-background fixed top-0 right-0 z-40">
+      <summary>Appearance</summary>
+      <form
+        onSubmit={form.handleSubmit(persist)}
+        className="max-h-[70vh] overflow-y-auto"
+      >
+        <AppearanceSettings control={form.control} setValue={form.setValue} />
+        <button type="submit">Save appearance</button>
+      </form>
+    </details>
   )
 }
 
@@ -267,6 +312,7 @@ export function NotesFixture() {
         </div>
       )}
       <ConvexQueryCacheProvider>
+        {backgrounds && <BackgroundSettings />}
         {composerParams.has('plan') ? (
           <SessionPlanSection />
         ) : composerParams.has('contextReset') ? (

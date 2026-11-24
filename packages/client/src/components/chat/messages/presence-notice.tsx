@@ -37,7 +37,7 @@ export function PresenceNotice({ message, record }: PresenceNoticeProps) {
       ref={ref}
       data-slot="presence-notice"
       data-message-id={message.id}
-      className="w-full"
+      className="chat-transcript-full-width"
     >
       <ContextDivider label={<PresenceLabel record={record} />} />
     </div>

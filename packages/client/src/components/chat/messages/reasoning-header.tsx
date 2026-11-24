@@ -68,7 +68,7 @@ export function ReasoningHeader({
       ref={showBody ? highlightRef : undefined}
       data-slot="reasoning-surface"
       data-open={showBody}
-      className="data-[open=true]:bg-m3-surface-container-low data-[open=true]:border-border w-full border border-transparent transition-all data-[open=true]:rounded-2xl data-[open=true]:px-3 data-[open=true]:py-2 data-[open=true]:[--gutter-inset:--spacing(3)]"
+      className="data-[open=true]:bg-m3-surface-container-low data-[open=true]:border-border w-full border border-transparent transition-[padding,border-radius,border-color,background-color,--gutter-inset] data-[open=true]:rounded-2xl data-[open=true]:px-3 data-[open=true]:py-2 data-[open=true]:[--gutter-inset:--spacing(3)] motion-reduce:transition-none"
     >
       <MessageHeader
         sender={sender}
@@ -97,8 +97,9 @@ export function ReasoningHeader({
             </span>
             {hasText && (
               <Accordion.Icon
+                aria-hidden
                 isExpanded={open}
-                className="text-muted-foreground shrink-0"
+                className="chat-collapsible-chevron text-muted-foreground shrink-0"
               />
             )}
           </Button>
