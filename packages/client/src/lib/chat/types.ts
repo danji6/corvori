@@ -1,6 +1,7 @@
 import type { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
 import type { SessionSummary } from '@cv/convex/model/session/types'
+import type { TranscriptLinkPreview } from '@cv/convex/validators/linkPreviews'
 import type { ReplyQuote } from '@cv/convex/validators/messages'
 import type { TokenUsage } from '@cv/convex/validators/providers'
 import type {
@@ -65,8 +66,9 @@ export type MessageSegmentInfo = {
   index: number
   /** How many of the message's flattened parts belong to this segment. */
   partCount: number
-  /** Serialized size of the segment's parts. */
+  /** Serialized size of the projected segment content. */
   sizeBytes: number
+  linkPreviews?: TranscriptLinkPreview[]
 }
 
 export type MessageRecord = Pick<

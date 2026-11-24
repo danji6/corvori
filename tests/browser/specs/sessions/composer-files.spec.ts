@@ -79,29 +79,47 @@ test('picking a file keeps typing on the current composer line', async ({
   await expect(editor.getByRole('heading')).toHaveText('Review these notes')
 })
 
-test('keeps the loaded link preview mounted through send confirmation', async ({
+test('shows a saved link preview after send, scroll remount, and reload', async ({
   page,
 }) => {
-  const editor = await openSendFixture(page)
+  await page.goto(
+    '/?fixture=subagent-approvals&id=parent&deferSend&savedPreview&history',
+  )
+  const editor = composer(page).locator('[contenteditable="true"]')
   await editor.fill('https://example.com')
   await sendButton(page).click()
 
   const preview = page.getByRole('link', { name: 'Preview for example.com' })
-  await expect(preview).toBeVisible()
-  const pendingPreview = await preview.elementHandle()
+  await expect(sendingButton(page)).toBeVisible()
+  await expect(preview).toHaveCount(0)
 
   await completeSend(page, true)
   const confirmed = page.locator('[data-message-id="sent-0"]')
-  const confirmedPreview = confirmed.getByRole('link', {
-    name: 'Preview for example.com',
-  })
-  await expect(confirmedPreview).toBeVisible()
-  expect(
-    await confirmedPreview.evaluate(
-      (element, before) => element === before,
-      pendingPreview,
-    ),
-  ).toBe(true)
+  await expect(
+    confirmed.getByRole('link', { name: 'https://example.com', exact: true }),
+  ).toBeVisible()
+  await expect(preview).toHaveCount(0)
+
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event('publish-link-preview')),
+  )
+  await expect(preview).toBeInViewport()
+  await page.mouse.move(600, 300)
+  await page.mouse.wheel(0, -1500)
+  await expect(preview).toHaveCount(0)
+  await page.evaluate(() =>
+    window.scrollTo(0, document.documentElement.scrollHeight),
+  )
+  await expect(preview).toBeInViewport()
+
+  await page.reload()
+  await expect(preview).toBeInViewport()
+  await editor.press('ArrowUp')
+  const inlineEditor = confirmed.locator('[data-slot="editor"]')
+  await expect(inlineEditor).toBeVisible()
+  await expect(preview).toHaveCount(0)
+  await inlineEditor.press('Escape')
+  await expect(preview).toBeVisible()
 })
 
 test('shows mixed attachments immediately and keeps them visible through confirmation', async ({

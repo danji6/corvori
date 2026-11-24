@@ -9,7 +9,9 @@ import type { PaginationOptions } from 'convex/server'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { AuthQueryCtx } from '../../functions'
 import schema from '../../schema'
+import type { TranscriptLinkPreview } from '../../validators/linkPreviews'
 import type { MessageWindowArgs } from '../../validators/messages'
+import { transcriptLinkPreviews } from '../linkPreviews/records'
 import {
   getActiveSegmentRow,
   getSegmentRow,
@@ -27,6 +29,7 @@ import { activeStreamView } from '../stream/view'
 export type WindowSegment = {
   segmentIndex: number
   parts: unknown[]
+  linkPreviews?: TranscriptLinkPreview[]
   sizeBytes: number
   /** Placeholder hydrated by the dedicated processing segment query. */
   live?: boolean
@@ -300,11 +303,16 @@ export async function joinSegmentsWithinBudget(
         break
       }
       const parts = stripLinkSnapshotParts(segment.parts)
-      const sizeBytes = serializedSize(parts)
+      const linkPreviews =
+        'linkPreviews' in segment && segment.linkPreviews
+          ? await transcriptLinkPreviews(ctx, segment.linkPreviews)
+          : undefined
+      const sizeBytes = serializedSize(parts) + serializedSize(linkPreviews)
       loaded.push({
         segmentIndex: segment.segmentIndex,
         parts,
         sizeBytes,
+        ...(linkPreviews && { linkPreviews }),
         ...(segment.segmentIndex === activeSegmentIndex && { live: true }),
       })
       total += sizeBytes

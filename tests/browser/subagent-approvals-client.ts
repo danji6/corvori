@@ -37,6 +37,7 @@ const hasLocalApproval = new URLSearchParams(location.search).has('localApproval
 const hasQuestion = new URLSearchParams(location.search).has('question')
 const hasParentRequest = hasLocalApproval || hasQuestion
 const deferSend = new URLSearchParams(location.search).has('deferSend')
+const savedPreview = new URLSearchParams(location.search).has('savedPreview')
 
 const questionPart = {
   type: 'tool-ask',
@@ -85,7 +86,9 @@ type Entry = {
 }
 const cache = new Map<string, Entry>()
 const listeners = new Set<() => void>()
-const sent: WindowMessage[] = []
+const sent: WindowMessage[] = savedPreview
+  ? JSON.parse(sessionStorage.getItem('saved-preview-messages') ?? '[]')
+  : []
 let attachmentCount = 0
 let attachmentUrlsReady = false
 let typingCount = Number(
@@ -97,6 +100,29 @@ const key = (reference: FunctionReference<'query'>, args: unknown) =>
 
 function notify() {
   for (const listener of listeners) listener()
+}
+
+if (savedPreview) {
+  window.addEventListener('publish-link-preview', () => {
+    const message = sent.at(-1)
+    if (!message) throw new Error('Expected a confirmed message')
+    sent[sent.length - 1] = {
+      ...message,
+      segments: message.segments.map((segment) => ({
+        ...segment,
+        linkPreviews: [
+          {
+            kind: 'website',
+            url: 'https://example.com',
+            title: 'Preview for example.com',
+          },
+        ],
+      })),
+    }
+    sessionStorage.setItem('saved-preview-messages', JSON.stringify(sent))
+    cache.clear()
+    notify()
+  })
 }
 
 window.addEventListener('release-attachment-urls', () => {
@@ -367,8 +393,6 @@ async function respond(
 export const approvalFixtureClient = {
   async action(reference: FunctionReference<'action'>) {
     const name = getFunctionName(reference)
-    if (name === 'actions/attachments:previewLink' && deferSend)
-      return { kind: 'website', title: 'Preview for example.com' }
     if (name === 'actions/attachments:confirmImage')
       return {
         id: `attachment-${++attachmentCount}`,

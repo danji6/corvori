@@ -1,13 +1,22 @@
-import { useLinkPreviews } from '@/hooks/chat/link-previews'
+import type { TranscriptLinkPreview } from '@cv/convex/validators/linkPreviews'
+import { linkPreviewUrls } from '@cv/core/utils/markdown-links'
 import { PlayIcon } from 'lucide-react'
 
-export function LinkPreviews({ text }: { text: string }) {
-  const previews = useLinkPreviews(text)
-  if (!previews.length) return null
+type LinkPreviewsProps = {
+  text: string
+  previews: TranscriptLinkPreview[]
+}
+
+export function LinkPreviews({ text, previews }: LinkPreviewsProps) {
+  const byUrl = new Map(previews.map((entry) => [entry.url, entry]))
+  const matches = linkPreviewUrls(text)
+    .map((url) => byUrl.get(url))
+    .filter((entry) => entry !== undefined)
+  if (!matches.length) return null
 
   return (
     <div className="mt-2 grid gap-2">
-      {previews.map(({ url, title, description, image, kind }) => (
+      {matches.map(({ url, title, description, image, kind }) => (
         <a
           key={url}
           href={url}

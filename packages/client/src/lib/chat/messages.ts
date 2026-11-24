@@ -3,6 +3,7 @@ import { generateId } from '@/lib/utils'
 import type { Doc } from '@cv/convex/_generated/dataModel'
 import { minRole } from '@cv/convex/lib/roles'
 import { SHELL_TOOL_PART_TYPE } from '@cv/convex/lib/userShell'
+import type { WindowSegment } from '@cv/convex/model/chat/queries'
 import type { MessageExtra } from '@cv/convex/model/chat/types'
 import { settleUnansweredToolPart } from '@cv/core/utils/tool-parts'
 import type { FileUIPart, TextUIPart, UIMessage } from 'ai'
@@ -20,7 +21,7 @@ import type { MessageRecord, PartMetadata } from './types'
 export type Message = UIMessage & { status: 'processing' | 'done' }
 
 type MessageDoc = Doc<'messages'> & {
-  segments: { segmentIndex: number; parts: unknown[]; sizeBytes: number }[]
+  segments: WindowSegment[]
   sizeBytes: number
   hasOlderSegments: boolean
   hasNewerSegments: boolean
@@ -79,6 +80,7 @@ function convertDoc(doc: MessageDoc): ConvertedEntry {
         index: segment.segmentIndex,
         partCount: segment.parts.length,
         sizeBytes: segment.sizeBytes,
+        linkPreviews: segment.linkPreviews,
       })),
       hasOlderSegments: doc.hasOlderSegments,
       hasNewerSegments: doc.hasNewerSegments,

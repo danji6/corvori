@@ -172,6 +172,7 @@ export async function duplicate(
         role: message.role,
         type: message.type,
         status: 'done',
+        skipLinkPreviews: true,
         hidden: message.hidden,
         extra:
           extra && 'event' in extra && extra.participant

@@ -4,6 +4,7 @@ import { useStreamStore } from '@/hooks/chat/stream'
 import type { PartAddress } from '@/lib/chat/parts'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
+import { linkPreviewUrls } from '@cv/core/utils/markdown-links'
 import { serializedSize } from '@cv/core/utils/size'
 import type { OptimisticLocalStore } from 'convex/browser'
 import { useMutation } from 'convex/react'
@@ -113,12 +114,28 @@ export function useEditMessage() {
         page.map((message) => {
           if (message._id !== messageId) return message
           const parts = [{ type: 'text', text: content }]
+          const saved = message.segments.flatMap(
+            (segment) => segment.linkPreviews ?? [],
+          )
+          const previews = saved.length
+            ? linkPreviewUrls(content)
+                .map((url) => saved.find((entry) => entry.url === url))
+                .filter((entry) => entry !== undefined)
+            : []
+          const sizeBytes =
+            serializedSize(parts) +
+            (previews.length ? serializedSize(previews) : 0)
           return {
             ...message,
             segments: [
-              { segmentIndex: 0, parts, sizeBytes: serializedSize(parts) },
+              {
+                segmentIndex: 0,
+                parts,
+                sizeBytes,
+                ...(previews.length && { linkPreviews: previews }),
+              },
             ],
-            sizeBytes: serializedSize(parts),
+            sizeBytes,
             hasOlderSegments: false,
             hasNewerSegments: false,
           }

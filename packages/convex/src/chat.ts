@@ -6,7 +6,15 @@ import { authMutation, authQuery } from './functions'
 import * as ChangeLocations from './model/changes/locations'
 import * as Changes from './model/changes/sets'
 import * as Chat from './model/chat'
+import {
+  publishLinkPreview,
+  readLinkPreviewWork,
+} from './model/linkPreviews/records'
 import * as ChangesV from './validators/changes'
+import {
+  linkPreviewJobArgs,
+  publishLinkPreviewArgs,
+} from './validators/linkPreviews'
 import * as V from './validators/messages'
 import {
   userShellFinishArgsValidator,
@@ -22,6 +30,16 @@ import {
 export const messagesWindow = authQuery({
   args: V.messagesWindowArgsValidator.fields,
   handler: Chat.messagesWindow,
+})
+
+export const _readLinkPreviewWork = internalQuery({
+  args: linkPreviewJobArgs.fields,
+  handler: readLinkPreviewWork,
+})
+
+export const _publishLinkPreview = internalMutation({
+  args: publishLinkPreviewArgs.fields,
+  handler: publishLinkPreview,
 })
 
 export const processingMessageSegments = authQuery({

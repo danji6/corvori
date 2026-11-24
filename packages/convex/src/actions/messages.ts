@@ -3,6 +3,16 @@
 import { v } from 'convex/values'
 
 import { internalAction } from '../_generated/server'
+import { linkPreviewJobArgs } from '../validators/linkPreviews'
+
+export const _loadLinkPreviews = internalAction({
+  args: linkPreviewJobArgs.fields,
+  handler: async (ctx, args) => {
+    const { loadSavedLinkPreviews } =
+      await import('../model/linkPreviews/worker')
+    await loadSavedLinkPreviews(ctx, args)
+  },
+})
 
 export const _runPromptEvaluation = internalAction({
   args: { id: v.id('promptEvaluations') },

@@ -7,6 +7,11 @@ const parser = unified().use(remarkParse).use(remarkGfm).freeze()
 
 export type MarkdownLink = { url: string; start: number; end: number }
 
+export function linkPreviewUrls(text: string): string[] {
+  const urls = markdownHttpLinks(text).map(({ url }) => url)
+  return [...new Set(urls)].slice(0, 4)
+}
+
 /** Finds explicit links and plain HTTP URLs while skipping Markdown code. */
 export function markdownHttpLinks(markdown: string): MarkdownLink[] {
   const links: MarkdownLink[] = []

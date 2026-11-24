@@ -7,6 +7,7 @@ import type {
   EditMessagePartArgs,
 } from '../../validators/messages'
 import * as Attachments from '../attachments/files'
+import { deleteLinkPreviewImages } from '../linkPreviews/records'
 import {
   allVersionParts,
   deleteVersions,
@@ -139,6 +140,7 @@ export async function deleteMessageParts(
       // Emptied segments are dropped without renumbering the remaining
       // ones (gaps keep later part addresses stable)
       await releaseEvaluation(ctx, row.promptEvaluationId)
+      await deleteLinkPreviewImages(ctx, row)
       await ctx.db.delete(row._id)
       await invalidateCompletedHistory(ctx, message)
     } else {

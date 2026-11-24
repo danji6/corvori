@@ -126,6 +126,7 @@ async function importMessages(
         extra:
           extra && 'event' in extra ? { ...extra, participant: sender } : extra,
         status: 'done',
+        skipLinkPreviews: true,
       },
       parts,
     )

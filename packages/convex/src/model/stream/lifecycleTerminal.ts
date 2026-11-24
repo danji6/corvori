@@ -20,6 +20,7 @@ import {
   finalizeTurn,
   getProcessingSegmentRow,
   listSelectedSegments,
+  reconcileFinishedLinkPreviews,
   sealSegment,
 } from '../messageContents'
 import {
@@ -247,6 +248,9 @@ export async function failStream(
       metadata: { ...doc?.metadata, error: message },
     })
     await demoteFailedSummary(ctx, stream)
+    if (doc && stream.command.kind !== 'compact') {
+      await reconcileFinishedLinkPreviews(ctx, { ...doc, status: 'done' })
+    }
   }
 
   await discardStream(ctx, streamId)
@@ -359,6 +363,8 @@ export async function demoteFailedSummary(
       summaryBoundaryCreationTime: undefined,
     }),
   })
+  const message = await ctx.db.get(stream.state.processingMessageId)
+  if (message) await reconcileFinishedLinkPreviews(ctx, message)
 }
 
 export function preserveStoppedStreamError(

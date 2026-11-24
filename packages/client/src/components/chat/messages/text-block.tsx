@@ -1,3 +1,4 @@
+import type { TranscriptLinkPreview } from '@cv/convex/validators/linkPreviews'
 import type { TextUIPart } from 'ai'
 
 import { EditableText } from './editor/editable-text'
@@ -15,9 +16,15 @@ export type TextBlockProps = {
   part: TextUIPart
   segmentIndex?: number
   index?: number
+  linkPreviews?: TranscriptLinkPreview[]
 }
 
-export function TextBlock({ part, segmentIndex, index }: TextBlockProps) {
+export function TextBlock({
+  part,
+  segmentIndex,
+  index,
+  linkPreviews,
+}: TextBlockProps) {
   const message = useMessage()
   const editCtx = useMessageEdit()
   const isEditing = message != null && editCtx?.editingMessageId === message.id
@@ -36,7 +43,9 @@ export function TextBlock({ part, segmentIndex, index }: TextBlockProps) {
       >
         <SmoothText part={part} />
       </EditableText>
-      {showPreviews && <LinkPreviews text={part.text} />}
+      {showPreviews && linkPreviews && (
+        <LinkPreviews text={part.text} previews={linkPreviews} />
+      )}
     </>
   )
 }

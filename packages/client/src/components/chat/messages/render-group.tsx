@@ -12,6 +12,7 @@ import {
   isShellReportPart,
   isSubagentReportPart,
 } from '@/lib/chat/parts'
+import type { TranscriptLinkPreview } from '@cv/convex/validators/linkPreviews'
 import {
   type UIMessage,
   isReasoningUIPart,
@@ -46,6 +47,7 @@ export type RenderGroupProps = {
   version?: number
   attachmentIds?: Record<string, string>
   partMeta?: PartMetadata
+  linkPreviews?: TranscriptLinkPreview[]
 }
 
 export const RenderGroup = memo(function RenderGroup(props: RenderGroupProps) {
@@ -157,6 +159,7 @@ export const RenderGroup = memo(function RenderGroup(props: RenderGroupProps) {
             part={part}
             segmentIndex={props.segmentIndex ?? 0}
             index={group.index}
+            linkPreviews={props.linkPreviews}
           />
         )
     }

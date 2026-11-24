@@ -2,14 +2,10 @@
 
 import type { IncomingMessage } from 'node:http'
 
+import type { LinkPreviewMetadata } from '../../validators/linkPreviews'
 import { openPublicHttp, publicHttpUrl, readLimited } from './publicHttp'
 
-export type LinkPreview = {
-  kind: 'website' | 'image' | 'video' | 'audio'
-  title: string
-  description?: string
-  image?: string
-}
+type FetchedLinkPreview = LinkPreviewMetadata & { image?: Blob }
 
 const IMAGE_LIMIT = 384 * 1024
 const HTML_LIMIT = 512 * 1024
@@ -17,7 +13,7 @@ const IMAGE_TYPE = /^image\/(?:apng|avif|gif|jpeg|png|webp)$/
 
 export async function loadLinkPreview(
   value: string,
-): Promise<LinkPreview | null> {
+): Promise<FetchedLinkPreview | null> {
   if (value.length > 2_048) return null
   const signal = AbortSignal.timeout(5_000)
   try {
@@ -40,16 +36,16 @@ async function responsePreview(
   url: URL,
   response: IncomingMessage,
   signal: AbortSignal,
-): Promise<LinkPreview | null> {
+): Promise<FetchedLinkPreview | null> {
   const mediaType = contentType(response)
-  const name = url.pathname.split('/').pop() || url.hostname
+  const title = (url.pathname.split('/').pop() || url.hostname).slice(0, 200)
 
   if (IMAGE_TYPE.test(mediaType)) {
     const image = await readImage(response)
-    return { kind: 'image', title: name, image }
+    return { kind: 'image', title, image }
   }
-  if (mediaType.startsWith('video/')) return { kind: 'video', title: name }
-  if (mediaType.startsWith('audio/')) return { kind: 'audio', title: name }
+  if (mediaType.startsWith('video/')) return { kind: 'video', title }
+  if (mediaType.startsWith('audio/')) return { kind: 'audio', title }
   if (mediaType !== 'text/html') return null
 
   return openGraphPreview(
@@ -73,7 +69,10 @@ async function openGraphPreview(url: URL, html: Buffer, signal: AbortSignal) {
   const title = fields.get('og:title')
   if (!title) return null
 
-  const preview: LinkPreview = { kind: 'website', title: title.slice(0, 200) }
+  const preview: FetchedLinkPreview = {
+    kind: 'website',
+    title: title.slice(0, 200),
+  }
   const description = fields.get('og:description')
   if (description) preview.description = description.slice(0, 400)
   const image = fields.get('og:image:secure_url') ?? fields.get('og:image')
@@ -104,7 +103,7 @@ async function loadImage(
 
 async function readImage(response: IncomingMessage) {
   const image = await readLimited(response, IMAGE_LIMIT)
-  return `data:${contentType(response)};base64,${image.toString('base64')}`
+  return new Blob([new Uint8Array(image)], { type: contentType(response) })
 }
 
 function contentType(response: IncomingMessage) {
@@ -132,7 +131,7 @@ function youtubeVideoId(url: URL) {
 async function youtubePreview(
   id: string,
   signal: AbortSignal,
-): Promise<LinkPreview> {
+): Promise<FetchedLinkPreview> {
   const image = await loadImage(
     `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
     undefined,

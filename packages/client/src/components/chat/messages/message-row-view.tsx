@@ -326,6 +326,9 @@ function GroupRow({ row, message, messageMeta, partMeta }: GroupRowProps) {
     (candidate) => candidate.segmentIndex === row.segmentIndex,
   )
   const group = slice?.groups[row.groupIndex]
+  const segment = messageMeta?.segments.find(
+    ({ index }) => index === row.segmentIndex,
+  )
   const highlightRef = useMessageHighlightRef(
     highlightTargetForRow(message.id, row),
   )
@@ -361,6 +364,7 @@ function GroupRow({ row, message, messageMeta, partMeta }: GroupRowProps) {
               : group
           }
           segmentIndex={row.segmentIndex}
+          linkPreviews={segment?.linkPreviews}
           groupIndex={row.groupIndex}
           inWorkGroup={inWorkGroup}
           version={messageMeta?.selectedVersion ?? 1}

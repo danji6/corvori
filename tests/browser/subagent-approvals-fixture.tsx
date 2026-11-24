@@ -1,4 +1,5 @@
 import { ChatSessionView } from '@/components/chat/chat-session-view'
+import { MessageEditProvider } from '@/components/chat/messages/editor'
 import { ChatSearchProvider } from '@/components/chat/search/chat-search-context'
 import { Toaster } from '@/components/ui/sonner'
 import '@/globals.css'
@@ -87,7 +88,9 @@ function Session() {
       <ChatMessagesProvider key={sessionId}>
         <StreamStoreProvider>
           <ChatSearchProvider>
-            <View />
+            <MessageEditProvider onEdit={() => {}}>
+              <View />
+            </MessageEditProvider>
           </ChatSearchProvider>
         </StreamStoreProvider>
       </ChatMessagesProvider>

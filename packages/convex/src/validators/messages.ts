@@ -2,6 +2,7 @@ import { type Infer, v } from 'convex/values'
 
 import { rememberScopeValidator } from './approvals'
 import { commandExtraValidator } from './commands'
+import { linkPreviewRecord } from './linkPreviews'
 import { tokenUsageValidator } from './providers'
 import { sessionModeValidator } from './sessionModes'
 
@@ -322,6 +323,8 @@ export const messageContentSchema = v.object({
   /** This segment's index, starting from 0. Gaps allowed after part deletion. */
   segmentIndex: v.number(),
   parts: v.array(v.any()),
+  linkPreviews: v.optional(v.array(linkPreviewRecord)),
+  linkPreviewGeneration: v.optional(v.number()),
   /** This segment's slice of the turn metadata. */
   metadata: v.optional(messageMetaValidator),
   searchText: v.optional(v.string()),

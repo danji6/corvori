@@ -10,6 +10,11 @@ import type { MutationCtx, QueryCtx } from '../_generated/server'
 import { error } from '../errors'
 import type { TokenUsage } from '../validators/providers'
 import { assertPartsCap, assertSegmentFits } from './caps'
+import {
+  canGenerateLinkPreviews,
+  deleteLinkPreviewImages,
+  reconcileLinkPreviews,
+} from './linkPreviews/records'
 import { removeForMessage as removeMcpOperations } from './mcp/operations/records'
 import {
   isContextEligible,
@@ -39,6 +44,8 @@ type InsertMessageFields = {
   extra?: Doc<'messages'>['extra']
   replyTo?: Doc<'messages'>['replyTo']
   summaryBoundaryCreationTime?: number
+  /** Bulk copies keep saved text without looking up its links. */
+  skipLinkPreviews?: boolean
 }
 
 /** Invalidates history if this document could be present in a completed snapshot. */
@@ -194,7 +201,7 @@ export async function allVersionParts(
  */
 export async function insertMessage(
   ctx: MutationCtx,
-  fields: InsertMessageFields,
+  { skipLinkPreviews, ...fields }: InsertMessageFields,
   parts: unknown[],
   placement?: MessagePlacement,
 ) {
@@ -216,11 +223,21 @@ export async function insertMessage(
   })
   const message = await ctx.db.get(messageId)
   if (!message) error('Message missing after insertion', 500)
+
   await ctx.db.patch(messageId, {
     position: messagePosition(message, placement),
   })
 
-  let contentId = await insertSegment(ctx, messageId, fields, segments[0], 0)
+  const generatePreviews = !skipLinkPreviews && canGenerateLinkPreviews(fields)
+
+  let contentId = await insertSegment(
+    ctx,
+    messageId,
+    fields,
+    segments[0],
+    0,
+    generatePreviews,
+  )
   for (const [index, segmentParts] of segments.slice(1).entries()) {
     contentId = await insertSegment(
       ctx,
@@ -228,6 +245,7 @@ export async function insertMessage(
       fields,
       segmentParts,
       index + 1,
+      generatePreviews,
     )
   }
 
@@ -246,14 +264,15 @@ async function readMessageSenderName(
   return (await resolveAuthor(ctx, sessionId, sender))?.name ?? null
 }
 
-function insertSegment(
+async function insertSegment(
   ctx: MutationCtx,
   messageId: Id<'messages'>,
   fields: InsertMessageFields,
   parts: unknown[],
   segmentIndex: number,
+  generatePreviews: boolean,
 ) {
-  return ctx.db.insert('messageContents', {
+  const contentId = await ctx.db.insert('messageContents', {
     messageId,
     sessionId: fields.sessionId,
     version: 1,
@@ -263,6 +282,9 @@ function insertSegment(
     // Hidden messages must not surface in message search
     searchText: fields.hidden ? undefined : searchTextFromParts(parts),
   })
+  if (generatePreviews)
+    await reconcileLinkPreviews(ctx, { _id: contentId }, parts)
+  return contentId
 }
 
 type AddVersionArgs = {
@@ -332,6 +354,8 @@ export async function patchSegmentParts(
     await ctx.db.patch(messageId, { contextEligible })
   }
   if (message.status !== 'done') return
+  if (canGenerateLinkPreviews(message))
+    await reconcileLinkPreviews(ctx, row, parts)
   if (
     row.version === message.selectedVersion ||
     message.contextEligible !== contextEligible
@@ -386,11 +410,28 @@ export async function finalizeTurn(
     contextEligible,
     metadata: mergeSegmentMetadata(segments),
   })
+  await reconcileFinishedLinkPreviews(
+    ctx,
+    { ...message, status: 'done' },
+    segments,
+  )
   await invalidateCompletedHistory(ctx, {
     ...message,
     status: 'done',
     contextEligible,
   })
+}
+
+export async function reconcileFinishedLinkPreviews(
+  ctx: MutationCtx,
+  message: Doc<'messages'>,
+  segments?: Doc<'messageContents'>[],
+) {
+  if (!canGenerateLinkPreviews(message)) return
+  for (const segment of segments ??
+    (await listSelectedSegments(ctx, message))) {
+    await reconcileLinkPreviews(ctx, segment, segment.parts)
+  }
 }
 
 /** Writes provider metadata to a segment row and the doc's turn accumulation. */
@@ -434,8 +475,15 @@ export async function replaceSelectedContent(
     parts,
     searchText: searchTextFromParts(parts),
   })
-  for (const row of segments.slice(1)) {
+  const collapsed = segments.slice(1)
+  const generatePreviews = canGenerateLinkPreviews(message)
+
+  if (generatePreviews) {
+    await reconcileLinkPreviews(ctx, head, parts, collapsed)
+  }
+  for (const row of collapsed) {
     await releaseEvaluation(ctx, row.promptEvaluationId)
+    if (!generatePreviews) await deleteLinkPreviewImages(ctx, row)
     await ctx.db.delete(row._id)
   }
 
@@ -464,6 +512,12 @@ export async function setSegmentParts(
     searchText: message.hidden ? undefined : searchTextFromParts(parts),
     promptEvaluationId: evaluationId,
   })
+
+  const status =
+    row.version === message.selectedVersion ? message.status : 'done'
+
+  if (canGenerateLinkPreviews({ ...message, status }))
+    await reconcileLinkPreviews(ctx, row, parts)
 
   if (row.version !== message.selectedVersion) return
 
@@ -503,6 +557,7 @@ export async function deleteVersions(
   const rows = await listAllRows(ctx, messageId)
   for (const row of rows) {
     await releaseEvaluation(ctx, row.promptEvaluationId)
+    await deleteLinkPreviewImages(ctx, row)
     for (const storageId of collectToolOutputStorageIds(row.parts)) {
       await ctx.storage.delete(storageId).catch(() => {})
     }

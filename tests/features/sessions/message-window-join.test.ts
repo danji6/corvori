@@ -12,8 +12,9 @@ type Row = Record<string, unknown> & {
 }
 
 /** Fakes just enough of the db for `listSelectedSegments`. */
-function fakeCtx(segmentRows: Row[]) {
+function fakeCtx(segmentRows: Row[], getUrl?: (id: string) => Promise<string>) {
   return {
+    storage: { getUrl },
     db: {
       query: () => {
         const captured: Record<string, unknown> = {}
@@ -72,6 +73,47 @@ function segment(messageId: string, segmentIndex: number): Row {
 }
 
 describe('joinSegmentsWithinBudget', () => {
+  test('projects only ready previews and includes them in the window budget', async () => {
+    const url = 'https://example.com'
+    const image = 'https://storage.example/image'
+    const ready = { url, kind: 'website' as const, title: 'Example' }
+    const ctx = fakeCtx(
+      [
+        {
+          ...segment('m_1', 0),
+          parts: [text(url)],
+          linkPreviews: [
+            { ...ready, state: 'ready', imageStorageId: 'image' },
+            {
+              url: 'https://example.com/another',
+              state: 'pending',
+              generation: 1,
+            },
+          ],
+        },
+        segment('m_1', 1),
+      ],
+      async () => image,
+    )
+
+    const { messages } = await joinSegmentsWithinBudget(
+      ctx,
+      [doc('m_1')],
+      docSize + serializedSize([text(url)]) + 1,
+      { direction: 'newer' },
+    )
+    const previews = [{ ...ready, image }]
+    expect(messages[0].segments).toEqual([
+      {
+        segmentIndex: 0,
+        parts: [text(url)],
+        linkPreviews: previews,
+        sizeBytes: serializedSize([text(url)]) + serializedSize(previews),
+      },
+    ])
+    expect(messages[0].hasNewerSegments).toBe(true)
+  })
+
   test('loads every segment when the budget allows', async () => {
     const ctx = fakeCtx([segment('m_1', 0), segment('m_1', 1)])
 
