@@ -1,7 +1,4 @@
-import {
-  guidanceSnapshot,
-  mcpContextInstructions,
-} from '@cv/convex/model/mcp/catalogs/context'
+import { guidanceSnapshot } from '@cv/convex/model/mcp/catalogs/context'
 import { catalogNote } from '@cv/convex/model/skills/runtime'
 import { mcpToModelOutput } from '@cv/convex/model/tool/mcpOutput'
 import { publish } from '@cv/convex/model/toolkits/publication'
@@ -156,9 +153,6 @@ test('an empty skill directory exposes no skill tools or automatic catalog', asy
 })
 
 test('generated guidance and incomplete previews reference only available helpers', () => {
-  const direct = mcpContextInstructions('{}', ['docs_work'])
-  for (const tool of ['mcp_protocol', 'search_mcp_tools', 'call_mcp_tool'])
-    expect(direct).not.toContain(tool)
   expect(
     guidanceSnapshot([{ server: 'Docs', initialization: 'data' }], false)[0],
   ).not.toHaveProperty('fullGuidance')

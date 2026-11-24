@@ -2,6 +2,8 @@ import type { Id } from '@cv/convex/_generated/dataModel'
 import type { ActionCtx } from '@cv/convex/_generated/server'
 import { prepareChanges } from '@cv/convex/model/changes/sets'
 import { reserveStream } from '@cv/convex/model/chat/reserve'
+import { servers as namedMcpServers } from '@cv/convex/model/mcp/brokerAccess'
+import { activeRuntimes } from '@cv/convex/model/mcp/catalogs/records'
 import { reserveStreamEvaluation } from '@cv/convex/model/promptEvaluation/reserve'
 import * as PromptEval from '@cv/convex/model/promptEvaluation/state'
 import { _save, removeForSession } from '@cv/convex/model/session/cache'
@@ -12,7 +14,10 @@ import {
 } from '@cv/convex/model/skills/context'
 import { assignments } from '@cv/convex/model/skills/endpoints'
 import { prepareCapabilities } from '@cv/convex/model/stream/capabilities'
-import { prepareWorkspaceContext } from '@cv/convex/model/stream/contextNotes'
+import {
+  prepareMcpContext,
+  prepareWorkspaceContext,
+} from '@cv/convex/model/stream/contextNotes'
 import { prepare } from '@cv/convex/model/stream/engineSetup'
 import { _getProviderHistorySnapshot } from '@cv/convex/model/stream/providerHistory'
 import { _getContext, _getProviderHistory } from '@cv/convex/model/stream/reads'
@@ -169,6 +174,8 @@ export function skillRequests(root: string) {
           return _getProviderHistory(fixture.ctx, args as StreamExecutionArgs)
         case 'streams:_getFilesystemContext':
           return filesystemToolContext(fixture.ctx, args as StreamExecutionArgs)
+        case 'mcpCatalogs:_activeRuntimes':
+          return activeRuntimes(fixture.ctx, args as StreamExecutionArgs)
         case 'toolkits:_execution':
           return executionToolkits(fixture.ctx, args as StreamExecutionArgs)
         case 'toolkits:_available':
@@ -214,6 +221,10 @@ export function skillRequests(root: string) {
         return prepareChanges(fixture.ctx, args as never)
       if (getFunctionName(reference) === 'streams:_prepareSkillContext')
         return prepareSkillContext(fixture.ctx, args as PrepareContextNoteArgs)
+      if (getFunctionName(reference) === 'mcpBroker:_servers')
+        return namedMcpServers(fixture.ctx, args as StreamExecutionArgs)
+      if (getFunctionName(reference) === 'streams:_prepareMcpContext')
+        return prepareMcpContext(fixture.ctx, args as PrepareContextNoteArgs)
       if (getFunctionName(reference) === 'streams:_prepareWorkspaceContext')
         return prepareWorkspaceContext(
           fixture.ctx,

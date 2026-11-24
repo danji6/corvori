@@ -28,17 +28,7 @@ export async function servers(ctx: MutationCtx, args: StreamExecutionArgs) {
       server.recordId!,
       server.label || 'MCP server',
     )
-    const catalog = server.catalogId
-      ? await ctx.db.get(server.catalogId as Id<'mcpCatalogs'>)
-      : null
-    named.push({
-      ...server,
-      name,
-      catalogRevision: catalog?.fingerprint,
-      catalogUpdatedAt: catalog
-        ? new Date(catalog.createdAt).toISOString()
-        : undefined,
-    })
+    named.push({ ...server, name })
   }
   return named
 }

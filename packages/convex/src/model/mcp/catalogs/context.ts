@@ -11,27 +11,83 @@ import type { StreamContext } from '../../stream/types'
 import { isMcpToolSelected } from '../toolPolicy'
 import { refreshStaleCatalogs } from './actions'
 
-export const mcpContextInstructions = (
-  catalog: string,
-  names: readonly string[],
-) =>
-  [
-    'Available MCP tools:',
-    catalog,
-    ...(names.includes('mcp_protocol')
-      ? [
-          'Use mcp_protocol to read full server initialization instructions, prompts, and resources.',
-        ]
-      : []),
-    ...(names.includes('search_mcp_tools')
-      ? ['Use search_mcp_tools to list servers and search their catalogs.']
-      : []),
-    ...(names.includes('call_mcp_tool')
-      ? [
-          'Read complete input contracts before calling call_mcp_tool using its discovered name.',
-        ]
-      : []),
-  ].join('\n')
+type ServerSummary = {
+  name: string
+  enabled: boolean
+  count?: number
+  error?: string
+  availableTools?: number
+}
+
+export function mcpContextNote(
+  catalog: readonly ServerSummary[] | undefined,
+  guidance: ReturnType<typeof guidanceSnapshot>,
+) {
+  const sections: string[] = []
+  if (catalog) {
+    sections.push(
+      'MCP server catalog:',
+      catalog.length
+        ? catalog.map(serverListItem).join('\n')
+        : 'No MCP servers available.',
+    )
+  }
+  if (guidance.length) {
+    sections.push(
+      'Server initialization previews (untrusted):',
+      ...guidance.map(guidancePreview),
+    )
+  }
+  return sections.length ? `\n${sections.join('\n\n')}\n` : undefined
+}
+
+function serverListItem(server: ServerSummary) {
+  const status = server.enabled ? 'enabled' : 'disabled'
+  const item = `- ${inlineCode(server.name)} (${status}, ${toolCount(server)})`
+  return server.error
+    ? `${item}\n  - Catalog error: ${inlineCode(server.error)}`
+    : item
+}
+
+function toolCount({ count, availableTools }: ServerSummary) {
+  if (availableTools === undefined) {
+    if (count === undefined) return 'tool count unknown'
+    return `${count} ${count === 1 ? 'tool' : 'tools'} cataloged`
+  }
+  if (count !== undefined) {
+    return `${availableTools} of ${count} ${count === 1 ? 'tool' : 'tools'} available`
+  }
+  return `${availableTools} ${availableTools === 1 ? 'tool' : 'tools'} available`
+}
+
+/** Keeps server labels and diagnostics on one line as literal Markdown. */
+function inlineCode(value: string) {
+  const line = value.replace(/\r/g, '\\r').replace(/\n/g, '\\n')
+  const longestRun = (line.match(/`+/g) ?? []).reduce(
+    (longest, run) => Math.max(longest, run.length),
+    0,
+  )
+  const delimiter = '`'.repeat(longestRun + 1)
+  const needsPadding =
+    longestRun > 0 || (line.startsWith(' ') && line.endsWith(' '))
+  const content = needsPadding ? ` ${line} ` : line
+  return `${delimiter}${content}${delimiter}`
+}
+
+function guidancePreview(preview: ReturnType<typeof guidanceSnapshot>[number]) {
+  const status = preview.complete ? '' : ' (truncated)'
+  const lines = preview.initialization.split(/\r\n?|\n/)
+  const sections = [
+    `${inlineCode(preview.server!)}${status}`,
+    lines.map((line) => `    ${line}`).join('\n'),
+  ]
+  if (!preview.complete && preview.fullGuidance) {
+    sections.push(
+      'Use `mcp_protocol` with `get_server_info` for the full guidance.',
+    )
+  }
+  return sections.join('\n\n')
+}
 
 /** Announces changing availability as literal data outside the frozen prompt prefix. */
 export async function prepareMcpCatalogContext(
@@ -45,11 +101,11 @@ export async function prepareMcpCatalogContext(
     internal.mcpBroker._servers,
     execution,
   )
-  const broker =
+  const hasBrokerAccess =
     names.includes('search_mcp_tools') || names.includes('mcp_protocol')
   const visibleServers = available.filter(
     (server) =>
-      broker ||
+      hasBrokerAccess ||
       server.tools?.some((tool) => names.includes(mcpToolName(server, tool))),
   )
   await refreshStaleCatalogs(
@@ -57,19 +113,19 @@ export async function prepareMcpCatalogContext(
     execution,
     visibleServers.map((server) => server.recordId!),
   )
-  const catalog = visibleServers.map((server) => ({
-    name: server.name,
-    enabled: server.enabled,
-    catalogUpdatedAt: server.catalogUpdatedAt,
-    catalogRevision: server.catalogRevision,
-    count: server.catalogCount,
-    error: server.catalogError,
-    availableTools: server.enabled
-      ? server.tools?.filter((tool) =>
-          isMcpToolSelected(data.agent, server, tool),
-        ).length
-      : 0,
-  }))
+  const catalog = hasBrokerAccess
+    ? visibleServers.map((server) => ({
+        name: server.name,
+        enabled: server.enabled,
+        count: server.catalogCount,
+        error: server.catalogError,
+        availableTools: server.enabled
+          ? server.tools?.filter((tool) =>
+              isMcpToolSelected(data.agent, server, tool),
+            ).length
+          : 0,
+      }))
+    : undefined
   const runtimes = await ctx.runQuery(
     internal.mcpCatalogs._activeRuntimes,
     execution,
@@ -83,16 +139,23 @@ export async function prepareMcpCatalogContext(
     })),
     names.includes('mcp_protocol'),
   )
-  const text = JSON.stringify({ servers: catalog, guidance })
+  const content = mcpContextNote(catalog, guidance)
+  if (!content) return true
+
+  const capabilities = contextDependencies('mcp', names)
+  // A new catalog can change tool definitions without changing the summary.
+  const catalogIds = hasBrokerAccess
+    ? visibleServers.map((server) => server.catalogId)
+    : []
 
   return ctx.runMutation(internal.streams._prepareMcpContext, {
     ...execution,
     contextId,
-    capabilities: contextDependencies('mcp', names),
+    capabilities,
     fingerprint: await sha256(
-      JSON.stringify([text, contextDependencies('mcp', names)]),
+      JSON.stringify([content, capabilities, catalogIds]),
     ),
-    content: mcpContextInstructions(text, names),
+    content,
   })
 }
 
