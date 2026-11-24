@@ -74,17 +74,14 @@
       var(--default-transition-timing-function)
     );
 
-    /* Only the incoming hover state animates its colors. */
     @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-      &:hover {
-        --button-hover-duration: 150ms;
-        transition-property:
-          border-color, box-shadow, opacity, background-color, color;
-        transition-duration:
-          var(--button-transition-duration), var(--button-transition-duration),
-          var(--button-transition-duration), var(--button-hover-duration),
-          var(--button-hover-duration);
-      }
+      --button-hover-duration: 150ms;
+      transition-property:
+        border-color, box-shadow, opacity, background-color, color;
+      transition-duration:
+        var(--button-transition-duration), var(--button-transition-duration),
+        var(--button-transition-duration), var(--button-hover-duration),
+        var(--button-hover-duration);
     }
   }
 }
