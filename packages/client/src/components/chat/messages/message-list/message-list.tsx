@@ -47,10 +47,7 @@ import { useMessageEdit } from '../editor/message-edit-context'
 import { MessageRowView } from '../message-row-view'
 import type { ScrollDeps, WindowMeta } from './deps'
 import { MessageListContent } from './message-list-content'
-import {
-  type FinishComposerReveal,
-  MessageListContext,
-} from './message-list-context'
+import { MessageListContext } from './message-list-context'
 import {
   type MessageListHandle,
   useMessageListHandle,
@@ -78,10 +75,9 @@ export type MessageListProps = Omit<React.ComponentProps<'div'>, 'ref'> & {
     autoScrolling?: boolean,
     extraBottomInset?: number,
   ) => void
-  onIntoViewSettle?: () => void
+  onScrollSettle?: () => void
   onInitialPositionSettled?: () => void
   onTranscriptNavigate?: () => void
-  holdComposerForReveal?: () => FinishComposerReveal | undefined
   shellFocusBlocked?: boolean
   restoreComposerFocus?: (input: HTMLElement) => void
 }
@@ -97,10 +93,9 @@ export function MessageList({
   header,
   isAtBottom,
   onScrollChange,
-  onIntoViewSettle,
+  onScrollSettle,
   onInitialPositionSettled,
   onTranscriptNavigate,
-  holdComposerForReveal,
   shellFocusBlocked,
   restoreComposerFocus,
   ...rest
@@ -191,16 +186,11 @@ export function MessageList({
     setSubagentFollowReleased(true)
   }, [])
 
-  const releaseAfterLayout = useRef(false)
   const reportScroll = useCallback(
     (event?: Event, autoScrolling = false) => {
-      if (releaseAfterLayout.current) {
-        releaseAfterLayout.current = false
-        onIntoViewSettle?.()
-      }
       onScrollChange?.(event, autoScrolling, extraBottomInset)
     },
-    [extraBottomInset, onIntoViewSettle, onScrollChange],
+    [extraBottomInset, onScrollChange],
   )
   const handlePositionChange = useCallback(
     (autoScrolling: boolean) => reportScroll(undefined, autoScrolling),
@@ -210,7 +200,7 @@ export function MessageList({
   const scroller = useScroller({
     enabled: autoScroll && !isEditing,
     editing: isEditing,
-    onSettle: onIntoViewSettle,
+    onSettle: onScrollSettle,
     onFollowRelease: releaseFollowOverride,
     onPositionChange: handlePositionChange,
     bottomInset: bottomPadding ?? 0,
@@ -225,15 +215,10 @@ export function MessageList({
     setShiftInProgress,
     holdPosition,
     holdLayoutPosition,
+    syncLayoutPosition,
     scrollUntilCondition,
     isAutoScrolling,
   } = scroller
-
-  const handleIntoViewSettle = useCallback(() => {
-    // Keep explicit releases from hiding the dock in the middle of a hold.
-    if (coordinator.kind === 'layout') releaseAfterLayout.current = true
-    else onIntoViewSettle?.()
-  }, [coordinator, onIntoViewSettle])
 
   useLayoutEffect(() => {
     coordinator.resumeFollow()
@@ -448,26 +433,15 @@ export function MessageList({
   // Fade the swapped content for a smoother transition
   useVersionCrossfade(messageIds, messageStore)
 
-  const holdLocalComposer = useCallback(
-    (messageId: string) => {
-      const sender = messageStore.getMessageMetadata(messageId)?.sender
-      if (sender?.type === 'user' && sender.id === profile?._id) {
-        return holdComposerForReveal?.()
-      }
-    },
-    [holdComposerForReveal, messageStore, profile?._id],
-  )
-
   const messageListCtxValue = useMemo(
     () => ({
       scrollRef: docScrollRef as React.RefObject<HTMLElement | null>,
       scrollCoordinator: coordinator,
       onLayoutChange: holdLayoutPosition,
-      onIntoViewSettle: handleIntoViewSettle,
+      onRowsMeasured: syncLayoutPosition,
       releaseFollow: holdPosition,
       resumeFollow: () => unlockScroll(true),
       trackPendingLayout: coordinator.trackPendingLayout,
-      holdComposerForReveal: holdLocalComposer,
       shellFocusBlocked,
       restoreComposerFocus,
       bottomPadding: bottomPadding ?? 0,
@@ -475,11 +449,10 @@ export function MessageList({
     }),
     [
       holdLayoutPosition,
-      handleIntoViewSettle,
+      syncLayoutPosition,
       holdPosition,
       unlockScroll,
       coordinator,
-      holdLocalComposer,
       shellFocusBlocked,
       restoreComposerFocus,
       bottomPadding,

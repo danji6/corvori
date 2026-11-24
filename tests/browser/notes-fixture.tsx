@@ -137,6 +137,7 @@ function Transcript() {
         scrollRef: docScrollRef,
         scrollCoordinator: scroller.coordinator,
         onLayoutChange: scroller.holdLayoutPosition,
+        onRowsMeasured: scroller.syncLayoutPosition,
         trackPendingLayout: scroller.coordinator.trackPendingLayout,
         releaseFollow: holdPosition,
         resumeFollow: noop,

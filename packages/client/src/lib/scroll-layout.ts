@@ -1,25 +1,25 @@
 import { trackUntilSettled } from './scroll-settle'
 import type { ScrollTarget } from './scroll-target'
 
+export type ScrollLayoutAnchor = 'top' | 'bottom'
+
 type LayoutPositionOptions = {
+  anchor: ScrollLayoutAnchor
   pending: () => boolean
   done: () => void
 }
 
-/** Retains the document offset while animated rows and virtual measurements settle. */
+/** Retains the chosen viewport edge while animated rows and measurements settle. */
 export function preserveLayoutPosition(
   target: ScrollTarget,
-  { pending, done }: LayoutPositionOptions,
+  { anchor, pending, done }: LayoutPositionOptions,
 ) {
   const top = target.getScrollTop()
   let height = target.getScrollHeight()
 
-  const restore = () => {
-    const bottom = Math.max(
-      0,
-      target.getScrollHeight() - target.getClientHeight(),
-    )
-    const position = Math.min(top, bottom)
+  const restore = (scrollHeight = target.getScrollHeight()) => {
+    const bottom = Math.max(0, scrollHeight - target.getClientHeight())
+    const position = anchor === 'bottom' ? bottom : Math.min(top, bottom)
     if (Math.abs(target.getScrollTop() - position) > 0.5) {
       target.setScrollTop(position)
     }
@@ -27,14 +27,14 @@ export function preserveLayoutPosition(
 
   const cancel = trackUntilSettled(
     () => {
-      restore()
       const next = target.getScrollHeight()
+      restore(next)
       const delta = next - height
       height = next
       return delta
     },
-    { pending, onDone: done },
+    { pending, onDone: done, tolerance: anchor === 'bottom' ? 0 : undefined },
   )
 
-  return { restore, cancel }
+  return { anchor, restore, cancel }
 }

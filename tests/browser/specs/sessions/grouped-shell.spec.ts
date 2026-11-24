@@ -1,4 +1,6 @@
-import { type Page, expect, test } from '@playwright/test'
+import { type Locator, type Page, expect, test } from '@playwright/test'
+
+import { expectAnchoredExpansion } from '../../transcript-expansion'
 
 test('forwards input for a user shell without a wait signal', async ({
   page,
@@ -38,44 +40,29 @@ async function showShellAtBottom(page: Page, height: number) {
   return { shell, trigger }
 }
 
-test('opening a shell command scrolls only enough to reveal its output', async ({
-  page,
-}) => {
-  const height = 760
-  const { shell, trigger } = await showShellAtBottom(page, height)
-  await trigger.evaluate((button) => {
-    const triggerButton = button as HTMLButtonElement
-    // Leave room to scroll past the output and preserve the starting viewport.
-    const scrollTop = window.scrollY
-    button.closest('main')!.style.paddingBottom = '100vh'
-    document.scrollingElement!.scrollTop = scrollTop
-    // Apply the requested distance immediately so the test measures its destination.
-    const scrollBy = window.scrollBy.bind(window)
-    window.scrollBy = (options?: ScrollToOptions | number, y?: number) => {
-      if (typeof options === 'object') {
-        scrollBy({ ...options, behavior: 'instant' })
-        if (options.behavior === 'smooth') {
-          document.documentElement.dataset.shellReveal = 'done'
-        }
-      } else {
-        scrollBy(options ?? 0, y ?? 0)
-      }
+for (const anchor of ['top', 'bottom'] as const) {
+  test(`opening a shell command preserves the viewport ${anchor}`, async ({
+    page,
+  }) => {
+    const { shell, trigger } = await showShellAtBottom(page, 760)
+    if (anchor === 'top') {
+      await page.mouse.wheel(0, -60)
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => document.documentElement.scrollHeight - innerHeight - scrollY,
+          ),
+        )
+        .toBeGreaterThanOrEqual(50)
     }
-    triggerButton.click()
+    await expect(trigger).toBeInViewport({ ratio: 1 })
+    await expectAnchoredExpansion(trigger, anchor)
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    await expect(shell.locator('[data-slot="terminal-wrapper"]')).toBeVisible()
   })
+}
 
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true')
-  await expect(page.locator('html')).toHaveAttribute(
-    'data-shell-reveal',
-    'done',
-  )
-  const terminal = shell.locator('[data-slot="terminal-wrapper"]')
-  const output = (await terminal.boundingBox())!
-  expect(output.y + output.height).toBeLessThanOrEqual(height - 80)
-  expect((await trigger.boundingBox())!.y).toBeGreaterThan(140)
-})
-
-test('a live shell waiting for input still reveals the terminal automatically', async ({
+test('a live shell waiting for input opens and can receive focus when in view', async ({
   page,
 }) => {
   let allowTerminal!: () => void
@@ -104,6 +91,7 @@ test('a live shell waiting for input still reveals the terminal automatically', 
     allowTerminal()
   }
   const terminal = shell.locator('[data-slot="terminal-wrapper"]')
+  await scrollToTerminal(terminal)
   await expect(terminal.locator('.xterm-helper-textarea')).toBeFocused()
   await page.keyboard.insertText('dummy')
   await page.keyboard.press('Enter')
@@ -111,14 +99,6 @@ test('a live shell waiting for input still reveals the terminal automatically', 
     'data-terminal-input',
     'dummy\r',
   )
-  await expect
-    .poll(async () => {
-      const box = await terminal.boundingBox()
-      return box ? box.y + box.height : Infinity
-    })
-    .toBeLessThanOrEqual(680)
-  expect((await trigger.boundingBox())!.y).toBeGreaterThan(120)
-
   const otherControl = page.getByRole('button', {
     name: 'Append terminal output',
   })
@@ -181,83 +161,28 @@ test('pastes a URL into a shell command without adding a Markdown link', async (
   await expect(shell.locator('[data-block-trigger] .shiki')).toHaveText(command)
 })
 
-async function publishShellOutput(
-  page: Page,
-  { cancel = false, waiting = false } = {},
-) {
-  await page.evaluate(
-    ({ cancel, waiting }) => {
-      const list = document.querySelector<HTMLElement>(
-        '[data-slot="message-list"]',
-      )!
-      list.style.paddingBottom = '100vh'
-      const scrollBy = window.scrollBy.bind(window)
-      window.scrollBy = (options?: ScrollToOptions | number, y?: number) => {
-        if (typeof options === 'object' && options.behavior === 'smooth') {
-          document.documentElement.dataset.shellReveal = 'scrolled'
-          scrollBy({ ...options, behavior: 'instant' })
-        } else if (typeof options === 'object') {
-          scrollBy(options)
-        } else {
-          scrollBy(options ?? 0, y ?? 0)
-        }
-      }
-      if (cancel) {
-        const shell = list.querySelector('[data-slot="shell-block"]')!
-        const observer = new MutationObserver(() => {
-          if (shell.getAttribute('data-open') !== 'true') return
-          observer.disconnect()
-          requestAnimationFrame(() => {
-            list.dispatchEvent(
-              new WheelEvent('wheel', { bubbles: true, deltaY: -100 }),
-            )
-            document.documentElement.dataset.shellReveal = 'cancelled'
-          })
-        })
-        observer.observe(shell, {
-          attributes: true,
-          attributeFilter: ['data-open'],
-        })
-      }
-      window.dispatchEvent(
-        new CustomEvent('publish-submitted-shell-output', { detail: waiting }),
-      )
-    },
-    { cancel, waiting },
+async function publishShellOutput(page: Page, { waiting = false } = {}) {
+  await page.evaluate((waiting) => {
+    window.dispatchEvent(
+      new CustomEvent('publish-submitted-shell-output', { detail: waiting }),
+    )
+  }, waiting)
+}
+
+async function scrollToTerminal(terminal: Locator) {
+  await terminal.evaluate((element) =>
+    element.scrollIntoView({ block: 'center' }),
   )
 }
 
-test('a submitted shell reveals output and keeps the empty composer docked until scrolling', async ({
+test('a submitted shell still opens automatically when output arrives', async ({
   page,
 }) => {
-  const { composer, shell } = await submitShell(page)
+  const { shell, trigger } = await submitShell(page)
   await publishShellOutput(page)
-  await expect(page.locator('html')).toHaveAttribute(
-    'data-shell-reveal',
-    'scrolled',
-  )
-  await expect(shell.locator('[data-slot="terminal-wrapper"]')).toBeInViewport({
-    ratio: 1,
-  })
-  await expect(composer).toBeInViewport({ ratio: 1 })
-  await expect(
-    page.getByRole('button', { name: 'Scroll to bottom' }),
-  ).toBeVisible()
-  await page.mouse.move(120, 320)
-  await page.mouse.wheel(0, -380)
-  await expect(composer).not.toBeInViewport()
-})
-
-test('a cancelled shell reveal releases the composer override', async ({
-  page,
-}) => {
-  const { composer, trigger } = await submitShell(page)
-  await publishShellOutput(page, { cancel: true })
   await expect(trigger).toHaveAttribute('aria-expanded', 'true')
-  await expect(composer).not.toBeInViewport()
-  await expect(page.locator('html')).toHaveAttribute(
-    'data-shell-reveal',
-    'cancelled',
+  await expect(shell.locator('[data-slot="terminal-wrapper"]')).toContainText(
+    'Command output',
   )
 })
 
@@ -268,12 +193,9 @@ for (const newerDraft of [false, true]) {
     const { editor, shell } = await submitShell(page)
     if (newerDraft) await editor.fill('Next message')
     await publishShellOutput(page, { waiting: true })
+    await scrollToTerminal(shell.locator('[data-slot="terminal-wrapper"]'))
     const input = shell.locator('.xterm-helper-textarea')
     await expect(input).toBeAttached()
-    await expect(page.locator('html')).toHaveAttribute(
-      'data-shell-reveal',
-      'scrolled',
-    )
     if (newerDraft) {
       await page.keyboard.insertText(' draft')
       await expect(editor).toHaveText('Next message draft')
@@ -302,11 +224,9 @@ test('a focused shell can restore a hidden composer when its terminal disappears
 }) => {
   const { composer, editor, shell } = await submitShell(page)
   await publishShellOutput(page, { waiting: true })
+  await scrollToTerminal(shell.locator('[data-slot="terminal-wrapper"]'))
   const input = shell.locator('.xterm-helper-textarea')
   await expect(input).toBeFocused()
-  await expect(
-    page.getByRole('button', { name: 'Scroll to bottom' }),
-  ).toBeVisible()
   await page.mouse.move(120, 320)
   await page.mouse.wheel(0, -32)
   await expect(composer).not.toBeInViewport()
@@ -326,6 +246,7 @@ test('a shell exit leaves focus on the control the user moved to', async ({
 }) => {
   const { shell, trigger } = await submitShell(page)
   await publishShellOutput(page, { waiting: true })
+  await scrollToTerminal(shell.locator('[data-slot="terminal-wrapper"]'))
   const input = shell.locator('.xterm-helper-textarea')
   await expect(input).toBeFocused()
   await trigger.focus()

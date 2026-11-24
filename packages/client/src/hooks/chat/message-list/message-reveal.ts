@@ -52,8 +52,7 @@ export function useMessageReveal(
         const virtualizer = virtuaRef.current
 
         if (index >= 0 && virtualizer) {
-          // Note: virtua uses window.scroll for this, which
-          // is suppressed during auto-follow
+          // The scroller guards Virtua's writes during auto-follow.
           virtualizer.scrollToIndex(index, {
             align: 'start',
             offset: -topPaddingPx,

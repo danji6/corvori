@@ -6,7 +6,6 @@ import { useJobTail, useLiveShellJob } from '@/hooks/chat/terminals'
 import { useToolOutput } from '@/hooks/chat/tool-output'
 import { useLatch } from '@/hooks/latch'
 import type { ShellToolOutput } from '@/lib/chat'
-import type { SourceMessagePart } from '@/lib/chat/combine'
 import { parseOutputValue } from '@/lib/chat/tool-output'
 import { toast } from '@/lib/notifications'
 import { api } from '@cv/convex/_generated/api'
@@ -154,8 +153,6 @@ function ShellCommandBlock({
   const confirmedWaiting = confirmedLive && attestedWaiting === true
   const focusWhenReady =
     interactive && confirmedWaiting && inputAllowed && !detached
-  const sourceMessageId =
-    (part as SourceMessagePart).sourceMessageId ?? messageId
   const displayTerm =
     (tailing ? tail.term : undefined) ??
     saved?.term ??
@@ -169,12 +166,6 @@ function ShellCommandBlock({
   const wasInteractive = useLatch(
     `shell-input:${latchKey}\0${jobId ?? ''}`,
     inputAllowed && isAdmin && sessionId !== null,
-  )
-
-  // Reveal an interactive terminal only the first time it goes live
-  const revealTerminal = useLatch(
-    `reveal:${latchKey}`,
-    interactive || (Boolean(alwaysExpand) && hasTerminal),
   )
 
   // An interactive PTY can accept input before the wait probe detects a prompt.
@@ -220,9 +211,6 @@ function ShellCommandBlock({
       messageId={messageId}
       forceError={forceError}
       autoExpand={interactive || Boolean(alwaysExpand)}
-      reveal={revealTerminal}
-      revealComposerMessageId={alwaysExpand ? sourceMessageId : undefined}
-      revealOnOpen="manual"
       fullWidth
       surface="inset"
       noErrorText={hasTerminal || Boolean(fallbackText)}

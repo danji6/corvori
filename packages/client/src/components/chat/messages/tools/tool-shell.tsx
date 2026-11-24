@@ -47,9 +47,6 @@ export function ToolShell({
   footer,
   collapsible = true,
   autoExpand = false,
-  reveal: revealProp,
-  revealComposerMessageId,
-  revealOnOpen,
   fullWidth = false,
   surface = false,
   noErrorText = false,
@@ -77,13 +74,6 @@ export function ToolShell({
       data-tool-call-id={part.toolCallId}
       collapsible={collapsible}
       shimmer={status === 'running'}
-      reveal={revealProp ?? isAwaitingApproval}
-      revealComposerMessageId={
-        hasBody && open && userOpen === null
-          ? revealComposerMessageId
-          : undefined
-      }
-      revealOnOpen={revealOnOpen}
       open={hasBody && open}
       onOpenChange={setUserOpen}
       canExpand={hasBody}

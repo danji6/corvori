@@ -1,5 +1,4 @@
 import { Accordion, Button } from '@/components/ui'
-import { useScrollIntoView } from '@/hooks/chat/scroll-into-view'
 import { useIsMessageStreaming } from '@/hooks/chat/stream'
 import type { MessageRecord } from '@/lib/chat'
 import { type MessageRow, segmentGroupsFor } from '@/lib/chat/rows'
@@ -7,13 +6,7 @@ import { workExpansion } from '@/lib/chat/work-state'
 import { summarizeWork } from '@/lib/chat/work-summary'
 import { cn } from '@/lib/utils'
 import type { UIMessage } from 'ai'
-import {
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
 
 import { useMessageHighlightRef } from './message-highlight-context'
 import { useMessageList } from './message-list/message-list-context'
@@ -39,28 +32,7 @@ export function WorkBlock({
   )
   const list = useMessageList()
   const isStreaming = useIsMessageStreaming(message.id)
-  const blockRef = useRef<HTMLButtonElement>(null)
   const highlightRef = useMessageHighlightRef(message.id)
-  const [revealOnOpen, setRevealOnOpen] = useState(false)
-
-  const attachBlock = useCallback(
-    (element: HTMLButtonElement | null) => {
-      if (!element) return
-      blockRef.current = element
-      const unregisterHighlight = highlightRef(element)
-      return () => {
-        blockRef.current = null
-        unregisterHighlight?.()
-      }
-    },
-    [highlightRef],
-  )
-
-  const getBlockBottom = useCallback(
-    (trigger: HTMLElement) => getWorkBottom(trigger, workId),
-    [workId],
-  )
-  useScrollIntoView({ active: open && revealOnOpen, blockRef, getBlockBottom })
 
   const summary = useMemo(
     () =>
@@ -71,13 +43,12 @@ export function WorkBlock({
   const toggle = () => {
     list?.onLayoutChange()
     const mountedRows = getMountedTransitionRows('data-work-id', workId)
-    setRevealOnOpen(!open)
     workExpansion.setOpen(workId, !open, mountedRows)
   }
 
   return (
     <Button
-      ref={attachBlock}
+      ref={highlightRef}
       data-slot="work-block"
       data-open={open}
       variant="plain"
@@ -103,13 +74,4 @@ export function WorkBlock({
       />
     </Button>
   )
-}
-
-/** Work details are sibling rows. The last mounted one bounds the visible group. */
-function getWorkBottom(trigger: HTMLElement, workId: string) {
-  const row = trigger.closest('[data-row-kind="work"]')
-  const details = row?.parentElement?.querySelectorAll(
-    `[data-work-id="${CSS.escape(workId)}"]`,
-  )
-  return details && details[details.length - 1]?.getBoundingClientRect().bottom
 }

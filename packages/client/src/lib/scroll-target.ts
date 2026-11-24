@@ -1,4 +1,4 @@
-import { scrollDebug, scrollDebugSource } from './scroll-debug'
+import { SCROLL_DEBUG, scrollDebug, scrollDebugSource } from './scroll-debug'
 
 /**
  * Used to keep track of {@link WindowScrollTarget}'s scrolling operations and
@@ -130,20 +130,27 @@ export class WindowScrollTarget implements ScrollTarget {
 let windowScrollPatched = false
 
 /**
- * Suppresses window scrolling when one of the suppressors returns true.
- * Notes:
- * - This may break in future versions of virtua/motion
- * - Programmatic navigation won't work while this operates (use the scroller for that)
+ * Guards both document scroll APIs while the scroller owns the viewport.
+ * Virtua's window driver also writes through document.scrollingElement.
  */
 export function patchWindowScroll(suppressors: Iterable<() => boolean>) {
   if (windowScrollPatched || typeof window === 'undefined') return
   windowScrollPatched = true
+  patchScrollMethods(window, suppressors)
+  if (document.scrollingElement)
+    patchScrollMethods(document.scrollingElement, suppressors)
+}
+
+function patchScrollMethods(
+  target: Window | Element,
+  suppressors: Iterable<() => boolean>,
+) {
   for (const name of ['scrollTo', 'scroll', 'scrollBy'] as const) {
-    const original = (window[name] as (...a: unknown[]) => unknown).bind(window)
-    ;(window as unknown as Record<string, unknown>)[name] = (
+    const original = (target[name] as (...a: unknown[]) => unknown).bind(target)
+    ;(target as unknown as Record<string, unknown>)[name] = (
       ...args: unknown[]
     ) => {
-      const before = window.scrollY
+      const before = SCROLL_DEBUG ? window.scrollY : undefined
       const internal = internalScrollWrites > 0
       if (!internal) {
         for (const suppress of suppressors) {

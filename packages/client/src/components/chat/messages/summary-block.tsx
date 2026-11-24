@@ -6,12 +6,10 @@ import { isTextUIPart } from 'ai'
 import { CollapsibleBlock } from './collapsible-block'
 import { ContextDivider } from './context-divider'
 import { EditableText } from './editor/editable-text'
-import { useMessageList } from './message-list/message-list-context'
 import { SmoothText } from './smooth-text'
 
 export function SummaryBlock({ message }: { message: UIMessage }) {
   const isStreaming = isMessageStreaming(message)
-  const onIntoViewSettle = useMessageList()?.onIntoViewSettle
   const [open, onOpenChange] = useCollapsible(message.id)
   const textPart = message.parts.find(isTextUIPart)
   if (!textPart) return null
@@ -26,7 +24,6 @@ export function SummaryBlock({ message }: { message: UIMessage }) {
         shimmer={isStreaming}
         open={open}
         onOpenChange={onOpenChange}
-        onExpand={onIntoViewSettle}
         fullWidth
         bodyClassName="px-4 pt-2 pb-4"
         className="bg-muted/50 border-border rounded-2xl border p-0.5"

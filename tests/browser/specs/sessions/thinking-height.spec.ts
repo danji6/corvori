@@ -4,6 +4,9 @@ async function openThinking(page: Page) {
   await page.goto('/?fixture=notes&id=notes&tailWork')
   const work = page.locator('[data-slot="work-block"]')
   await work.click()
+  await expect(
+    page.locator('[data-slot="virtualized-row-transition"][data-state]'),
+  ).toHaveCount(0)
   const blocks = page.locator('[data-slot="reasoning-block"]')
   await expect(blocks.first()).toBeVisible()
   return blocks
@@ -88,10 +91,20 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
     await page.emulateMedia({ reducedMotion })
     const block = (await openThinking(page)).first()
     await block.getByRole('button').press('Enter')
+    await expect(block).toHaveAttribute('data-open', 'true')
     await waitForAnimations(block)
     await block.getByRole('button').evaluate((button: HTMLButtonElement) => {
+      const block = button.closest('[data-slot="reasoning-block"]')!
+      const observer = new MutationObserver(() => {
+        if (block.getAttribute('data-open') !== 'false') return
+        observer.disconnect()
+        requestAnimationFrame(() => button.click())
+      })
+      observer.observe(block, {
+        attributes: true,
+        attributeFilter: ['data-open'],
+      })
       button.click()
-      requestAnimationFrame(() => button.click())
     })
     await expect(block).toHaveAttribute('data-open', 'true')
     await waitForAnimations(block)

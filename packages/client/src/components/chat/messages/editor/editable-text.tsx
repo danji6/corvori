@@ -68,7 +68,7 @@ export function EditableText({
   const prevShouldEditRef = useRef(false)
   useLayoutEffect(() => {
     if (shouldEdit && !prevShouldEditRef.current) {
-      onLayoutChange?.()
+      onLayoutChange?.('top')
     }
     prevShouldEditRef.current = !!shouldEdit
   }, [shouldEdit, onLayoutChange])

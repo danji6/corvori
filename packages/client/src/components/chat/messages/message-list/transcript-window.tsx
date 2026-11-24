@@ -22,6 +22,7 @@ import { UPDATE_SIZE_EVENT, UPDATE_VIRTUAL_STATE } from 'virtua/unstable_core'
 
 import { MessageHighlightLayer } from '../message-highlight-context'
 import { MessageBackgroundLayer } from './message-background-layer'
+import { useMessageList } from './message-list-context'
 
 type ItemComponent = ComponentType<CustomItemComponentProps>
 
@@ -61,6 +62,8 @@ export function TranscriptWindow({
     store.$getStateVersion,
   )
   const reportResize = useEffectEvent(onResize)
+  const onRowsMeasured = useMessageList()?.onRowsMeasured
+  const totalSize = store.$getTotalSize()
 
   useLayoutEffect(() => {
     store.$subscribe(UPDATE_VIRTUAL_STATE, (sync) => {
@@ -78,6 +81,10 @@ export function TranscriptWindow({
   useLayoutEffect(() => {
     driver.$effect()
   }, [driver, version])
+
+  useLayoutEffect(() => {
+    onRowsMeasured?.()
+  }, [onRowsMeasured, totalSize])
 
   useImperativeHandle(
     ref,
@@ -112,7 +119,7 @@ export function TranscriptWindow({
         flex: 'none',
         position: 'relative',
         width: '100%',
-        height: store.$getTotalSize(),
+        height: totalSize,
         pointerEvents: store.$isScrolling() ? 'none' : undefined,
       }}
     >

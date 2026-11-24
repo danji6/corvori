@@ -189,12 +189,12 @@ function initialMessages() {
     ]
   }
   if (params.has('groupedReply')) return groupedReplyMessages()
+  if (params.has('compaction')) return compactionMessages()
   if (params.has('shellComposer') || params.has('composer')) {
     return Array.from({ length: 32 }, (_, index) =>
       message(`history${index}`, index),
     )
   }
-  if (params.has('compaction')) return compactionMessages()
   if (params.has('todoWork')) return todoWorkMessages()
   if (params.has('fileChanges')) return fileChangeMessages()
   if (params.has('shellReports')) return shellMessages()

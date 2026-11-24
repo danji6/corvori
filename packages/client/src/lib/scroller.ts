@@ -1,7 +1,10 @@
 import { ScrollBindings } from './scroll-bindings'
 import { ScrollCoordinator } from './scroll-coordinator'
 import { FollowAnimation } from './scroll-follow'
-import { preserveLayoutPosition } from './scroll-layout'
+import {
+  type ScrollLayoutAnchor,
+  preserveLayoutPosition,
+} from './scroll-layout'
 import type { AutoScrollerOptions } from './scroll-options'
 import type { ScrollTarget } from './scroll-target'
 
@@ -22,7 +25,7 @@ const LAYOUT_SHIFT_SETTLE_MS = 250
 /** How close to the bottom (px) before autoscroll should trigger again. */
 const FOLLOW_RESUME_DISTANCE = 80
 
-/** Accounts for rounded scroll metrics when a downward gesture cannot move. */
+/** Accounts for rounded scroll metrics at the bottom edge. */
 const BOTTOM_EDGE_TOLERANCE = 1
 
 /** Bottom tolerance for preserving the tail when the dock or keyboard grows. */
@@ -393,17 +396,23 @@ export class Scroller {
   }
 
   /** Holds the viewport through a user-triggered expansion or collapse. */
-  holdLayoutPosition = () => {
+  holdLayoutPosition = (anchor?: ScrollLayoutAnchor) => {
+    const target = this.target
+    if (!target) return
+    const atBottom = getDistanceFromBottom(target) <= BOTTOM_EDGE_TOLERANCE
+    const holdingBottom = this.layoutPosition?.anchor === 'bottom'
+    const layoutAnchor =
+      anchor ?? (atBottom || holdingBottom ? 'bottom' : 'top')
+
     // An explicit toggle supersedes a saved position that is still settling.
     if (this.coordinator.kind === 'restore') this.coordinator.cancel()
     this.holdPosition()
-    const target = this.target
-    if (!target) return
     const operation = this.coordinator.begin('layout', { exclusive: true })
     if (!operation) return
 
     this._updateOverflowAnchor()
     const position = preserveLayoutPosition(target, {
+      anchor: layoutAnchor,
       pending: () => this.coordinator.layoutPending,
       done: () => {
         this.layoutPosition = null
@@ -414,6 +423,12 @@ export class Scroller {
     })
     this.layoutPosition = position
     operation.onCancel(position.cancel)
+  }
+
+  /** Aligns the bottom as soon as virtual rows commit their measured heights. */
+  syncLayoutPosition = () => {
+    const position = this.layoutPosition
+    if (position?.anchor === 'bottom') position.restore()
   }
 
   scrollToBottom = (immediate = false) => {

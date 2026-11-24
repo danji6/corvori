@@ -108,14 +108,7 @@ function PresentedPlan({
     if (holdFollow) releaseFollow?.()
   }, [holdFollow, releaseFollow])
 
-  // Plans are read from the top, so align the start below the nav
-  useScrollIntoView({
-    active: reveal,
-    revealOnMount: true,
-    align: 'start',
-    behavior: 'smooth',
-    blockRef,
-  })
+  useScrollIntoView({ active: reveal, blockRef })
 
   return (
     <div

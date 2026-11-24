@@ -2,7 +2,6 @@ import { useCollapsible } from '@/hooks/chat/collapsible'
 import { AlertCircleIcon } from 'lucide-react'
 
 import { CollapsibleBlock } from './collapsible-block'
-import { useMessageList } from './message-list/message-list-context'
 
 export function ErrorBlock({
   messageId,
@@ -11,7 +10,6 @@ export function ErrorBlock({
   messageId: string
   error: string
 }) {
-  const onIntoViewSettle = useMessageList()?.onIntoViewSettle
   const [open, onOpenChange] = useCollapsible(`${messageId}:error`)
 
   return (
@@ -20,7 +18,6 @@ export function ErrorBlock({
       label="Error"
       open={open}
       onOpenChange={onOpenChange}
-      onExpand={onIntoViewSettle}
       bodyClassName="px-4 pt-2 pb-4"
       className="border-destructive/20 bg-destructive/10 min-w-32 rounded-2xl"
       leadingIcon={

@@ -257,7 +257,6 @@ function HiddenChipContent({
       leadingIcon={<Icon className="text-muted-foreground size-3.5 shrink-0" />}
       open={open}
       onOpenChange={setOpen}
-      revealOnOpen={false}
       dense
       surface={grouped ? 'inset-row' : 'inset'}
       triggerClassName={grouped ? 'py-0' : 'py-(--work-header-padding-y)'}

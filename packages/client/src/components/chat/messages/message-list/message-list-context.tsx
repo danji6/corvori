@@ -1,21 +1,16 @@
 import { createOptionalContext } from '@/hooks/context'
 import type { ScrollCoordinator } from '@/lib/scroll-coordinator'
+import type { ScrollLayoutAnchor } from '@/lib/scroll-layout'
 import { useLayoutEffect } from 'react'
-
-/** Releases a provisional dock hold unless the reveal requested a scroll. */
-export type FinishComposerReveal = (scrolled: boolean) => void
 
 type MessageListContextValue = {
   scrollRef: React.RefObject<HTMLElement | null>
   scrollCoordinator?: ScrollCoordinator
-  onLayoutChange: () => void
-  onIntoViewSettle?: () => void
+  onLayoutChange: (anchor?: ScrollLayoutAnchor) => void
+  onRowsMeasured?: () => void
   releaseFollow: () => void
   resumeFollow: () => void
   trackPendingLayout?: () => () => void
-  holdComposerForReveal?: (
-    messageId: string,
-  ) => FinishComposerReveal | undefined
   shellFocusBlocked?: boolean
   restoreComposerFocus?: (input: HTMLElement) => void
   bottomPadding: number

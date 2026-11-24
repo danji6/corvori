@@ -1,4 +1,5 @@
 import { ScrollCoordinator } from '@/lib/scroll-coordinator'
+import type { ScrollLayoutAnchor } from '@/lib/scroll-layout'
 import { ElementScrollTarget, WindowScrollTarget } from '@/lib/scroll-target'
 import { type AutoScrollerOptions, Scroller } from '@/lib/scroller'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -47,8 +48,12 @@ export function useScroller(
     scrollerRef.current?.holdPosition()
   }, [])
 
-  const holdLayoutPosition = useCallback(() => {
-    scrollerRef.current?.holdLayoutPosition()
+  const holdLayoutPosition = useCallback((anchor?: ScrollLayoutAnchor) => {
+    scrollerRef.current?.holdLayoutPosition(anchor)
+  }, [])
+
+  const syncLayoutPosition = useCallback(() => {
+    scrollerRef.current?.syncLayoutPosition()
   }, [])
 
   const pauseFollow = useCallback((direction: 1 | -1) => {
@@ -135,6 +140,7 @@ export function useScroller(
     scrollToBottom,
     holdPosition,
     holdLayoutPosition,
+    syncLayoutPosition,
     pauseFollow,
     scrollUntilCondition,
     isAutoScrolling,

@@ -6,7 +6,6 @@ import {
   Skeleton,
 } from '@/components/ui'
 import { useTurnChanges } from '@/hooks/chat/changes'
-import { useScrollIntoView } from '@/hooks/chat/scroll-into-view'
 import type { Id } from '@cv/convex/_generated/dataModel'
 import { CHECKPOINT_LOCATION_CHANGED } from '@cv/core/types/changes'
 import type { ChangedFile } from '@cv/core/types/changes'
@@ -18,7 +17,7 @@ import {
   Redo2Icon,
   Undo2Icon,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { useGrowOnly } from '../grow-only'
 import {
@@ -49,7 +48,6 @@ export function ChangesSummary({
   const messageList = useMessageList()
   const [showAll, setShowAll] = useState(false)
   const [expandedKeys, setExpandedKeys] = useState<string[]>([])
-  const [revealKey, setRevealKey] = useState<string>()
   const [hovered, setHovered] = useState<string>()
   const loadsFiles =
     summary?.phase === 'ready' ||
@@ -82,10 +80,9 @@ export function ChangesSummary({
   const hasExpandableFiles = expandableKeys.length > 0
   const hasExpandedFiles = expandedKeys.length > 0
 
-  const updateExpandedFiles = (keys: string[], keyToReveal?: string) => {
+  const updateExpandedFiles = (keys: string[]) => {
     messageList?.onLayoutChange()
     setExpandedKeys(keys)
-    setRevealKey(keyToReveal)
     setHovered((current) =>
       current !== undefined && keys.includes(current) ? undefined : current,
     )
@@ -140,10 +137,7 @@ export function ChangesSummary({
         className="border-border ml-1 w-auto border-l pl-5"
         multiple
         value={expandedKeys}
-        onValueChange={(value: string[]) => {
-          const openedKey = value.find((key) => !expandedKeys.includes(key))
-          updateExpandedFiles(value, openedKey)
-        }}
+        onValueChange={updateExpandedFiles}
       >
         {loadingFiles && (
           <LoadingFiles count={Math.min(summary.fileCount, 5)} />
@@ -154,7 +148,6 @@ export function ChangesSummary({
             changeSetId={summary._id}
             file={file}
             expanded={expandedKeys.includes(file.key)}
-            revealOnOpen={revealKey === file.key}
             hovered={hovered === file.key}
             onHover={(open) => {
               if (open) {
@@ -270,7 +263,6 @@ type ChangedFileRowProps = {
   changeSetId: Id<'changeSets'>
   file: ChangedFile
   expanded: boolean
-  revealOnOpen: boolean
   hovered: boolean
   onHover: (open: boolean) => void
 }
@@ -299,19 +291,15 @@ function ExpandableFileRow({
   changeSetId,
   file,
   expanded,
-  revealOnOpen,
   hovered,
   onHover,
 }: ChangedFileRowProps) {
   const [pointerInside, setPointerInside] = useState(false)
   const [animating, setAnimating] = useState(false)
-  const blockRef = useRef<HTMLDivElement>(null)
-
   usePendingMessageLayout(animating)
-  useScrollIntoView({ active: expanded && revealOnOpen, blockRef })
 
   return (
-    <Accordion.Item ref={blockRef} value={file.key} className="min-w-0">
+    <Accordion.Item value={file.key} className="min-w-0">
       <Popover
         open={hovered && !expanded}
         onOpenChange={(open, details) => {

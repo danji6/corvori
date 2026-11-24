@@ -1,5 +1,7 @@
 import { type Locator, expect, test } from '@playwright/test'
 
+import { expectAnchoredExpansion } from '../../transcript-expansion'
+
 test('keeps old names in the transcript and search while avatars update', async ({
   page,
 }) => {
@@ -108,11 +110,11 @@ test('the participant menu removes members and unlinks agents', async ({
   await expect(page.getByRole('combobox', { name: 'Link agent' })).toBeVisible()
 })
 
-test('opening a long summary at the bottom brings its start below the nav', async ({
-  page,
-}) => {
+test('a long summary grows upward at the bottom', async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 600 })
-  await page.goto('/?fixture=notes&id=notes&compaction')
+  await page.goto('/?fixture=notes&id=notes&compaction&composer&intoView')
+  const composer = page.locator('[data-slot="chat-box"]')
+  await expect(composer).toBeInViewport({ ratio: 1 })
   const summary = page.getByRole('button', { name: /^Summary\b/ })
   await expect(summary).toBeInViewport({ ratio: 1 })
   await expect
@@ -126,15 +128,12 @@ test('opening a long summary at the bottom brings its start below the nav', asyn
     .toBe(true)
   expect((await summary.boundingBox())!.y).toBeGreaterThan(120)
 
-  await summary.click()
-  await expect(summary).toHaveAttribute('aria-expanded', 'true')
-  await expect
-    .poll(async () => (await summary.boundingBox())?.y ?? Infinity)
-    .toBeLessThan(120)
-  const nav = (await page.getByRole('navigation').boundingBox())!
-  expect((await summary.boundingBox())!.y).toBeGreaterThanOrEqual(
-    nav.y + nav.height,
-  )
+  await expectAnchoredExpansion(summary, 'bottom')
+  const paragraphs = page.getByText('Summary of the completed work.', {
+    exact: true,
+  })
+  await expect(paragraphs.last()).toBeInViewport()
+  await expect(composer).toBeInViewport({ ratio: 1 })
 })
 
 test('opens a lone thought directly from the sender header', async ({
@@ -393,9 +392,7 @@ test('file changes share a list with independent, persistent diff toggles', asyn
   await expect(second).toContainText('newSecond')
 })
 
-test('opening work at the bottom holds the viewport, then reveals its details', async ({
-  page,
-}) => {
+test('work details grow upward at the bottom', async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 530 })
   await page.goto('/?fixture=notes&id=notes&fileChanges&longShell')
   const work = page.locator('[data-slot="work-block"]')
@@ -408,10 +405,11 @@ test('opening work at the bottom holds the viewport, then reveals its details', 
     )
     .toBeLessThanOrEqual(1)
 
-  const { start, frames } = await work.evaluate(async (button) => {
+  const { start, end, frames } = await work.evaluate(async (button) => {
     const start = scrollY
-    const frames: { y: number; opening: boolean }[] = []
+    const frames: { bottomDistance: number; opening: boolean }[] = []
     const deadline = performance.now() + 5000
+    let lastHeight = -1
     let stable = 0
     ;(button as HTMLButtonElement).click()
     while (performance.now() < deadline) {
@@ -421,29 +419,21 @@ test('opening work at the bottom holds the viewport, then reveals its details', 
           '[data-work-id] [data-slot="virtualized-row-transition"][data-state]',
         ),
       )
-      const last = Array.from(document.querySelectorAll('[data-work-id]')).at(
-        -1,
-      )
-      const bottom = last?.getBoundingClientRect().bottom ?? Infinity
-      const revealed = !opening && bottom <= innerHeight - 80
-      stable = revealed && frames.at(-1)?.y === scrollY ? stable + 1 : 0
-      frames.push({ y: scrollY, opening })
-      if (stable >= 5) return { start, frames }
+      const hasDetails = Boolean(document.querySelector('[data-work-id]'))
+      const height = document.documentElement.scrollHeight
+      stable = hasDetails && !opening && height === lastHeight ? stable + 1 : 0
+      lastHeight = height
+      frames.push({ bottomDistance: height - innerHeight - scrollY, opening })
+      if (stable >= 8) return { start, end: scrollY, frames }
     }
-    throw new Error('The work details did not scroll into view')
+    throw new Error('The work details did not finish expanding')
   })
 
-  const opening = frames.filter((frame) => frame.opening)
-  expect(opening.length).toBeGreaterThan(0)
-  expect(opening.every((frame) => Math.abs(frame.y - start) <= 1)).toBe(true)
-  expect(
-    frames.every((frame, i) => i === 0 || frame.y >= frames[i - 1].y - 1),
-  ).toBe(true)
-  expect(frames.at(-1)!.y).toBeGreaterThan(start + 20)
-  const nav = (await page.getByRole('navigation').boundingBox())!
-  expect((await work.boundingBox())!.y).toBeGreaterThanOrEqual(
-    nav.y + nav.height,
+  expect(frames.some((frame) => frame.opening)).toBe(true)
+  expect(frames.every((frame) => Math.abs(frame.bottomDistance) <= 1)).toBe(
+    true,
   )
+  expect(end).toBeGreaterThan(start + 20)
 })
 
 test('preparing a work summary keeps the existing reply visible in place', async ({
@@ -499,7 +489,7 @@ for (const phase of ['preparing', 'opening', 'open'] as const) {
   test(`collapsing work at the tail preserves position without bouncing (phase=${phase})`, async ({
     page,
   }) => {
-    await page.goto('/?fixture=notes&id=notes&tailWork')
+    await page.goto('/?fixture=notes&id=notes&tailWork&singleEdit')
     const work = page.locator('[data-slot="work-block"]')
     await expect(work).toBeVisible()
     // Stop auto-follow before setting the starting position.
@@ -515,11 +505,13 @@ for (const phase of ['preparing', 'opening', 'open'] as const) {
       .toBeLessThanOrEqual(1)
     await expect(work).toBeInViewport({ ratio: 1 })
 
-    const { originalY, positions } = await collapseWorkAtPhase(work, phase)
+    const { originalY, settledY, distances } = await collapseWorkAtPhase(
+      work,
+      phase,
+    )
     await expect(work).toHaveAttribute('aria-expanded', 'false')
-    expect(
-      Math.max(...positions.map((y) => Math.abs(y - originalY))),
-    ).toBeLessThanOrEqual(1)
+    expect(Math.max(...distances.map(Math.abs))).toBeLessThanOrEqual(1)
+    expect(Math.abs(settledY - originalY)).toBeLessThanOrEqual(1)
   })
 }
 
@@ -555,12 +547,14 @@ async function collapseWorkAtPhase(
       button.click()
     })
 
-    const positions = [scrollY]
+    const bottomDistance = () =>
+      document.documentElement.scrollHeight - innerHeight - scrollY
+    const distances = []
     for (let index = 0; index < 45; index++) {
       await frame()
-      positions.push(scrollY)
+      distances.push(bottomDistance())
     }
-    return { originalY, positions }
+    return { originalY, settledY: scrollY, distances }
   }, phase)
 }
 

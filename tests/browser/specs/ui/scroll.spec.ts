@@ -121,6 +121,10 @@ test('bottom navigation blocks competing corrections until following takes over'
           const tick = () => {
             const before = window.scrollY
             window.scrollBy({ top: -120, behavior: 'instant' })
+            document.scrollingElement!.scrollBy({
+              top: -120,
+              behavior: 'instant',
+            })
             samples.push({ before, after: window.scrollY })
             if (samples.length < 8) requestAnimationFrame(tick)
             else resolve(samples)

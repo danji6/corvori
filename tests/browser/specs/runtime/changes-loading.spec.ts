@@ -151,7 +151,7 @@ test('shows diff markers before syntax highlighting without resizing the code', 
 })
 
 for (const delayedDiff of [false, true]) {
-  test(`reveals an expanded file after its diff settles (delayed diff=${delayedDiff})`, async ({
+  test(`keeps the viewport in place when a diff expands (delayed diff=${delayedDiff})`, async ({
     page,
   }) => {
     const height = 530
@@ -220,15 +220,10 @@ for (const delayedDiff of [false, true]) {
       }
       const panel = page.locator('[data-slot="accordion-content"]')
       await expect(panel.locator('.diff-add').first()).toBeVisible()
-      await expect
-        .poll(async () => {
-          const box = await panel.boundingBox()
-          return box ? box.y + box.height : Infinity
-        })
-        .toBeLessThanOrEqual(height - 80)
-      const settled = (await sampleFilePosition(first)).at(-1)!
-      expect(settled).toBeLessThan(before.y - 20)
-      expect(settled).toBeGreaterThanOrEqual(64)
+      const positions = await sampleFilePosition(first)
+      expect(
+        Math.max(...positions.map((top) => Math.abs(top - before.y))),
+      ).toBeLessThanOrEqual(2)
     } finally {
       resolveDiff()
     }

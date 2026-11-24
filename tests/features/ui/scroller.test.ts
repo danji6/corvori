@@ -226,6 +226,7 @@ describe('collapsing layout ownership', () => {
   })
 
   test('restores the offset after temporary shrinkage and releases on user input', () => {
+    content.scrollTop = 1000
     scroller.holdLayoutPosition()
     expect(scroller.coordinator.kind).toBe('layout')
     expect(content.style.overflowAnchor).toBe('none')
@@ -237,7 +238,7 @@ describe('collapsing layout ownership', () => {
 
     scrollHeight = 2000
     mutate()
-    expect(content.scrollTop).toBe(1200)
+    expect(content.scrollTop).toBe(1000)
 
     content.dispatchEvent(new WheelEvent('wheel', { deltaY: -100 }))
     content.scrollTop = 900
@@ -246,6 +247,32 @@ describe('collapsing layout ownership', () => {
     expect(content.scrollTop).toBe(900)
     expect(scroller.coordinator.kind).toBeNull()
     expect(content.style.overflowAnchor).toBe('')
+  })
+
+  test('holds the bottom through growth, a second toggle, and shrinkage', () => {
+    scroller.holdLayoutPosition()
+    scrollHeight += 200
+    scroller.holdLayoutPosition()
+    resize()
+    expect(content.scrollTop).toBe(1400)
+
+    scrollHeight -= 100
+    mutate()
+    expect(content.scrollTop).toBe(1300)
+
+    content.dispatchEvent(new WheelEvent('wheel', { deltaY: -100 }))
+    content.scrollTop = 1100
+    scrollHeight += 200
+    resize()
+    expect(content.scrollTop).toBe(1100)
+    expect(scroller.coordinator.kind).toBeNull()
+  })
+
+  test('supports holding the top at the bottom for inline editing', () => {
+    scroller.holdLayoutPosition('top')
+    scrollHeight += 200
+    resize()
+    expect(content.scrollTop).toBe(1200)
   })
 })
 

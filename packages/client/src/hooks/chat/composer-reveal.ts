@@ -10,46 +10,19 @@ const SCROLL_KEYS = new Set([
   'PageUp',
 ])
 
-type DockHold = {
-  sessionId: string
-  pending: ReadonlySet<symbol>
-  retained: boolean
-}
-
-/** Holds the dock through an opted-in reveal and until transcript navigation. */
+/** Keeps the dock visible after restoring composer focus. */
 export function useComposerReveal(
   sessionId: string | undefined,
   isAtBottom: boolean,
 ) {
-  const [hold, setHold] = useState<DockHold | null>(null)
-  const visible = hold !== null && hold.sessionId === sessionId
-  if (hold && !visible) setHold(null)
+  const [heldSessionId, setHeldSessionId] = useState<string>()
+  const visible = heldSessionId !== undefined && heldSessionId === sessionId
+  if (heldSessionId !== undefined && !visible) setHeldSessionId(undefined)
 
-  const clear = useCallback(() => setHold(null), [])
-
-  const begin = useCallback(() => {
-    if (!sessionId) return
-    const token = Symbol()
-    setHold((current) => {
-      const previous = current?.sessionId === sessionId ? current : null
-      return {
-        sessionId,
-        pending: new Set([...(previous?.pending ?? []), token]),
-        retained: previous?.retained ?? false,
-      }
-    })
-    return (scrolled: boolean) => {
-      setHold((current) => finishReveal(current, token, scrolled))
-    }
-  }, [sessionId])
+  const clear = useCallback(() => setHeldSessionId(undefined), [])
 
   const keepVisible = useCallback(() => {
-    if (!sessionId) return
-    setHold((current) => ({
-      sessionId,
-      pending: current?.sessionId === sessionId ? current.pending : new Set(),
-      retained: true,
-    }))
+    if (sessionId) setHeldSessionId(sessionId)
   }, [sessionId])
 
   const wasAtBottom = useRef(isAtBottom)
@@ -79,15 +52,7 @@ export function useComposerReveal(
     }
   }, [visible, clear])
 
-  return { visible, begin, clear, keepVisible }
-}
-
-function finishReveal(hold: DockHold | null, token: symbol, scrolled: boolean) {
-  if (!hold?.pending.has(token)) return hold
-  const pending = new Set(hold.pending)
-  pending.delete(token)
-  const retained = hold.retained || scrolled
-  return pending.size || retained ? { ...hold, pending, retained } : null
+  return { visible, clear, keepVisible }
 }
 
 function isTranscriptGesture(event: Event) {

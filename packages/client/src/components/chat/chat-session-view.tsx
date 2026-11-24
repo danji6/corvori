@@ -206,7 +206,6 @@ export function ChatSessionView({
 
   const {
     visible: keepComposerVisible,
-    begin: holdComposerForReveal,
     clear: clearComposerReveal,
     keepVisible: revealComposerForFocus,
   } = useComposerReveal(session?._id, isAtBottom)
@@ -375,10 +374,9 @@ export function ChatSessionView({
                 header={hasPrompts && <ChatPrompts className="h-fit" />}
                 isAtBottom={isAtBottom}
                 onScrollChange={onMessageListScroll}
-                onIntoViewSettle={releaseSticky}
+                onScrollSettle={releaseSticky}
                 onInitialPositionSettled={handleInitialPositionSettled}
                 onTranscriptNavigate={clearComposerReveal}
-                holdComposerForReveal={holdComposerForReveal}
                 restoreComposerFocus={restoreComposerFocus}
                 shellFocusBlocked={
                   isEditing || searchOpen || showInteractionPicker || hasContent

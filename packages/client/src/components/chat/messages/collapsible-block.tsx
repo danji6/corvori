@@ -1,12 +1,14 @@
 import { Accordion } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
 import { Collapsible, useCollapsible } from '@/components/ui/collapsible'
-import { useScrollIntoView } from '@/hooks/chat/scroll-into-view'
 import { cn } from '@/lib/utils'
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 
 import { useGrowOnly } from './grow-only'
-import { useMessageList } from './message-list/message-list-context'
+import {
+  useMessageList,
+  usePendingMessageLayout,
+} from './message-list/message-list-context'
 
 export type CollapsibleBlockProps = React.ComponentPropsWithoutRef<'div'> & {
   label: React.ReactNode
@@ -17,12 +19,6 @@ export type CollapsibleBlockProps = React.ComponentPropsWithoutRef<'div'> & {
   collapsible?: boolean
   /** Animate the label with a shimmer. */
   shimmer?: boolean
-  /** When it turns true, scrolls the block into view above the dock. */
-  reveal?: boolean
-  /** Source message whose automatic reveal requests a visible composer. */
-  revealComposerMessageId?: string
-  /** Reveal on every open by default, or use 'manual' for header toggles only. */
-  revealOnOpen?: boolean | 'manual'
   /** The bordered surface expands its padding. Inset rows start indented. */
   surface?: boolean | 'inset' | 'inset-row'
   /** Compact header height and no outer margin, for stacking inside a group. */
@@ -32,7 +28,6 @@ export type CollapsibleBlockProps = React.ComponentPropsWithoutRef<'div'> & {
   onOpenChange?: (open: boolean) => void
   fullWidth?: boolean
   footer?: React.ReactNode
-  onExpand?: () => void
   headerClassName?: string
   triggerClassName?: string
   bodyClassName?: string
@@ -50,9 +45,6 @@ export function CollapsibleBlock({
   canExpand = true,
   collapsible = true,
   shimmer = false,
-  reveal = false,
-  revealComposerMessageId,
-  revealOnOpen = true,
   surface = false,
   dense = false,
   defaultOpen = false,
@@ -60,7 +52,6 @@ export function CollapsibleBlock({
   onOpenChange,
   fullWidth = false,
   footer,
-  onExpand,
   className,
   headerClassName,
   triggerClassName,
@@ -71,25 +62,14 @@ export function CollapsibleBlock({
   children,
   ...rest
 }: CollapsibleBlockProps) {
-  const [openedManually, setOpenedManually] = useState(false)
-  const blockRef = useRef<HTMLDivElement>(null)
   const contentId = useId()
   const messageList = useMessageList()
   const releaseHeight = useGrowOnly()?.release
-  const revealExpansion = revealOnOpen === 'manual' ? openedManually : revealOnOpen // prettier-ignore
-
-  if (open === false && openedManually) setOpenedManually(false)
 
   // Re-measure retained row heights when the header density changes.
   useLayoutEffect(() => {
     releaseHeight?.()
   }, [dense, releaseHeight])
-
-  useScrollIntoView({
-    active: reveal,
-    blockRef,
-    revealComposerMessageId,
-  })
 
   const insetRow = surface === 'inset-row' || surface === true
   const insetSurface = surface === 'inset' || insetRow
@@ -124,7 +104,6 @@ export function CollapsibleBlock({
     return (
       <>
         <div
-          ref={blockRef}
           data-open="true"
           data-full-width={fullWidth ? '' : undefined}
           className={shellClassName}
@@ -156,15 +135,13 @@ export function CollapsibleBlock({
 
   return (
     <>
-      <div ref={blockRef}>
+      <div>
         <Collapsible
           defaultOpen={defaultOpen}
           open={open}
           onOpenChange={(next) => {
             messageList?.onLayoutChange()
-            if (revealOnOpen === 'manual') setOpenedManually(next)
             onOpenChange?.(next)
-            if (next) onExpand?.()
           }}
           data-full-width={fullWidth ? '' : undefined}
           className={shellClassName}
@@ -196,13 +173,7 @@ export function CollapsibleBlock({
             />
             {actions}
           </div>
-          <Content
-            id={contentId}
-            blockRef={blockRef}
-            revealOnOpen={revealExpansion}
-          >
-            {body}
-          </Content>
+          <Content id={contentId}>{body}</Content>
         </Collapsible>
       </div>
       {footer}
@@ -327,31 +298,21 @@ function Trigger({
   )
 }
 
-function Content({
-  id,
-  children,
-  blockRef,
-  revealOnOpen = true,
-}: {
-  id: string
-  children?: React.ReactNode
-  blockRef: React.RefObject<HTMLDivElement | null>
-  revealOnOpen?: boolean
-}) {
+function Content({ id, children }: { id: string; children?: React.ReactNode }) {
   const { isOpen } = useCollapsible()
   const contentRef = useRef<HTMLDivElement>(null)
   const [present, setPresent] = useState(isOpen)
   const [expanded, setExpanded] = useState(isOpen)
   const beginShrink = useGrowOnly()?.beginShrink
 
+  usePendingMessageLayout(present && !isOpen)
+  useOpeningLayout(isOpen, expanded, contentRef)
+
   useLayoutEffect(() => {
     if (isOpen || !present) return
     const finishShrink = beginShrink?.()
     let cancelled = false
-    const animations = getCollapseAnimations(contentRef.current)
-    void Promise.allSettled(
-      animations.map((animation) => animation.finished),
-    ).then(() => {
+    void waitForBlockAnimations(contentRef.current).then(() => {
       if (!cancelled) setPresent(false)
     })
     return () => {
@@ -368,11 +329,6 @@ function Content({
     const frame = requestAnimationFrame(() => setExpanded(true))
     return () => cancelAnimationFrame(frame)
   }, [isOpen])
-
-  useScrollIntoView({
-    active: isOpen && revealOnOpen,
-    blockRef,
-  })
 
   if (!present) return null
 
@@ -393,9 +349,25 @@ function Content({
   )
 }
 
-/** Keep the row free to shrink until the body and its surrounding padding settle. */
-function getCollapseAnimations(content: HTMLElement | null) {
-  if (!content) return []
+/** Holds the viewport from the opening commit through the height transition. */
+function useOpeningLayout(
+  isOpen: boolean,
+  expanded: boolean,
+  contentRef: React.RefObject<HTMLDivElement | null>,
+) {
+  const trackPendingLayout = useMessageList()?.trackPendingLayout
+
+  useLayoutEffect(() => {
+    if (!isOpen || !trackPendingLayout) return
+    const done = trackPendingLayout()
+    if (expanded) void waitForBlockAnimations(contentRef.current).then(done)
+    return done
+  }, [isOpen, expanded, contentRef, trackPendingLayout])
+}
+
+/** Waits for the body and its surrounding padding to finish changing size. */
+function waitForBlockAnimations(content: HTMLElement | null) {
+  if (!content) return Promise.resolve()
   const padding =
     content.parentElement?.getAnimations().filter((animation) => {
       return (
@@ -403,5 +375,6 @@ function getCollapseAnimations(content: HTMLElement | null) {
         animation.transitionProperty === '--work-surface-expansion'
       )
     }) ?? []
-  return [...content.getAnimations(), ...padding]
+  const animations = [...content.getAnimations(), ...padding]
+  return Promise.allSettled(animations.map((animation) => animation.finished))
 }
