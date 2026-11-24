@@ -79,6 +79,31 @@ test('picking a file keeps typing on the current composer line', async ({
   await expect(editor.getByRole('heading')).toHaveText('Review these notes')
 })
 
+test('keeps the loaded link preview mounted through send confirmation', async ({
+  page,
+}) => {
+  const editor = await openSendFixture(page)
+  await editor.fill('https://example.com')
+  await sendButton(page).click()
+
+  const preview = page.getByRole('link', { name: 'Preview for example.com' })
+  await expect(preview).toBeVisible()
+  const pendingPreview = await preview.elementHandle()
+
+  await completeSend(page, true)
+  const confirmed = page.locator('[data-message-id="sent-0"]')
+  const confirmedPreview = confirmed.getByRole('link', {
+    name: 'Preview for example.com',
+  })
+  await expect(confirmedPreview).toBeVisible()
+  expect(
+    await confirmedPreview.evaluate(
+      (element, before) => element === before,
+      pendingPreview,
+    ),
+  ).toBe(true)
+})
+
 test('shows mixed attachments immediately and keeps them visible through confirmation', async ({
   page,
 }) => {

@@ -111,12 +111,16 @@ export function MessageContextMenu({
   const ownsHighlightRef = useRef(false)
 
   const slices = segmentGroupsFor(message, record)
-  const baseScope: GroupScope | null =
-    row.kind === 'group'
-      ? { segmentIndex: row.segmentIndex, groupIndex: row.groupIndex }
-      : null
-  const [scope, setScope] = useState<GroupScope | null>(baseScope)
-  const scopeRef = useRef<GroupScope | null>(baseScope)
+  const groupScope = useMemo(
+    () =>
+      row.kind === 'group'
+        ? { segmentIndex: row.segmentIndex, groupIndex: row.groupIndex }
+        : null,
+    [row],
+  )
+  const [selectedScope, setSelectedScope] = useState<GroupScope | null>(null)
+  const scopeRef = useRef<GroupScope | null>(null)
+  const scope = groupScope ?? selectedScope
   const reply = useReplyAction(message, record, scope)
 
   const menu = useMemo(
@@ -133,9 +137,11 @@ export function MessageContextMenu({
     // Preload the editor in case the user intends to edit the message
     if (canMutate) prefetchRichTextEditor()
     editSelectionRef.current = captureMessageEditSelection(message.id, x, y)
-    const next = resolveScope(row, x, y)
+    if (groupScope) return
+
+    const next = resolveHeaderScope(row, x, y)
     scopeRef.current = next
-    setScope(next)
+    setSelectedScope(next)
   }
 
   function handleOpenChange(open: boolean) {
@@ -149,7 +155,7 @@ export function MessageContextMenu({
     }
 
     ownsHighlightRef.current = true
-    const block = scopeRef.current
+    const block = groupScope ?? scopeRef.current
     if (block && countGroups(slices) > 1) {
       highlight.setTarget({
         messageId: message.id,
@@ -407,14 +413,11 @@ function DeleteMenu({
 }
 
 /** Which group the menu acts on for a given right-click, or null for message-wide. */
-function resolveScope(
+function resolveHeaderScope(
   row: MessageRow,
   x: number,
   y: number,
 ): GroupScope | null {
-  if (row.kind === 'group') {
-    return { segmentIndex: row.segmentIndex, groupIndex: row.groupIndex }
-  }
   if (row.kind === 'header' && row.reasoning !== undefined) {
     const element = document.elementFromPoint(x, y)
     if (element?.closest('[data-reasoning-address]')) {

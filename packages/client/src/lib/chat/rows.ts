@@ -19,6 +19,7 @@ import {
 import { groupShellReportRows } from './shell-work-reports'
 import type { MessageRecord, PartMetadata } from './types'
 import {
+  type LayoutGroup,
   type ReasoningAddress,
   type ResolveWorkId,
   type WorkGroup,
@@ -178,6 +179,31 @@ function dividerRow(id: string, meta: MessageRecord | undefined): MessageRow {
     : { kind: 'context-reset', key: `reset:${id}`, messageId: id }
 }
 
+function lastTextGroup(
+  groups: readonly LayoutGroup[],
+): LayoutGroup | undefined {
+  for (let index = groups.length - 1; index >= 0; index--) {
+    const entry = groups[index]!
+    const { group } = entry
+    if (group.type === 'single' && group.part.type === 'text') return entry
+  }
+}
+
+function groupAddress(
+  entry: LayoutGroup,
+  fileCounts: Map<number, number> | null,
+) {
+  const { group, segmentIndex } = entry
+  if (!fileCounts || group.type !== 'files') {
+    return `s${segmentIndex}:${groupKey(group)}`
+  }
+
+  // Server-added parts can shift file groups within their segment.
+  const occurrence = fileCounts.get(segmentIndex) ?? 0
+  fileCounts.set(segmentIndex, occurrence + 1)
+  return `s${segmentIndex}:files:${occurrence}`
+}
+
 export function buildRows(
   ids: string[],
   getMessage: (id: string) => UIMessage | null,
@@ -208,6 +234,9 @@ export function buildRows(
       continue
     }
 
+    const clientSendId = meta?.clientSendId
+    const renderId = clientSendId === undefined ? id : `send:${clientSendId}`
+
     // Hidden messages render as a single compact chip (styled by type).
     if (meta?.hidden) {
       const grouped = groupBySender && previousSenderKey !== null
@@ -233,6 +262,11 @@ export function buildRows(
     const slices = segmentGroupsFor(message, meta)
     const reasoning = !meta?.type ? latestReasoning(id, slices) : undefined
     const layout = buildWorkLayout(message, meta, slices, resolveWorkId)
+    // The send's text can move to a new segment when other parts are inserted.
+    const sentText =
+      clientSendId === undefined || meta?.hasNewerSegments
+        ? undefined
+        : lastTextGroup(layout.groups)
     const summarizedWork = new Map(
       layout.work
         .filter((work) => work.groups.length > 1 || work.toolCallIds.length > 0)
@@ -245,15 +279,15 @@ export function buildRows(
         ? { senderGroupId: senderHeader.messageId }
         : undefined
 
-    // A `:grp` suffix on the first emitted row's key lets `rowKeysEqual`
-    // catch grouping toggles even when no header row appears or vanishes
+    // Preserve existing row keys for messages created without a client send ID.
     let first = true
-    const firstKey = (key: string) => (first && grouped ? `${key}:grp` : key)
+    const firstKey = (key: string) =>
+      clientSendId === undefined && first && grouped ? `${key}:grp` : key
 
     if (hasHeader) {
       senderHeader = {
         kind: 'header',
-        key: `h:${id}`,
+        key: `h:${renderId}`,
         messageId: id,
         reasoning,
         ...summary,
@@ -265,7 +299,7 @@ export function buildRows(
     if (meta?.replyTo) {
       rows.push({
         kind: 'reply',
-        key: firstKey(`r:${id}`),
+        key: firstKey(`r:${renderId}`),
         messageId: id,
         ...senderGroup,
         ...summary,
@@ -275,6 +309,8 @@ export function buildRows(
     }
 
     const emitted = new Set<string>()
+    const fileCounts =
+      clientSendId === undefined ? null : new Map<number, number>()
     for (const entry of layout.groups) {
       const work = entry.workId ? summarizedWork.get(entry.workId) : undefined
       if (work && !emitted.has(work.id)) {
@@ -290,11 +326,11 @@ export function buildRows(
         emitted.add(work.id)
         first = false
       }
+      const blockKey =
+        entry === sentText ? 'text' : groupAddress(entry, fileCounts)
       rows.push({
         kind: 'group',
-        key: firstKey(
-          `g:${id}:s${entry.segmentIndex}:${groupKey(entry.group)}`,
-        ),
+        key: firstKey(`g:${renderId}:${blockKey}`),
         messageId: id,
         segmentIndex: entry.segmentIndex,
         groupIndex: entry.groupIndex,
@@ -311,7 +347,7 @@ export function buildRows(
     if (first || (!summary && hasFooterContent(message, meta, duration))) {
       rows.push({
         kind: 'footer',
-        key: firstKey(`f:${id}`),
+        key: firstKey(`f:${renderId}`),
         messageId: id,
         ...senderGroup,
         ...summary,

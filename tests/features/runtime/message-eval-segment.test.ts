@@ -50,6 +50,32 @@ function fixture(role: 'admin' | 'user' = 'admin', workspace = true) {
   return { ...f, action }
 }
 
+test('preserves the send identity of a submitted shell block', async () => {
+  const { ctx, rows } = fixture()
+  const clientSendId = '18be8750-f12b-4714-a733-82ec67007db0'
+  const messageId = await sendMessage(ctx, {
+    sessionId,
+    clientSendId,
+    content: '$ pwd',
+    silent: true,
+  })
+
+  expect(rows('messages')).toContainEqual(
+    expect.objectContaining({ _id: messageId, clientSendId }),
+  )
+  expect(rows('messageContents')).toContainEqual(
+    expect.objectContaining({
+      messageId,
+      parts: [
+        expect.objectContaining({
+          type: 'tool-shell',
+          toolCallId: clientSendId,
+        }),
+      ],
+    }),
+  )
+})
+
 test('an admin send without an agent captures shell output once and preserves attachments and variables', async () => {
   const f = fixture()
   f.rows('attachments').push({

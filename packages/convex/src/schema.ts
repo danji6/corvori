@@ -170,6 +170,7 @@ export default defineSchema({
     .index('by_ownerId_order', ['ownerId', 'order']),
 
   messages: defineTable(V.messageSchema)
+    .index('by_sessionId_clientSendId', ['sessionId', 'clientSendId'])
     .index('by_sessionId_contextAnchor', ['sessionId', 'extra.anchorMessageId'])
     .index('by_sessionId', ['sessionId'])
     .index('by_sessionId_position', ['sessionId', 'position'])

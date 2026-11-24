@@ -71,6 +71,7 @@ export type MessageSegmentInfo = {
 
 export type MessageRecord = Pick<
   Doc<'messages'>,
+  | 'clientSendId'
   | 'sender'
   | 'senderName'
   | 'type'

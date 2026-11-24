@@ -367,6 +367,8 @@ async function respond(
 export const approvalFixtureClient = {
   async action(reference: FunctionReference<'action'>) {
     const name = getFunctionName(reference)
+    if (name === 'actions/attachments:previewLink' && deferSend)
+      return { kind: 'website', title: 'Preview for example.com' }
     if (name === 'actions/attachments:confirmImage')
       return {
         id: `attachment-${++attachmentCount}`,

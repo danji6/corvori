@@ -44,6 +44,7 @@ const USER_SHELL_REAP_MS = 15 * 60 * 1000
 type RunShellCommandArgs = {
   session: Session
   membership: Doc<'userSessions'>
+  clientSendId?: string
   command: string
   silent: boolean
   hasAttachments: boolean
@@ -56,8 +57,11 @@ type RunShellCommandArgs = {
  */
 export async function runShellCommand(
   ctx: AuthMutationCtx,
-  { session, membership, command, silent, hasAttachments }: RunShellCommandArgs,
+  args: RunShellCommandArgs,
 ) {
+  const { session, membership, clientSendId, command, silent, hasAttachments } =
+    args
+
   requireRole(ctx.role, 'admin')
   if (!session.workspace) {
     error('A workspace is required to run shell commands', 409)
@@ -68,7 +72,7 @@ export async function runShellCommand(
 
   const part: ShellToolPart = {
     type: SHELL_TOOL_PART_TYPE,
-    toolCallId: generateId(),
+    toolCallId: clientSendId ?? generateId(),
     state: 'input-available',
     input: { command },
   }
@@ -79,6 +83,7 @@ export async function runShellCommand(
     ctx,
     {
       sessionId: session._id,
+      clientSendId,
       sender,
       role: 'user',
       status: 'processing',

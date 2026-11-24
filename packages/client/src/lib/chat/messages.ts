@@ -62,6 +62,7 @@ function convertDoc(doc: MessageDoc): ConvertedEntry {
   const entry: ConvertedEntry = {
     message: doc.status === 'done' ? finalizeMessageParts(message) : message,
     record: {
+      clientSendId: doc.clientSendId,
       _creationTime: doc._creationTime,
       position: doc.position,
       sender: doc.sender,

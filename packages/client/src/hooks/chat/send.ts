@@ -11,6 +11,7 @@ import {
 } from '@/lib/chat/attachment-send-previews'
 import {
   createOptimisticMessageId,
+  hasMessageSend,
   showMessageUpload,
 } from '@/lib/chat/message-uploads'
 import type { SharedAttachment } from '@/lib/chat/types'
@@ -39,7 +40,9 @@ type ResolvedFileLink = {
   snapshot?: WorkspaceLinkSnapshot<Id<'_storage'>>
 }
 
-type SendArgs = FunctionArgs<typeof api.chat.sendMessage>
+type SendArgs = FunctionArgs<typeof api.chat.sendMessage> & {
+  clientSendId: string
+}
 
 type UploadMeta = { mediaType: string; filename: string }
 
@@ -76,9 +79,11 @@ export function useSendMessage() {
 
       const content = pending.content.trim()
       const messageRole = role ?? pending.role ?? 'user'
+      const clientSendId = generateId()
 
       const args: SendArgs = {
         sessionId: session._id,
+        clientSendId,
         content,
         ...(messageRole !== 'user' ? { role: messageRole } : {}),
         ...(pending.silent ? { silent: true } : {}),
@@ -90,7 +95,7 @@ export function useSendMessage() {
         }),
       }
 
-      const optimisticId = createOptimisticMessageId()
+      const optimisticId = createOptimisticMessageId(clientSendId)
       const sender = optimisticSender(messageRole, profile, agent, optimisticId)
       const senderName = (sender.type === 'agent' ? assistant : user) ?? null
       const attribution = { sender, senderName }
@@ -194,8 +199,6 @@ export function useSendMessage() {
           : optimistic
 
         previews?.confirm(attachments)
-        if (attachments.length > 0) upload?.matchAttachment(attachments[0].id)
-
         const messageId = await sendMutation.withOptimisticUpdate((store) => {
           if (confirmedMessage)
             optimisticallyInsertMessage(store, confirmedMessage)
@@ -371,7 +374,7 @@ function buildOptimisticMessage(
     ? [
         {
           type: 'tool-shell',
-          toolCallId: generateId(),
+          toolCallId: args.clientSendId,
           state: 'input-available',
           input: { command },
         },
@@ -380,6 +383,7 @@ function buildOptimisticMessage(
 
   return {
     _id: id,
+    clientSendId: args.clientSendId,
     _creationTime: Date.now(),
     position: `~${id}`,
     sessionId: args.sessionId,
@@ -407,7 +411,7 @@ function optimisticallyInsertMessage(
       continue
     }
     const value = query.value
-    if (!value) continue
+    if (!value || hasMessageSend(value.page, doc)) continue
     store.setQuery(api.chat.messagesWindow, query.args, {
       ...value,
       page: [...value.page, doc],

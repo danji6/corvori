@@ -28,6 +28,7 @@ export type MessageWithParts = Doc<'messages'> & { parts: unknown[] }
 
 type InsertMessageFields = {
   sessionId: Id<'sessions'>
+  clientSendId?: Doc<'messages'>['clientSendId']
   sender: Doc<'messages'>['sender']
   senderName?: Doc<'messages'>['senderName']
   role: Doc<'messages'>['role']

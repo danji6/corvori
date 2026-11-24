@@ -50,12 +50,17 @@ function fixture() {
 
 test('saves shared URLs as session-local attachments and opens them after a host change', async () => {
   const { ctx, rows, getUrl } = fixture()
+  const clientSendId = 'f8f3dd4b-f817-4c9b-bb92-c6605f1d7458'
   const messageId = await sendMessage(ctx, {
     sessionId,
+    clientSendId,
     content: sharedUrl + ' ' + sharedUrl,
     silent: true,
   })
   const [card] = rows('attachments').slice(1)
+  expect(rows('messages')).toContainEqual(
+    expect.objectContaining({ _id: messageId, clientSendId }),
+  )
   expect(card).toMatchObject({ fileId: 'file1', sessionId, messageId })
   expect(rows('attachmentFiles')).toHaveLength(1)
   expect(rows('attachments')).toHaveLength(2)
@@ -90,6 +95,21 @@ test('saves shared URLs as session-local attachments and opens them after a host
     url: newUrl,
     shareUrl: attachmentShareUrl(newUrl, 'file1'),
   })
+})
+
+test('rejects reused send IDs within a session before creating another message', async () => {
+  const { ctx, rows } = fixture()
+  const args = {
+    sessionId,
+    clientSendId: '610031e7-6f1a-44e4-bfc2-74422201d6b1',
+    content: 'Hello',
+    silent: true,
+  }
+  await sendMessage(ctx, args)
+  await expect(sendMessage(ctx, args)).rejects.toThrow(
+    'Client send ID is already in use',
+  )
+  expect(rows('messages')).toHaveLength(1)
 })
 
 test('removes only verified links and leaves other links in place', async () => {

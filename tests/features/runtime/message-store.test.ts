@@ -107,6 +107,67 @@ function contextInput(ids: string[]): MessageStoreInput {
   return value
 }
 
+test('keeps each send keyed through out-of-order confirmation of identical text', () => {
+  const store = createMessageStore()
+  const first = 'optimistic:first'
+  const second = 'optimistic:second'
+
+  function sync(sends: [id: string, clientSendId: string][]) {
+    const value = input(sends.map(([id]) => id))
+    for (const [id, clientSendId] of sends) {
+      value.messageMetaByMessage.get(id)!.clientSendId = clientSendId
+    }
+    for (const item of value.results) {
+      item.role = 'user'
+      item.parts = [{ type: 'text', text: 'Same message' }]
+      if (item.id === 'confirmed-second') {
+        item.parts.unshift({
+          type: 'file',
+          url: 'attachment:1',
+          mediaType: 'text/plain',
+        })
+        value.messageMetaByMessage.get(item.id)!.segments = [
+          { index: 0, partCount: 1, sizeBytes: 64 },
+          { index: 1, partCount: 1, sizeBytes: 64 },
+        ]
+      }
+    }
+    store.sync(value)
+  }
+
+  sync([
+    [first, 'first'],
+    [second, 'second'],
+  ])
+  const keys = (id: string) =>
+    store
+      .getRows()
+      .filter((row) => row.messageId === id)
+      .map((row) => row.key)
+  const firstKeys = keys(first)
+  const secondKeys = keys(second)
+
+  sync([
+    ['confirmed-second', 'second'],
+    [first, 'first'],
+  ])
+  expect(store.getIds()).toEqual(['confirmed-second', first])
+  expect(keys(first)).toEqual(firstKeys)
+  expect(keys('confirmed-second')).toEqual([
+    secondKeys[0],
+    expect.any(String),
+    secondKeys[1],
+  ])
+  expect(keys(second)).toEqual([])
+
+  sync([
+    ['confirmed-second', 'second'],
+    ['confirmed-first', 'first'],
+  ])
+  expect(store.getIds()).toEqual(['confirmed-second', 'confirmed-first'])
+  expect(keys('confirmed-first')).toEqual(firstKeys)
+})
+
 describe('context note display order', () => {
   test('preserves the server order of incoming notes before a streaming answer', () => {
     const store = createMessageStore()

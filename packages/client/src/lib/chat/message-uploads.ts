@@ -1,20 +1,14 @@
-import { generateId } from '@/lib/utils'
 import type { Id } from '@cv/convex/_generated/dataModel'
 import type { WindowMessage } from '@cv/convex/model/chat/queries'
 import { useSyncExternalStore } from 'react'
 
-type MessageUpload = {
-  message: WindowMessage
-  attachmentId?: Id<'attachments'>
-}
-
 const prefix = 'optimistic:'
-const empty: MessageUpload[] = []
-const uploadsBySession = new Map<Id<'sessions'>, MessageUpload[]>()
+const empty: WindowMessage[] = []
+const uploadsBySession = new Map<Id<'sessions'>, WindowMessage[]>()
 const listeners = new Set<() => void>()
 
-export function createOptimisticMessageId() {
-  return `${prefix}${generateId()}` as Id<'messages'>
+export function createOptimisticMessageId(clientSendId: string) {
+  return `${prefix}${clientSendId}` as Id<'messages'>
 }
 
 export function isOptimisticMessageId(id: string) {
@@ -26,7 +20,7 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener)
 }
 
-function update(sessionId: Id<'sessions'>, uploads: MessageUpload[]) {
+function update(sessionId: Id<'sessions'>, uploads: WindowMessage[]) {
   if (uploads.length > 0) uploadsBySession.set(sessionId, uploads)
   else uploadsBySession.delete(sessionId)
   listeners.forEach((listener) => listener())
@@ -34,24 +28,14 @@ function update(sessionId: Id<'sessions'>, uploads: MessageUpload[]) {
 
 export function showMessageUpload(message: WindowMessage) {
   const { sessionId } = message
-  const upload: MessageUpload = { message }
-  update(sessionId, [...(uploadsBySession.get(sessionId) ?? empty), upload])
+  update(sessionId, [...(uploadsBySession.get(sessionId) ?? empty), message])
 
   return {
-    matchAttachment(attachmentId: Id<'attachments'>) {
-      const uploads = uploadsBySession.get(sessionId) ?? empty
-      update(
-        sessionId,
-        uploads.map((item) =>
-          item.message === message ? { message, attachmentId } : item,
-        ),
-      )
-    },
     finish() {
       const uploads = uploadsBySession.get(sessionId) ?? empty
       update(
         sessionId,
-        uploads.filter((item) => item.message !== message),
+        uploads.filter((item) => item !== message),
       )
     },
   }
@@ -68,34 +52,19 @@ export function useMessageUploads(sessionId: Id<'sessions'> | null) {
 /** Shows each upload until the optimistic mutation or its server row appears. */
 export function appendMessageUploads(
   page: WindowMessage[],
-  uploads: MessageUpload[],
+  uploads: WindowMessage[],
 ) {
   if (uploads.length === 0) return page
 
-  const visible = uploads.filter(
-    ({ message, attachmentId }) =>
-      !page.some(
-        (row) =>
-          row._id === message._id ||
-          (attachmentId && hasAttachment(row, attachmentId)),
-      ),
-  )
-  return visible.length > 0
-    ? [...page, ...visible.map(({ message }) => message)]
-    : page
+  const visible = uploads.filter((message) => !hasMessageSend(page, message))
+  return visible.length > 0 ? [...page, ...visible] : page
 }
 
-function hasAttachment(
-  message: WindowMessage,
-  attachmentId: Id<'attachments'>,
-) {
-  return message.segments.some(({ parts }) =>
-    parts.some(
-      (part) =>
-        part !== null &&
-        typeof part === 'object' &&
-        'attachmentId' in part &&
-        part.attachmentId === attachmentId,
-    ),
+export function hasMessageSend(page: WindowMessage[], message: WindowMessage) {
+  const { _id, clientSendId } = message
+  return page.some(
+    (row) =>
+      row._id === _id ||
+      (clientSendId !== undefined && row.clientSendId === clientSendId),
   )
 }

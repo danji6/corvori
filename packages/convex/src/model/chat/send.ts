@@ -58,6 +58,8 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
     }
   }
 
+  await assertClientSendIdAvailable(ctx, args)
+
   const activeStream = await Memberships.getActiveStream(ctx, args.sessionId)
   const command = role === 'user' ? parseShellCommand(args.content) : null
   const { attachments, content: messageText } = await loadAttachments(
@@ -79,6 +81,7 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
     return runShellCommand(ctx, {
       session,
       membership,
+      clientSendId: args.clientSendId,
       command,
       silent,
       hasAttachments: attachments.length > 0,
@@ -114,6 +117,7 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
     ctx,
     {
       sessionId: args.sessionId,
+      clientSendId: args.clientSendId,
       sender,
       role,
       ...(replyTo && { replyTo }),
@@ -169,6 +173,30 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
   })
 
   return messageId
+}
+
+const ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+async function assertClientSendIdAvailable(
+  ctx: MutationCtx,
+  {
+    sessionId,
+    clientSendId,
+  }: Pick<SendMessageArgs, 'sessionId' | 'clientSendId'>,
+) {
+  if (clientSendId === undefined) return
+
+  if (!ID_PATTERN.test(clientSendId)) error('Invalid client send ID', 400)
+
+  const existing = await ctx.db
+    .query('messages')
+    .withIndex('by_sessionId_clientSendId', (q) =>
+      q.eq('sessionId', sessionId).eq('clientSendId', clientSendId),
+    )
+    .first()
+
+  if (existing) error('Client send ID is already in use', 409)
 }
 
 export async function invokeAgent(

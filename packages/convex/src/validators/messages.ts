@@ -179,6 +179,7 @@ export const workspaceSnapshotValidator = v.union(
 
 export const sendMessageArgsValidator = v.object({
   sessionId: v.id('sessions'),
+  clientSendId: v.optional(v.string()),
   content: v.string(),
   role: v.optional(roleValidator),
   silent: v.optional(v.boolean()), // skips agent invocation (and eventually, notifications)
@@ -283,6 +284,8 @@ export type AnswerQuestionsArgs = Infer<typeof answerQuestionsArgsValidator>
 /** A session message and metadata for its selected content version. */
 export const messageSchema = v.object({
   sessionId: v.id('sessions'),
+  /** Correlates a client send with its confirmed transcript rows. */
+  clientSendId: v.optional(v.string()),
   /** Sortable key for this message's place in the session transcript. */
   position: v.string(),
   sender: messageSenderValidator,
