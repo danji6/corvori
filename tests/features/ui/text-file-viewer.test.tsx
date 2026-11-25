@@ -4,7 +4,7 @@ import {
   readAttachmentTextPreview,
   readTextPreview,
 } from '@/lib/text-file-preview'
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, mock, spyOn, test } from 'bun:test'
 
 function fileItem(
   name: string,
@@ -55,11 +55,34 @@ describe('text file viewer', () => {
     const url = 'data:text/plain,%80first%0Asecond%FF%0Athird'
     const { signal } = new AbortController()
 
-    expect(await readAttachmentTextPreview(url, signal)).toEqual({
-      text: '�first\nsecond�\nthird',
-      shownBytes: 20,
-      truncated: false,
-    })
+    expect(
+      await Array.fromAsync(readAttachmentTextPreview(url, signal)),
+    ).toEqual([
+      { text: '�first\nsecond�\nthird', shownBytes: 20, truncated: false },
+    ])
     await expect(readTextPreview(url, signal)).rejects.toBeInstanceOf(TypeError)
+  })
+
+  test('cancels the unread stream when a partial preview is discarded', async () => {
+    const file = new File([], 'large.log')
+    const cancel = mock()
+    using _stream = spyOn(file, 'stream').mockReturnValue(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new Uint8Array(64 * 1024 + 1).fill(97))
+        },
+        cancel,
+      }),
+    )
+    const pages = readAttachmentTextPreview(file, new AbortController().signal)
+
+    try {
+      const { value } = await pages.next()
+      expect(value).toMatchObject({ shownBytes: 64 * 1024, truncated: true })
+      expect(cancel).not.toHaveBeenCalled()
+    } finally {
+      await pages.return()
+    }
+    expect(cancel).toHaveBeenCalledTimes(1)
   })
 })

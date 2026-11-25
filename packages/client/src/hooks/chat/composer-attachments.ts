@@ -135,11 +135,7 @@ export function useComposerAttachments({
   const files = useMemo<FileItem[]>(
     () =>
       fileParts.map((part) =>
-        buildDraftFileItem(
-          part,
-          part.id in pastedText,
-          originalFiles[part.id]?.size,
-        ),
+        buildDraftFileItem(part, part.id in pastedText, originalFiles[part.id]),
       ),
     [fileParts, originalFiles, pastedText],
   )
@@ -335,7 +331,7 @@ type RestoredDraftFile = {
 function buildDraftFileItem(
   part: PendingFilePart,
   canInsertInline: boolean,
-  originalSize?: number,
+  originalFile?: File,
 ) {
   const share = part.share
   const file = buildFileItemFromPart(
@@ -344,9 +340,14 @@ function buildDraftFileItem(
     normalizeBrowserUrl(share?.url) ?? undefined,
     normalizeBrowserUrl(share?.previewUrl) ?? undefined,
     share?.shareUrl,
-    share?.byteLength ?? originalSize,
+    share?.byteLength ?? originalFile?.size,
   )
-  return { ...file, canInsertInline, imageDimensions: share?.imageDimensions }
+  return {
+    ...file,
+    originalFile,
+    canInsertInline,
+    imageDimensions: share?.imageDimensions,
+  }
 }
 
 async function restoreAttachmentDraft(

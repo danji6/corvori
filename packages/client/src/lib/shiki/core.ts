@@ -5,6 +5,8 @@ import {
   type ShikiTransformer,
   createHighlighter,
 } from 'shiki'
+import { hastToHtml } from 'shiki/core'
+import type { GrammarState } from 'shiki/types'
 
 import { type ParsedDiffLine, diffGutters, parseDiffLines } from './diff'
 import { addLineGutter, gutterTransformer } from './gutter'
@@ -123,6 +125,37 @@ export async function runHighlighter(code: string, lang?: string) {
       defaultColor: false,
       transformers: [gutterTransformer],
     })
+  }
+}
+
+/** Keeps the grammar state across pages without caching attachment text. */
+export function createTextPreviewHighlighter(language: string) {
+  let grammarState: GrammarState | undefined
+
+  return async (complete: string | null, tail: string | null) => {
+    const hl = await getHighlighter()
+    const lang = resolveLang(hl, '', language)
+    const lines: string[] = []
+
+    const highlight = (code: string) =>
+      hl.codeToHast(code, {
+        lang,
+        theme: themeName,
+        grammarState,
+        transformers: [
+          {
+            line(node) {
+              lines.push(hastToHtml(node.children))
+            },
+          },
+        ],
+      })
+
+    if (complete !== null)
+      grammarState = hl.getLastGrammarState(highlight(complete))
+    if (tail !== null) highlight(tail)
+
+    return lines
   }
 }
 

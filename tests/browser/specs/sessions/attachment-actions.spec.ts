@@ -51,6 +51,106 @@ async function measuredAttachmentLayout(strip: Locator, lines: number) {
   return attachmentLayout(strip)
 }
 
+test('loads large text in portions and starts fresh when reopened', async ({
+  page,
+}) => {
+  const pageBytes = 64 * 1024
+  const first = 'const start = 1\n/*\n'
+  const prefix = first.padEnd(pageBytes - 2, 'build output\n')
+  const middle = '☀️ next portion'
+  const suffix = 'end of build'
+  const rest = `${middle}\n*/\n`.padEnd(pageBytes, '// build output\n')
+  const content = prefix + rest + suffix
+  const middleLine = prefix.split('\n').length
+
+  const ready = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
+  let requests = 0
+  await page.route('https://storage.example.test/build.ts', async (route) => {
+    await ready[requests++]?.promise
+    await route.fulfill({
+      contentType: 'text/plain',
+      headers: { 'access-control-allow-origin': '*' },
+      body: content,
+    })
+  })
+
+  await page.goto(`${fixture}&textAttachment`)
+  const trigger = page.getByRole('button', { name: 'Preview build.ts' })
+  const dialog = page.getByRole('dialog', { name: 'build.ts' })
+  const text = dialog.getByLabel('Attachment text')
+  const loading = dialog.getByRole('progressbar', { name: 'Loading' })
+  const loadMore = dialog.getByRole('button', { name: 'Load more' })
+  const notice = dialog.getByRole('status')
+  const numbers = text.locator('[data-slot="attachment-preview-line-number"]')
+  const marker = text.getByText('... [truncated]', { exact: true })
+  const highlightedMiddle = text
+    .locator('code span')
+    .filter({ hasText: middle })
+  const scrollToEnd = () =>
+    text.evaluate((element) => {
+      element.scrollTop = element.scrollHeight
+    })
+
+  try {
+    await trigger.click()
+    await expect(loading).toBeVisible()
+    ready[0].resolve()
+    await expect(notice).toContainText('too large to preview all at once')
+    await expect(text).toContainText('const start = 1')
+    await expect(numbers.first()).toHaveText('1')
+    await expect(
+      text.locator('code span').filter({ hasText: /^const$/ }),
+    ).toBeVisible()
+    expect(await numbers.count()).toBeLessThan(150)
+
+    await scrollToEnd()
+    await expect(marker).toBeInViewport()
+    await expect(marker.locator('..').locator('code')).toHaveText(
+      prefix.split('\n').at(-1)!,
+    )
+
+    await loadMore.click()
+    await expect(notice).toContainText('128.0 KiB')
+    await text.evaluate((element, line) => {
+      element.scrollTop = (line - 1) * 18
+    }, middleLine)
+    await expect(highlightedMiddle).toHaveCSS('font-style', 'italic')
+    await expect(
+      highlightedMiddle
+        .locator('../..')
+        .locator('[data-slot="attachment-preview-line-number"]'),
+    ).toHaveText(String(middleLine))
+    await expect(highlightedMiddle.locator('../..')).not.toContainText(
+      '... [truncated]',
+    )
+    await scrollToEnd()
+    await expect(marker).toBeInViewport()
+    expect(requests).toBe(1)
+
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    await expect(page.getByLabel('Attachment text')).toHaveCount(0)
+    await expect(dialog).toBeHidden()
+    await trigger.click()
+    await expect(loading).toBeVisible()
+    await expect(text).toHaveCount(0)
+    ready[1].resolve()
+    await expect(loadMore).toBeVisible()
+    await expect(notice).toContainText('64.0 KiB')
+    await expect(text).toContainText('const start = 1')
+    await expect(numbers.first()).toHaveText('1')
+    await loadMore.click()
+    await expect(notice).toContainText('128.0 KiB')
+    await loadMore.click()
+    await expect(loadMore).toHaveCount(0)
+    await scrollToEnd()
+    await expect(text).toContainText(suffix)
+    await expect(marker).toHaveCount(0)
+    expect(requests).toBe(2)
+  } finally {
+    for (const request of ready) request.resolve()
+  }
+})
+
 test('remeasures wrapped attachments after resizing and removal', async ({
   page,
 }) => {

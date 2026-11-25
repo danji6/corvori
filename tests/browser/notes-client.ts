@@ -245,7 +245,14 @@ function attachmentMessages() {
         filename: 'project-report-with-a-long-attachment-name.pdf',
       }
     : file('second.png')
-  const parts: UIMessage['parts'] = [first, second]
+  const textFile = {
+    ...file('build.ts'),
+    mediaType: 'text/plain',
+  }
+  const parts: UIMessage['parts'] = [
+    first,
+    params.has('textAttachment') ? textFile : second,
+  ]
   if (!attachmentGuest)
     parts.unshift({ type: 'text', text: 'Keep this caption' })
   const sender = { type: 'user', id: 'owner' }

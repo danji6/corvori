@@ -77,6 +77,15 @@ test('picking a file keeps typing on the current composer line', async ({
 
   await page.keyboard.insertText(' these notes')
   await expect(editor.getByRole('heading')).toHaveText('Review these notes')
+
+  await composer(page)
+    .getByRole('button', { name: 'Preview notes.txt' })
+    .click()
+  const dialog = page.getByRole('dialog', { name: 'notes.txt' })
+  await expect(dialog.getByLabel('Attachment text').locator('code')).toHaveText(
+    'notes',
+  )
+  await expect(dialog.getByRole('button', { name: 'Load more' })).toHaveCount(0)
 })
 
 test('wraps large drafts and keeps file actions and the editor reachable', async ({

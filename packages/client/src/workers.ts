@@ -1,5 +1,6 @@
-import { type Remote, wrap } from 'comlink'
+import { type ProxyMarked, type Remote, wrap } from 'comlink'
 
+import type { createTextPreviewHighlighter } from './lib/shiki/core'
 import type { SchemeExport } from './lib/theme'
 
 export type WorkerApi<T> = {
@@ -29,6 +30,9 @@ export function ThemeWorker() {
 export type ShikiWorkerApi = {
   highlight: (code: string, lang?: string) => Promise<string>
   highlightDiff: (diff: string, lang?: string) => Promise<string>
+  openTextPreview: (
+    language: string,
+  ) => ReturnType<typeof createTextPreviewHighlighter> & ProxyMarked
 }
 
 export function ShikiWorker() {

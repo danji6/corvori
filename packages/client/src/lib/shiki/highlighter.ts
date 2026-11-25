@@ -1,5 +1,6 @@
 import { ShikiWorker, type ShikiWorkerApi } from '@/workers'
 import type { WorkerApi } from '@/workers'
+import { releaseProxy } from 'comlink'
 
 import { isClient } from '../utils'
 import { runDiffHighlighter, runHighlighter } from './core'
@@ -52,6 +53,37 @@ export async function highlightDiff(diff: string, lang?: string) {
   )
 }
 
+/** Opens a worker endpoint owned by a single text preview. */
+export function openTextPreviewHighlighter(
+  language: string,
+  signal: AbortSignal,
+) {
+  let endpoint:
+    ReturnType<WorkerApi<ShikiWorkerApi>['api']['openTextPreview']> | undefined
+  let pending: Promise<string[]> | undefined
+
+  signal.addEventListener(
+    'abort',
+    () => {
+      void Promise.allSettled([endpoint, pending]).then(([result]) => {
+        if (result.status === 'fulfilled') result.value?.[releaseProxy]()
+      })
+    },
+    { once: true },
+  )
+
+  return (complete: string | null, tail: string | null) => {
+    pending = schedule(async () => {
+      signal.throwIfAborted()
+      endpoint ??= getWorker().api.openTextPreview(language)
+      const highlight = await endpoint
+      signal.throwIfAborted()
+      return highlight(complete, tail)
+    })
+    return pending
+  }
+}
+
 function cacheKey(code: string, lang: string | undefined, diff: boolean) {
   return `${diff ? 'd' : 'c'}\0${lang ?? ''}\0${code}`
 }
@@ -73,7 +105,7 @@ function runOnce(key: string, run: () => Promise<string>): Promise<string> {
   return promise
 }
 
-function schedule(run: () => Promise<string>) {
+function schedule<T>(run: () => Promise<T>) {
   if (!isClient) return run()
 
   // A single worker cannot execute highlights concurrently. Serialize calls

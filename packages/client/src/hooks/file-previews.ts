@@ -7,6 +7,7 @@ export type FileItem = {
   id: string
   url: string
   file: File
+  originalFile?: File
   originalUrl?: string
   shareUrl?: string
   byteLength?: number
