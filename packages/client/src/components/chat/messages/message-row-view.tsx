@@ -17,6 +17,7 @@ import {
   useScopedAppearance,
 } from '@/lib/chat'
 import type { MessageRecord, PartMetadata } from '@/lib/chat'
+import type { PartGroup } from '@/lib/chat/parts'
 import { type MessageRow, segmentGroupsFor } from '@/lib/chat/rows'
 import { messageDisplayRole } from '@/lib/chat/sender-groups'
 import { cn, formatDuration, isTouchDevice } from '@/lib/utils'
@@ -76,8 +77,20 @@ export const MessageRowView = memo(function MessageRowView({
     return <PresenceNotice message={message} record={messageMeta} />
   }
 
+  const group =
+    row.kind === 'group'
+      ? segmentGroupsFor(message, messageMeta).find(
+          (slice) => slice.segmentIndex === row.segmentIndex,
+        )?.groups[row.groupIndex]
+      : undefined
+
   return (
-    <RowShell message={message} messageMeta={messageMeta} row={row}>
+    <RowShell
+      message={message}
+      messageMeta={messageMeta}
+      row={row}
+      naturalHeight={group?.type === 'files'}
+    >
       {row.kind === 'context-reset' ? (
         <ContextResetRow messageId={message.id} />
       ) : row.kind === 'header' ? (
@@ -89,6 +102,7 @@ export const MessageRowView = memo(function MessageRowView({
       ) : row.kind === 'group' ? (
         <GroupRow
           row={row}
+          group={group}
           message={message}
           messageMeta={messageMeta}
           partMeta={partMeta}
@@ -130,10 +144,17 @@ type RowShellProps = {
   message: UIMessage
   messageMeta?: MessageRecord
   row: MessageRow
+  naturalHeight: boolean
   children: React.ReactNode
 }
 
-function RowShell({ message, messageMeta, row, children }: RowShellProps) {
+function RowShell({
+  message,
+  messageMeta,
+  row,
+  naturalHeight,
+  children,
+}: RowShellProps) {
   const rowRef = useRef<HTMLDivElement>(null)
   // The header's row includes the gutter, even when the text column stays fixed.
   const headerWidthRef = row.kind === 'header' ? rowRef : undefined
@@ -204,7 +225,7 @@ function RowShell({ message, messageMeta, row, children }: RowShellProps) {
           roleClass,
         )}
       >
-        {row.kind === 'footer' ? (
+        {row.kind === 'footer' || naturalHeight ? (
           children
         ) : (
           <GrowOnly growKey={growKey} widthRef={headerWidthRef}>
@@ -318,17 +339,20 @@ function useReasoningHeader(
 
 type GroupRowProps = {
   row: Extract<MessageRow, { kind: 'group' }>
+  group?: PartGroup
   message: UIMessage
   messageMeta?: MessageRecord
   partMeta?: PartMetadata
 }
 
-function GroupRow({ row, message, messageMeta, partMeta }: GroupRowProps) {
+function GroupRow({
+  row,
+  group,
+  message,
+  messageMeta,
+  partMeta,
+}: GroupRowProps) {
   const attachmentIds = useAttachmentIds(message)
-  const slice = segmentGroupsFor(message, messageMeta).find(
-    (candidate) => candidate.segmentIndex === row.segmentIndex,
-  )
-  const group = slice?.groups[row.groupIndex]
   const segment = messageMeta?.segments.find(
     ({ index }) => index === row.segmentIndex,
   )

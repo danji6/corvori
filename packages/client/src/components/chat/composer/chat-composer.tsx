@@ -393,8 +393,17 @@ export function ChatComposer({
     return editor ? pasteCollapsedText(editor, e) : false
   }
 
-  async function handleFilePick(picked: ComposerFileBatch) {
+  function handleFilePick(picked: ComposerFileBatch) {
     if (props.inert) return
+    return addFilesToDraft(picked)
+  }
+
+  function handleViewportFileDrop(picked: ComposerFileBatch) {
+    if (fileDropDisabled) return
+    return addFilesToDraft(picked)
+  }
+
+  async function addFilesToDraft(picked: ComposerFileBatch) {
     if (!(await attachments.addFiles(picked))) return
     dropZoneRef.current?.clear()
     const editor = editorRef.current
@@ -438,7 +447,7 @@ export function ChatComposer({
             disabled={fileDropDisabled}
             draftKey={draftKey}
             pickerRef={dropZoneRef}
-            onDrop={handleFilePick}
+            onDrop={handleViewportFileDrop}
           />
           {isTypingCommandName && (
             <CommandPicker
@@ -478,6 +487,7 @@ export function ChatComposer({
             )}
             <FileStrip
               files={attachments.files}
+              className="max-h-[min(40dvh,20rem)] overflow-x-hidden overflow-y-auto"
               onRemove={attachments.removeFile}
               onInsertInline={attachments.insertInline}
               noAnimation={sending}

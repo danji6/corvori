@@ -236,7 +236,16 @@ function attachmentMessages() {
     url: 'attachment:first',
     attachmentId: 'first-file',
   }
-  const parts: UIMessage['parts'] = [first, file('second.png')]
+  const second = params.has('wrappedAttachments')
+    ? {
+        type: 'file' as const,
+        url: 'attachment:report',
+        attachmentId: 'report-file',
+        mediaType: 'application/pdf',
+        filename: 'project-report-with-a-long-attachment-name.pdf',
+      }
+    : file('second.png')
+  const parts: UIMessage['parts'] = [first, second]
   if (!attachmentGuest)
     parts.unshift({ type: 'text', text: 'Keep this caption' })
   const sender = { type: 'user', id: 'owner' }
@@ -603,12 +612,14 @@ function query(name: string, args: Record<string, unknown>) {
   }
   if (attachmentActions && name === 'attachments:getUrlMap') {
     const url = 'https://storage.example.test/first.png'
+    const reportUrl = 'https://storage.example.test/report.pdf'
     return {
       'first-file': {
         url,
         previewUrl: 'https://storage.example.test/first-preview.png',
         shareUrl: url,
       },
+      'report-file': { url: reportUrl, shareUrl: reportUrl, byteLength: 2048 },
     }
   }
   if (params.has('liveAuthors')) {

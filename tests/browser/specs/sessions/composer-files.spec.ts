@@ -72,11 +72,59 @@ test('picking a file keeps typing on the current composer line', async ({
   })
   await expect(
     composer(page).getByRole('button', { name: 'Preview notes.txt' }),
-  ).toBeVisible()
+  ).toContainText('5 B')
   await expect(editor).toBeFocused()
 
   await page.keyboard.insertText(' these notes')
   await expect(editor.getByRole('heading')).toHaveText('Review these notes')
+})
+
+test('wraps large drafts and keeps file actions and the editor reachable', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 600, height: 580 })
+  await page.goto('/?fixture=empty-chat')
+  const longName = `${'long-attachment-name-'.repeat(5)}.txt`
+  const names = [
+    longName,
+    ...Array.from({ length: 9 }, (_, i) => `notes-${i}.txt`),
+  ]
+  await picker(page).setInputFiles(
+    names.map((name) => ({
+      name,
+      mimeType: 'text/plain',
+      buffer: Buffer.alloc(0),
+    })),
+  )
+
+  const strip = composer(page).locator('[data-slot="file-strip"]')
+  const fullName = strip.getByText(longName, { exact: true })
+  await expect(fullName).toHaveAttribute('title', longName)
+  await expect(
+    strip.getByRole('button', { name: `Preview ${longName}` }),
+  ).toContainText('0 B')
+  await expect
+    .poll(() =>
+      fullName.evaluate((element) => element.scrollWidth > element.clientWidth),
+    )
+    .toBe(true)
+
+  await expect
+    .poll(() =>
+      strip.evaluate((element) => ({
+        hasVerticalOverflow: element.scrollHeight > element.clientHeight,
+        hasHorizontalOverflow: element.scrollWidth > element.clientWidth,
+      })),
+    )
+    .toEqual({ hasVerticalOverflow: true, hasHorizontalOverflow: false })
+
+  const remove = strip.getByRole('button', { name: 'Remove file notes-8.txt' })
+  await remove.click()
+  await expect(remove).toHaveCount(0)
+  const editor = composer(page).locator('[contenteditable="true"]')
+  await expect(editor).toBeInViewport()
+  await editor.fill('Draft with files')
+  await expect(editor).toHaveText('Draft with files')
 })
 
 test('shows a saved link preview after send, scroll remount, and reload', async ({
@@ -208,8 +256,15 @@ test('shows mixed attachments immediately and keeps them visible through confirm
     await page.evaluate(() =>
       window.dispatchEvent(new Event('release-attachment-urls')),
     )
-    await expect(files.getByLabel('Download screen.png')).toBeVisible()
+    await expect(
+      files.locator('[data-attachment-name="screen.png"]'),
+    ).toHaveAttribute('data-attachment-url', /\/composer-file\//)
+    await preview.click({ button: 'right' })
+    await expect(
+      page.getByRole('menuitem', { name: 'Download', exact: true }),
+    ).toBeVisible()
     await expect(preview).toHaveAttribute('src', /^data:image/)
+    await page.keyboard.press('Escape')
   } finally {
     remote.resolve()
   }
