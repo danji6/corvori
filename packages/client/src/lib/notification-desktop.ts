@@ -3,7 +3,7 @@ import {
   notificationBody,
   notificationTag,
 } from '@/lib/chat/notification-ui'
-import { APP_ID } from '@cv/core/const'
+import { APP_ID, APP_NAME } from '@cv/core/const'
 import { desktopApprovalActions } from '@cv/core/notification-actions'
 
 /** Shows a native notification when browser permission allows it. */
@@ -39,7 +39,8 @@ export async function showDesktopNotification(
       : [{ action: 'dismiss', title: 'Dismiss' }],
   }
 
-  await registration.showNotification(notification.actorName, options)
+  const title = `${APP_NAME} · ${notification.actorName}`
+  await registration.showNotification(title, options)
   return true
 }
 

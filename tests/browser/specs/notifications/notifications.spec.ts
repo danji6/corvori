@@ -29,11 +29,12 @@ test('toast shows the agent description and applies a session approval without n
   await expect(page).toHaveURL(/id=other-chat/)
 })
 
-test('desktop options contain the description and a session click responds in the background', async ({
+test('desktop notifications show the app and sender and support background approval', async ({
   page,
 }) => {
   await page.addInitScript(() => {
     const captures: Array<{
+      title: string
       data: { userId: string; notificationId: string; sessionId: string }
       body: string
       actions: unknown[]
@@ -51,10 +52,10 @@ test('desktop options contain the description and a session click responds in th
     const worker = new EventTarget()
     const registration = {
       showNotification: async (
-        _title: string,
-        options: (typeof captures)[number],
+        title: string,
+        options: Omit<(typeof captures)[number], 'title'>,
       ) => {
-        captures.push(options)
+        captures.push({ ...options, title })
       },
       getNotifications: async () =>
         captures.map((options) => ({
@@ -79,6 +80,7 @@ test('desktop options contain the description and a session click responds in th
     )
     .toMatchObject([
       {
+        title: 'Corvori · Ada',
         body: 'Start the local sidecar test server',
         requireInteraction: true,
         actions: [
