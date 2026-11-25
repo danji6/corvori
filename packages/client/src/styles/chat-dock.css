@@ -1,7 +1,7 @@
 @layer components {
   [data-slot='chat-dock'] {
     --dock-widgets-height: --spacing(9);
-    --dock-widgets-gap: --spacing(1);
+    --dock-widgets-gap: --spacing(2);
   }
 
   [data-slot='chat-dock-alert'] {

@@ -76,7 +76,7 @@ export function ReplyQuoteCard({
         className={cn(
           'flex min-w-0 flex-1',
           jump &&
-            'hover:bg-m3-surface-container focus-visible:ring-ring cursor-pointer outline-0 transition-colors focus-visible:ring-1 focus-visible:ring-inset',
+            'hover:bg-m3-surface-container focus-visible:ring-ring cursor-pointer rounded-xl outline-0 transition-colors focus-visible:ring-1 focus-visible:ring-inset',
         )}
       >
         <span
