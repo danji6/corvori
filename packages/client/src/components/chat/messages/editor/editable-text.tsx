@@ -46,6 +46,7 @@ export function EditableText({
   const isStreaming = part.state === 'streaming'
 
   const editingAddress = editCtx?.editingAddress ?? null
+  const replyQuoteRemoved = editCtx?.replyQuoteRemoved
   const isEditing =
     editCtx?.editingMessageId === msgCtx?.id &&
     (editingAddress == null ||
@@ -72,6 +73,12 @@ export function EditableText({
     }
     prevShouldEditRef.current = !!shouldEdit
   }, [shouldEdit, onLayoutChange])
+
+  useLayoutEffect(() => {
+    if (shouldEdit && replyQuoteRemoved) {
+      editorRef.current?.view.dom.focus({ preventScroll: true })
+    }
+  }, [shouldEdit, replyQuoteRemoved])
 
   const appliedScrollRef = useRef(0)
   const entryScrollRef = useRef(0)

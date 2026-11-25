@@ -1,12 +1,17 @@
 import type { MessageRow } from '@/lib/chat/rows'
 import { exportSchemeCss } from '@/lib/theme'
 import type { Id } from '@cv/convex/_generated/dataModel'
-import { deleteMessageAttachment } from '@cv/convex/model/chat/mutations'
+import {
+  deleteMessageAttachment,
+  editMessage,
+} from '@cv/convex/model/chat/mutations'
 import { quoteMessage } from '@cv/convex/model/chat/replies'
 import { DEFAULT_SETTINGS } from '@cv/convex/model/defaults'
 import type {
   DeleteMessageAttachmentArgs,
+  EditMessageArgs,
   PartAddress,
+  ReplyQuote,
 } from '@cv/convex/validators/messages'
 import { parseShellCommand } from '@cv/core/shell/command'
 import { toDisplayName } from '@cv/core/utils/names'
@@ -79,6 +84,7 @@ function noteExtra(type?: NoteType) {
 const params = new URLSearchParams(location.search)
 const attachmentActions = params.has('attachmentActions')
 const attachmentGuest = params.has('attachmentGuest')
+const replyQuoteEditing = params.has('replyQuoteEditing')
 let continuationActive = params.has('continuation')
 let planContent = 'Original plan'
 let submittedShell: ReturnType<typeof message> | undefined
@@ -151,7 +157,7 @@ if (params.has('liveAuthors')) {
 
 function initialMessages() {
   if (attachmentActions) return attachmentMessages()
-  if (params.has('liveAuthors')) {
+  if (params.has('liveAuthors') || replyQuoteEditing) {
     const answer = {
       ...message('answer', 1),
       role: 'assistant',
@@ -284,7 +290,7 @@ function attachmentMessages() {
   ]
 }
 
-function attachmentDb() {
+function messageDb() {
   const userId = attachmentGuest ? 'guest' : 'owner'
   const db = lifecycleDatabase({
     sessions: [{ _id: 'notes', ownerId: 'owner' }],
@@ -824,7 +830,7 @@ export const notesClient = {
   ) {
     const name = getFunctionName(reference)
     if (attachmentActions && name === 'chat:deleteMessageAttachment') {
-      const { ctx, rows } = attachmentDb()
+      const { ctx, rows } = messageDb()
       const deleted = await deleteMessageAttachment(
         ctx,
         args as DeleteMessageAttachmentArgs,
@@ -846,6 +852,27 @@ export const notesClient = {
       }
       refresh()
       return deleted
+    }
+    if (replyQuoteEditing && name === 'chat:editMessage') {
+      if (params.has('rejectQuoteRemoval'))
+        throw new Error('Quote removal rejected')
+      const { ctx, rows } = messageDb()
+      await editMessage(ctx, args as EditMessageArgs)
+      const saved = rows('messages').find((row) => row._id === args.messageId)
+      const parts = rows('messageContents').find(
+        (segment) => segment.messageId === args.messageId,
+      )?.parts as UIMessage['parts']
+      messages = messages.map((row) =>
+        row._id === args.messageId
+          ? ({
+              ...row,
+              replyTo: saved?.replyTo as ReplyQuote | undefined,
+              segments: [{ ...row.segments[0], parts }],
+            } as typeof row)
+          : row,
+      )
+      refresh()
+      return
     }
     if (backgrounds && name === 'settings:update') {
       localStorage.setItem(
@@ -902,7 +929,7 @@ export const notesClient = {
       const quote =
         attachmentActions && args.replyToId
           ? await quoteMessage(
-              attachmentDb().ctx,
+              messageDb().ctx,
               'notes' as Id<'sessions'>,
               args.replyToId,
               args.replyToPart,

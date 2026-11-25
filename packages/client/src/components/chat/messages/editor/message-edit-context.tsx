@@ -42,6 +42,8 @@ export type MessageEditContextValue = {
   completedEditRevision: number
   onSave: () => void
   onCancel: () => void
+  replyQuoteRemoved: boolean
+  onRemoveReplyQuote: () => void
   startEditing: (messageId: string, content: string, opts?: EditOptions) => void
   pendingSelection: PendingSelection | null
 }
@@ -63,9 +65,16 @@ type PendingRequest = {
   opts?: EditOptions
 }
 
+export type MessageEditChange = {
+  id: string
+  content?: string
+  address?: PartAddress
+  removeReplyQuote?: true
+}
+
 export type MessageEditProviderProps = {
   children: React.ReactNode
-  onEdit: (id: string, content: string, address?: PartAddress) => void
+  onEdit: (change: MessageEditChange) => void
 }
 
 export function MessageEditProvider({
@@ -74,7 +83,9 @@ export function MessageEditProvider({
 }: MessageEditProviderProps) {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editingAddress, setEditingAddress] = useState<PartAddress | null>(null)
+  const [replyQuoteRemoved, setReplyQuoteRemoved] = useState(false)
   const draftRef = useRef('')
+  const originalContentRef = useRef('')
   const addressRef = useRef<PartAddress | undefined>(undefined)
   const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null) // prettier-ignore
   const [pendingRequest, setPendingRequest] = useState<PendingRequest | null>(null) // prettier-ignore
@@ -88,15 +99,18 @@ export function MessageEditProvider({
   const clearState = useCallback(() => {
     setEditingMessageId(null)
     setEditingAddress(null)
+    setReplyQuoteRemoved(false)
     setPendingSelection(null)
   }, [])
 
   const activate = useCallback(
     (messageId: string, content: string, opts?: EditOptions) => {
       draftRef.current = content
+      originalContentRef.current = content
       addressRef.current = opts?.address
       setEditingMessageId(messageId)
       setEditingAddress(opts?.address ?? null)
+      setReplyQuoteRemoved(false)
       setPendingSelection(
         opts && (opts.selectedText || opts.caret || opts.caretOffset != null)
           ? {
@@ -128,14 +142,27 @@ export function MessageEditProvider({
     [activate],
   )
 
-  const onSave = useCallback(() => {
+  const saveDraft = useCallback(() => {
     const { editingMessageId: id, onEdit: edit } = latestRef.current
-    if (id) {
-      edit(id, draftRef.current.trim(), addressRef.current)
+    if (!id) return false
+    const content = draftRef.current.trim()
+    const quoteOnly =
+      replyQuoteRemoved && content === originalContentRef.current.trim()
+    edit({
+      id,
+      content: quoteOnly ? undefined : content,
+      address: addressRef.current,
+      ...(replyQuoteRemoved && { removeReplyQuote: true }),
+    })
+    return true
+  }, [replyQuoteRemoved])
+
+  const onSave = useCallback(() => {
+    if (saveDraft()) {
       setCompletedEditRevision((revision) => revision + 1)
     }
     clearState()
-  }, [clearState])
+  }, [clearState, saveDraft])
 
   const onCancel = useCallback(() => {
     if (latestRef.current.editingMessageId) {
@@ -144,22 +171,7 @@ export function MessageEditProvider({
     clearState()
   }, [clearState])
 
-  function handleConfirmSave() {
-    const { editingMessageId: id, onEdit: edit } = latestRef.current
-    if (id) {
-      edit(id, draftRef.current.trim(), addressRef.current)
-    }
-    const req = pendingRequest
-    setPendingRequest(null)
-    clearState()
-    if (req) {
-      startTransition(() => activate(req.messageId, req.content, req.opts))
-    } else if (id) {
-      setCompletedEditRevision((revision) => revision + 1)
-    }
-  }
-
-  function handleConfirmDiscard() {
+  function finishSwitch() {
     const req = pendingRequest
     setPendingRequest(null)
     clearState()
@@ -170,6 +182,13 @@ export function MessageEditProvider({
     }
   }
 
+  function handleConfirmSave() {
+    saveDraft()
+    finishSwitch()
+  }
+
+  const onRemoveReplyQuote = useCallback(() => setReplyQuoteRemoved(true), [])
+
   const contextValue = useMemo<MessageEditContextValue>(
     () => ({
       editingMessageId,
@@ -177,6 +196,8 @@ export function MessageEditProvider({
       completedEditRevision,
       onSave,
       onCancel,
+      replyQuoteRemoved,
+      onRemoveReplyQuote,
       startEditing,
       pendingSelection,
     }),
@@ -186,6 +207,8 @@ export function MessageEditProvider({
       completedEditRevision,
       onSave,
       onCancel,
+      replyQuoteRemoved,
+      onRemoveReplyQuote,
       startEditing,
       pendingSelection,
     ],
@@ -222,10 +245,7 @@ export function MessageEditProvider({
             </AlertDialog.Header>
             <AlertDialog.Footer>
               <AlertDialog.Cancel>Keep editing</AlertDialog.Cancel>
-              <AlertDialog.Action
-                variant="destructive"
-                onClick={handleConfirmDiscard}
-              >
+              <AlertDialog.Action variant="destructive" onClick={finishSwitch}>
                 Discard
               </AlertDialog.Action>
               <AlertDialog.Action onClick={handleConfirmSave}>

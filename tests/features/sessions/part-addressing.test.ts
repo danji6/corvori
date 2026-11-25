@@ -2,6 +2,7 @@
 import {
   deleteMessageAttachment,
   deleteMessageParts,
+  editMessage,
   editMessagePart,
 } from '@cv/convex/model/chat'
 import { messageFileKey } from '@cv/core/attachments'
@@ -298,5 +299,76 @@ describe('editMessagePart', () => {
         text: 'nope',
       }),
     ).rejects.toThrow()
+  })
+})
+
+describe('removing a reply quote while editing', () => {
+  const messageId = 'm_1' as never
+
+  function withQuote() {
+    const { message, segments } = fixture()
+    message.sender = { type: 'user', id: 'user_1' }
+    message.contextEligible = true
+    message.replyTo = {
+      target: { id: 'original', creationTime: 1 },
+      sender: { type: 'agent', id: 'agent_1' },
+      senderName: 'Agent',
+      text: 'Original message',
+    }
+    segments[1].parts = [
+      { type: 'file', url: 'attachment:a', attachmentId: 'a' },
+      text('Keep  **this** formatting'),
+    ]
+    return { message, segments }
+  }
+
+  test('a quote-only edit preserves all content and invalidates history once', async () => {
+    const { message, segments } = withQuote()
+    const originalSegments = structuredClone(segments)
+    const { ctx, patches, rows } = mutationCtx({ message, segments })
+
+    await editMessage(ctx, { messageId, removeReplyQuote: true })
+    await editMessage(ctx, { messageId, removeReplyQuote: true })
+
+    expect(message.replyTo).toBeUndefined()
+    expect(rows).toEqual(originalSegments)
+    expect(patches).toEqual([
+      { id: messageId, patch: { replyTo: undefined } },
+      { id: 'state_1', patch: { completedHistoryRevision: 1 } },
+    ])
+  })
+
+  test('can save a block edit and remove the quote in the same mutation', async () => {
+    const data = withQuote()
+    const { ctx, patches, rows } = mutationCtx(data)
+
+    await editMessagePart(ctx, {
+      messageId,
+      segmentIndex: 1,
+      partIndex: 1,
+      text: 'Edited caption',
+      removeReplyQuote: true,
+    })
+
+    expect(data.message.replyTo).toBeUndefined()
+    expect(rows[0].parts).toEqual([text('a0'), text('a1')])
+    expect(rows[1].parts).toEqual([
+      { type: 'file', url: 'attachment:a', attachmentId: 'a' },
+      text('Edited caption'),
+    ])
+    expect(patches.filter(({ id }) => id === 'state_1')).toEqual([
+      { id: 'state_1', patch: { completedHistoryRevision: 1 } },
+    ])
+  })
+
+  test('requires the same permission as a text edit', async () => {
+    const data = withQuote()
+    const { ctx, patches } = mutationCtx(data, 'another_user')
+
+    await expect(
+      editMessage(ctx, { messageId, removeReplyQuote: true }),
+    ).rejects.toThrow('Forbidden')
+    expect(data.message.replyTo).toBeDefined()
+    expect(patches).toHaveLength(0)
   })
 })

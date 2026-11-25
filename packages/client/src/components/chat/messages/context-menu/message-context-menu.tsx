@@ -72,7 +72,8 @@ export function MessageContextMenu({
   const highlight = useMessageHighlight()
   const [confirm, setConfirm] = useState<DeleteConfirmation | null>(null)
   const [selection, setSelection] = useState<MenuSelection | null>(null)
-  const isEditing = editCtx?.editingMessageId === message.id
+  const editingMessageId = editCtx?.editingMessageId
+  const isEditingThisMessage = editingMessageId === message.id
 
   const editSelectionRef = useRef<MessageEditSelectionSnapshot | null>(null)
   const ownsHighlightRef = useRef(false)
@@ -184,7 +185,7 @@ export function MessageContextMenu({
     })
   }
 
-  if (isEditing) return children
+  if (isEditingThisMessage) return children
 
   return (
     <>
@@ -207,7 +208,10 @@ export function MessageContextMenu({
             </>
           )}
           {reply && (
-            <ContextMenu.Item onSelect={reply}>
+            <ContextMenu.Item
+              onSelect={reply}
+              disabled={Boolean(editingMessageId)}
+            >
               <ReplyIcon />
               Reply
             </ContextMenu.Item>

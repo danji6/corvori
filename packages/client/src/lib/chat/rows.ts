@@ -97,6 +97,20 @@ export type MessageRow = MessageRowKind & {
   summary?: boolean
 }
 
+/** Hides the edit draft's quote while keeping the following row's key stable. */
+export function omitReplyRow(rows: MessageRow[], messageId: string) {
+  const index = rows.findIndex(
+    (row) => row.kind === 'reply' && row.messageId === messageId,
+  )
+  if (index < 0) return rows
+
+  const next = rows.slice(index + 1)
+  if (rows[index].grouped && next[0]?.messageId === messageId) {
+    next[0] = { ...next[0], grouped: true }
+  }
+  return [...rows.slice(0, index), ...next]
+}
+
 /** One loaded segment's part slice with its cached part groups. */
 export type SegmentGroups = {
   segmentIndex: number

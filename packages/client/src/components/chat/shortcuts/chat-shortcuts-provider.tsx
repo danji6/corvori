@@ -50,10 +50,15 @@ export function ChatShortcutsProvider({
     return true
   }, [store, editCtx, messageListRef])
 
+  const cancelAfterQuoteRemoval = editCtx?.replyQuoteRemoved
+    ? editCtx.onCancel
+    : undefined
+
   // Keep the window listener stable while still reading live state
   const latestRef = useRef({
     status,
     editingMessageId: editCtx?.editingMessageId,
+    cancelAfterQuoteRemoval,
     onAbort,
     onOpenSearch,
   })
@@ -61,15 +66,21 @@ export function ChatShortcutsProvider({
     latestRef.current = {
       status,
       editingMessageId: editCtx?.editingMessageId,
+      cancelAfterQuoteRemoval,
       onAbort,
       onOpenSearch,
     }
-  }, [status, editCtx?.editingMessageId, onAbort, onOpenSearch])
+  }, [
+    status,
+    editCtx?.editingMessageId,
+    cancelAfterQuoteRemoval,
+    onAbort,
+    onOpenSearch,
+  ])
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      const { status, editingMessageId, onAbort, onOpenSearch } =
-        latestRef.current
+      const { status, editingMessageId, cancelAfterQuoteRemoval, onAbort, onOpenSearch } = latestRef.current // prettier-ignore
 
       if (
         (e.metaKey || e.ctrlKey) &&
@@ -84,7 +95,11 @@ export function ChatShortcutsProvider({
 
       if (e.key === 'Escape') {
         if (e.defaultPrevented) return // command picker handled it
-        if (editingMessageId) return // inline editor handles cancel
+        if (editingMessageId) {
+          // The text editor may be outside the rendered window when X had focus.
+          if (e.target === document.body) cancelAfterQuoteRemoval?.()
+          return
+        }
         if (status === 'ready') return // nothing to stop
         e.preventDefault()
         if (onAbort) onAbort()

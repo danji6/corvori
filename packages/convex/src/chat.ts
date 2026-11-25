@@ -176,7 +176,7 @@ export const impersonate = authMutation({
 })
 
 export const editMessage = authMutation({
-  args: { messageId: v.id('messages'), content: v.string() },
+  args: V.editMessageArgsValidator.fields,
   handler: Chat.editMessage,
 })
 

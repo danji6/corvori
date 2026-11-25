@@ -16,6 +16,7 @@ import { ChatSearchProvider } from '@/components/chat/search/chat-search-context
 import { SessionAgentList } from '@/components/chat/sessions/session-agent-list'
 import { SessionMemberList } from '@/components/chat/sessions/session-member-list'
 import { SessionPlanSection } from '@/components/chat/sessions/session-plan-section'
+import { Toaster } from '@/components/ui/sonner'
 import '@/globals.css'
 import { AttachmentUrlProvider } from '@/hooks/chat/attachment-urls'
 import { AvatarUrlProvider } from '@/hooks/chat/avatars'
@@ -306,6 +307,7 @@ function Composer() {
 export function NotesFixture() {
   return (
     <ConvexProvider client={notesClient}>
+      {composerParams.has('rejectQuoteRemoval') && <Toaster />}
       {composerParams.has('liveAuthors') && <AvatarUrlProvider />}
       {composerParams.has('attachmentActions') && <AttachmentUrlProvider />}
       {composerParams.has('liveAuthors') && (
@@ -318,7 +320,8 @@ export function NotesFixture() {
         {backgrounds && <BackgroundSettings />}
         {composerParams.has('plan') ? (
           <SessionPlanSection />
-        ) : composerParams.has('contextReset') ? (
+        ) : composerParams.has('contextReset') ||
+          composerParams.has('replyQuoteEditing') ? (
           <ChatSearchProvider>
             <ChatSession
               sessionId="notes"

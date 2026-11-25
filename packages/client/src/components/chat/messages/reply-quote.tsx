@@ -1,11 +1,13 @@
 import { MarkdownSnippet } from '@/components/markdown'
+import { RippleButton } from '@/components/ui'
 import { useAuthorProfile } from '@/hooks/chat/author-profile'
 import { cn } from '@/lib/utils'
 import type { ReplyQuote } from '@cv/convex/validators/messages'
 import { toDisplayName } from '@cv/core/utils/names'
-import { BotIcon, UserIcon } from 'lucide-react'
+import { BotIcon, UserIcon, XIcon } from 'lucide-react'
 import { useCallback } from 'react'
 
+import { useMessageEdit } from './editor/message-edit-context'
 import {
   highlightTargetForRow,
   useMessageHighlight,
@@ -38,6 +40,9 @@ export function ReplyQuoteCard({
 }: ReplyQuoteCardProps) {
   const highlightRef = useMessageHighlightRef(messageId)
   const jump = useJumpToMessage(quote.target)
+  const edit = useMessageEdit()
+  const onRemove =
+    edit?.editingMessageId === messageId ? edit.onRemoveReplyQuote : undefined
   const unavailable = !quote.target && !quote.text
 
   function handleClick(event: React.MouseEvent) {
@@ -47,6 +52,7 @@ export function ReplyQuoteCard({
   }
 
   function handleKeyDown(event: React.KeyboardEvent) {
+    if (event.target !== event.currentTarget) return
     if (event.key !== 'Enter' && event.key !== ' ') return
     event.preventDefault()
     jump?.()
@@ -56,30 +62,47 @@ export function ReplyQuoteCard({
     <div
       ref={highlightRef}
       data-slot="reply-quote"
-      role={jump ? 'button' : undefined}
-      tabIndex={jump ? 0 : undefined}
-      title={jump ? 'Jump to message' : undefined}
-      onClick={jump ? handleClick : undefined}
-      onKeyDown={jump ? handleKeyDown : undefined}
       className={cn(
         'bg-m3-surface-container-low flex w-full min-w-0 overflow-hidden rounded-xl border text-left',
-        jump &&
-          'hover:bg-m3-surface-container focus-visible:ring-ring cursor-pointer outline-0 transition-colors focus-visible:ring-1',
         className,
       )}
     >
-      <span
-        aria-hidden
+      <div
+        role={jump ? 'button' : undefined}
+        tabIndex={jump ? 0 : undefined}
+        title={jump ? 'Jump to message' : undefined}
+        onClick={jump ? handleClick : undefined}
+        onKeyDown={jump ? handleKeyDown : undefined}
         className={cn(
-          'w-1 shrink-0',
-          unavailable ? 'bg-border' : 'bg-m3-primary',
+          'flex min-w-0 flex-1',
+          jump &&
+            'hover:bg-m3-surface-container focus-visible:ring-ring cursor-pointer outline-0 transition-colors focus-visible:ring-1 focus-visible:ring-inset',
         )}
-      />
-      <ReplyAttachmentThumbnail quote={quote} />
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5 px-3 py-2">
-        {!unavailable && <ReplyQuoteSender quote={quote} />}
-        <ReplyQuoteExcerpt quote={quote} lines={2} />
+      >
+        <span
+          aria-hidden
+          className={cn(
+            'w-1 shrink-0',
+            unavailable ? 'bg-border' : 'bg-m3-primary',
+          )}
+        />
+        <ReplyAttachmentThumbnail quote={quote} />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5 px-3 py-2">
+          {!unavailable && <ReplyQuoteSender quote={quote} />}
+          <ReplyQuoteExcerpt quote={quote} lines={2} />
+        </div>
       </div>
+      {onRemove && (
+        <RippleButton
+          size="icon-sm"
+          variant="surface"
+          aria-label="Remove reply quote"
+          className="text-muted-foreground mr-1 shrink-0 self-center"
+          onClick={onRemove}
+        >
+          <XIcon />
+        </RippleButton>
+      )}
     </div>
   )
 }

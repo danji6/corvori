@@ -6,7 +6,7 @@ import type { UIMessage } from 'ai'
 import { dequal } from 'dequal'
 
 import { limitRetained, mergeRetained } from './message-merge'
-import { type MessageRow, buildRows, rowKeysEqual } from './rows'
+import { type MessageRow, buildRows, omitReplyRow, rowKeysEqual } from './rows'
 import type { MessageRecord, PartMetadata } from './types'
 import { createWorkIdentity } from './work-layout'
 
@@ -108,6 +108,7 @@ export function createMessageStore() {
   const resolveWorkId = createWorkIdentity()
 
   const listeners = new Set<() => void>()
+  const pendingQuoteRemovals = new Set<string>()
 
   const subscribe = (listener: () => void) => {
     listeners.add(listener)
@@ -115,13 +116,16 @@ export function createMessageStore() {
   }
 
   const rebuildRows = (): boolean => {
-    const nextRows = buildRows(
+    let nextRows = buildRows(
       ids,
       (id) => messagesById.get(id) ?? null,
       (id) => messageMetaByMessage.get(id),
       (id) => partMetaByMessage.get(id),
       { groupBySender, resolveWorkId },
     )
+    for (const id of pendingQuoteRemovals) {
+      nextRows = omitReplyRow(nextRows, id)
+    }
     if (rowKeysEqual(rows, nextRows)) return false
     rows = nextRows
     return true
@@ -141,6 +145,25 @@ export function createMessageStore() {
     partMetaByMessage = mapWithout(partMetaByMessage, messageId)
     rebuildRows()
     listeners.forEach((listener) => listener())
+  }
+
+  /** Hides the quote while saving, even if its message leaves the live query. */
+  const beginReplyQuoteRemoval = (messageId: string) => {
+    pendingQuoteRemovals.add(messageId)
+    if (rebuildRows()) listeners.forEach((listener) => listener())
+
+    return (saved: boolean) => {
+      pendingQuoteRemovals.delete(messageId)
+      const record = messageMetaByMessage.get(messageId)
+      const reconciled = saved && record?.replyTo !== undefined
+      if (reconciled) {
+        messageMetaByMessage = new Map(messageMetaByMessage)
+        messageMetaByMessage.set(messageId, { ...record, replyTo: undefined })
+      }
+      if (rebuildRows() || reconciled) {
+        listeners.forEach((listener) => listener())
+      }
+    }
   }
 
   const sync = (input: MessageStoreInput) => {
@@ -223,6 +246,7 @@ export function createMessageStore() {
     subscribe,
     sync,
     evict,
+    beginReplyQuoteRemoval,
     getIds: () => ids,
     getRows: () => rows,
     getWindowMetadata: () => windowMeta,

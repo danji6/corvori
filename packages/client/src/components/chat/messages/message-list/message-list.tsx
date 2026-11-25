@@ -29,7 +29,7 @@ import { useVersionHold } from '@/hooks/chat/message-list/version-hold'
 import { useWindowSlide } from '@/hooks/chat/message-list/window-slide'
 import { getNavPaddingPx } from '@/hooks/nav-padding'
 import { useScroller } from '@/hooks/scroller'
-import type { MessageRow } from '@/lib/chat/rows'
+import { type MessageRow, omitReplyRow } from '@/lib/chat/rows'
 import { isOngoingStream } from '@/lib/chat/stream'
 import {
   useCallback,
@@ -101,7 +101,14 @@ export function MessageList({
   ...rest
 }: MessageListProps) {
   const messageIds = useMessageIds()
-  const rows = useMessageRows()
+  const messageRows = useMessageRows()
+  const edit = useMessageEdit()
+  const editingId = edit?.editingMessageId ?? null
+  const replyQuoteRemoved = edit?.replyQuoteRemoved
+  const rows = useMemo(() => {
+    if (!editingId || !replyQuoteRemoved) return messageRows
+    return omitReplyRow(messageRows, editingId)
+  }, [editingId, messageRows, replyQuoteRemoved])
   const messageStore = useMessageStore()
   const profile = useUserProfile()
   const status = useChatStatus()
@@ -179,7 +186,7 @@ export function MessageList({
 
   const autoScroll = scrollMode === 'follow' || followOverride || subagentFollow
 
-  const isEditing = !!useMessageEdit()?.editingMessageId
+  const isEditing = !!editingId
 
   const releaseFollowOverride = useCallback(() => {
     setFollowOverride(false)
@@ -348,8 +355,6 @@ export function MessageList({
   useEffect(() => {
     handleScrollChange()
   }, [messageIds, handleScrollChange])
-
-  const editingId = useMessageEdit()?.editingMessageId ?? null
 
   // Bring the edited message into view to keep it mounted while editing
   useEffect(() => {

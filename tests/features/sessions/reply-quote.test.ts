@@ -1,4 +1,5 @@
 /// <reference types="bun-types" />
+import { createMessageStore } from '@/lib/chat/message-store'
 import { replyTargetFor } from '@/lib/chat/reply-target-store'
 import { buildRows, findPartRow } from '@/lib/chat/rows'
 import type { MessageRecord } from '@/lib/chat/types'
@@ -16,6 +17,7 @@ import {
 } from '@cv/core/reply-quote'
 import { describe, expect, test } from 'bun:test'
 import { lifecycleDatabase } from '~/tests/helpers/lifecycle-db'
+import { entry, syncPage } from '~/tests/helpers/older-pages'
 
 const SESSION = 'session_1' as Id<'sessions'>
 const sender = { type: 'user', id: 'user_1' }
@@ -27,6 +29,38 @@ const file = {
   mediaType: 'image/png',
   url: '/image.png',
 }
+
+test('reconciles an optimistic quote removal when the message leaves the live query', () => {
+  const store = createMessageStore()
+  const reply = entry(1, [text('Reply body')])
+  const id = reply.message.id
+  const quote = {
+    text: 'Quoted text',
+    sender: reply.record.sender,
+    senderName: null,
+  }
+  reply.record.replyTo = quote
+  const overlap = entry(2, [text('Still loaded')])
+  const live = { isAtLiveTail: true }
+  const replyRow = () => store.getRows().find((row) => row.kind === 'reply')
+  syncPage(store, [reply, overlap], live)
+  expect(replyRow()?.messageId).toBe(id)
+
+  const rejectRemoval = store.beginReplyQuoteRemoval(id)
+  syncPage(store, [overlap, entry(3, [text('New message')])], live)
+  expect(store.getMessage(id)).toEqual(reply.message)
+  expect(replyRow()).toBeUndefined()
+
+  rejectRemoval(false)
+  expect(replyRow()?.messageId).toBe(id)
+  expect(store.getMessageMetadata(id)?.replyTo).toEqual(quote)
+
+  const confirmRemoval = store.beginReplyQuoteRemoval(id)
+  confirmRemoval(true)
+  expect(replyRow()).toBeUndefined()
+  expect(store.getMessageMetadata(id)?.replyTo).toBeUndefined()
+  expect(store.getMessage(id)).toEqual(reply.message)
+})
 
 describe('quotableText', () => {
   test('quotes an agent turn by its final answer', () => {

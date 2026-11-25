@@ -10,6 +10,7 @@ import { minRole } from '../../lib/roles'
 import type {
   DeleteMessageAttachmentArgs,
   DeleteMessagePartsArgs,
+  EditMessageArgs,
   EditMessagePartArgs,
 } from '../../validators/messages'
 import * as Attachments from '../attachments/files'
@@ -32,18 +33,23 @@ import { collectToolOutputStorageIds } from '../stream/toolOutput'
 import { clearAnnouncedMode } from './notes'
 import { forgetQuotedMessage } from './replies'
 
-export async function editMessage(
-  ctx: AuthMutationCtx,
-  args: { messageId: Id<'messages'>; content: string },
-) {
+export async function editMessage(ctx: AuthMutationCtx, args: EditMessageArgs) {
   const { message } = await requireMessageMutation(ctx, args.messageId)
   requireEditable(message)
+  if (args.content === undefined) {
+    if (!args.removeReplyQuote) error('Message content is required', 400)
+    if (await clearReplyQuote(ctx, message))
+      await invalidateCompletedHistory(ctx, message)
+    return
+  }
+
   const parts = [{ type: 'text', text: args.content }]
 
   const segments = await listSelectedSegments(ctx, message)
   const removed = segments.flatMap((segment) => segment.parts)
   await deleteToolOutput(ctx, removed)
   await replaceSelectedContent(ctx, message, parts)
+  if (args.removeReplyQuote) await clearReplyQuote(ctx, message)
   await removeUnreferencedAttachmentsForParts(ctx, message._id, removed)
 
   await reserveSegmentEvaluation(ctx, {
@@ -81,6 +87,7 @@ export async function editMessagePart(
   parts[args.partIndex] = { ...edited, text: args.text }
 
   await setSegmentParts(ctx, message, row, parts)
+  if (args.removeReplyQuote) await clearReplyQuote(ctx, message)
 
   await reserveSegmentEvaluation(ctx, {
     messageId: message._id,
@@ -89,6 +96,13 @@ export async function editMessagePart(
     version: message.selectedVersion,
     segmentIndex: args.segmentIndex,
   })
+}
+
+/** Clears the quote metadata. Content writes already invalidate history. */
+async function clearReplyQuote(ctx: AuthMutationCtx, message: Doc<'messages'>) {
+  if (!message.replyTo) return false
+  await ctx.db.patch(message._id, { replyTo: undefined })
+  return true
 }
 
 /** @returns true when removing the parts deleted the whole message. */

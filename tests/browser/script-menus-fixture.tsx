@@ -129,7 +129,7 @@ export function ScriptMenusFixture() {
       <ConvexQueryCacheProvider>
         <ChatMessagesProvider>
           <MessageEditProvider
-            onEdit={(_id, content) => setSavedMarkdown(content)}
+            onEdit={({ content }) => setSavedMarkdown(content ?? '')}
           >
             <Menus />
             <output aria-label="Saved message markdown">{savedMarkdown}</output>

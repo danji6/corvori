@@ -14,6 +14,7 @@ import { editorKit } from '@/lib/tiptap/kit'
 import { pasteTextLines } from '@/lib/tiptap/paste'
 import { serializeDocumentToMarkdown } from '@/lib/tiptap/serialize'
 import { cn } from '@/lib/utils'
+import type { Node } from '@tiptap/pm/model'
 import type { EditorView } from '@tiptap/pm/view'
 import { EditorContent, useEditor } from '@tiptap/react'
 import type { Editor } from '@tiptap/react'
@@ -60,6 +61,8 @@ export function InlineEditor({
       ? initialMarkdown
       : normalizeMathDelimiters(initialMarkdown)
   const editorRef = useRef<Editor | null>(null)
+  const initialDocumentRef = useRef<Node | null>(null)
+  const initialMarkdownRef = useRef(initialMarkdown)
   const onChangeRef = useRef(onChange)
   const onSaveRef = useRef(onSave)
   const handleKeyDownRef = useRef(handleKeyDown)
@@ -71,6 +74,15 @@ export function InlineEditor({
     handleKeyDownRef.current = handleKeyDown
     handlePasteRef.current = handlePaste
   })
+
+  function publishDraft(editor: Editor) {
+    const unchanged = initialDocumentRef.current?.eq(editor.state.doc)
+    onChangeRef.current(
+      unchanged
+        ? initialMarkdownRef.current
+        : serializeDocumentToMarkdown(editor),
+    )
+  }
 
   const editor = useEditor({
     extensions: [
@@ -88,7 +100,7 @@ export function InlineEditor({
     contentType: 'markdown',
     immediatelyRender: false,
     onUpdate({ editor: e }) {
-      onChange(serializeDocumentToMarkdown(e))
+      publishDraft(e)
     },
     editorProps: {
       attributes: {
@@ -102,7 +114,7 @@ export function InlineEditor({
           (event.metaKey || event.ctrlKey)
         ) {
           event.preventDefault()
-          onChangeRef.current(readMarkdown(editorRef.current))
+          if (editorRef.current) publishDraft(editorRef.current)
           onSaveRef.current()
           return true
         }
@@ -118,6 +130,7 @@ export function InlineEditor({
 
   useEffect(() => {
     editorRef.current = editor
+    initialDocumentRef.current = editor?.state.doc ?? null
     return () => {
       if (editorRef.current === editor) editorRef.current = null
     }
@@ -174,11 +187,6 @@ export function InlineEditor({
       <EditorContent editor={editor} />
     </EditorContextMenu>
   )
-}
-
-/** Serializes the editor to markdown. */
-function readMarkdown(editor: Editor | null | undefined): string {
-  return editor ? serializeDocumentToMarkdown(editor) : ''
 }
 
 /**

@@ -112,6 +112,8 @@ export function useDeleteMessagesFrom() {
 export function useEditMessage() {
   const editMutation = useMutation(api.chat.editMessage).withOptimisticUpdate(
     (store, { messageId, content }) => {
+      if (content === undefined) return
+
       updateMessagePages(store, (page) =>
         page.map((message) => {
           if (message._id !== messageId) return message
@@ -147,11 +149,12 @@ export function useEditMessage() {
   )
 
   return useCallback(
-    (id: string, content: string) => {
-      editMutation({ messageId: id as Id<'messages'>, content }).catch(
-        console.error,
-      )
-    },
+    (id: string, content?: string, removeReplyQuote?: true) =>
+      editMutation({
+        messageId: id as Id<'messages'>,
+        content,
+        removeReplyQuote,
+      }),
     [editMutation],
   )
 }
@@ -186,14 +189,14 @@ export function useEditMessagePart() {
   )
 
   return useCallback(
-    (id: string, address: PartAddress, text: string) => {
+    (id: string, address: PartAddress, text: string, removeReplyQuote?: true) =>
       editMutation({
         messageId: id as Id<'messages'>,
         segmentIndex: address.segmentIndex,
         partIndex: address.partIndex,
         text,
-      }).catch(console.error)
-    },
+        removeReplyQuote,
+      }),
     [editMutation],
   )
 }

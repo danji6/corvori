@@ -9,6 +9,7 @@ import {
   useEditMessage,
   useEditMessagePart,
   useIsWorkspaceAdmin,
+  useMessageStore,
   useSendMessage,
   useSessionMode,
   useWorkspaceFileIndex,
@@ -17,8 +18,7 @@ import { useComposerSubmission } from '@/hooks/chat/composer-submission'
 import { useNavPadding } from '@/hooks/nav-padding'
 import type { PendingMessage } from '@/lib/chat'
 import { ChatError, ChatWarning, RateLimitError } from '@/lib/chat/errors'
-import type { PartAddress } from '@/lib/chat/parts'
-import { toast } from '@/lib/notifications'
+import { toast, toastError } from '@/lib/notifications'
 import { generateId } from '@/lib/utils'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
@@ -27,7 +27,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { ChatSessionView } from './chat-session-view'
 import type { ChatProps } from './chat-types'
-import { MessageEditProvider } from './messages/editor'
+import { type MessageEditChange, MessageEditProvider } from './messages/editor'
 import type { AgentItem } from './sessions/agent-combobox'
 import { ShortcutsDialog } from './shortcuts'
 
@@ -92,6 +92,7 @@ function ChatSessionContent({
   const abort = useAbortStream()
   const editMessage = useEditMessage()
   const editMessagePart = useEditMessagePart()
+  const messageStore = useMessageStore()
   const compact = useCompact()
   const { toggleMode } = useSessionMode()
   const invokeAgent = useMutation(api.chat.invokeAgent)
@@ -264,11 +265,28 @@ function ChatSessionContent({
   }, [session, invokeAgent, handleError])
 
   const handleEdit = useCallback(
-    (id: string, content: string, address?: PartAddress) => {
-      if (address != null) editMessagePart(id, address, content)
-      else editMessage(id, content)
+    ({ id, content, address, removeReplyQuote }: MessageEditChange) => {
+      const finishQuoteRemoval = removeReplyQuote
+        ? messageStore.beginReplyQuoteRemoval(id)
+        : undefined
+      const save =
+        address && content !== undefined
+          ? editMessagePart(id, address, content, removeReplyQuote)
+          : editMessage(id, content, removeReplyQuote)
+
+      if (finishQuoteRemoval) {
+        save.then(
+          () => finishQuoteRemoval(true),
+          (error) => {
+            finishQuoteRemoval(false)
+            toastError(error, 'Could not remove reply quote')
+          },
+        )
+      } else {
+        save.catch(console.error)
+      }
     },
-    [editMessage, editMessagePart],
+    [editMessage, editMessagePart, messageStore],
   )
 
   return (

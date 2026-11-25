@@ -234,11 +234,20 @@ export const messagesWindowArgsValidator = v.object({
 
 export type MessageWindowArgs = Infer<typeof messagesWindowArgsValidator>
 
+export const editMessageArgsValidator = v.object({
+  messageId: v.id('messages'),
+  content: v.optional(v.string()),
+  removeReplyQuote: v.optional(v.literal(true)),
+})
+
+export type EditMessageArgs = Infer<typeof editMessageArgsValidator>
+
 export const editMessagePartArgsValidator = v.object({
   messageId: v.id('messages'),
   segmentIndex: v.number(),
   partIndex: v.number(),
   text: v.string(),
+  removeReplyQuote: v.optional(v.literal(true)),
 })
 
 export type EditMessagePartArgs = Infer<typeof editMessagePartArgsValidator>
