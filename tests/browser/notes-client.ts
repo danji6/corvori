@@ -215,7 +215,11 @@ function initialMessages() {
   }
   if (params.has('groupedReply')) return groupedReplyMessages()
   if (params.has('compaction')) return compactionMessages()
-  if (params.has('shellComposer') || params.has('composer')) {
+  const showHistory =
+    params.has('editHistory') ||
+    params.has('shellComposer') ||
+    params.has('composer')
+  if (showHistory) {
     return Array.from({ length: 32 }, (_, index) =>
       message(`history${index}`, index),
     )

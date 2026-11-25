@@ -84,6 +84,71 @@ test('the caret can still type on the blank line between paragraphs', async ({
   await expect.poll(() => saved.textContent()).toBe('First\nInserted\nSecond')
 })
 
+test('preserves the caret and selection when scrolling away from an edited message', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=notes&id=notes&editHistory&intoView')
+  const latest = page.getByText('Content for history31', { exact: true })
+  await expect(latest).toBeInViewport()
+  const column = page.locator('.chat-transcript-column')
+  await expect(column.locator('..')).toHaveCSS('opacity', '1')
+  await page.keyboard.press('Alt+Home')
+
+  const message = page.locator(
+    '[data-row-kind="group"][data-message-id="history2"]',
+  )
+  const text = 'Content for history2'
+  const line = message.getByText(text, { exact: true })
+  await expect(line).toBeInViewport()
+  await line.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Edit Message' }).click()
+  const editor = message.locator('[data-slot="editor"]')
+  await expect(editor).toBeFocused()
+  await page.evaluate(() => window.scrollBy(0, 50))
+
+  const editedLine = editor.getByText(text, { exact: true })
+  const select = (focusOffset: number) =>
+    editedLine.evaluate((line, offset) => {
+      const node = line.firstChild!
+      document.getSelection()!.setBaseAndExtent(node, 2, node, offset)
+    }, focusOffset)
+  const selection = () =>
+    editor.evaluate(() => {
+      const current = document.getSelection()!
+      return {
+        anchor: current.anchorNode?.textContent,
+        anchorOffset: current.anchorOffset,
+        focus: current.focusNode?.textContent,
+        focusOffset: current.focusOffset,
+      }
+    })
+
+  for (const focusOffset of [2, 8]) {
+    await select(focusOffset)
+    const before = await page.evaluate(() => window.scrollY)
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+    await expect(latest).toBeInViewport()
+    await expect(editor).toHaveCount(1)
+    await expect(editor).not.toBeInViewport()
+
+    await page.evaluate((scrollY) => window.scrollTo(0, scrollY), before)
+    await expect(editedLine).toBeInViewport()
+    await expect(editor).toBeFocused()
+    expect(await selection()).toEqual({
+      anchor: text,
+      anchorOffset: 2,
+      focus: text,
+      focusOffset,
+    })
+    expect(await page.evaluate(() => window.scrollY)).toBeCloseTo(before, 0)
+  }
+
+  await page.getByRole('button', { name: 'Cancel edit' }).click()
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+  await expect(latest).toBeInViewport()
+  await expect(message).toHaveCount(0)
+})
+
 test('messages show editable link destinations and disable navigation during editing', async ({
   page,
 }) => {

@@ -29,7 +29,7 @@ import { useVersionHold } from '@/hooks/chat/message-list/version-hold'
 import { useWindowSlide } from '@/hooks/chat/message-list/window-slide'
 import { getNavPaddingPx } from '@/hooks/nav-padding'
 import { useScroller } from '@/hooks/scroller'
-import { type MessageRow, omitReplyRow } from '@/lib/chat/rows'
+import { type MessageRow, findPartRow, omitReplyRow } from '@/lib/chat/rows'
 import { isOngoingStream } from '@/lib/chat/stream'
 import {
   useCallback,
@@ -104,12 +104,21 @@ export function MessageList({
   const messageRows = useMessageRows()
   const edit = useMessageEdit()
   const editingId = edit?.editingMessageId ?? null
+  const editingAddress = edit?.editingAddress ?? undefined
   const replyQuoteRemoved = edit?.replyQuoteRemoved
   const rows = useMemo(() => {
     if (!editingId || !replyQuoteRemoved) return messageRows
     return omitReplyRow(messageRows, editingId)
   }, [editingId, messageRows, replyQuoteRemoved])
   const messageStore = useMessageStore()
+  const editingRowIndex = useMemo(() => {
+    if (!editingId) return -1
+    const message = messageStore.getMessage(editingId)
+    if (!message) return -1
+    const record = messageStore.getMessageMetadata(editingId)
+    const row = findPartRow(rows, message, record, editingAddress)
+    return row ? rows.indexOf(row) : -1
+  }, [editingAddress, editingId, rows, messageStore])
   const profile = useUserProfile()
   const status = useChatStatus()
   const invokedBy = useStreamInvokedBy()
@@ -356,23 +365,6 @@ export function MessageList({
     handleScrollChange()
   }, [messageIds, handleScrollChange])
 
-  // Bring the edited message into view to keep it mounted while editing
-  useEffect(() => {
-    if (!editingId) return
-
-    const isMounted = Boolean(
-      document.querySelector(`[data-message-id="${CSS.escape(editingId)}"]`),
-    )
-    if (isMounted) return
-
-    const idx = rows.findIndex(
-      (row) => row.kind === 'group' && row.messageId === editingId,
-    )
-    if (idx >= 0) virtuaRef.current?.scrollToIndex(idx, { align: 'nearest' })
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingId])
-
   const shouldRevealStream =
     isAtBottom === true && isAtLiveTail && !isMidListStream
 
@@ -489,6 +481,7 @@ export function MessageList({
             emptyStyle={innerStyle}
             messages={{
               rows,
+              editingRowIndex,
               showBackgrounds,
               hasHeaderContainer,
               innerStyle,

@@ -419,27 +419,29 @@ export function findToolRow(
   }
 }
 
-/** Finds the row rendering a stored part address once its segment is loaded. */
+/** Finds the row for a part address, or the text row for a whole-message edit. */
 export function findPartRow(
-  rows: MessageRow[],
+  rows: readonly MessageRow[],
   message: UIMessage,
   record: MessageRecord | undefined,
-  address: PartAddress,
+  address?: PartAddress,
 ): MessageRow | undefined {
-  const slice = segmentGroupsFor(message, record).find(
-    (slice) => slice.segmentIndex === address.segmentIndex,
-  )
-  if (!slice) return undefined
-  const groupIndex = slice.groups.findIndex((group) =>
-    groupPartIndices(slice.parts, group).includes(address.partIndex),
-  )
-  return rows.find(
-    (row) =>
-      row.kind === 'group' &&
-      row.messageId === message.id &&
-      row.segmentIndex === address.segmentIndex &&
-      row.groupIndex === groupIndex,
-  )
+  for (const slice of segmentGroupsFor(message, record)) {
+    if (address && slice.segmentIndex !== address.segmentIndex) continue
+    const groupIndex = slice.groups.findIndex((group) =>
+      address
+        ? groupPartIndices(slice.parts, group).includes(address.partIndex)
+        : group.type === 'single' && group.part.type === 'text',
+    )
+    if (groupIndex < 0) continue
+    return rows.find(
+      (row) =>
+        row.kind === 'group' &&
+        row.messageId === message.id &&
+        row.segmentIndex === slice.segmentIndex &&
+        row.groupIndex === groupIndex,
+    )
+  }
 }
 
 export function rowKeysEqual(a: MessageRow[], b: MessageRow[]): boolean {

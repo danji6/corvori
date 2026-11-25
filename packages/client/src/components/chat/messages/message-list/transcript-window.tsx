@@ -8,6 +8,7 @@ import {
   type ComponentType,
   type ReactElement,
   type RefObject,
+  useEffect,
   useEffectEvent,
   useImperativeHandle,
   useLayoutEffect,
@@ -30,6 +31,7 @@ type ItemComponent = ComponentType<CustomItemComponentProps>
 type TranscriptWindowProps = {
   ref: RefObject<WindowVirtualizerHandle | null>
   rows: readonly MessageRow[]
+  editingRowIndex?: number
   showBackgrounds: boolean
   transitions: ReadonlyMap<string, RowTransition>
   shift: boolean
@@ -42,6 +44,7 @@ type TranscriptWindowProps = {
 export function TranscriptWindow({
   ref,
   rows,
+  editingRowIndex = -1,
   showBackgrounds,
   transitions,
   shift,
@@ -110,6 +113,30 @@ export function TranscriptWindow({
   )
 
   const visibleIndices = transcript.visibleIndices(entries)
+  const editingRowKey = rows[editingRowIndex]?.key
+  const editOutsideRange =
+    editingRowKey !== undefined && !visibleIndices.includes(editingRowIndex)
+  const [mountedEditKey, setMountedEditKey] = useState<string>()
+  const keepEditorMounted = editingRowKey === mountedEditKey
+  // Let an offscreen edit scroll into range before the editor holds the layout.
+  const nextMountedEditKey =
+    editOutsideRange && !keepEditorMounted ? undefined : editingRowKey
+  if (nextMountedEditKey !== mountedEditKey) {
+    setMountedEditKey(nextMountedEditKey)
+  }
+
+  const revealEditor = useEffectEvent(() => {
+    if (editOutsideRange) driver.$scroll(editingRowIndex, { align: 'nearest' })
+  })
+  useEffect(() => {
+    if (editingRowKey) revealEditor()
+  }, [editingRowKey])
+
+  // Keep the editor DOM and its selection alive at its normal transcript offset.
+  const renderedIndices =
+    editOutsideRange && keepEditorMounted
+      ? [...visibleIndices, editingRowIndex].sort((a, b) => a - b)
+      : visibleIndices
 
   return (
     <div
@@ -137,7 +164,7 @@ export function TranscriptWindow({
         />
       )}
       <MessageHighlightLayer root={root} rows={rows} layoutVersion={version} />
-      {visibleIndices.map((index) => (
+      {renderedIndices.map((index) => (
         <TranscriptItem
           key={rows[index]!.key}
           item={item}

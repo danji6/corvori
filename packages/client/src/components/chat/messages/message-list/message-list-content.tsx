@@ -163,6 +163,7 @@ function LoadingOverlay({ showIndicator, inset }: LoadingOverlayProps) {
 
 type MessageRowsProps = {
   rows: readonly MessageRow[]
+  editingRowIndex?: number
   showBackgrounds?: boolean
   hasHeaderContainer: boolean
   innerStyle?: CSSProperties
@@ -182,6 +183,7 @@ type MessageRowsProps = {
 
 function MessageRows({
   rows,
+  editingRowIndex,
   showBackgrounds = false,
   hasHeaderContainer,
   innerStyle,
@@ -255,6 +257,7 @@ function MessageRows({
             <TranscriptWindow
               ref={virtuaRef}
               rows={rows}
+              editingRowIndex={editingRowIndex}
               showBackgrounds={showBackgrounds}
               transitions={transitions}
               item={VirtualizedItem}

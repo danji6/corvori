@@ -321,6 +321,7 @@ export function NotesFixture() {
         {composerParams.has('plan') ? (
           <SessionPlanSection />
         ) : composerParams.has('contextReset') ||
+          composerParams.has('editHistory') ||
           composerParams.has('keyboardEdit') ||
           composerParams.has('replyQuoteEditing') ? (
           <ChatSearchProvider>
