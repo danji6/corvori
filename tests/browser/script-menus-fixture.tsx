@@ -1,4 +1,4 @@
-import { EditableText } from '@/components/chat/messages/editor/editable-text'
+import { MessageContextMenu } from '@/components/chat/messages/context-menu/message-context-menu'
 import { ScriptManager } from '@/components/chat/messages/editor/menu/script-manager'
 import { ScriptToolbarContent } from '@/components/chat/messages/editor/menu/script-toolbar'
 import {
@@ -6,7 +6,7 @@ import {
   useMessageEdit,
 } from '@/components/chat/messages/editor/message-edit-context'
 import { MessageContext } from '@/components/chat/messages/message-context'
-import { MessageContextMenu } from '@/components/chat/messages/message-context-menu'
+import { TextBlock } from '@/components/chat/messages/text-block'
 import '@/globals.css'
 import { ChatMessagesProvider } from '@/hooks/chat/messages'
 import { DEFAULT_SETTINGS } from '@cv/convex/model/defaults'
@@ -17,15 +17,15 @@ import { type FunctionReference, getFunctionName } from 'convex/server'
 import { useState } from 'react'
 
 const scripts: unknown[] = []
-const attachmentOnly = new URLSearchParams(location.search).get(
-  'attachmentOnly',
-)
+const params = new URLSearchParams(location.search)
+const attachmentOnly = params.get('attachmentOnly')
+const messageText = params.get('message') ?? 'Fixture text'
 const message: UIMessage = {
   id: 'fixture',
   role: attachmentOnly === 'assistant' ? 'assistant' : 'user',
   parts: attachmentOnly
     ? [{ type: 'file', mediaType: 'image/png', url: '/favicon.png' }]
-    : [{ type: 'text', text: 'Fixture text' }],
+    : [{ type: 'text', text: messageText }],
 }
 
 /** Supplies stable query results while failing any accidental write. */
@@ -73,26 +73,24 @@ function Menus() {
         <div
           data-message-id={message.id}
           data-testid="message"
-          className="border p-8"
+          className="max-w-full border p-8"
         >
           <MessageContext.Provider
             value={{
               id: message.id,
               canEdit: !readOnly,
-              content: 'Fixture text',
+              content: messageText,
             }}
           >
             {part?.type === 'text' ? (
-              <EditableText part={part} index={0}>
-                {part.text}
-              </EditableText>
+              <TextBlock part={part} index={0} />
             ) : (
-              'Fixture text'
+              messageText
             )}
           </MessageContext.Provider>
         </div>
       </MessageContextMenu>
-      <button onClick={() => edit?.startEditing(message.id, 'Fixture text')}>
+      <button onClick={() => edit?.startEditing(message.id, messageText)}>
         Start editing
       </button>
       <output aria-label="Editing message">

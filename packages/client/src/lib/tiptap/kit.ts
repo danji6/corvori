@@ -34,6 +34,8 @@ export type EditorKitOptions = {
   math?: MathMode
   /** Adds the table node set. */
   tables?: boolean
+  /** Keeps the Markdown label and destination editable in message text. */
+  sourceLinks?: boolean
   /** Static placeholder. Editors with a dynamic one should append their own. */
   placeholder?: string
   /** Highlight delay for code blocks while typing. */
@@ -49,6 +51,7 @@ export type EditorKitOptions = {
 export function editorKit({
   math,
   tables,
+  sourceLinks = false,
   placeholder,
   debounce,
   collapseBlocks = false,
@@ -57,7 +60,12 @@ export function editorKit({
     LineStarterKit.configure({
       codeBlock: false,
       hardBreak: false,
-      link: { protocols: ['attachment'] },
+      sourceLinks,
+      link: {
+        protocols: ['attachment'],
+        openOnClick: false,
+        ...(sourceLinks ? { autolink: false, linkOnPaste: false } : {}),
+      },
     }),
     CodeBlockShiki.configure({
       themes: { light: themeName, dark: themeName },
@@ -67,7 +75,7 @@ export function editorKit({
       ...(debounce == null ? {} : { debounce }),
     }),
     SourceMarkdown,
-    InlineSource,
+    InlineSource.configure({ sourceLinks }),
     EditableLines.configure({ collapseBlocks }),
     ...(math
       ? [MarkdownMath, MathDecoration.configure({ mathMode: math })]

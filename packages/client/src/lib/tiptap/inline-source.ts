@@ -1,6 +1,7 @@
 import { findHtmlSpans } from '@/lib/markdown/html-scan'
 import { scanInterpreterSyntax } from '@/lib/tiptap/interpreter-syntax'
 import type { PositionRange } from '@/lib/tiptap/lines'
+import { linkLabelRange } from '@/lib/tiptap/source-links'
 import type {
   JSONContent,
   MarkdownParseHelpers,
@@ -19,7 +20,7 @@ export const SOURCE_DELIMITERS = {
 export type SourceFormat = keyof typeof SOURCE_DELIMITERS
 
 export type SourceSpan = {
-  format: SourceFormat
+  format: SourceFormat | 'link'
   from: number
   to: number
   contentFrom: number
@@ -133,10 +134,38 @@ function walkTokens(
       if (format !== 'code') {
         walkTokens(manager, token.tokens ?? [], offset + size, spans)
       }
+    } else if (token.type === 'link') {
+      walkLink(manager, token, offset, spans)
     }
-    // Links are already native marks; scanning their labels never reveals destinations
     offset += raw.length
   }
+}
+
+function walkLink(
+  manager: MarkdownManager,
+  token: MarkdownToken,
+  offset: number,
+  spans: SourceSpan[],
+): void {
+  const label = linkLabelRange(token)
+  if (!label) return
+
+  const raw = token.raw ?? ''
+  spans.push({
+    format: 'link',
+    from: offset,
+    to: offset + raw.length,
+    contentFrom: offset + label.from,
+    contentTo: offset + label.to,
+  })
+
+  if (!raw.startsWith('[')) return
+  const labelSource = raw.slice(label.from, label.to)
+  const tokens =
+    labelSource === token.text
+      ? (token.tokens ?? [])
+      : inlineTokens(manager, labelSource)
+  walkTokens(manager, tokens, offset + label.from, spans)
 }
 
 /** Reads a text block without losing offsets at hard breaks or inline atoms. */

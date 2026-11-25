@@ -26,11 +26,11 @@ import { memo, useMemo, useRef } from 'react'
 
 import { ChangesSummary } from './changes/changes-summary'
 import { ContextDivider } from './context-divider'
+import { MessageContextMenu } from './context-menu/message-context-menu'
 import { ErrorBlock } from './error-block'
 import { GrowOnly } from './grow-only'
 import { HiddenChip } from './hidden-chip'
 import { MessageContext } from './message-context'
-import { MessageContextMenu } from './message-context-menu'
 import { MessageHeader } from './message-header'
 import {
   highlightTargetForRow,

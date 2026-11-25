@@ -8,6 +8,7 @@ import {
   handleSourceBeforeInput,
   handleSourceKey,
 } from '@/lib/tiptap/source-input'
+import { preventLinkNavigation } from '@/lib/tiptap/source-links'
 import {
   normalizeSourceDocument,
   normalizeSourceMarks,
@@ -27,10 +28,14 @@ type SourceMeta = { focused?: boolean; dragging?: boolean }
 const sourceKey = new PluginKey<SourceState>('inlineSource')
 
 /** Previews inline Markdown while retaining every editable source character. */
-export const InlineSource = Extension.create({
+export const InlineSource = Extension.create<{ sourceLinks: boolean }>({
   name: 'inlineSource',
   // Normalize JSON after Markdown and EditableLines have initialized
   priority: 40,
+
+  addOptions() {
+    return { sourceLinks: false }
+  },
 
   onBeforeCreate() {
     const manager = this.editor.markdown
@@ -40,6 +45,7 @@ export const InlineSource = Extension.create({
       this.editor.options.content = normalizeSourceDocument(
         this.editor.schema,
         content,
+        this.options.sourceLinks,
       )
     }
   },
@@ -51,6 +57,7 @@ export const InlineSource = Extension.create({
   addProseMirrorPlugins() {
     const manager = this.editor.markdown
     if (!manager) return []
+    const { sourceLinks } = this.options
     return [
       new Plugin<SourceState>({
         key: sourceKey,
@@ -88,7 +95,7 @@ export const InlineSource = Extension.create({
         appendTransaction: (transactions, _old, state) => {
           if (!transactions.some((tr) => tr.docChanged)) return null
           const tr = state.tr
-          return normalizeSourceMarks(tr) ? tr : null
+          return normalizeSourceMarks(tr, sourceLinks) ? tr : null
         },
         view: (view) => {
           const finishDrag = () => {
@@ -114,6 +121,8 @@ export const InlineSource = Extension.create({
           handleKeyDown: (view, event) =>
             handleSourceKey(view, event, sourceKey.getState(view.state)),
           handleDOMEvents: {
+            click: preventLinkNavigation,
+            auxclick: preventLinkNavigation,
             beforeinput: (view, event) =>
               handleSourceBeforeInput(
                 view,
@@ -165,7 +174,7 @@ function decorate(
     if (selectionTouchesSpan)
       revealedThrough = Math.max(revealedThrough, span.to)
 
-    const revealed = span.to <= revealedThrough
+    const revealed = span.format === 'link' || span.to <= revealedThrough
 
     decorations.push(
       Decoration.inline(span.contentFrom, span.contentTo, {

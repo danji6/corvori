@@ -35,6 +35,7 @@ export type FileStripProps = Omit<
   files: FileItem[]
   onRemove?: (id: string) => void
   onInsertInline?: (id: string) => void
+  actionsInContextMenu?: boolean
   size?: number
   noAnimation?: boolean
 }
@@ -45,6 +46,7 @@ export function FileStrip(props: FileStripProps) {
     files,
     onRemove,
     onInsertInline,
+    actionsInContextMenu = false,
     size = DEFAULT_SIZE,
     noAnimation = false,
     ...rest
@@ -101,7 +103,19 @@ export function FileStrip(props: FileStripProps) {
         const { preview, media } = previewsById.get(item.id)!
         return (
           <div className="shrink-0" style={{ width: size }}>
-            <div className="relative isolate" style={{ height: size }}>
+            <div
+              className="relative isolate"
+              style={{ height: size }}
+              data-attachment-name={
+                actionsInContextMenu ? item.file.name : undefined
+              }
+              data-attachment-url={
+                actionsInContextMenu ? item.originalUrl : undefined
+              }
+              data-attachment-share-url={
+                actionsInContextMenu ? item.shareUrl : undefined
+              }
+            >
               {media ? (
                 <MediaThumbnail
                   src={
@@ -137,7 +151,9 @@ export function FileStrip(props: FileStripProps) {
                     {formatByteLength(item.byteLength ?? item.file.size)}
                   </span>
                 )}
-              <FileActions item={item} onInsertInline={onInsertInline} />
+              {!actionsInContextMenu && (
+                <FileActions item={item} onInsertInline={onInsertInline} />
+              )}
             </div>
           </div>
         )

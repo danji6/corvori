@@ -1,6 +1,7 @@
 import { useAttachmentUrls } from '@/hooks/chat'
 import { buildFileItemFromPart } from '@/lib/chat'
 import { getAttachmentSendPreview } from '@/lib/chat/attachment-send-previews'
+import { isDisplayableUrl } from '@/lib/io'
 import type { Id } from '@cv/convex/_generated/dataModel'
 import type { FileUIPart } from 'ai'
 import { useMemo } from 'react'
@@ -36,8 +37,13 @@ export function FileBlock({ parts, attachmentIds }: FileBlockProps) {
           resolved?.shareUrl ?? undefined,
           resolved?.byteLength ?? local?.byteLength,
         )
+        const hasDirectSource =
+          !part.url.startsWith('attachment:') && isDisplayableUrl(file.url)
+
         return {
           ...file,
+          originalUrl:
+            file.originalUrl ?? (hasDirectSource ? file.url : undefined),
           localPreview: local?.preview,
           imageDimensions: resolved?.imageDimensions ?? local?.imageDimensions,
         }
@@ -50,6 +56,7 @@ export function FileBlock({ parts, attachmentIds }: FileBlockProps) {
       data-slot="file-block"
       files={files}
       size={128}
+      actionsInContextMenu
       // Virtua disables pointer events on the list while scrolling.
       className="pointer-events-auto gap-(--message-block-gap) p-0"
       noAnimation

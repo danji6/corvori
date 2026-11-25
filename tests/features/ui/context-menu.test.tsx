@@ -15,18 +15,49 @@ afterEach(() => {
   container?.remove()
 })
 
-function openMenu(trigger: Element, x = 40) {
+function openMenu(trigger: Element, x = 40, shiftKey = false) {
   const event = new MouseEvent('contextmenu', {
     bubbles: true,
     cancelable: true,
+    button: 2,
     clientX: x,
     clientY: 40,
+    shiftKey,
   })
   act(() => {
     trigger.dispatchEvent(event)
   })
   return event.defaultPrevented
 }
+
+test('reopens on successive right clicks and lets Shift bypass the menu', () => {
+  const openPoints: number[] = []
+  container = document.body.appendChild(document.createElement('div'))
+  root = createRoot(container)
+  act(() => {
+    root?.render(
+      <ContextMenu onOpen={({ x }) => openPoints.push(x)}>
+        <ContextMenu.Trigger>
+          <span>Message</span>
+        </ContextMenu.Trigger>
+        <ContextMenu.Content>
+          <ContextMenu.Item>Copy</ContextMenu.Item>
+        </ContextMenu.Content>
+      </ContextMenu>,
+    )
+  })
+  const trigger = container.querySelector('span')!
+
+  expect(openMenu(trigger)).toBe(true)
+  expect(openMenu(trigger)).toBe(true)
+  expect(openMenu(trigger, 60)).toBe(true)
+  expect(menu()?.querySelector('button')?.textContent).toBe('Copy')
+  expect(openPoints).toEqual([40, 40, 60])
+
+  expect(openMenu(trigger, 60, true)).toBe(false)
+  expect(menu()).toBeNull()
+  expect(openPoints).toEqual([40, 40, 60])
+})
 
 function startTouch(trigger: Element, x: number) {
   const event = new Event('touchstart', { bubbles: true })

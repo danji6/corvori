@@ -293,11 +293,11 @@
 }
 
 /* Match row spacing inside Markdown while preserving nested typography. */
-.chat-markdown > * {
+.chat-markdown > :not(.ProseMirror-gapcursor) {
   margin-block: 0;
 }
 
-.chat-markdown > * + * {
+.chat-markdown > :not(.ProseMirror-gapcursor) ~ :not(.ProseMirror-gapcursor) {
   margin-block-start: var(--message-block-gap);
 }
 

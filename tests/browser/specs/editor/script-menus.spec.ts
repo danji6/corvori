@@ -72,6 +72,72 @@ test('the context menu remains disabled for a message being edited', async ({
   await expect(page.getByRole('menu')).toHaveCount(0)
 })
 
+test('copies the link under the latest right-click, including through the open menu', async ({
+  page,
+}) => {
+  const firstUrl = 'https://example.test/first'
+  const secondUrl = 'https://example.test/second'
+  const message = `[**First link**](${firstUrl})\n\n[**Second link**](${secondUrl})\n\nPlain text`
+  await page.addInitScript(() => {
+    let clipboard = ''
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: async (value: string) => {
+          clipboard = value
+        },
+        readText: async () => clipboard,
+      },
+    })
+  })
+  await page.goto(
+    `/?fixture=script-menus&message=${encodeURIComponent(message)}`,
+  )
+  await page.getByLabel('Read only').check()
+  const first = page.getByRole('link', { name: 'First link' }).locator('strong')
+  const second = page
+    .getByRole('link', { name: 'Second link' })
+    .locator('strong')
+  const copyLink = page.getByRole('menuitem', {
+    name: 'Copy Link',
+    exact: true,
+  })
+  const menu = page.getByRole('menu')
+
+  await first.click({ button: 'right', position: { x: 2, y: 8 } })
+  await expect(copyLink).toBeVisible()
+  const secondBounds = (await second.boundingBox())!
+  const x = Math.ceil(secondBounds.x) + 8
+  const y = Math.ceil(secondBounds.y) + 8
+  await expect
+    .poll(() =>
+      menu.evaluate(
+        (popup, point) =>
+          popup.contains(document.elementFromPoint(point.x, point.y)),
+        { x, y },
+      ),
+    )
+    .toBe(true)
+  await page.mouse.click(x, y, { button: 'right' })
+  await expect(menu).toHaveCSS('top', `${y}px`)
+  await expect(menu.getByRole('menuitem', { name: 'Download' })).toHaveCount(0)
+  await copyLink.click()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    secondUrl,
+  )
+
+  await first.click({ button: 'right' })
+  await expect(copyLink).toBeVisible()
+  const plain = page.getByText('Plain text', { exact: true })
+  const plainBounds = (await plain.boundingBox())!
+  await page.mouse.click(plainBounds.x + 8, plainBounds.y + 8, {
+    button: 'right',
+  })
+  await expect(copyLink).toHaveCount(0)
+  await expect(
+    menu.getByRole('menuitem', { name: 'Copy Message' }),
+  ).toBeVisible()
+})
+
 test('pasting external text into a message keeps its editable blank lines on save', async ({
   page,
 }) => {

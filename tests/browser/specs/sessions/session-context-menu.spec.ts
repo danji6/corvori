@@ -156,7 +156,7 @@ test('supports reduced motion without scrolling the title', async ({
   await expect(page.getByRole('menu')).toHaveCount(0)
 })
 
-test('allows scrolling the menu and keeps repeated right-click dismissal', async ({
+test('allows scrolling the menu and reopens at the latest right-click', async ({
   page,
 }) => {
   await page.goto('/?fixture=session-folders')
@@ -174,10 +174,11 @@ test('allows scrolling the menu and keeps repeated right-click dismissal', async
     .toBe(30)
   await expect(menu).toBeVisible()
   const bounds = (await row.boundingBox())!
-  await page.mouse.click(
-    bounds.x + bounds.width / 2,
-    bounds.y + bounds.height / 2,
-    { button: 'right' },
-  )
-  await expect(menu).toHaveCount(0)
+  const x = Math.round(bounds.x + bounds.width / 2) - 10
+  const y = Math.round(bounds.y + bounds.height / 2)
+  await page.mouse.click(x, y, { button: 'right' })
+  await expect(menu).toHaveCSS('left', `${x}px`)
+  await expect(
+    menu.getByRole('menuitem', { name: 'Rename…', exact: true }),
+  ).toBeVisible()
 })

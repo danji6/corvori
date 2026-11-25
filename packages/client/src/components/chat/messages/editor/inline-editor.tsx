@@ -5,6 +5,7 @@ import {
   QuotedTextDecoration,
   setEditorMathMode,
 } from '@/lib/tiptap/decorations'
+import { ParagraphLines } from '@/lib/tiptap/decorations/paragraph-lines'
 import {
   collectSourceSpans,
   sourceDelimiterRanges,
@@ -72,7 +73,13 @@ export function InlineEditor({
 
   const editor = useEditor({
     extensions: [
-      ...editorKit({ math: mathMode, tables: true, placeholder }),
+      ...editorKit({
+        math: mathMode,
+        tables: true,
+        sourceLinks: true,
+        placeholder,
+      }),
+      ParagraphLines,
       QuotedTextDecoration,
       MentionDecoration,
     ],
@@ -85,7 +92,7 @@ export function InlineEditor({
     editorProps: {
       attributes: {
         'data-slot': 'editor',
-        class: cn('min-h-20', editorClassName),
+        class: cn('chat-markdown', editorClassName),
       },
       handleKeyDown: (view, event) => {
         if (

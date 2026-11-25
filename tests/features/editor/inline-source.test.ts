@@ -20,9 +20,9 @@ afterEach(() => {
   for (const editor of editors.splice(0)) editor.destroy()
 })
 
-function open(content: string | JSONContent = ''): Editor {
+function open(content: string | JSONContent = '', sourceLinks = false): Editor {
   const editor = new Editor({
-    extensions: editorKit({ math: 'single', tables: true }),
+    extensions: editorKit({ math: 'single', tables: true, sourceLinks }),
     content,
     ...(typeof content === 'string'
       ? { contentType: 'markdown' as const }
@@ -31,6 +31,44 @@ function open(content: string | JSONContent = ''): Editor {
   editors.push(editor)
   return editor
 }
+
+test('message links retain their label, destination, and title as editable source', () => {
+  const original =
+    '**[Kyoto National Museum](<https://example.com/a(b)> "Visit")**'
+  const e = open(original, true)
+  expect(e.state.doc.textContent).toBe(original)
+  expect(e.view.dom.querySelector('.md-source-link')?.textContent).toBe(
+    'Kyoto National Museum',
+  )
+  expect(e.view.dom.querySelector('a')).toBeNull()
+
+  const url = original.indexOf('example.com') + 1
+  e.view.dispatch(e.state.tr.insertText('museum.example', url, url + 11))
+  const saved = serializeDocumentToMarkdown(e)
+  expect(saved).toBe(original.replace('example.com', 'museum.example'))
+  expect(open(saved, true).state.doc.textContent).toBe(saved)
+})
+
+test('message autolinks keep their original spelling and reference links expose the resolved URL', () => {
+  const autolinks =
+    'https://example.com and <https://example.com> and www.example.com'
+  expect(serializeDocumentToMarkdown(open(autolinks, true))).toBe(autolinks)
+  expect(
+    serializeDocumentToMarkdown(
+      open('[museum][ref]\n\n[ref]: https://example.com', true),
+    ),
+  ).toBe('[museum](https://example.com)')
+})
+
+test('native links pasted into a message become editable link source', () => {
+  const e = open('', true)
+  e.commands.insertContent(
+    '<a href="https://example.com/one"><strong>one</strong></a><a href="https://example.com/two">two</a>',
+  )
+  expect(e.state.doc.textContent).toBe(
+    '[**one**](https://example.com/one)[two](https://example.com/two)',
+  )
+})
 
 function focus(e: Editor, focused = true): void {
   const event = new FocusEvent(focused ? 'focus' : 'blur')

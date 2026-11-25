@@ -33,7 +33,11 @@ test('copies and pastes public links, opens previews, and downloads originals by
   })
   await page.goto('/?fixture=attachment-download')
 
-  await page.getByRole('button', { name: 'Copy link to image.png' }).click()
+  const sourceImage = page.getByRole('img', { name: 'image.png' })
+  await sourceImage.click({ button: 'right' })
+  const menu = page.getByRole('menu')
+  await expect(menu.getByRole('menuitem')).toHaveText(['Download', 'Copy Link'])
+  await menu.getByRole('menuitem', { name: 'Copy Link' }).click()
   const copied = await page.evaluate(() => navigator.clipboard.readText())
   expect(copied).toBe(fileUrl + '#attachment=image')
 
@@ -57,20 +61,31 @@ test('copies and pastes public links, opens previews, and downloads originals by
 
   const cases = [
     {
-      control: page.getByRole('button', { name: 'Download processed.pdf' }),
+      preview: page.getByRole('link', { name: 'Open processed.pdf' }),
       filename: 'processed.pdf',
       bytes: pdf,
     },
     {
-      control: message.getByRole('button', { name: 'Download image.png' }),
+      preview: message.getByRole('img', { name: 'image.png' }),
       filename: 'image.png',
       bytes: png,
     },
   ]
   const url = page.url()
-  for (const { control, filename: name, bytes } of cases) {
+  for (const { preview, filename: name, bytes } of cases) {
+    await expect(
+      page.getByRole('button', { name: `Download ${name}` }),
+    ).toHaveCount(0)
+    await expect(
+      page.getByRole('button', { name: `Copy link to ${name}` }),
+    ).toHaveCount(0)
+    await preview.click({ button: 'right' })
+    await expect(menu.getByRole('menuitem')).toHaveText([
+      'Download',
+      'Copy Link',
+    ])
     const event = page.waitForEvent('download')
-    await control.click()
+    await menu.getByRole('menuitem', { name: 'Download' }).click()
     const download = await event
 
     expect(download.suggestedFilename()).toBe(name)

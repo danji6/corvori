@@ -12,12 +12,15 @@ export function AttachmentAnchor({
   const id = reference?.attachmentId
   const ids = useMemo(() => (id ? [id] : []), [id])
   const resolved = useAttachmentUrls(ids)
-  const url = id ? resolved[id]?.url : null
+  const attachment = id ? resolved[id] : undefined
 
   return (
     <T.a
       {...props}
-      href={url ?? undefined}
+      href={attachment?.url ?? undefined}
+      data-attachment-name={reference?.filename}
+      data-attachment-url={attachment?.url ?? undefined}
+      data-attachment-share-url={attachment?.shareUrl ?? undefined}
       target="_blank"
       rel="noopener noreferrer"
     />

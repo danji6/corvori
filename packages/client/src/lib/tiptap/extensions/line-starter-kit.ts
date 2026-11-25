@@ -1,13 +1,23 @@
 import { isSourceFormat, parseSourceMark } from '@/lib/tiptap/inline-source'
 import { sourceFormatCommand } from '@/lib/tiptap/source-commands'
+import { parseLinkSource } from '@/lib/tiptap/source-links'
 import type { Mark } from '@tiptap/core'
 import { StarterKit } from '@tiptap/starter-kit'
+import type { StarterKitOptions } from '@tiptap/starter-kit'
 
 /** Keeps StarterKit's inline Markdown editable as source. */
-export const LineStarterKit = StarterKit.extend({
+export const LineStarterKit = StarterKit.extend<
+  StarterKitOptions & { sourceLinks?: boolean }
+>({
   addExtensions() {
     return (this.parent?.() ?? []).map((extension) => {
       if (extension.type !== 'mark') return extension
+      if (extension.name === 'link' && this.options.sourceLinks) {
+        return (extension as Mark).extend({
+          parseMarkdown: parseLinkSource,
+          addPasteRules: () => [],
+        })
+      }
       if (!isSourceFormat(extension.name)) return extension
       return sourceMark(extension as Mark)
     })

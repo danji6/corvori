@@ -12,10 +12,10 @@ import {
 import { createPortal, flushSync } from 'react-dom'
 
 type ContextMenuPoint = { x: number; y: number }
+type ContextMenuOpenTarget = ContextMenuPoint & { target: Element | null }
 
 type OpenContextMenuPoint = ContextMenuPoint & { key: number }
 
-const NATIVE_PASSTHROUGH_RADIUS = 6
 const LONG_PRESS_MS = 500
 const TOUCH_CONTEXT_MENU_WINDOW_MS = 1200
 const TOUCH_MOVE_CANCEL = 10
@@ -100,7 +100,7 @@ function useContextMenuSub() {
 
 type ContextMenuProps = {
   children: React.ReactNode
-  onOpen?: (point: ContextMenuPoint) => void
+  onOpen?: (point: ContextMenuOpenTarget) => void
   onOpenChange?: (open: boolean) => void
   disabled?: boolean
 }
@@ -125,8 +125,8 @@ function ContextMenuRoot({
   const touchMenuAttemptedRef = useRef(false)
   const touchCanceledRef = useRef(false)
 
-  function open(x: number, y: number) {
-    onOpen?.({ x, y })
+  function open(x: number, y: number, target: EventTarget | null) {
+    onOpen?.({ x, y, target: target instanceof Element ? target : null })
     openKeyRef.current += 1
     setPoint({ x, y, key: openKeyRef.current })
   }
@@ -147,11 +147,11 @@ function ContextMenuRoot({
     return Date.now() < recentTouchUntilRef.current
   }
 
-  function openFromTouch(x: number, y: number) {
+  function openFromTouch(x: number, y: number, target: EventTarget | null) {
     if (touchMenuAttemptedRef.current) return
     touchMenuAttemptedRef.current = true
     clearLongPress()
-    open(x, y)
+    open(x, y, target)
   }
 
   useEffect(() => clearLongPress, [])
@@ -165,13 +165,17 @@ function ContextMenuRoot({
     ? {}
     : {
         onContextMenu(event) {
-          const { clientX, clientY } = event
+          if (event.shiftKey) return
+          const { clientX, clientY, target } = event
           const fromTouch = hasRecentTouch()
           // The click position can change which items render. Commit the
           // popup before the browser decides whether to show its own menu.
           flushSync(() => {
-            if (!fromTouch) open(clientX, clientY)
-            else if (!touchCanceledRef.current) openFromTouch(clientX, clientY)
+            if (!fromTouch) {
+              open(clientX, clientY, target)
+            } else if (!touchCanceledRef.current) {
+              openFromTouch(clientX, clientY, target)
+            }
           })
           if (!hasMenuItems(menuRef.current)) return
           event.preventDefault()
@@ -180,6 +184,7 @@ function ContextMenuRoot({
         onTouchStart(event) {
           if (event.touches.length !== 1) return clearLongPress()
           const touch = event.touches[0]
+          const target = event.target
           touchStartRef.current = { x: touch.clientX, y: touch.clientY }
           touchMenuAttemptedRef.current = false
           touchCanceledRef.current = false
@@ -187,7 +192,7 @@ function ContextMenuRoot({
             Date.now() + TOUCH_CONTEXT_MENU_WINDOW_MS
           clearLongPress()
           longPressRef.current = setTimeout(() => {
-            openFromTouch(touch.clientX, touch.clientY)
+            openFromTouch(touch.clientX, touch.clientY, target)
           }, LONG_PRESS_MS)
         },
         onTouchMove(event) {
@@ -212,10 +217,9 @@ function ContextMenuRoot({
         },
       }
 
-  // Dismissal + native passthrough while open
+  // Dismissal while open
   useEffect(() => {
-    if (!point || !shown) return
-    const anchor = point
+    if (!shown) return
 
     function onScroll(event: Event) {
       const target = event.target
@@ -232,22 +236,24 @@ function ContextMenuRoot({
     }
 
     function onContextMenu(event: MouseEvent) {
-      // Let the originating trigger handle a native event from its long press.
-      const fromTrigger =
-        event.target instanceof Node &&
-        triggerRef.current?.contains(event.target)
-      if (fromTrigger && hasRecentTouch()) {
-        return
-      }
-      if (
-        Math.abs(event.clientX - anchor.x) <= NATIVE_PASSTHROUGH_RADIUS &&
-        Math.abs(event.clientY - anchor.y) <= NATIVE_PASSTHROUGH_RADIUS
-      ) {
-        close()
-        event.stopPropagation()
-        return
-      }
-      close()
+      if (event.shiftKey) return close()
+
+      const target = event.target
+      if (!(target instanceof Node)) return close()
+      if (triggerRef.current?.contains(target)) return
+      const popup = menuRef.current
+      if (!popup?.contains(target)) return close()
+
+      event.preventDefault()
+      event.stopPropagation()
+
+      // Uncover the hit point before the underlying trigger reads it.
+      const { clientX, clientY } = event
+      flushSync(close)
+      const underneath = document.elementFromPoint(clientX, clientY)
+      if (!underneath?.closest('[data-context-menu-trigger]')) return
+
+      underneath.dispatchEvent(new MouseEvent('contextmenu', event))
     }
 
     function onKey(event: KeyboardEvent) {
@@ -269,7 +275,7 @@ function ContextMenuRoot({
       window.removeEventListener('blur', close)
       document.removeEventListener('keydown', onKey)
     }
-  }, [point, shown, close])
+  }, [shown, close])
 
   return (
     <ContextMenuContext.Provider
@@ -294,6 +300,7 @@ function ContextMenuTrigger({
   return (
     <div
       ref={triggerRef}
+      data-context-menu-trigger
       className={cn('contents', className)}
       {...triggerProps}
     >
@@ -313,7 +320,7 @@ function ContextMenuContent({
   if (!point || typeof document === 'undefined') return null
 
   return createPortal(
-    <ContextMenuPopup point={point} className={className}>
+    <ContextMenuPopup key={point.key} point={point} className={className}>
       {children}
     </ContextMenuPopup>,
     document.body,
@@ -687,4 +694,4 @@ export const ContextMenu = Object.assign(ContextMenuRoot, {
   Separator: ContextMenuSeparator,
 })
 
-export type { ContextMenuPoint, ContextMenuProps }
+export type { ContextMenuOpenTarget, ContextMenuPoint, ContextMenuProps }

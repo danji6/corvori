@@ -143,6 +143,7 @@ export function EditableText({
             </div>
           )}
           <div
+            className="min-w-0"
             style={{
               gridArea: '1/1',
               opacity: editorReady ? 1 : 0,

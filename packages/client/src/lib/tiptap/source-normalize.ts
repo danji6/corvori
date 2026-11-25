@@ -1,4 +1,5 @@
 import { SOURCE_DELIMITERS, isSourceFormat } from '@/lib/tiptap/inline-source'
+import { linkSourceSuffix } from '@/lib/tiptap/source-links'
 import type { JSONContent } from '@tiptap/core'
 import type { Mark, Node, Schema } from '@tiptap/pm/model'
 import { EditorState, type Transaction } from '@tiptap/pm/state'
@@ -18,29 +19,39 @@ export function codeDelimiters(text: string): { open: string; close: string } {
   return { open: fence + padding, close: padding + fence }
 }
 
-function wrappers(node: Node): Wrapper[] {
-  return node.marks
-    .filter((mark) => isSourceFormat(mark.type.name))
-    .map((mark) => {
-      const name = mark.type.name as keyof typeof SOURCE_DELIMITERS
-      const delimiter = SOURCE_DELIMITERS[name]
-      return {
-        name,
-        ...(name === 'code'
-          ? codeDelimiters(node.text ?? '')
-          : { open: delimiter, close: delimiter }),
-      }
-    })
+function sourceWrapper(
+  mark: Mark,
+  node: Node,
+  sourceLinks: boolean,
+): Wrapper | null {
+  const { name } = mark.type
+  if (sourceLinks && name === 'link') {
+    const { href, title } = mark.attrs
+    if (typeof href !== 'string') return null
+    return { name, open: '[', close: linkSourceSuffix(href, title) }
+  }
+  if (!isSourceFormat(name)) return null
+
+  const delimiter = SOURCE_DELIMITERS[name]
+  return {
+    name,
+    ...(name === 'code'
+      ? codeDelimiters(node.text ?? '')
+      : { open: delimiter, close: delimiter }),
+  }
 }
 
 /** Converts incoming native formatting to delimiters in the same transaction. */
-export function normalizeSourceMarks(tr: Transaction): boolean {
+export function normalizeSourceMarks(
+  tr: Transaction,
+  sourceLinks = false,
+): boolean {
   const changes: MarkChanges = { insertions: [], removals: [] }
 
   tr.doc.descendants((node, pos) => {
     if (node.type.spec.code) return false
     if (!node.isTextblock) return
-    collectBlockChanges(node, pos, changes)
+    collectBlockChanges(node, pos, changes, sourceLinks)
     return false
   })
 
@@ -59,19 +70,21 @@ function collectBlockChanges(
   node: Node,
   pos: number,
   changes: MarkChanges,
+  sourceLinks: boolean,
 ): void {
   let active: Wrapper[] = []
 
   node.forEach((child, offset) => {
-    const next = child.isText ? wrappers(child) : []
     const at = pos + 1 + offset
+    const next: Wrapper[] = []
+    for (const mark of child.marks) {
+      const wrapper = sourceWrapper(mark, child, sourceLinks)
+      if (!wrapper) continue
+      if (child.isText) next.push(wrapper)
+      changes.removals.push({ from: at, to: at + child.nodeSize, mark })
+    }
     const text = transitionDelimiters(active, next)
     if (text) changes.insertions.push({ pos: at, text })
-    for (const mark of child.marks) {
-      if (isSourceFormat(mark.type.name)) {
-        changes.removals.push({ from: at, to: at + child.nodeSize, mark })
-      }
-    }
     active = next
   })
 
@@ -101,7 +114,8 @@ function sharedWrappers(left: Wrapper[], right: Wrapper[]): number {
   while (common < left.length && common < right.length) {
     if (
       left[common].name !== right[common].name ||
-      left[common].open !== right[common].open
+      left[common].open !== right[common].open ||
+      left[common].close !== right[common].close
     ) {
       break
     }
@@ -114,11 +128,12 @@ function sharedWrappers(left: Wrapper[], right: Wrapper[]): number {
 export function normalizeSourceDocument(
   schema: Schema,
   content: JSONContent,
+  sourceLinks = false,
 ): JSONContent {
   const state = EditorState.create({
     schema,
     doc: schema.nodeFromJSON(content),
   })
   const tr = state.tr
-  return normalizeSourceMarks(tr) ? tr.doc.toJSON() : content
+  return normalizeSourceMarks(tr, sourceLinks) ? tr.doc.toJSON() : content
 }

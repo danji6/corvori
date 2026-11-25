@@ -40,6 +40,16 @@
   @apply leading-7;
 }
 
+/* Keep editable blank lines as tall as the gap between rendered paragraphs. */
+.ProseMirror p.chat-markdown-paragraph {
+  line-height: var(--message-block-gap);
+}
+
+.chat-markdown-paragraph
+  :is(span.chat-markdown-text, .html-preview, .math-preview) {
+  @apply leading-7;
+}
+
 .ProseMirror blockquote {
   @apply mt-6 border-l-2 pl-6 italic;
 }
@@ -129,8 +139,20 @@
   @apply mt-4 w-full border-collapse border;
 }
 
+.ProseMirror.chat-markdown > .tableWrapper {
+  @apply overflow-x-auto;
+}
+
+.ProseMirror.chat-markdown > .tableWrapper > table {
+  margin-block: 0;
+}
+
 .ProseMirror thead {
   @apply bg-muted/50 border-b;
+}
+
+.ProseMirror.chat-markdown tbody > tr:first-child:has(> th):not(:hover) {
+  @apply bg-muted/50;
 }
 
 .ProseMirror tbody tr:last-child {
@@ -167,8 +189,13 @@
   @apply my-4;
 }
 
-.ProseMirror a {
+.ProseMirror a,
+.ProseMirror .md-source-link {
   @apply text-m3-primary font-medium underline;
+}
+
+.ProseMirror a {
+  cursor: text;
 }
 
 .ProseMirror .quoted-text {
