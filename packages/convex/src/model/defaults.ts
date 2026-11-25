@@ -81,7 +81,6 @@ export const DEFAULT_SETTINGS = {
   titleSystemPrompt: DEFAULT_TITLE_SYSTEM_PROMPT,
   scrollMode: 'follow' as 'follow' | 'into-view',
   mathMode: 'single' as MathMode,
-  desktopNotifications: true,
   invertSend: false,
   groupBySender: true,
   messageBackgrounds: true,

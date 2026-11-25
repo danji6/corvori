@@ -160,7 +160,6 @@ function useNotificationState() {
     recent: summary?.recent,
     activeIds,
     activeSessionId,
-    desktopReady: preferences.desktopReady,
     desktopEnabled: preferences.desktopEnabled,
     show,
     markRead,

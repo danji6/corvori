@@ -23,7 +23,6 @@ type DeliveryOptions = {
   recent: NotificationItem[] | undefined
   activeIds: string[] | undefined
   activeSessionId: string | null
-  desktopReady: boolean
   desktopEnabled: boolean
   show: (notification: NotificationItem) => void
   markRead: (notification: NotificationItem) => void
@@ -110,9 +109,9 @@ export function useNotificationDelivery(options: DeliveryOptions) {
   }, [userId, options.activeIds, options.activeSessionId, presence])
 
   useEffect(() => {
-    if (options.desktopReady && !options.desktopEnabled)
+    if (!options.desktopEnabled)
       void closeAllDesktopNotifications(userId).catch(toastError)
-  }, [userId, options.desktopEnabled, options.desktopReady])
+  }, [userId, options.desktopEnabled])
 
   const mounted = useRef(false)
   useEffect(() => {

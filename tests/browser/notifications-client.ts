@@ -5,7 +5,6 @@ import { type FunctionReference, getFunctionName } from 'convex/server'
 let items: NotificationItem[] = JSON.parse(
   localStorage.getItem('fixture:notifications') ?? '[]',
 )
-let desktopNotifications = localStorage.getItem('fixture:desktop') !== 'false'
 let failNext = false
 let release: (() => void) | undefined
 let log = '[]'
@@ -171,11 +170,6 @@ const client = {
           : item,
       )
     }
-    if (name === 'settings:update') {
-      desktopNotifications = (args.patch as { desktopNotifications: boolean })
-        .desktopNotifications
-      localStorage.setItem('fixture:desktop', String(desktopNotifications))
-    }
     if (
       name === 'notifications:markAllRead' ||
       name === 'notifications:markSessionRead'
@@ -211,7 +205,6 @@ const client = {
 export const notificationsClient = client as unknown as ConvexReactClient
 
 function queryResult(name: string, args: Record<string, unknown>) {
-  if (name === 'settings:get') return { desktopNotifications }
   if (name === 'notifications:list')
     return items.filter(
       (item) => !item.attention && item.status === args.status,
@@ -245,11 +238,6 @@ function queryResult(name: string, args: Record<string, unknown>) {
 }
 
 window.addEventListener('storage', (event) => {
-  if (event.key === 'fixture:desktop') {
-    desktopNotifications = event.newValue !== 'false'
-    cache.clear()
-    for (const listener of listeners) listener()
-  }
   if (event.key === 'fixture:notifications') {
     items = JSON.parse(event.newValue ?? '[]')
     cache.clear()
