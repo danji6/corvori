@@ -1,7 +1,13 @@
 import { createOptionalContext } from '@/hooks/context'
+import type { MessageRow } from '@/lib/chat/rows'
 import type { ScrollCoordinator } from '@/lib/scroll-coordinator'
 import type { ScrollLayoutAnchor } from '@/lib/scroll-layout'
-import { useLayoutEffect } from 'react'
+import { createContext, useLayoutEffect } from 'react'
+
+export const VirtualizedRowsContext = createContext<{
+  rows: readonly MessageRow[]
+  showBackgrounds: boolean
+}>({ rows: [], showBackgrounds: false })
 
 type MessageListContextValue = {
   scrollRef: React.RefObject<HTMLElement | null>

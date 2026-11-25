@@ -22,7 +22,7 @@ import { messageDisplayRole } from '@/lib/chat/sender-groups'
 import { cn, formatDuration, isTouchDevice } from '@/lib/utils'
 import { toDisplayName } from '@cv/core/utils/names'
 import { type UIMessage, isReasoningUIPart } from 'ai'
-import { memo, useMemo, useRef } from 'react'
+import { memo, useContext, useMemo, useRef } from 'react'
 
 import { ChangesSummary } from './changes/changes-summary'
 import { ContextDivider } from './context-divider'
@@ -36,6 +36,7 @@ import {
   highlightTargetForRow,
   useMessageHighlightRef,
 } from './message-highlight-context'
+import { VirtualizedRowsContext } from './message-list/message-list-context'
 import { MessageVersionSwitcher } from './message-version-switcher'
 import { NoteGroupBlock } from './note-group-block'
 import { PresenceNotice } from './presence-notice'
@@ -243,6 +244,8 @@ type HeaderRowProps = {
 
 function HeaderRow({ row, message, messageMeta }: HeaderRowProps) {
   const highlightRef = useMessageHighlightRef(message.id)
+  const { showBackgrounds } = useContext(VirtualizedRowsContext)
+  const avatarHighlightRef = showBackgrounds ? undefined : highlightRef
   const role = messageDisplayRole(message, messageMeta)
 
   const reasoning = useReasoningHeader(message, messageMeta, row.reasoning)
@@ -270,7 +273,7 @@ function HeaderRow({ row, message, messageMeta }: HeaderRowProps) {
         <ReasoningHeader
           sender={sender}
           role={role}
-          avatarRef={highlightRef}
+          avatarRef={avatarHighlightRef}
           openKey={`${row.messageId}:v${messageMeta?.selectedVersion ?? 1}:header-reasoning`}
           part={reasoning.part}
           messageId={message.id}
@@ -281,7 +284,7 @@ function HeaderRow({ row, message, messageMeta }: HeaderRowProps) {
         <MessageHeader
           sender={sender}
           role={role}
-          avatarRef={highlightRef}
+          avatarRef={avatarHighlightRef}
           gutter
         />
       )}

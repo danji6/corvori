@@ -28,15 +28,11 @@ import {
   VirtualizedRowTransition,
   useRowTransitions,
 } from '../virtualized-row-transition'
+import { VirtualizedRowsContext } from './message-list-context'
 import { getRowSpacing, getWorkDetailTrailingSpacing } from './row-spacing'
 import { TranscriptWindow } from './transcript-window'
 
 const CONTENT_FADE_TRANSITION = { duration: 0.18, ease: 'easeOut' } as const
-
-const VirtualizedRowsContext = createContext<{
-  rows: readonly MessageRow[]
-  showBackgrounds: boolean
-}>({ rows: [], showBackgrounds: false })
 
 const RowTransitionsContext = createContext<ReadonlyMap<string, RowTransition>>(
   new Map(),

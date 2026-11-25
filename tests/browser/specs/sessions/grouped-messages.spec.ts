@@ -157,18 +157,20 @@ test('opens a lone thought directly from the sender header', async ({
   await expect(page.getByText('First thinking block.')).toBeVisible()
 })
 
-test('the sender menu highlights the grouped reply from its gutter avatar through its final text', async ({
+test('the sender menu includes the gutter avatar in the highlight only with backgrounds off', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1600, height: 900 })
-  await page.goto('/?fixture=notes&id=notes&groupedReply&composer')
+  await page.goto('/?fixture=notes&id=notes&groupedReply&backgrounds')
   const headers = page.locator('[data-slot="message-header"]')
   const avatar = headers.first().locator('[data-slot="avatar"]')
   const work = page.locator('[data-slot="work-block"]')
+  const backgrounds = page.locator('[data-slot="message-background"]')
   const highlight = page.locator('[data-slot="message-highlight"]')
   const answer = page.getByText('Content for answer', { exact: true })
   const next = page.getByText('Content for next', { exact: true })
   await expect(headers).toHaveCount(2)
+  await expect(backgrounds.first()).toBeVisible()
   await expect(work).toHaveCount(2)
   await expect(work.last()).toHaveAttribute('aria-expanded', 'false')
 
@@ -183,10 +185,24 @@ test('the sender menu highlights the grouped reply from its gutter avatar throug
   const outline = (await highlight.boundingBox())!
   const body = (await answer.boundingBox())!
   const avatarBox = (await avatar.boundingBox())!
-  expect(avatarBox.x + avatarBox.width).toBeLessThan(body.x)
-  expect(outline.x).toBeLessThanOrEqual(avatarBox.x)
+  expect(outline.x).toBeGreaterThanOrEqual(avatarBox.x + avatarBox.width)
   expect(outline.x + outline.width).toBeGreaterThanOrEqual(body.x + body.width)
   expect(await bottomOf(highlight)).toBeLessThan(await bottomOf(next))
+
+  await page.keyboard.press('Escape')
+  await expect(highlight).toHaveCount(0)
+  await page.getByText('Appearance', { exact: true }).click()
+  await page.getByRole('switch', { name: 'Message backgrounds' }).click()
+  await page.getByRole('button', { name: 'Save appearance' }).click()
+  await expect(backgrounds).toHaveCount(0)
+
+  await avatar.click({ button: 'right' })
+  await expect
+    .poll(() => bottomOf(highlight))
+    .toBeGreaterThanOrEqual(await bottomOf(answer))
+  expect((await highlight.boundingBox())!.x).toBeLessThanOrEqual(
+    (await avatar.boundingBox())!.x,
+  )
 })
 
 test('the avatar highlight spans the message while the thinking menu scopes its block', async ({
