@@ -12,6 +12,7 @@ import {
 import { createPortal, flushSync } from 'react-dom'
 
 type ContextMenuPoint = { x: number; y: number }
+/** The target is null when a gesture is forwarded directly to the trigger. */
 type ContextMenuOpenTarget = ContextMenuPoint & { target: Element | null }
 
 type OpenContextMenuPoint = ContextMenuPoint & { key: number }
@@ -166,7 +167,8 @@ function ContextMenuRoot({
     : {
         onContextMenu(event) {
           if (event.shiftKey) return
-          const { clientX, clientY, target } = event
+          const { clientX, clientY } = event
+          const target = event.target === event.currentTarget ? null : event.target // prettier-ignore
           const fromTouch = hasRecentTouch()
           // The click position can change which items render. Commit the
           // popup before the browser decides whether to show its own menu.
@@ -184,7 +186,7 @@ function ContextMenuRoot({
         onTouchStart(event) {
           if (event.touches.length !== 1) return clearLongPress()
           const touch = event.touches[0]
-          const target = event.target
+          const target = event.target === event.currentTarget ? null : event.target // prettier-ignore
           touchStartRef.current = { x: touch.clientX, y: touch.clientY }
           touchMenuAttemptedRef.current = false
           touchCanceledRef.current = false
@@ -291,9 +293,11 @@ function ContextMenuRoot({
 function ContextMenuTrigger({
   children,
   className,
+  onMouseDown,
 }: {
   children: React.ReactNode
   className?: string
+  onMouseDown?: React.MouseEventHandler<HTMLDivElement>
 }) {
   const { triggerRef, triggerProps } = useContextMenu()
 
@@ -303,6 +307,7 @@ function ContextMenuTrigger({
       data-context-menu-trigger
       className={cn('contents', className)}
       {...triggerProps}
+      onMouseDown={onMouseDown}
     >
       {children}
     </div>
@@ -416,10 +421,9 @@ function ContextMenuPopup({
         top: currentPlacement?.y ?? 0,
         maxWidth: `calc(100vw - ${VIEWPORT_PAD * 2}px)`,
         transformOrigin: origin,
-        zIndex: 50,
       }}
       className={cn(
-        'bg-popover text-popover-foreground ring-foreground/10 min-w-36 overflow-visible rounded-lg p-1 shadow-md ring-1 transition-[opacity,scale] duration-100',
+        'bg-popover text-popover-foreground ring-foreground/10 z-50 min-w-36 overflow-visible rounded-lg p-1 shadow-md ring-1 transition-[opacity,scale] duration-100',
         canAnimate
           ? 'scale-100 opacity-100'
           : 'pointer-events-none scale-95 opacity-0',

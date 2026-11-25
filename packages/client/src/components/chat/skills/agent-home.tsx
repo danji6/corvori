@@ -2,6 +2,7 @@ import { WorkspacePickerDialog } from '@/components/chat/sessions/workspace-pick
 import { AlertMessage, ConfirmDialog, RippleButton } from '@/components/ui'
 import { useAgentHomeStatus } from '@/hooks/chat/agent-home-status'
 import { useHomeOperation } from '@/hooks/chat/skills'
+import { writeClipboardText } from '@/lib/clipboard'
 import { toastError } from '@/lib/notifications'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
@@ -113,7 +114,11 @@ export function AgentHomeSettings({ agentId }: { agentId: Id<'agents'> }) {
         {resolvedPath && (
           <RippleButton
             variant="input"
-            onClick={() => void navigator.clipboard.writeText(resolvedPath)}
+            onClick={() => {
+              void writeClipboardText(resolvedPath).catch((error) =>
+                toastError(error, 'Failed to copy path'),
+              )
+            }}
           >
             <CopyIcon /> Copy path
           </RippleButton>

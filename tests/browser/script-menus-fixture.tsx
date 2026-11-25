@@ -15,9 +15,23 @@ import { ConvexQueryCacheProvider } from 'convex-helpers/react/cache'
 import { ConvexProvider, type ConvexReactClient } from 'convex/react'
 import { type FunctionReference, getFunctionName } from 'convex/server'
 import { useState } from 'react'
+import { Toaster } from 'sonner'
 
-const scripts: unknown[] = []
 const params = new URLSearchParams(location.search)
+const scripts = params.has('withScripts')
+  ? [
+      ['Uppercase selection', 'return text.toUpperCase()'],
+      ['Replace message', 'return replace("message", "Replaced")'],
+    ].map(([name, code], order) => ({
+      _id: `script-${order}`,
+      _creationTime: 0,
+      name,
+      code,
+      icon: '',
+      pinned: order === 0,
+      order,
+    }))
+  : []
 const attachmentOnly = params.get('attachmentOnly')
 const messageText = params.get('message') ?? 'Fixture text'
 const message: UIMessage = {
@@ -73,7 +87,7 @@ function Menus() {
         <div
           data-message-id={message.id}
           data-testid="message"
-          className="max-w-full border p-8"
+          className="w-full max-w-lg border p-8"
         >
           <MessageContext.Provider
             value={{
@@ -102,6 +116,7 @@ function Menus() {
         onAction={() => setActions((count) => count + 1)}
       />
       <ScriptManager />
+      <Toaster />
     </main>
   )
 }

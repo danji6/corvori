@@ -1,10 +1,14 @@
 import { useMessageAppearance } from '@/hooks/chat/appearances'
 import { useMessageStore } from '@/hooks/chat/messages'
-import { messageBackgroundRanges } from '@/lib/chat/message-backgrounds'
+import {
+  type MessageBackgroundRange,
+  messageBackgroundRanges,
+} from '@/lib/chat/message-backgrounds'
 import type { MessageRow } from '@/lib/chat/rows'
 import { useScopedAppearance } from '@/lib/chat/scoped-appearance'
-import { memo, useMemo, useSyncExternalStore } from 'react'
+import { Fragment, memo, useMemo, useSyncExternalStore } from 'react'
 
+import { useMessageHighlightRef } from '../message-highlight-context'
 import { getRowSpacing } from './row-spacing'
 
 type MessageBackgroundLayerProps = {
@@ -24,35 +28,110 @@ export function MessageBackgroundLayer({
   const firstVisible = visibleIndices[0]
   const lastVisible = visibleIndices.at(-1)
   if (firstVisible === undefined || lastVisible === undefined) return null
+  const isVisible = ({ first, last }: { first: number; last: number }) =>
+    last >= firstVisible && first <= lastVisible
 
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
-      {ranges
-        .filter(
-          ({ first, last }) => last >= firstVisible && first <= lastVisible,
-        )
-        .map(({ first, last, paletteMessageId }) => {
-          const start = getOffset(first)
-          const end = getOffset(last) + getSize(last)
-          if (end <= start) return null
+      {ranges.filter(isVisible).map(renderRange)}
+    </div>
+  )
 
-          const row = rows[first]!
-          const gap = getRowSpacing(row, rows[first - 1])
-          return (
-            <div
-              key={row.key}
-              data-slot="message-background"
-              data-palette-message-id={paletteMessageId}
-              className="chat-message-background absolute rounded-2xl"
-              style={{
-                top: gap ? `calc(${start}px + ${gap})` : start,
-                bottom: `calc(100% - ${end}px)`,
-              }}
-            >
-              <SenderTint messageId={paletteMessageId} />
-            </div>
-          )
-        })}
+  function renderRange({
+    first,
+    last,
+    paletteMessageId,
+    messages,
+  }: MessageBackgroundRange) {
+    if (getOffset(last) + getSize(last) <= getOffset(first)) return null
+
+    const singleMessage = messages.length === 1
+    return (
+      <Fragment key={rows[first]!.key}>
+        <BackgroundSurface
+          paletteMessageId={paletteMessageId}
+          messageId={singleMessage ? messages[0]!.messageId : undefined}
+          style={spanStyle(first, last, false, false)}
+        >
+          <SenderTint messageId={paletteMessageId} />
+        </BackgroundSurface>
+        {!singleMessage &&
+          messages.filter(isVisible).map((span) => {
+            const flatStart = span.first !== first
+            const flatEnd = span.last !== last
+            return (
+              <BackgroundSurface
+                key={span.messageId}
+                messageId={span.messageId}
+                flatStart={flatStart}
+                flatEnd={flatEnd}
+                style={spanStyle(span.first, span.last, flatStart, flatEnd)}
+              />
+            )
+          })}
+      </Fragment>
+    )
+  }
+
+  function spanStyle(
+    first: number,
+    last: number,
+    flatStart: boolean,
+    flatEnd: boolean,
+  ) {
+    // Divide the shared background at the same midpoint as the gap menu.
+    const top = rowEdge(first, flatStart ? 2 : 1)
+    const end = flatEnd
+      ? rowEdge(last + 1, 2)
+      : `${getOffset(last) + getSize(last)}px`
+    return { top, bottom: `calc(100% - ${end})` }
+  }
+
+  function rowEdge(index: number, divisor: number) {
+    const offset = `${getOffset(index)}px`
+    const gap = getRowSpacing(rows[index], rows[index - 1])
+    return gap ? `calc(${offset} + ${gap} / ${divisor})` : offset
+  }
+}
+
+type BackgroundSurfaceProps = {
+  paletteMessageId?: string
+  messageId?: string
+  style: React.CSSProperties
+  flatStart?: boolean
+  flatEnd?: boolean
+  children?: React.ReactNode
+}
+
+function BackgroundSurface({
+  paletteMessageId,
+  messageId,
+  style,
+  flatStart,
+  flatEnd,
+  children,
+}: BackgroundSurfaceProps) {
+  // A single-message surface can use the same element for tint and selection.
+  const highlightRef = useMessageHighlightRef({
+    messageId: messageId ?? '',
+    segmentIndex: null,
+    groupIndex: null,
+    surface: 'background',
+  })
+
+  return (
+    <div
+      ref={messageId ? highlightRef : undefined}
+      data-slot={
+        paletteMessageId ? 'message-background' : 'message-background-part'
+      }
+      data-palette-message-id={paletteMessageId}
+      data-flat-start={flatStart || undefined}
+      data-flat-end={flatEnd || undefined}
+      className="chat-message-background absolute"
+      style={style}
+    >
+      {children}
     </div>
   )
 }

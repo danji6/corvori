@@ -111,6 +111,12 @@ test('uses the sender palette in both modes and keeps highlights above the tint'
   await text.click({ button: 'right' })
   const highlight = page.locator('[data-slot="message-highlight"]')
   await expect(highlight).toBeVisible()
+  await expect(highlight).toHaveCSS(
+    'border-radius',
+    await background.evaluate(
+      (element) => getComputedStyle(element).borderRadius,
+    ),
+  )
   expect(
     await highlight.evaluate((el) =>
       el.previousElementSibling?.contains(

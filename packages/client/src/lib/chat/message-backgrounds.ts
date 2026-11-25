@@ -6,6 +6,13 @@ export type MessageBackgroundRange = {
   first: number
   last: number
   paletteMessageId: string
+  messages: MessageBackgroundSpan[]
+}
+
+type MessageBackgroundSpan = {
+  first: number
+  last: number
+  messageId: string
 }
 
 /** Finds contiguous surfaces in the projected transcript, including open details. */
@@ -13,21 +20,36 @@ export function messageBackgroundRanges(
   rows: readonly MessageRow[],
 ): MessageBackgroundRange[] {
   const ranges: MessageBackgroundRange[] = []
-  let previousGroup: string | undefined
+  let range: MessageBackgroundRange | undefined
 
   for (const [index, row] of rows.entries()) {
     const group = messageBackgroundGroup(row)
     if (!group) {
-      previousGroup = undefined
+      range = undefined
       continue
     }
 
-    if (previousGroup === group) {
-      ranges[ranges.length - 1]!.last = index
+    if (range?.paletteMessageId !== group) {
+      range = {
+        first: index,
+        last: index,
+        paletteMessageId: group,
+        messages: [],
+      }
+      ranges.push(range)
     } else {
-      ranges.push({ first: index, last: index, paletteMessageId: group })
+      range.last = index
     }
-    previousGroup = group
+    const lastMessage = range.messages.at(-1)
+    if (lastMessage?.messageId === row.messageId) {
+      lastMessage.last = index
+    } else {
+      range.messages.push({
+        first: index,
+        last: index,
+        messageId: row.messageId,
+      })
+    }
   }
   return ranges
 }

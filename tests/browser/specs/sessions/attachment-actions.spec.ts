@@ -258,12 +258,62 @@ test('a guest can reply to an attachment-only message from every menu surface', 
     'alt',
     'first.png',
   )
-  await expect(
-    page.getByText('Thanks for the files', { exact: true }),
-  ).toBeVisible()
+  const replyText = page.getByText('Thanks for the files', { exact: true })
+  await expect(replyText).toBeVisible()
+  await quote.click({ trial: true })
+  const quoteRow = quote.locator('xpath=ancestor::*[@data-row-kind="reply"]')
+  const bodyRow = replyText.locator(
+    'xpath=ancestor::*[@data-slot="message-row"]',
+  )
+  const card = (await quote.boundingBox())!
+  const above = (await quoteRow.boundingBox())!.y
+  const below = (await bodyRow.boundingBox())!.y
+  const cardBottom = card.y + card.height
+
+  expect(card.y - above).toBeGreaterThan(2)
+  expect(below - cardBottom).toBeGreaterThan(2)
+  for (const y of [(above + card.y) / 2, (cardBottom + below) / 2]) {
+    await page.mouse.click(card.x + card.width / 2, y, { button: 'right' })
+    await expect(
+      menu.getByRole('menuitem', { name: 'Copy Message' }),
+    ).toBeVisible()
+    await page.keyboard.press('Escape')
+  }
+
   await quote.click()
   await expect(page.locator('[data-slot="message-highlight"]')).toBeVisible()
   await expect(first).toBeInViewport()
+})
+
+test('the gap between a caption and its attachments opens the whole message menu', async ({
+  page,
+}) => {
+  await page.goto(fixture)
+  const caption = page.getByText('Keep this caption', { exact: true })
+  const textRow = caption.locator('xpath=ancestor::*[@data-slot="message-row"]')
+  const attachments = page.locator(fileRow)
+  await attachments.click({ trial: true })
+  const text = (await textRow.boundingBox())!
+  const files = (await attachments.boundingBox())!
+  const textBottom = text.y + text.height
+  expect(files.y - textBottom).toBeGreaterThan(2)
+
+  await page.mouse.click(text.x + text.width / 2, (textBottom + files.y) / 2, {
+    button: 'right',
+  })
+  const menu = page.getByRole('menu')
+  await expect(
+    menu.getByRole('menuitem', { name: 'Copy Message' }),
+  ).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'Copy Link' })).toHaveCount(0)
+  await expect(menu.getByRole('menuitem', { name: 'Download' })).toHaveCount(0)
+  const highlight = page.locator('[data-slot="message-highlight"]')
+  await expect(highlight).toBeVisible()
+  const bounds = (await highlight.boundingBox())!
+  expect(bounds.y).toBeLessThanOrEqual(text.y)
+  expect(bounds.y + bounds.height).toBeGreaterThanOrEqual(
+    files.y + files.height,
+  )
 })
 
 test('a text-block reply shows the first file when the original is outside the loaded window', async ({
@@ -328,6 +378,72 @@ for (const filename of ['first.png', 'second.png']) {
   })
 }
 
+test('opens the message menu just beyond the bottom and side of its highlight', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1200, height: 1000 })
+  await page.goto(fixture)
+  const row = page.locator(singleRow)
+  const menu = page.getByRole('menu')
+  const highlight = page.locator('[data-slot="message-highlight"]')
+
+  await row.click({ button: 'right', position: { x: 350, y: 48 } })
+  await expect(highlight).toBeVisible()
+  const bounds = (await highlight.boundingBox())!
+  const { x, y, width, height } = bounds
+  const edgePoints = [
+    { x: x + width / 2, y: y + height + 2 },
+    { x: x + width + 2, y: y + height - 24 },
+  ]
+
+  for (const point of edgePoints) {
+    await page.keyboard.press('Escape')
+    await expect(highlight).toHaveCount(0)
+    await page.mouse.click(point.x, point.y, { button: 'right' })
+    await expect(menu.getByRole('menuitem')).toHaveText([
+      'Reply',
+      'Delete Message',
+    ])
+  }
+
+  await page.keyboard.press('Escape')
+  await page.mouse.click(x + width / 2, y + height + 12, { button: 'right' })
+  await expect(menu).toHaveCount(0)
+})
+
+test('the full-message highlight and menu reach the background edges', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1200, height: 1000 })
+  await page.goto(`${fixture}&backgrounds`)
+  const background = page.locator(
+    '[data-slot="message-background"][data-palette-message-id="single-attachment"]',
+  )
+  await page.locator(singleRow).click({ trial: true })
+  const { x, y, width, height } = (await background.boundingBox())!
+  const menu = page.getByRole('menu')
+  const highlight = page.locator('[data-slot="message-highlight"]')
+  const points = [
+    { x: x + width / 2, y: y + 2 },
+    { x: x + width / 2, y: y + height - 2 },
+    { x: x + 2, y: y + height / 2 },
+    { x: x + width - 2, y: y + height / 2 },
+    { x: x + width - 8, y: y + 6 },
+  ]
+
+  for (const point of points) {
+    await page.mouse.click(point.x, point.y, { button: 'right' })
+    await expect(menu.getByRole('menuitem')).toHaveText([
+      'Reply',
+      'Delete Message',
+    ])
+    await expect
+      .poll(() => highlight.boundingBox())
+      .toEqual({ x, y, width, height })
+    await page.keyboard.press('Escape')
+  }
+})
+
 test('uses the attachment action for a sole file, even without a download URL', async ({
   page,
 }) => {
@@ -343,6 +459,16 @@ test('uses the attachment action for a sole file, even without a download URL', 
     'Delete Message',
   ])
   await preview.click({ button: 'right' })
+  const highlight = page.locator('[data-slot="message-highlight"]')
+  await expect(highlight).toBeVisible()
+  const attachment = (await preview.boundingBox())!
+  await expect
+    .poll(async () => (await highlight.boundingBox())?.width ?? 0)
+    .toBeCloseTo(attachment.width + 24, 0)
+  const selection = (await highlight.boundingBox())!
+  expect(attachment.x - selection.x).toBeCloseTo(12, 0)
+  expect(attachment.y - selection.y).toBeCloseTo(12, 0)
+  expect(selection.height - attachment.height).toBeCloseTo(24, 0)
   await menu.getByRole('menuitem', { name: 'Reply' }).click()
   const composer = page.locator('[data-slot="composer-reply"]')
   await expect(composer).toContainText('1 attachment')

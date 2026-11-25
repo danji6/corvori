@@ -109,9 +109,27 @@
     );
   }
 
+  :is(.chat-message-background, .chat-message-highlight) {
+    border-radius: var(--radius-2xl);
+  }
+
   .chat-message-background {
     inset-inline: calc(-1 * var(--message-surface-outset));
     background: var(--surface-container-low);
+  }
+
+  [data-slot='message-background-part'] {
+    background: transparent;
+  }
+
+  .chat-message-background[data-flat-start] {
+    border-start-start-radius: 0;
+    border-start-end-radius: 0;
+  }
+
+  .chat-message-background[data-flat-end] {
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
   }
 
   [data-slot='message-background-tint'] {

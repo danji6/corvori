@@ -15,6 +15,8 @@ import {
 import type { MessageRecord } from '@/lib/chat'
 import { noteContentKey } from '@/lib/chat/note-state'
 import type { HiddenChipPlacement } from '@/lib/chat/rows'
+import { writeClipboardText } from '@/lib/clipboard'
+import { toastError } from '@/lib/notifications'
 import { cn, isTouchDevice } from '@/lib/utils'
 import type { MessageExtra } from '@cv/convex/model/chat/types'
 import type { UIMessage } from 'ai'
@@ -196,9 +198,9 @@ export function HiddenChip({ message, record, placement }: HiddenChipProps) {
         <ContextMenu.Content>
           <ContextMenu.Item
             onSelect={() => {
-              navigator.clipboard
-                .writeText(copyText ?? extractTextFromMessage(message))
-                .catch(() => {})
+              void writeClipboardText(
+                copyText ?? extractTextFromMessage(message),
+              ).catch((error) => toastError(error, 'Failed to copy content'))
             }}
           >
             <CopyIcon />

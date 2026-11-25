@@ -1,10 +1,14 @@
 import { ContextMenu } from '@/components/ui'
+import { writeClipboardText } from '@/lib/clipboard'
+import { toastError } from '@/lib/notifications'
 import { CopyIcon, PencilIcon, Trash2Icon } from 'lucide-react'
 
 import type { MenuState } from './message-menu-state'
 
 function copy(text: string) {
-  navigator.clipboard.writeText(text).catch(() => {})
+  void writeClipboardText(text).catch((error) =>
+    toastError(error, 'Failed to copy message'),
+  )
 }
 
 type EditMenuProps = {
@@ -49,50 +53,42 @@ export function EditMenu({ edit, onEditBlock, onEditMessage }: EditMenuProps) {
   )
 }
 
-type CopyMenuProps = {
-  copy: MenuState['copy']
+type CopyMenuProps = MenuState['copy'] & {
+  hasSelection: boolean
 }
 
-export function CopyMenu({ copy: copyState }: CopyMenuProps) {
-  const { blockText, messageText } = copyState
-
-  if (copyState.submenu && blockText !== undefined && messageText) {
-    return (
-      <ContextMenu.Sub>
-        <ContextMenu.SubTrigger>
-          <CopyIcon />
-          Copy
-        </ContextMenu.SubTrigger>
-        <ContextMenu.SubContent>
-          <ContextMenu.Item onSelect={() => copy(blockText)}>
-            <CopyIcon />
-            Copy Block
-          </ContextMenu.Item>
-          <ContextMenu.Item onSelect={() => copy(messageText)}>
-            <CopyIcon />
-            Copy Message
-          </ContextMenu.Item>
-        </ContextMenu.SubContent>
-      </ContextMenu.Sub>
-    )
-  }
-
-  if (blockText !== undefined) {
-    return (
+export function CopyMenu({
+  blockText,
+  messageText,
+  hasSelection,
+}: CopyMenuProps) {
+  const copyMessage = messageText ? (
+    <ContextMenu.Item onSelect={() => copy(messageText)}>
+      <CopyIcon />
+      {hasSelection ? 'Copy Selection' : 'Copy Message'}
+    </ContextMenu.Item>
+  ) : null
+  const copyBlock =
+    blockText !== undefined ? (
       <ContextMenu.Item onSelect={() => copy(blockText)}>
         <CopyIcon />
         Copy Block
       </ContextMenu.Item>
-    )
-  }
+    ) : null
 
-  if (!messageText) return null
+  if (!copyMessage || !copyBlock) return copyMessage ?? copyBlock
 
   return (
-    <ContextMenu.Item onSelect={() => copy(messageText)}>
-      <CopyIcon />
-      Copy Message
-    </ContextMenu.Item>
+    <ContextMenu.Sub>
+      <ContextMenu.SubTrigger>
+        <CopyIcon />
+        Copy
+      </ContextMenu.SubTrigger>
+      <ContextMenu.SubContent>
+        {copyBlock}
+        {copyMessage}
+      </ContextMenu.SubContent>
+    </ContextMenu.Sub>
   )
 }
 

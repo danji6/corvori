@@ -29,6 +29,8 @@ import {
   useRowTransitions,
 } from '../virtualized-row-transition'
 import { VirtualizedRowsContext } from './message-list-context'
+import { MessageMenuGap } from './message-menu-gap'
+import { MessageMenuSpace } from './nearby-message-menu'
 import { getRowSpacing, getWorkDetailTrailingSpacing } from './row-spacing'
 import { TranscriptWindow } from './transcript-window'
 
@@ -323,19 +325,15 @@ function VirtualizedItem({
 
   const content = (
     <>
-      {spacing && <div aria-hidden style={{ height: spacing }} />}
+      {spacing && (
+        <MessageMenuGap height={spacing} row={row} adjacent={previousRow} />
+      )}
       {startsBackground && (
-        <div
-          aria-hidden
-          className="h-(--message-background-padding-block-start)"
-        />
+        <MessageMenuSpace className="h-(--message-background-padding-block-start)" />
       )}
       {children}
       {endsBackground && (
-        <div
-          aria-hidden
-          className="h-(--message-background-padding-block-end)"
-        />
+        <MessageMenuSpace className="h-(--message-background-padding-block-end)" />
       )}
     </>
   )
@@ -351,7 +349,6 @@ function VirtualizedItem({
       data-slot="virtualized-item"
       data-row-kind={row?.kind}
       data-message-id={row?.messageId}
-      data-sender-group-id={row?.senderGroupId ?? row?.messageId}
       data-row-key={row?.key}
       data-note-group-id={row?.kind === 'hidden' ? row.noteGroupId : undefined}
       data-work-id={row?.kind === 'group' ? row.workId : undefined}
@@ -379,7 +376,12 @@ function VirtualizedItem({
             </div>
           )}
           {workDetailTrailingSpacing && (
-            <div aria-hidden style={{ height: workDetailTrailingSpacing }} />
+            <MessageMenuGap
+              height={workDetailTrailingSpacing}
+              row={row}
+              adjacent={nextRow}
+              trailing
+            />
           )}
         </VirtualizedRowTransition>
       ) : row?.kind === 'hidden' && row.noteGroupId ? (

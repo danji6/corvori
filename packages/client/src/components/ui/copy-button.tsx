@@ -1,5 +1,6 @@
 import { useTimeoutState } from '@/hooks'
-import { Result } from '@/lib/result'
+import { writeClipboardText } from '@/lib/clipboard'
+import { toastError } from '@/lib/notifications'
 import { isTouchDevice } from '@/lib/utils'
 import { mergeProps } from '@base-ui/react/merge-props'
 import type { Tooltip as TooltipPrimitive } from '@base-ui/react/tooltip'
@@ -58,11 +59,12 @@ export function CopyButton({
   }, [isCopied, isHovered])
 
   async function handleCopy() {
-    await Result.from(
-      navigator.clipboard.writeText(
-        typeof value === 'string' ? value : value(),
-      ),
-    ).catch()
+    try {
+      await writeClipboardText(typeof value === 'string' ? value : value())
+    } catch (error) {
+      toastError(error, 'Failed to copy')
+      return
+    }
     if (isTouch) setHovered(true)
     setDisplayedCopied(true)
     setKeepOpenAfterCopy(true)

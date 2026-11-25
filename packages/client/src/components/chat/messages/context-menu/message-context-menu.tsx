@@ -27,6 +27,7 @@ import {
   type DeleteConfirmation,
   DeleteConfirmations,
 } from './delete-confirmations'
+import { MESSAGE_MENU_TRIGGER_CLASS } from './forward-message-menu'
 import { CopyMenu, DeleteMenu, EditMenu } from './message-menu-items'
 import {
   type GroupScope,
@@ -49,8 +50,14 @@ export type MessageContextMenuProps = {
 }
 
 type MenuSelection = {
+  scope: GroupScope | null
   target: MessageTarget | null
   deletion: AttachmentDeletion | null
+  selectedText?: string
+}
+
+function getSelectedText(): string | undefined {
+  return document.getSelection()?.toString() || undefined
 }
 
 export function MessageContextMenu({
@@ -78,9 +85,7 @@ export function MessageContextMenu({
         : null,
     [row],
   )
-  const [selectedScope, setSelectedScope] = useState<GroupScope | null>(null)
-  const scopeRef = useRef<GroupScope | null>(null)
-  const scope = groupScope ?? selectedScope
+  const scope = selection ? selection.scope : groupScope
   const reply = useReplyAction(message, record, scope)
 
   const menu = useMemo(
@@ -88,12 +93,19 @@ export function MessageContextMenu({
     [message, slices, record, scope, canMutate],
   )
   const hasEdit = menu.edit.submenu || Boolean(menu.edit.messageText)
-  const hasCopy = menu.copy.blockText !== undefined || Boolean(menu.copy.messageText) // prettier-ignore
+  const messageCopyText = selection?.selectedText ?? menu.copy.messageText
+  const hasCopy = menu.copy.blockText !== undefined || Boolean(messageCopyText)
   const hasEditOrCopy = hasEdit || hasCopy
   const hasMessageActions = reply || menu.retry || hasEditOrCopy || menu.delete.message // prettier-ignore
   const messageTarget = selection?.target
   const attachmentDeletion = canMutate ? selection?.deletion : null
   const hasTargetActions = messageTarget?.download || messageTarget?.link
+
+  function preserveSelection(event: React.MouseEvent) {
+    if (event.button !== 2 || event.shiftKey) return
+    // WebKit can clear the selection before dispatching contextmenu.
+    if (getSelectedText()) event.preventDefault()
+  }
 
   function handleOpen({ x, y, target }: ContextMenuOpenTarget) {
     const nextTarget = resolveMessageTarget(target)
@@ -101,7 +113,7 @@ export function MessageContextMenu({
     if (canMutate) prefetchRichTextEditor()
     editSelectionRef.current = captureMessageEditSelection(message.id, x, y)
 
-    const next = groupScope ?? resolveHeaderScope(row, target)
+    const next = target ? (groupScope ?? resolveHeaderScope(row, target)) : null
     const deletion = canMutate
       ? selectAttachmentDeletion({
           tile: nextTarget?.attachment,
@@ -112,9 +124,12 @@ export function MessageContextMenu({
         })
       : null
 
-    setSelection({ target: nextTarget, deletion })
-    scopeRef.current = next
-    if (!groupScope) setSelectedScope(next)
+    setSelection({
+      scope: next,
+      target: nextTarget,
+      deletion,
+      selectedText: getSelectedText(),
+    })
     if (ownsHighlightRef.current) highlightScope(next, nextTarget)
   }
 
@@ -122,7 +137,7 @@ export function MessageContextMenu({
     if (!highlight) return
     if (open) {
       ownsHighlightRef.current = true
-      highlightScope(scopeRef.current, messageTarget ?? null)
+      highlightScope(scope, messageTarget ?? null)
       return
     }
 
@@ -147,10 +162,6 @@ export function MessageContextMenu({
         ...scope,
         ...(row.kind === 'header' && { surface: 'header' }),
       })
-      return
-    }
-    if (row.kind === 'header' && !scope) {
-      highlight.setTarget({ senderGroupId: row.messageId })
       return
     }
     highlight.setTarget(highlightTargetForRow(message.id, null))
@@ -178,7 +189,16 @@ export function MessageContextMenu({
   return (
     <>
       <ContextMenu onOpen={handleOpen} onOpenChange={handleOpenChange}>
-        <ContextMenu.Trigger>{children}</ContextMenu.Trigger>
+        <ContextMenu.Trigger
+          className={
+            row.kind === 'context-reset'
+              ? undefined
+              : MESSAGE_MENU_TRIGGER_CLASS
+          }
+          onMouseDown={preserveSelection}
+        >
+          {children}
+        </ContextMenu.Trigger>
         <ContextMenu.Content>
           {hasTargetActions && messageTarget && (
             <>
@@ -206,7 +226,11 @@ export function MessageContextMenu({
             onEditBlock={startEditBlock}
             onEditMessage={startEditMessage}
           />
-          <CopyMenu copy={menu.copy} />
+          <CopyMenu
+            blockText={menu.copy.blockText}
+            messageText={messageCopyText}
+            hasSelection={selection?.selectedText !== undefined}
+          />
           {menu.delete.message && (
             <>
               {(menu.retry || hasEditOrCopy) && <ContextMenu.Separator />}

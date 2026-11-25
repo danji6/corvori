@@ -157,37 +157,40 @@ test('opens a lone thought directly from the sender header', async ({
   await expect(page.getByText('First thinking block.')).toBeVisible()
 })
 
-test('the sender menu includes the gutter avatar in the highlight only with backgrounds off', async ({
+test('the sender menu highlights the first message in the group', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1600, height: 900 })
   await page.goto('/?fixture=notes&id=notes&groupedReply&backgrounds')
   const headers = page.locator('[data-slot="message-header"]')
   const avatar = headers.first().locator('[data-slot="avatar"]')
-  const work = page.locator('[data-slot="work-block"]')
   const backgrounds = page.locator('[data-slot="message-background"]')
   const highlight = page.locator('[data-slot="message-highlight"]')
   const answer = page.getByText('Content for answer', { exact: true })
-  const next = page.getByText('Content for next', { exact: true })
+  const followup = page.getByText('Content for followup', { exact: true })
   await expect(headers).toHaveCount(2)
-  await expect(backgrounds.first()).toBeVisible()
-  await expect(work).toHaveCount(2)
-  await expect(work.last()).toHaveAttribute('aria-expanded', 'false')
+  await expect
+    .poll(() => bottomOf(backgrounds.first()))
+    .toBeGreaterThan(await bottomOf(followup))
 
   await avatar.click({ button: 'right' })
   await expect(
-    page.getByRole('menuitem', { name: 'Delete Message' }),
+    page.getByRole('menuitem', { name: 'Copy Message' }),
   ).toBeVisible()
   await expect(highlight).toHaveCount(1)
   await expect
     .poll(() => bottomOf(highlight))
     .toBeGreaterThanOrEqual(await bottomOf(answer))
   const outline = (await highlight.boundingBox())!
+  const background = (await backgrounds.first().boundingBox())!
   const body = (await answer.boundingBox())!
   const avatarBox = (await avatar.boundingBox())!
+  expect(outline.x).toBeCloseTo(background.x, 0)
+  expect(outline.y).toBeCloseTo(background.y, 0)
+  expect(outline.width).toBeCloseTo(background.width, 0)
   expect(outline.x).toBeGreaterThanOrEqual(avatarBox.x + avatarBox.width)
   expect(outline.x + outline.width).toBeGreaterThanOrEqual(body.x + body.width)
-  expect(await bottomOf(highlight)).toBeLessThan(await bottomOf(next))
+  expect(await bottomOf(highlight)).toBeLessThan(await bottomOf(followup))
 
   await page.keyboard.press('Escape')
   await expect(highlight).toHaveCount(0)
@@ -203,6 +206,95 @@ test('the sender menu includes the gutter avatar in the highlight only with back
   expect((await highlight.boundingBox())!.x).toBeLessThanOrEqual(
     (await avatar.boundingBox())!.x,
   )
+  expect(await bottomOf(highlight)).toBeLessThan(await bottomOf(followup))
+})
+
+test('a gap within a sender group opens the nearest message menu', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    let clipboard = ''
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: async (value: string) => {
+          clipboard = value
+        },
+        readText: async () => clipboard,
+      },
+    })
+  })
+  await page.goto('/?fixture=notes&id=notes&groupedReply&backgrounds')
+  const answer = page.getByText('Content for answer', { exact: true })
+  const followup = page.getByText('Content for followup', { exact: true })
+  const messageRow = (text: Locator) =>
+    text.locator('xpath=ancestor::*[@data-slot="message-row"]')
+  await followup.click({ trial: true })
+
+  const answerEnd = await bottomOf(messageRow(answer))
+  const next = (await messageRow(followup).boundingBox())!
+  const gap = next.y - answerEnd
+  expect(gap).toBeGreaterThan(4)
+  const upper = {
+    x: Math.round(next.x + 20),
+    y: Math.round(answerEnd + gap / 4),
+  }
+  const lower = { x: upper.x + 5, y: Math.round(next.y - gap / 4) }
+  const openAt = ({ x, y }: typeof upper) =>
+    page.mouse.click(x, y, { button: 'right' })
+  const menu = page.getByRole('menu')
+  const copy = menu.getByRole('menuitem', { name: 'Copy Message' })
+  const highlight = page.locator('[data-slot="message-highlight"]')
+
+  await openAt(upper)
+  await expect(copy).toBeVisible()
+  await expect(highlight).toHaveCount(1)
+  expect(await bottomOf(highlight)).toBeLessThan(await bottomOf(followup))
+  // Reopen over the lower half even when it is covered by the current popup.
+  await expect
+    .poll(() =>
+      menu.evaluate(
+        (popup, { x, y }) => popup.contains(document.elementFromPoint(x, y)),
+        lower,
+      ),
+    )
+    .toBe(true)
+  await openAt(lower)
+  await expect(highlight).toHaveCount(1)
+  await expect
+    .poll(async () => (await highlight.boundingBox())?.y)
+    .toBeGreaterThan((await answer.boundingBox())!.y)
+  await copy.click()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    'Content for followup',
+  )
+
+  const background = page.locator('[data-slot="message-background"]').first()
+  const edge = (await background.boundingBox())!.x + 2
+  await openAt({ x: edge, y: upper.y })
+  await copy.click()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    'Content for answer',
+  )
+  await openAt({ x: edge, y: lower.y })
+  await copy.click()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    'Content for followup',
+  )
+
+  const nextHeader = page.locator('[data-slot="message-header"]').last()
+  const nextHeaderTop = (await nextHeader.boundingBox())!.y
+  const followupEnd = await bottomOf(messageRow(followup))
+  await openAt({ x: upper.x, y: followupEnd + 14 })
+  await expect(copy).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await page.keyboard.down('Shift')
+  await openAt(lower)
+  await page.keyboard.up('Shift')
+  await expect(menu).toHaveCount(0)
+
+  await openAt({ x: upper.x, y: (followupEnd + nextHeaderTop) / 2 })
+  await expect(menu).toHaveCount(0)
 })
 
 test('the avatar highlight spans the message while the thinking menu scopes its block', async ({

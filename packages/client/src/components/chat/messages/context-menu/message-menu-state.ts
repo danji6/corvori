@@ -31,7 +31,6 @@ export type MenuState = {
   copy: {
     blockText?: string
     messageText?: string
-    submenu: boolean
   }
   delete: {
     blockAddresses: PartAddress[]
@@ -131,7 +130,6 @@ export function getMessageContextMenuState(
     copy: {
       blockText: canCopyBlock ? blockText : undefined,
       messageText,
-      submenu: canCopyBlock && Boolean(messageText),
     },
     delete: {
       blockAddresses: canMutate ? blockAddresses : [],

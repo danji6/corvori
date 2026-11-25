@@ -505,17 +505,10 @@ function groupedWorkMessages() {
 }
 
 function groupedReplyMessages() {
-  const followup = { ...message('work', 1), _id: 'followup' }
-  followup.segments[0].parts.push({
-    type: 'reasoning',
-    text: 'Checking the implementation.',
-    state: 'done',
-  })
   return [
-    message('work', 0),
-    followup,
-    { ...message('answer', 2), role: 'assistant' },
-    message('next', 3),
+    { ...message('answer', 0), role: 'assistant' },
+    { ...message('followup', 1), role: 'assistant' },
+    message('next', 2),
   ]
 }
 

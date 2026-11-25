@@ -1,5 +1,6 @@
 import { ContextMenu } from '@/components/ui'
 import { downloadAttachment } from '@/lib/chat/attachment-download'
+import { writeClipboardText } from '@/lib/clipboard'
 import { toast, toastError } from '@/lib/notifications'
 import { DownloadIcon, LinkIcon } from 'lucide-react'
 
@@ -59,7 +60,7 @@ export function TargetActions({ target }: { target: MessageTarget }) {
 
 async function copyLink(link: string) {
   try {
-    await navigator.clipboard.writeText(link)
+    await writeClipboardText(link)
     toast.success('Link copied')
   } catch (error) {
     toastError(error, 'Failed to copy link')

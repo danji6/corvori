@@ -23,6 +23,7 @@ import { UPDATE_SIZE_EVENT, UPDATE_VIRTUAL_STATE } from 'virtua/unstable_core'
 import { MessageHighlightLayer } from '../message-highlight-context'
 import { MessageBackgroundLayer } from './message-background-layer'
 import { useMessageList } from './message-list-context'
+import { MessageMenuHitArea, useNearbyMessageMenu } from './nearby-message-menu'
 
 type ItemComponent = ComponentType<CustomItemComponentProps>
 
@@ -63,6 +64,7 @@ export function TranscriptWindow({
   )
   const reportResize = useEffectEvent(onResize)
   const onRowsMeasured = useMessageList()?.onRowsMeasured
+  const forwardNearbyMenu = useNearbyMessageMenu()
   const totalSize = store.$getTotalSize()
 
   useLayoutEffect(() => {
@@ -113,6 +115,8 @@ export function TranscriptWindow({
     <div
       ref={root}
       data-slot="transcript-window"
+      onContextMenu={forwardNearbyMenu}
+      onMouseDown={forwardNearbyMenu}
       style={{
         contain: 'size style',
         overflowAnchor: 'none',
@@ -123,6 +127,7 @@ export function TranscriptWindow({
         pointerEvents: store.$isScrolling() ? 'none' : undefined,
       }}
     >
+      <MessageMenuHitArea />
       {showBackgrounds && (
         <MessageBackgroundLayer
           rows={rows}

@@ -5,6 +5,7 @@ import {
   useFilePreviews,
 } from '@/hooks/file-previews'
 import { downloadAttachment } from '@/lib/chat/attachment-download'
+import { writeClipboardText } from '@/lib/clipboard'
 import {
   ACCEPTED_IMAGE_TYPES,
   ACCEPTED_VIDEO_TYPES,
@@ -240,8 +241,7 @@ function FileActions({
           className="size-7 rounded-full"
           aria-label={`Copy link to ${item.file.name}`}
           onClick={() => {
-            void navigator.clipboard
-              .writeText(copyText)
+            void writeClipboardText(copyText)
               .then(() => toast.success('Attachment link copied'))
               .catch((error) =>
                 toastError(error, 'Failed to copy attachment link'),

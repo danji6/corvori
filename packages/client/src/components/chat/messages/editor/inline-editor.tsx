@@ -19,6 +19,7 @@ import { EditorContent, useEditor } from '@tiptap/react'
 import type { Editor } from '@tiptap/react'
 import { useEffect, useRef } from 'react'
 
+import { EditorContextMenu } from './menu/editor-context-menu'
 import type { EditCaret, PendingSelection } from './message-edit-context'
 
 export type RichTextEditorProps = {
@@ -168,17 +169,10 @@ export function InlineEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor])
 
-  function handleWrapperKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Escape' && onCancel) {
-      e.preventDefault()
-      onCancel()
-    }
-  }
-
   return (
-    <div data-slot="editor-container" onKeyDown={handleWrapperKeyDown}>
+    <EditorContextMenu editor={editor} onCancel={onCancel}>
       <EditorContent editor={editor} />
-    </div>
+    </EditorContextMenu>
   )
 }
 

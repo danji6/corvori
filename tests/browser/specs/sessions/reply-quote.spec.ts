@@ -33,6 +33,17 @@ test('reply quotes jump to their exact text block across loaded windows', async 
       )
       .toBe(64)
     await expect(highlight).toBeVisible()
+    // After the jump, wait for the virtualized transcript to receive clicks again.
+    await expect
+      .poll(() =>
+        block.evaluate((element) => {
+          const { x, y, width, height } = element.getBoundingClientRect()
+          return element.contains(
+            document.elementFromPoint(x + width / 2, y + height / 2),
+          )
+        }),
+      )
+      .toBe(true)
     await block.click()
   }
 

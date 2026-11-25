@@ -30,7 +30,9 @@ export function messageWindowClient(
               calls.push(args)
               if (deferred) pending.set(key, args)
               cache.set(key, deferred ? undefined : read(args))
-            } else cache.set(key, [])
+            } else {
+              cache.set(key, name === 'chat:replyAttachment' ? null : [])
+            }
           }
           return cache.get(key)
         },

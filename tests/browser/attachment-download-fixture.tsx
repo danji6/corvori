@@ -163,7 +163,7 @@ function AttachmentGalleryMessage() {
       >
         <div
           ref={messageRef}
-          data-sender-group-id={galleryMessage.id}
+          data-message-id={galleryMessage.id}
           className="relative"
         >
           <p>Gallery message</p>

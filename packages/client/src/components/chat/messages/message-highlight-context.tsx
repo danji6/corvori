@@ -1,5 +1,6 @@
 import { createOptionalContext } from '@/hooks/context'
 import type { MessageRow } from '@/lib/chat/rows'
+import { cn } from '@/lib/utils'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   type RefObject,
@@ -17,11 +18,10 @@ export type HighlightTarget = {
   segmentIndex: number | null
   /** The block to highlight, or null to highlight the whole message. */
   groupIndex: number | null
-  surface?: 'header'
+  surface?: 'header' | 'background'
 }
 
-type HighlightSelection =
-  HighlightTarget | { senderGroupId: string } | { attachment: HTMLElement }
+type HighlightSelection = HighlightTarget | { attachment: HTMLElement }
 
 export type MessageHighlightValue = {
   target: HighlightSelection | null
@@ -32,13 +32,15 @@ export type MessageHighlightValue = {
 export const [MessageHighlightContext, useMessageHighlight] =
   createOptionalContext<MessageHighlightValue>()
 
-type HighlightRegistry = {
-  elementsRef: RefObject<Map<HTMLElement, HighlightTarget>>
-  version: number
-}
+export type HighlightElements = Map<HTMLElement, HighlightTarget>
 
-const [HighlightRegistryContext, useHighlightRegistry] =
-  createOptionalContext<HighlightRegistry>()
+const [MessageHighlightElementsContext, useMessageHighlightElements] =
+  createOptionalContext<RefObject<HighlightElements>>()
+
+export { useMessageHighlightElements }
+
+const [HighlightRegistryVersionContext, useHighlightRegistryVersion] =
+  createOptionalContext<number>()
 
 /** Targets the block a row renders, falling back to the whole message. */
 export function highlightTargetForRow(
@@ -108,10 +110,10 @@ type HighlightRect = {
   left: number
   width: number
   height: number
+  borderRadius?: string
 }
 
-const HIGHLIGHT_PAD_X = 8
-const HIGHLIGHT_PAD_Y = 12
+export const MESSAGE_HIGHLIGHT_PADDING = 12
 
 function keyForTarget(target: HighlightTarget): string {
   if (target.groupIndex === null) return `${target.messageId}:message`
@@ -125,7 +127,7 @@ export function MessageHighlightProvider({
 }) {
   const [target, setTarget] = useState<HighlightSelection | null>(null)
   const [registryVersion, setRegistryVersion] = useState(0)
-  const elementsRef = useRef(new Map<HTMLElement, HighlightTarget>())
+  const elementsRef = useRef<HighlightElements>(new Map())
 
   const registerElement = useCallback(
     (target: HighlightTarget, element: HTMLElement) => {
@@ -160,16 +162,13 @@ export function MessageHighlightProvider({
     () => ({ target, setTarget, registerElement }),
     [target, registerElement],
   )
-  const registry = useMemo(
-    () => ({ elementsRef, version: registryVersion }),
-    [registryVersion],
-  )
-
   return (
     <MessageHighlightContext.Provider value={value}>
-      <HighlightRegistryContext.Provider value={registry}>
-        {children}
-      </HighlightRegistryContext.Provider>
+      <MessageHighlightElementsContext value={elementsRef}>
+        <HighlightRegistryVersionContext value={registryVersion}>
+          {children}
+        </HighlightRegistryVersionContext>
+      </MessageHighlightElementsContext>
     </MessageHighlightContext.Provider>
   )
 }
@@ -191,14 +190,15 @@ function useHighlightRect(
   target: HighlightSelection | null | undefined,
   { root, rows, layoutVersion }: MessageHighlightLayerProps,
 ) {
-  const registry = useHighlightRegistry()
+  const elementsRef = useMessageHighlightElements()
+  const registryVersion = useHighlightRegistryVersion()
   const [rect, setRect] = useState<HighlightRect | null>(null)
 
   const measure = useEffectEvent(() => {
     const container = root.current
     const next =
-      target && registry && container
-        ? measureInTranscript(target, registry.elementsRef.current, container)
+      target && elementsRef && container
+        ? measureInTranscript(target, elementsRef.current, container)
         : null
     setRect((current) => (sameRect(current, next) ? current : next))
   })
@@ -210,7 +210,7 @@ function useHighlightRect(
   }, [target])
 
   useLayoutEffect(() => {
-    if (!target || !registry) return
+    if (!target || !elementsRef) return
 
     const attachment = 'attachment' in target ? target.attachment : null
     function onScroll(event: Event) {
@@ -225,7 +225,7 @@ function useHighlightRect(
     const observer = new ResizeObserver(() => measure())
     const frame = requestAnimationFrame(() => {
       if (root.current) observer.observe(root.current)
-      const elements = getTargetElements(target, registry.elementsRef.current)
+      const elements = getTargetElements(target, elementsRef.current)
       for (const element of elements) observer.observe(element)
     })
     if (attachment) window.addEventListener('scroll', onScroll, true)
@@ -234,14 +234,14 @@ function useHighlightRect(
       observer.disconnect()
       if (attachment) window.removeEventListener('scroll', onScroll, true)
     }
-  }, [registry, root, target])
+  }, [elementsRef, registryVersion, root, target])
 
   useLayoutEffect(() => {
     if (!target) return
     // A virtual row can change its offset without changing its size.
     const frame = requestAnimationFrame(() => measure())
     return () => cancelAnimationFrame(frame)
-  }, [layoutVersion, registry, root, rows, target])
+  }, [elementsRef, layoutVersion, registryVersion, root, rows, target])
 
   return rect
 }
@@ -268,7 +268,8 @@ function sameRect(a: HighlightRect | null, b: HighlightRect | null) {
     a.top === b.top &&
     a.left === b.left &&
     a.width === b.width &&
-    a.height === b.height
+    a.height === b.height &&
+    a.borderRadius === b.borderRadius
   )
 }
 
@@ -277,22 +278,22 @@ function getTargetElements(
   elements: Map<HTMLElement, HighlightTarget>,
 ): HTMLElement[] {
   if ('attachment' in target) return [target.attachment]
-  if ('senderGroupId' in target) {
-    return Array.from(elements.keys()).filter(
-      (element) =>
-        element.closest<HTMLElement>('[data-sender-group-id]')?.dataset
-          .senderGroupId === target.senderGroupId,
-    )
+  if (target.groupIndex === null) {
+    const surfaces: HTMLElement[] = []
+    const content: HTMLElement[] = []
+    for (const [element, registeredTarget] of elements) {
+      if (registeredTarget.messageId !== target.messageId) continue
+      if (registeredTarget.surface === 'background') surfaces.push(element)
+      else content.push(element)
+    }
+    return surfaces.length ? surfaces : content
   }
 
   const targetKey = keyForTarget(target)
   return Array.from(elements.entries())
-    .filter(([, registeredTarget]) => {
-      if (target.groupIndex === null) {
-        return registeredTarget.messageId === target.messageId
-      }
-      return keyForTarget(registeredTarget) === targetKey
-    })
+    .filter(
+      ([, registeredTarget]) => keyForTarget(registeredTarget) === targetKey,
+    )
     .map(([element]) => element)
 }
 
@@ -302,7 +303,21 @@ function measureTarget(
 ): HighlightRect | null {
   if ('attachment' in target) return measureAttachment(target.attachment)
 
-  const rects = getTargetElements(target, elements)
+  const matching = getTargetElements(target, elements)
+  const surface = matching[0]
+  if (surface?.isConnected && elements.get(surface)?.surface === 'background') {
+    const { top, left, width, height } = surface.getBoundingClientRect()
+    if (!width || !height) return null
+    return {
+      top,
+      left,
+      width,
+      height,
+      borderRadius: getComputedStyle(surface).borderRadius,
+    }
+  }
+
+  const rects = matching
     .filter((element) => element.isConnected)
     .map((element) => element.getBoundingClientRect())
     .filter((rect) => rect.width > 0 && rect.height > 0)
@@ -354,10 +369,10 @@ function padHighlightBounds({
   right,
 }: Pick<DOMRectReadOnly, 'top' | 'bottom' | 'left' | 'right'>): HighlightRect {
   return {
-    top: top - HIGHLIGHT_PAD_Y,
-    left: left - HIGHLIGHT_PAD_X,
-    width: right - left + HIGHLIGHT_PAD_X * 2,
-    height: bottom - top + HIGHLIGHT_PAD_Y * 2,
+    top: top - MESSAGE_HIGHLIGHT_PADDING,
+    left: left - MESSAGE_HIGHLIGHT_PADDING,
+    width: right - left + MESSAGE_HIGHLIGHT_PADDING * 2,
+    height: bottom - top + MESSAGE_HIGHLIGHT_PADDING * 2,
   }
 }
 
@@ -393,8 +408,12 @@ function MessageHighlightOverlay({ rect }: { rect: HighlightRect | null }) {
             height: rect.height,
           }}
           exit={{ opacity: 0 }}
+          style={{ borderRadius: rect.borderRadius }}
           transition={{ duration: 0.12, ease: 'easeOut' }}
-          className="bg-m3-surface-container/70 ring-m3-outline-variant/40 pointer-events-none absolute z-0 rounded-xl ring-1"
+          className={cn(
+            'chat-message-highlight bg-m3-surface-container/70 ring-m3-outline-variant/40 pointer-events-none absolute z-0 ring-1',
+            rect.borderRadius && 'ring-inset',
+          )}
         />
       )}
     </AnimatePresence>

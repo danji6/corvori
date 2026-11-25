@@ -129,7 +129,7 @@ test('highlights only the attachment under the context menu', async ({
   await page.goto('/?fixture=attachment-download&gallery')
 
   const text = page.getByText('Gallery message', { exact: true })
-  const message = page.locator('[data-sender-group-id="gallery"]')
+  const message = page.locator('[data-message-id="gallery"]')
   const highlight = page.locator('[data-slot="message-highlight"]')
   const inline = page.getByRole('link', { name: 'Inline attachment' })
 
