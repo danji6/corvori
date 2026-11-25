@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 
 export type KeyboardViewport = {
   bottomInset: number
@@ -24,14 +24,24 @@ export function keyboardViewport(
 export function useKeyboardViewport() {
   const [metrics, setMetrics] = useState<KeyboardViewport>({ bottomInset: 0 })
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
-    const update = () => setMetrics(keyboardViewport(window.innerHeight, vv))
+    const update = () => {
+      const next = keyboardViewport(window.innerHeight, vv)
+      setMetrics((current) =>
+        current.height === next.height &&
+        current.bottomInset === next.bottomInset
+          ? current
+          : next,
+      )
+    }
     update()
+    window.addEventListener('resize', update)
     vv.addEventListener('resize', update)
     vv.addEventListener('scroll', update)
     return () => {
+      window.removeEventListener('resize', update)
       vv.removeEventListener('resize', update)
       vv.removeEventListener('scroll', update)
     }

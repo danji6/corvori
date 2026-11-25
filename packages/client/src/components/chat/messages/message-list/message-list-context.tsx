@@ -12,7 +12,7 @@ export const VirtualizedRowsContext = createContext<{
 type MessageListContextValue = {
   scrollRef: React.RefObject<HTMLElement | null>
   scrollCoordinator?: ScrollCoordinator
-  onLayoutChange: (anchor?: ScrollLayoutAnchor) => void
+  onLayoutChange: (anchor?: ScrollLayoutAnchor) => (() => void) | void
   onRowsMeasured?: () => void
   releaseFollow: () => void
   resumeFollow: () => void

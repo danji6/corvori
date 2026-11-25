@@ -49,7 +49,7 @@ export function useScroller(
   }, [])
 
   const holdLayoutPosition = useCallback((anchor?: ScrollLayoutAnchor) => {
-    scrollerRef.current?.holdLayoutPosition(anchor)
+    return scrollerRef.current?.holdLayoutPosition(anchor)
   }, [])
 
   const syncLayoutPosition = useCallback(() => {

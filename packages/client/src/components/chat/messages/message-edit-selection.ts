@@ -33,11 +33,12 @@ export function captureMessageEditSelection(
   x: number,
   y: number,
 ): MessageEditSelectionSnapshot {
-  const caret = editCaretFromPoint(x, y)
+  const point = caretFromPoint(x, y)
+  const caret = point ? editCaretFromPoint(point, x, y) : undefined
   return {
     caret,
     caretOffset: caret?.kind === 'text' ? caret.offset : undefined,
-    viewportTop: y,
+    viewportTop: caret && point ? (caretTop(point) ?? y) : y,
     carried: carriedSelectionsInRow(messageId, x, y),
   }
 }
@@ -84,15 +85,23 @@ function caretFromPoint(x: number, y: number): CaretPoint | null {
   return null
 }
 
-function editCaretFromPoint(x: number, y: number): EditCaret | undefined {
-  const caret = caretFromPoint(x, y)
-  if (!caret) return undefined
-
+function editCaretFromPoint(
+  caret: CaretPoint,
+  x: number,
+  y: number,
+): EditCaret | undefined {
   const codeCaret = codeCaretFromPoint(caret, x, y)
   if (codeCaret) return codeCaret
 
   const offset = textCaretOffset(caret)
   return offset == null ? undefined : { kind: 'text', offset }
+}
+
+function caretTop({ node, offset }: CaretPoint): number | undefined {
+  const range = document.createRange()
+  range.setStart(node, offset)
+  range.collapse(true)
+  return selectionTop(range)
 }
 
 function textCaretOffset(caret: CaretPoint): number | undefined {

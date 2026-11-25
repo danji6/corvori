@@ -32,8 +32,6 @@ export type RichTextEditorProps = {
   onReady?: (editor: Editor) => void
   /** Placeholder shown when the editor is empty. */
   placeholder?: string
-  /** Focus the editor on mount. Defaults to true (edit mode). */
-  autoFocus?: boolean
   /** Extra class applied to the contenteditable element. */
   editorClassName?: string
   /** ProseMirror keydown hook. Return true to stop default handling. */
@@ -50,7 +48,6 @@ export function InlineEditor({
   pendingSelection,
   onReady,
   placeholder,
-  autoFocus = true,
   editorClassName,
   handleKeyDown,
   handlePaste,
@@ -143,40 +140,7 @@ export function InlineEditor({
 
   useEffect(() => {
     if (!editor) return
-
-    if (pendingSelection) {
-      editor.view.dom.focus({ preventScroll: true })
-      let placed = false
-      if (pendingSelection.text) {
-        placed = findAndSelect(
-          editor,
-          pendingSelection.text,
-          pendingSelection.occurrenceIndex,
-        )
-      }
-      if (!placed && pendingSelection.caret) {
-        placed = placeEditCaret(editor, pendingSelection.caret)
-      }
-      if (!placed && pendingSelection.caretOffset != null) {
-        placed = placeCaret(editor, pendingSelection.caretOffset)
-      }
-      if (!placed) {
-        editor.commands.selectAll()
-      }
-
-      // Refocus in the next tick to preserve selection
-      setTimeout(() => {
-        if (!editor.isDestroyed) {
-          editor.view.dom.focus({ preventScroll: true })
-        }
-      }, 0)
-
-      pendingSelection.onEditorReady?.(editor)
-    } else if (autoFocus) {
-      editor.view.dom.focus({ preventScroll: true })
-      editor.commands.focus('start', { scrollIntoView: false })
-    }
-
+    if (pendingSelection) restoreEditSelection(editor, pendingSelection)
     onReady?.(editor)
     // pendingSelection and onReady are intentionally excluded
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -187,6 +151,15 @@ export function InlineEditor({
       <EditorContent editor={editor} />
     </EditorContextMenu>
   )
+}
+
+/** Sets the initial selection without focusing or scrolling the editor. */
+function restoreEditSelection(editor: Editor, selection: PendingSelection) {
+  const { text, occurrenceIndex, caret, caretOffset } = selection
+  if (text && findAndSelect(editor, text, occurrenceIndex)) return
+  if (caret && placeEditCaret(editor, caret)) return
+  if (caretOffset != null && placeCaret(editor, caretOffset)) return
+  editor.commands.selectAll()
 }
 
 /**
@@ -230,7 +203,7 @@ function placeCaret(editor: Editor, caretOffset: number): boolean {
   if (posMap.length === 0) return false
   const idx = Math.max(0, Math.min(caretOffset, posMap.length))
   const pos = idx < posMap.length ? posMap[idx] : posMap[posMap.length - 1] + 1
-  editor.chain().setTextSelection(pos).focus().run()
+  editor.commands.setTextSelection(pos)
   return true
 }
 
@@ -260,11 +233,7 @@ function placeCodeCaret(
 
   if (target.pos === -1) return false
   const offset = Math.max(0, Math.min(caretOffset, target.size))
-  editor
-    .chain()
-    .setTextSelection(target.pos + 1 + offset)
-    .focus()
-    .run()
+  editor.commands.setTextSelection(target.pos + 1 + offset)
   return true
 }
 
@@ -300,6 +269,6 @@ function findAndSelect(
 
   if (matches.length === 0) return false
   const { from, to } = matches[Math.min(occurrenceIndex, matches.length - 1)]
-  editor.chain().setTextSelection({ from, to }).focus().run()
+  editor.commands.setTextSelection({ from, to })
   return true
 }

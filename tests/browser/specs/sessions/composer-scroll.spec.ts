@@ -1,5 +1,66 @@
 import { expect, test } from '@playwright/test'
 
+test('keeps the selected message line in place as the mobile viewport shrinks', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 780 })
+  await page.goto('/?fixture=notes&id=notes&keyboardEdit')
+  const message = page.locator(
+    '[data-row-kind="group"][data-message-id="keyboard-edit"]',
+  )
+  const text = 'Message paragraph 28'
+  const line = message.getByText(text, { exact: true })
+  await line.scrollIntoViewIfNeeded()
+  await line.evaluate((el) =>
+    window.scrollBy(0, el.getBoundingClientRect().top - 210),
+  )
+  const before = (await line.boundingBox())!.y
+  await line.click({ button: 'right', position: { x: 48, y: 10 } })
+  await page.getByRole('menuitem', { name: 'Edit Message' }).click()
+  const editor = message.locator('[data-slot="editor"]')
+  await expect(editor).toBeFocused()
+  await page.setViewportSize({ width: 390, height: 460 })
+  const save = page.getByRole('button', { name: 'Save edit' })
+  await expect(save).toBeInViewport({ ratio: 1 })
+  await expect
+    .poll(() =>
+      save.evaluate((el) => innerHeight - el.getBoundingClientRect().bottom),
+    )
+    .toBeLessThan(80)
+
+  const editedLine = editor.getByText(text, { exact: true })
+  await expect
+    .poll(async () => Math.abs((await editedLine.boundingBox())!.y - before))
+    .toBeLessThanOrEqual(2)
+  const selectionText = await editor.evaluate(
+    () => document.getSelection()?.anchorNode?.textContent,
+  )
+  expect(selectionText).toContain(text)
+})
+
+test('keeps the focused composer and bottom fade above the resized mobile viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 780 })
+  await page.goto('/?fixture=notes&id=notes&composer')
+  const composer = page.locator(
+    '[data-slot="chat-box"] [contenteditable="true"]',
+  )
+  await expect(composer).toBeInViewport({ ratio: 1 })
+  await composer.click()
+  await expect(composer).toBeFocused()
+
+  const dock = page.locator('[data-slot="chat-dock"]')
+  const fade = dock.locator('..').locator(':scope > div > [aria-hidden="true"]')
+  for (const height of [460, 390, 780]) {
+    await page.setViewportSize({ width: 390, height })
+    await expect(composer).toBeInViewport({ ratio: 1 })
+    await expect
+      .poll(() => fade.evaluate((el) => el.getBoundingClientRect().bottom))
+      .toBeCloseTo(height, 0)
+  }
+})
+
 test('preserves the dock height and scroll position in fullscreen', async ({
   page,
 }) => {

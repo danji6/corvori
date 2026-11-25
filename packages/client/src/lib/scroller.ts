@@ -423,6 +423,7 @@ export class Scroller {
     })
     this.layoutPosition = position
     operation.onCancel(position.cancel)
+    return position.cancel
   }
 
   /** Aligns the bottom as soon as virtual rows commit their measured heights. */

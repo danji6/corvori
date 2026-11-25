@@ -43,9 +43,11 @@ export function EditableText({
   const messageList = useMessageList()
   const scrollRef = messageList?.scrollRef
   const onLayoutChange = messageList?.onLayoutChange
+  const scrollCoordinator = messageList?.scrollCoordinator
   const isStreaming = part.state === 'streaming'
 
   const editingAddress = editCtx?.editingAddress ?? null
+  const pendingSelection = editCtx?.pendingSelection
   const replyQuoteRemoved = editCtx?.replyQuoteRemoved
   const isEditing =
     editCtx?.editingMessageId === msgCtx?.id &&
@@ -54,58 +56,46 @@ export function EditableText({
         editingAddress.partIndex === index))
   const shouldEdit = isEditing && !isStreaming
 
-  const [editorReady, setEditorReady] = useState(false)
   const [editorInstance, setEditorInstance] = useState<Editor | null>(null)
-  const editorRef = useRef<Editor | null>(null)
-
-  if (!shouldEdit && editorReady) {
-    setEditorReady(false)
-  }
+  const editorReady = editorInstance !== null
 
   if (!shouldEdit && editorInstance !== null) {
     setEditorInstance(null)
   }
 
-  const prevShouldEditRef = useRef(false)
+  const scrollCheckpoint = useRef<(() => boolean) | undefined>(undefined)
   useLayoutEffect(() => {
-    if (shouldEdit && !prevShouldEditRef.current) {
-      onLayoutChange?.('top')
-    }
-    prevShouldEditRef.current = !!shouldEdit
-  }, [shouldEdit, onLayoutChange])
-
-  useLayoutEffect(() => {
-    if (shouldEdit && replyQuoteRemoved) {
-      editorRef.current?.view.dom.focus({ preventScroll: true })
-    }
-  }, [shouldEdit, replyQuoteRemoved])
+    if (!shouldEdit || editorReady) return
+    const cancel = onLayoutChange?.('top')
+    scrollCheckpoint.current = scrollCoordinator?.checkpoint()
+    return cancel
+  }, [shouldEdit, editorReady, onLayoutChange, scrollCoordinator])
 
   const appliedScrollRef = useRef(0)
   const entryScrollRef = useRef(0)
 
-  // Compensate scroll to keep the selected text visible
+  // Release the layout hold before focusing, then account for any revealed markup.
   useLayoutEffect(() => {
-    if (!editorReady) return
-    const editor = editorRef.current
+    if (!editorInstance) return
+    editorInstance.view.focus()
     const scrollEl = scrollRef?.current
-    const viewportTop = editCtx?.pendingSelection?.viewportTop
-    if (!editor || !scrollEl || viewportTop === undefined) return
-
-    try {
-      const { from } = editor.state.selection
-      if (from > 0) {
-        const coords = editor.view.coordsAtPos(from)
-        const delta = coords.top - viewportTop
-        if (Math.abs(delta) > 1) {
-          adjustScroll(scrollEl, delta)
-          appliedScrollRef.current += delta
-          entryScrollRef.current = readScroll(scrollEl)
-        }
-      }
-    } catch {
-      // coordsAtPos can throw for invalid positions, no-op
+    const viewportTop = pendingSelection?.viewportTop
+    const canAlign = scrollCheckpoint.current?.() !== false
+    if (scrollEl && viewportTop !== undefined && canAlign) {
+      const before = readScroll(scrollEl)
+      alignEditorSelection(editorInstance, scrollEl, viewportTop)
+      const after = readScroll(scrollEl)
+      appliedScrollRef.current += after - before
+      entryScrollRef.current = after
     }
-  }, [editorReady, editCtx?.pendingSelection, scrollRef])
+    pendingSelection?.onEditorReady?.(editorInstance)
+  }, [editorInstance, pendingSelection, scrollRef])
+
+  useLayoutEffect(() => {
+    if (shouldEdit && replyQuoteRemoved) {
+      editorInstance?.view.dom.focus({ preventScroll: true })
+    }
+  }, [editorInstance, shouldEdit, replyQuoteRemoved])
 
   // Reverse the entry compensation when leaving edit mode
   const wasEditingRef = useRef(false)
@@ -126,12 +116,6 @@ export function EditableText({
     if (Math.abs(readScroll(scrollEl) - entryScrollRef.current) > 2) return
     adjustScroll(scrollEl, -applied)
   }, [shouldEdit, scrollRef])
-
-  function handleEditorReady(editor: Editor) {
-    editorRef.current = editor
-    setEditorInstance(editor)
-    setEditorReady(true)
-  }
 
   return (
     <div
@@ -164,7 +148,7 @@ export function EditableText({
                   onSave={editCtx.onSave}
                   onCancel={editCtx.onCancel}
                   pendingSelection={editCtx.pendingSelection}
-                  onReady={handleEditorReady}
+                  onReady={setEditorInstance}
                 />
               </Suspense>
             </BubbleMenu>
@@ -175,6 +159,21 @@ export function EditableText({
       )}
     </div>
   )
+}
+
+function alignEditorSelection(
+  editor: Editor,
+  scrollEl: HTMLElement,
+  viewportTop: number,
+) {
+  const { from } = editor.state.selection
+  if (from === 0) return
+  try {
+    const delta = editor.view.coordsAtPos(from).top - viewportTop
+    if (Math.abs(delta) > 1) adjustScroll(scrollEl, delta)
+  } catch {
+    // The editor may not have a DOM position for this selection yet.
+  }
 }
 
 function adjustScroll(scrollEl: HTMLElement, delta: number) {

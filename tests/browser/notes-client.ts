@@ -59,6 +59,13 @@ function message(id: string, time: number, type?: NoteType) {
 }
 
 function noteText(id: string) {
+  if (id === 'keyboard-edit') {
+    return Array.from(
+      { length: 36 },
+      (_, index) =>
+        `**Message paragraph ${index + 1}** has enough text to wrap at a narrow width.`,
+    ).join('\n\n')
+  }
   const text =
     id === 'workspace'
       ? '<system-reminder>\n\n**Workspace details**\n\n' +
@@ -157,6 +164,7 @@ if (params.has('liveAuthors')) {
 
 function initialMessages() {
   if (attachmentActions) return attachmentMessages()
+  if (params.has('keyboardEdit')) return [message('keyboard-edit', 1)]
   if (params.has('liveAuthors') || replyQuoteEditing) {
     const answer = {
       ...message('answer', 1),
