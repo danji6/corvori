@@ -17,6 +17,7 @@ import { SessionAgentList } from '@/components/chat/sessions/session-agent-list'
 import { SessionMemberList } from '@/components/chat/sessions/session-member-list'
 import { SessionPlanSection } from '@/components/chat/sessions/session-plan-section'
 import '@/globals.css'
+import { AttachmentUrlProvider } from '@/hooks/chat/attachment-urls'
 import { AvatarUrlProvider } from '@/hooks/chat/avatars'
 import { useScrollPersistence } from '@/hooks/chat/message-list/scroll-persistence'
 import { useSeek } from '@/hooks/chat/message-list/seek'
@@ -306,6 +307,7 @@ export function NotesFixture() {
   return (
     <ConvexProvider client={notesClient}>
       {composerParams.has('liveAuthors') && <AvatarUrlProvider />}
+      {composerParams.has('attachmentActions') && <AttachmentUrlProvider />}
       {composerParams.has('liveAuthors') && (
         <div className="fixed top-0 left-0 z-40 w-56">
           <SessionAgentList />

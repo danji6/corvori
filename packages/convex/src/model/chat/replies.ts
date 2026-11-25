@@ -1,8 +1,14 @@
-import { clipReplyQuote, quotableText } from '@cv/core/reply-quote'
+import {
+  attachmentReplyCount,
+  attachmentReplyLabel,
+  clipReplyQuote,
+  quotableText,
+} from '@cv/core/reply-quote'
 
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../../_generated/server'
 import { error } from '../../errors'
+import type { AuthQueryCtx } from '../../functions'
 import type { PartAddress, ReplyQuote } from '../../validators/messages'
 import {
   getSegmentRow,
@@ -12,6 +18,47 @@ import {
 } from '../messageContents'
 import { hasMessageScript } from '../messages'
 import { modelSegmentParts } from '../promptEvaluation/messageParts'
+import { getMember } from '../session/memberships'
+
+/** Finds the first file in the original message, even outside the transcript window. */
+export async function getReplyAttachment(
+  ctx: AuthQueryCtx,
+  { messageId }: { messageId: Id<'messages'> },
+) {
+  const message = await ctx.db.get(messageId)
+  if (!message || message.hidden || message.type) return null
+  if (message.status === 'processing') return null
+
+  const member = await getMember(ctx, message.sessionId, ctx.userId)
+  if (!member) return null
+
+  const segments = queryMessageSegments(ctx, messageId, message.selectedVersion)
+  for await (const segment of segments) {
+    for (const part of segment.parts) {
+      const file = replyFilePart(part)
+      if (file) return file
+    }
+  }
+  return null
+}
+
+function replyFilePart(part: unknown) {
+  if (typeof part !== 'object' || part === null) return
+  const { type, url, mediaType, filename, attachmentId } = part as Record<
+    string,
+    unknown
+  >
+  if (type !== 'file' || typeof url !== 'string') return
+
+  return {
+    type: 'file' as const,
+    url,
+    mediaType:
+      typeof mediaType === 'string' ? mediaType : 'application/octet-stream',
+    ...(typeof filename === 'string' && { filename }),
+    ...(typeof attachmentId === 'string' && { attachmentId }),
+  }
+}
 
 /** Snapshots the message a reply quotes, rejecting ones that can't be quoted. */
 export async function quoteMessage(
@@ -146,7 +193,7 @@ async function remapQuotedPart(
   }
 }
 
-/** Reads the quoted text from the first segment that has any. */
+/** Reads the first quotable text or labels an attachment-only message. */
 async function quotedText(ctx: QueryCtx, message: Doc<'messages'>) {
   const answerLast = message.role === 'assistant'
   const segments = queryMessageSegments(
@@ -155,9 +202,11 @@ async function quotedText(ctx: QueryCtx, message: Doc<'messages'>) {
     message.selectedVersion,
   ).order(answerLast ? 'desc' : 'asc')
 
+  const partsBySegment: unknown[][] = []
   for await (const segment of segments) {
     const text = quotableText(await modelSegmentParts(ctx, segment), answerLast)
     if (text) return text
+    partsBySegment.push(segment.parts)
   }
-  return ''
+  return attachmentReplyLabel(attachmentReplyCount(partsBySegment))
 }

@@ -19,7 +19,14 @@ import {
   useMessageHighlight,
 } from '../message-highlight-context'
 import { useReplyAction } from '../reply-action'
-import { DeleteConfirmations } from './delete-confirmations'
+import {
+  type AttachmentDeletion,
+  selectAttachmentDeletion,
+} from './attachment-deletion'
+import {
+  type DeleteConfirmation,
+  DeleteConfirmations,
+} from './delete-confirmations'
 import { CopyMenu, DeleteMenu, EditMenu } from './message-menu-items'
 import {
   type GroupScope,
@@ -41,7 +48,10 @@ export type MessageContextMenuProps = {
   children: React.ReactElement
 }
 
-type Confirm = 'part' | 'message'
+type MenuSelection = {
+  target: MessageTarget | null
+  deletion: AttachmentDeletion | null
+}
 
 export function MessageContextMenu({
   message,
@@ -53,8 +63,8 @@ export function MessageContextMenu({
   const editCtx = useMessageEdit()
   const retryMessage = useRetryMessage()
   const highlight = useMessageHighlight()
-  const [confirm, setConfirm] = useState<Confirm | null>(null)
-  const [messageTarget, setMessageTarget] = useState<MessageTarget | null>(null)
+  const [confirm, setConfirm] = useState<DeleteConfirmation | null>(null)
+  const [selection, setSelection] = useState<MenuSelection | null>(null)
   const isEditing = editCtx?.editingMessageId === message.id
 
   const editSelectionRef = useRef<MessageEditSelectionSnapshot | null>(null)
@@ -78,28 +88,41 @@ export function MessageContextMenu({
     [message, slices, record, scope, canMutate],
   )
   const hasEdit = menu.edit.submenu || Boolean(menu.edit.messageText)
-  const hasCopy =
-    menu.copy.blockText !== undefined || Boolean(menu.copy.messageText)
+  const hasCopy = menu.copy.blockText !== undefined || Boolean(menu.copy.messageText) // prettier-ignore
   const hasEditOrCopy = hasEdit || hasCopy
-  const hasMessageActions =
-    reply || menu.retry || hasEditOrCopy || menu.delete.message
+  const hasMessageActions = reply || menu.retry || hasEditOrCopy || menu.delete.message // prettier-ignore
+  const messageTarget = selection?.target
+  const attachmentDeletion = canMutate ? selection?.deletion : null
+  const hasTargetActions = messageTarget?.download || messageTarget?.link
 
   function handleOpen({ x, y, target }: ContextMenuOpenTarget) {
-    setMessageTarget(resolveMessageTarget(target))
+    const nextTarget = resolveMessageTarget(target)
     // Preload the editor in case the user intends to edit the message
     if (canMutate) prefetchRichTextEditor()
     editSelectionRef.current = captureMessageEditSelection(message.id, x, y)
+
     const next = groupScope ?? resolveHeaderScope(row, target)
+    const deletion = canMutate
+      ? selectAttachmentDeletion({
+          tile: nextTarget?.attachment,
+          scope: next,
+          slices,
+          message,
+          record,
+        })
+      : null
+
+    setSelection({ target: nextTarget, deletion })
     scopeRef.current = next
     if (!groupScope) setSelectedScope(next)
-    if (ownsHighlightRef.current) highlightScope(next)
+    if (ownsHighlightRef.current) highlightScope(next, nextTarget)
   }
 
   function handleOpenChange(open: boolean) {
     if (!highlight) return
     if (open) {
       ownsHighlightRef.current = true
-      highlightScope(scopeRef.current)
+      highlightScope(scopeRef.current, messageTarget ?? null)
       return
     }
 
@@ -109,8 +132,15 @@ export function MessageContextMenu({
     }
   }
 
-  function highlightScope(scope: GroupScope | null) {
+  function highlightScope(
+    scope: GroupScope | null,
+    target: MessageTarget | null,
+  ) {
     if (!highlight) return
+    if (target?.attachment) {
+      highlight.setTarget({ attachment: target.attachment })
+      return
+    }
     if (scope && countGroups(slices) > 1) {
       highlight.setTarget({
         messageId: message.id,
@@ -150,7 +180,7 @@ export function MessageContextMenu({
       <ContextMenu onOpen={handleOpen} onOpenChange={handleOpenChange}>
         <ContextMenu.Trigger>{children}</ContextMenu.Trigger>
         <ContextMenu.Content>
-          {messageTarget && (
+          {hasTargetActions && messageTarget && (
             <>
               <TargetActions target={messageTarget} />
               {hasMessageActions && <ContextMenu.Separator />}
@@ -183,6 +213,11 @@ export function MessageContextMenu({
               <DeleteMenu
                 deleteState={menu.delete}
                 contextReset={record?.type === 'contextReset'}
+                onDeleteAttachment={
+                  attachmentDeletion
+                    ? () => setConfirm(attachmentDeletion)
+                    : undefined
+                }
                 onDeleteBlock={() => setConfirm('part')}
                 onDeleteMessage={() => setConfirm('message')}
               />

@@ -73,6 +73,28 @@ function segment(messageId: string, segmentIndex: number): Row {
 }
 
 describe('joinSegmentsWithinBudget', () => {
+  test('resolves attachment reply availability using segments outside the window', async () => {
+    const file = { type: 'file', url: '/image.png' }
+    const replyCount = async (secondPart: unknown) => {
+      const ctx = fakeCtx([
+        { ...segment('m_1', 0), parts: [file] },
+        { ...segment('m_1', 1), parts: [secondPart] },
+      ])
+      const { messages } = await joinSegmentsWithinBudget(
+        ctx,
+        [doc('m_1')],
+        1,
+        { direction: 'newer' },
+      )
+      expect(messages[0].hasNewerSegments).toBe(true)
+      expect(messages[0].segments).toHaveLength(1)
+      return messages[0].attachmentReplyCount
+    }
+
+    expect(await replyCount(file)).toBe(2)
+    expect(await replyCount(text('Unloaded text'))).toBe(0)
+  })
+
   test('projects only ready previews and includes them in the window budget', async () => {
     const url = 'https://example.com'
     const image = 'https://storage.example/image'

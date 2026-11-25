@@ -4,6 +4,30 @@ const ATTACHMENT_SCHEME = 'attachment:'
 
 export type AttachmentReference = { attachmentId: string; filename: string }
 
+/** Identifies a stored file occurrence, including older files without an ID. */
+export function messageFileKey(part: unknown): string | undefined {
+  if (typeof part !== 'object' || part === null) return
+  const { type, url, attachmentId, mediaType, filename } = part as Record<
+    string,
+    unknown
+  >
+  if (type !== 'file' || typeof url !== 'string') return
+  return typeof attachmentId === 'string' && attachmentId
+    ? JSON.stringify([attachmentId])
+    : JSON.stringify([url, mediaType, filename])
+}
+
+/** Whether a part should survive removal of the message's last attachment. */
+export function isAttachmentCompanionContent(part: unknown): boolean {
+  if (typeof part !== 'object' || part === null) return true
+  const { type, text } = part as Record<string, unknown>
+  if (type === 'step-start') return false
+  if (type === 'text' || type === 'reasoning') {
+    return typeof text === 'string' && Boolean(text.trim())
+  }
+  return true
+}
+
 /** Whether a composer paste should be represented as an attachment. */
 export function shouldAttachTextPaste(
   text: string,

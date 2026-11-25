@@ -1,11 +1,19 @@
 import type { MessageRow } from '@/lib/chat/rows'
 import { exportSchemeCss } from '@/lib/theme'
+import type { Id } from '@cv/convex/_generated/dataModel'
+import { deleteMessageAttachment } from '@cv/convex/model/chat/mutations'
+import { quoteMessage } from '@cv/convex/model/chat/replies'
 import { DEFAULT_SETTINGS } from '@cv/convex/model/defaults'
+import type {
+  DeleteMessageAttachmentArgs,
+  PartAddress,
+} from '@cv/convex/validators/messages'
 import { parseShellCommand } from '@cv/core/shell/command'
 import { toDisplayName } from '@cv/core/utils/names'
-import type { UIMessage } from 'ai'
+import { type UIMessage, isFileUIPart } from 'ai'
 import type { ConvexReactClient } from 'convex/react'
 import { type FunctionReference, getFunctionName } from 'convex/server'
+import { lifecycleDatabase } from '~/tests/helpers/lifecycle-db'
 
 type NoteType =
   'skills' | 'mcp' | 'workspace' | 'command' | 'todo' | 'contextReset'
@@ -69,6 +77,8 @@ function noteExtra(type?: NoteType) {
 }
 
 const params = new URLSearchParams(location.search)
+const attachmentActions = params.has('attachmentActions')
+const attachmentGuest = params.has('attachmentGuest')
 let continuationActive = params.has('continuation')
 let planContent = 'Original plan'
 let submittedShell: ReturnType<typeof message> | undefined
@@ -140,6 +150,7 @@ if (params.has('liveAuthors')) {
 }
 
 function initialMessages() {
+  if (attachmentActions) return attachmentMessages()
   if (params.has('liveAuthors')) {
     const answer = {
       ...message('answer', 1),
@@ -211,6 +222,75 @@ function initialMessages() {
     ),
     ...Array.from({ length: 35 }, (_, i) => message(`after${i}`, 50 + i)),
   ]
+}
+
+function attachmentMessages() {
+  const file = (filename: string) => ({
+    type: 'file' as const,
+    url: `https://storage.example.test/${filename}`,
+    mediaType: 'image/png',
+    filename,
+  })
+  const first = {
+    ...file('first.png'),
+    url: 'attachment:first',
+    attachmentId: 'first-file',
+  }
+  const parts: UIMessage['parts'] = [first, file('second.png')]
+  if (!attachmentGuest)
+    parts.unshift({ type: 'text', text: 'Keep this caption' })
+  const sender = { type: 'user', id: 'owner' }
+  return [
+    {
+      ...message('file-message', 1),
+      sender,
+      senderName: 'Attachment author',
+      segments: [{ segmentIndex: 0, parts, sizeBytes: 200 }],
+    },
+    {
+      ...message('single-attachment', 2),
+      sender,
+      segments: [
+        {
+          segmentIndex: 0,
+          parts: [
+            {
+              type: 'file' as const,
+              url: 'attachment:missing',
+              mediaType: 'application/pdf',
+              filename: 'archive.pdf',
+            },
+          ],
+          sizeBytes: 100,
+        },
+      ],
+    },
+  ]
+}
+
+function attachmentDb() {
+  const userId = attachmentGuest ? 'guest' : 'owner'
+  const db = lifecycleDatabase({
+    sessions: [{ _id: 'notes', ownerId: 'owner' }],
+    userSessions: [
+      {
+        _id: 'member',
+        sessionId: 'notes',
+        userId,
+        role: attachmentGuest ? 'member' : 'owner',
+      },
+    ],
+    messages: messages.map(({ segments: _segments, ...row }) => ({ ...row })),
+    messageContents: messages.flatMap((row) =>
+      row.segments.map((segment) => ({
+        ...segment,
+        _id: `${row._id}:${segment.segmentIndex}`,
+        messageId: row._id,
+        version: row.selectedVersion,
+      })),
+    ),
+  })
+  return { ...db, ctx: Object.assign(db.ctx, { userId, role: 'user' }) }
 }
 
 function thinkingWorkMessages() {
@@ -514,6 +594,23 @@ const cache = new Map<string, unknown>()
 const listeners = new Set<() => void>()
 
 function query(name: string, args: Record<string, unknown>) {
+  if (attachmentActions && name === 'chat:replyAttachment') {
+    const original = messages.find((message) => message._id === args.messageId)
+    return (
+      original?.segments.flatMap(({ parts }) => parts).find(isFileUIPart) ??
+      null
+    )
+  }
+  if (attachmentActions && name === 'attachments:getUrlMap') {
+    const url = 'https://storage.example.test/first.png'
+    return {
+      'first-file': {
+        url,
+        previewUrl: 'https://storage.example.test/first-preview.png',
+        shareUrl: url,
+      },
+    }
+  }
   if (params.has('liveAuthors')) {
     if (name === 'agents:list') return [fixtureAgent]
     if (name === 'sessionAgents:list') return linkedAgents
@@ -590,7 +687,7 @@ function query(name: string, args: Record<string, unknown>) {
   }
   if (name === 'users:getProfile')
     return {
-      _id: readOnly ? 'viewer' : 'owner',
+      _id: attachmentGuest ? 'guest' : readOnly ? 'viewer' : 'owner',
       role: params.has('shellComposer') ? 'admin' : 'user',
     }
   if (name === 'sessions:get')
@@ -636,6 +733,12 @@ function query(name: string, args: Record<string, unknown>) {
     }
   }
   if (name === 'chat:messagesWindow') {
+    if (params.has('unloadedReplyTarget') && !args.anchor) {
+      const sent = messages.filter((message) => message._id.startsWith('sent-'))
+      if (sent.length) {
+        return { page: sent, hasOlder: true, hasNewer: false, atTail: true }
+      }
+    }
     if (params.has('unloadedShell') && !args.anchor) {
       return {
         page: messages.filter((message) => message._id === 'shell3'),
@@ -703,9 +806,36 @@ export const notesClient = {
       agentId?: string
       userId?: string
       patch?: { messageBackgrounds?: boolean }
+      clientSendId?: string
+      replyToId?: Id<'messages'>
+      replyToPart?: PartAddress
     },
   ) {
     const name = getFunctionName(reference)
+    if (attachmentActions && name === 'chat:deleteMessageAttachment') {
+      const { ctx, rows } = attachmentDb()
+      const deleted = await deleteMessageAttachment(
+        ctx,
+        args as DeleteMessageAttachmentArgs,
+      )
+      if (deleted) {
+        messages = messages.filter((row) => row._id !== args.messageId)
+      } else {
+        const parts = rows('messageContents').find(
+          (segment) => segment.messageId === args.messageId,
+        )?.parts as UIMessage['parts']
+        messages = messages.map((row) =>
+          row._id === args.messageId
+            ? ({
+                ...row,
+                segments: [{ ...row.segments[0], parts }],
+              } as typeof row)
+            : row,
+        )
+      }
+      refresh()
+      return deleted
+    }
     if (backgrounds && name === 'settings:update') {
       localStorage.setItem(
         backgroundsKey,
@@ -758,9 +888,23 @@ export const notesClient = {
     }
     const canSend = params.has('composer') || params.has('contextReset')
     if (name === 'chat:sendMessage' && canSend) {
+      const quote =
+        attachmentActions && args.replyToId
+          ? await quoteMessage(
+              attachmentDb().ctx,
+              'notes' as Id<'sessions'>,
+              args.replyToId,
+              args.replyToPart,
+            )
+          : undefined
+      const quoted =
+        quote && messages.find((entry) => entry._id === args.replyToId)
       const sent = {
         ...message(`sent-${messages.length}`, Date.now()),
-        sender: { type: 'user', id: 'owner' },
+        sender: { type: 'user', id: attachmentGuest ? 'guest' : 'owner' },
+        ...(attachmentActions && { clientSendId: args.clientSendId }),
+        ...(quote &&
+          quoted && { replyTo: { ...quote, sender: quoted.sender } }),
       }
       sent.segments[0].parts = [{ type: 'text', text: args.content ?? '' }]
       messages = [...messages, sent]

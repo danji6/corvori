@@ -20,7 +20,8 @@ export type HighlightTarget = {
   surface?: 'header'
 }
 
-type HighlightSelection = HighlightTarget | { senderGroupId: string }
+type HighlightSelection =
+  HighlightTarget | { senderGroupId: string } | { attachment: HTMLElement }
 
 export type MessageHighlightValue = {
   target: HighlightSelection | null
@@ -211,15 +212,27 @@ function useHighlightRect(
   useLayoutEffect(() => {
     if (!target || !registry) return
 
+    const attachment = 'attachment' in target ? target.attachment : null
+    function onScroll(event: Event) {
+      if (
+        event.target instanceof Element &&
+        event.target.contains(attachment)
+      ) {
+        measure()
+      }
+    }
+
     const observer = new ResizeObserver(() => measure())
     const frame = requestAnimationFrame(() => {
       if (root.current) observer.observe(root.current)
       const elements = getTargetElements(target, registry.elementsRef.current)
       for (const element of elements) observer.observe(element)
     })
+    if (attachment) window.addEventListener('scroll', onScroll, true)
     return () => {
       cancelAnimationFrame(frame)
       observer.disconnect()
+      if (attachment) window.removeEventListener('scroll', onScroll, true)
     }
   }, [registry, root, target])
 
@@ -263,6 +276,7 @@ function getTargetElements(
   target: HighlightSelection,
   elements: Map<HTMLElement, HighlightTarget>,
 ): HTMLElement[] {
+  if ('attachment' in target) return [target.attachment]
   if ('senderGroupId' in target) {
     return Array.from(elements.keys()).filter(
       (element) =>
@@ -286,6 +300,8 @@ function measureTarget(
   target: HighlightSelection,
   elements: Map<HTMLElement, HighlightTarget>,
 ): HighlightRect | null {
+  if ('attachment' in target) return measureAttachment(target.attachment)
+
   const rects = getTargetElements(target, elements)
     .filter((element) => element.isConnected)
     .map((element) => element.getBoundingClientRect())
@@ -309,11 +325,39 @@ function measureTarget(
     },
   )
 
+  return padHighlightBounds(union)
+}
+
+function measureAttachment(attachment: HTMLElement): HighlightRect | null {
+  if (!attachment.isConnected) return null
+
+  const bounds = attachment.getBoundingClientRect()
+  // Keep the surface on the visible portion of a horizontally scrolling strip.
+  const strip = attachment.closest('[data-slot="file-block"]')
+  const clip = strip?.getBoundingClientRect()
+  const left = Math.max(bounds.left, clip?.left ?? bounds.left)
+  const right = Math.min(bounds.right, clip?.right ?? bounds.right)
+  if (right <= left || bounds.height <= 0) return null
+
+  return padHighlightBounds({
+    top: bounds.top,
+    bottom: bounds.bottom,
+    left,
+    right,
+  })
+}
+
+function padHighlightBounds({
+  top,
+  bottom,
+  left,
+  right,
+}: Pick<DOMRectReadOnly, 'top' | 'bottom' | 'left' | 'right'>): HighlightRect {
   return {
-    top: union.top - HIGHLIGHT_PAD_Y,
-    left: union.left - HIGHLIGHT_PAD_X,
-    width: union.right - union.left + HIGHLIGHT_PAD_X * 2,
-    height: union.bottom - union.top + HIGHLIGHT_PAD_Y * 2,
+    top: top - HIGHLIGHT_PAD_Y,
+    left: left - HIGHLIGHT_PAD_X,
+    width: right - left + HIGHLIGHT_PAD_X * 2,
+    height: bottom - top + HIGHLIGHT_PAD_Y * 2,
   }
 }
 

@@ -6,6 +6,7 @@ import { authMutation, authQuery } from './functions'
 import * as ChangeLocations from './model/changes/locations'
 import * as Changes from './model/changes/sets'
 import * as Chat from './model/chat'
+import { getReplyAttachment } from './model/chat/replies'
 import {
   publishLinkPreview,
   readLinkPreviewWork,
@@ -30,6 +31,11 @@ import {
 export const messagesWindow = authQuery({
   args: V.messagesWindowArgsValidator.fields,
   handler: Chat.messagesWindow,
+})
+
+export const replyAttachment = authQuery({
+  args: { messageId: v.id('messages') },
+  handler: getReplyAttachment,
 })
 
 export const _readLinkPreviewWork = internalQuery({
@@ -182,6 +188,11 @@ export const editMessagePart = authMutation({
 export const deleteMessageParts = authMutation({
   args: V.deleteMessagePartsArgsValidator.fields,
   handler: Chat.deleteMessageParts,
+})
+
+export const deleteMessageAttachment = authMutation({
+  args: V.deleteMessageAttachmentArgsValidator.fields,
+  handler: Chat.deleteMessageAttachment,
 })
 
 export const deleteMessage = authMutation({

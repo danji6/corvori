@@ -56,7 +56,7 @@ export function FileStrip(props: FileStripProps) {
   const previewsById = new Map(
     files.map((item, index) => {
       const preview = previews[index]
-      return [item.id, { preview, media: galleryEntry(item, preview) }]
+      return [item.id, { index, preview, media: galleryEntry(item, preview) }]
     }),
   )
   const gallery = [...previewsById.values()].flatMap(({ media }) =>
@@ -100,12 +100,13 @@ export function FileStrip(props: FileStripProps) {
             }
       }
       render={(item) => {
-        const { preview, media } = previewsById.get(item.id)!
+        const { index, preview, media } = previewsById.get(item.id)!
         return (
           <div className="shrink-0" style={{ width: size }}>
             <div
               className="relative isolate"
               style={{ height: size }}
+              data-attachment-index={actionsInContextMenu ? index : undefined}
               data-attachment-name={
                 actionsInContextMenu ? item.file.name : undefined
               }

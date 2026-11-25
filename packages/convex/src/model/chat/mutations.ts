@@ -1,8 +1,14 @@
+import {
+  isAttachmentCompanionContent,
+  messageFileKey,
+} from '@cv/core/attachments'
+
 import type { Doc, Id } from '../../_generated/dataModel'
 import { error } from '../../errors'
 import type { AuthMutationCtx } from '../../functions'
 import { minRole } from '../../lib/roles'
 import type {
+  DeleteMessageAttachmentArgs,
   DeleteMessagePartsArgs,
   EditMessagePartArgs,
 } from '../../validators/messages'
@@ -92,7 +98,48 @@ export async function deleteMessageParts(
 ): Promise<boolean> {
   const { message } = await requireMessageMutation(ctx, args.messageId)
   const segments = await listSelectedSegments(ctx, message)
+  return deleteSelectedParts(ctx, message, segments, partRemovalFilter(args))
+}
 
+/** Removes exactly the file occurrence selected in the transcript. */
+export async function deleteMessageAttachment(
+  ctx: AuthMutationCtx,
+  args: DeleteMessageAttachmentArgs,
+): Promise<boolean> {
+  const { message } = await requireMessageMutation(ctx, args.messageId)
+  const { segmentIndex, partIndex } = args.address
+  const segments = await listSelectedSegments(ctx, message)
+  const segment = segments.find((row) => row.segmentIndex === segmentIndex)
+  const fileKey = segment && messageFileKey(segment.parts[partIndex])
+
+  const selectionMatches =
+    message.selectedVersion === args.expectedVersion &&
+    segment?.parts.length === args.expectedSegmentPartCount &&
+    fileKey !== undefined &&
+    fileKey === args.expectedFileKey
+  if (!selectionMatches)
+    error('This attachment has changed. Reopen the menu and try again.', 409)
+
+  const selected: PartRemovalFilter = (segment, part) =>
+    segment === segmentIndex && part === partIndex
+  const hasOtherContent = segments.some((row) =>
+    row.parts.some(
+      (part, index) =>
+        !selected(row.segmentIndex, index) &&
+        isAttachmentCompanionContent(part),
+    ),
+  )
+  return deleteSelectedParts(
+    ctx,
+    message,
+    segments,
+    hasOtherContent ? selected : () => true,
+  )
+}
+
+type PartRemovalFilter = (segmentIndex: number, partIndex: number) => boolean
+
+function partRemovalFilter(args: DeleteMessagePartsArgs): PartRemovalFilter {
   const explicit = new Map<number, Set<number>>()
   for (const address of args.addresses) {
     const indices = explicit.get(address.segmentIndex) ?? new Set<number>()
@@ -101,7 +148,7 @@ export async function deleteMessageParts(
   }
 
   const from = args.from
-  const shouldRemove = (segmentIndex: number, partIndex: number) => {
+  return (segmentIndex, partIndex) => {
     if (explicit.get(segmentIndex)?.has(partIndex)) return true
     if (!from) return false
     return (
@@ -109,7 +156,14 @@ export async function deleteMessageParts(
       (segmentIndex === from.segmentIndex && partIndex >= from.partIndex)
     )
   }
+}
 
+async function deleteSelectedParts(
+  ctx: AuthMutationCtx,
+  message: Doc<'messages'>,
+  segments: Doc<'messageContents'>[],
+  shouldRemove: PartRemovalFilter,
+): Promise<boolean> {
   const removed: unknown[] = []
   const plans = segments.map((row) => {
     const kept = row.parts.filter(

@@ -2,8 +2,10 @@ import { useMessageStore } from '@/hooks/chat/messages'
 import { useActiveSession } from '@/hooks/chat/session'
 import { useStreamStore } from '@/hooks/chat/stream'
 import type { PartAddress } from '@/lib/chat/parts'
+import { toastError } from '@/lib/notifications'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
+import type { DeleteMessageAttachmentArgs } from '@cv/convex/validators/messages'
 import { linkPreviewUrls } from '@cv/core/utils/markdown-links'
 import { serializedSize } from '@cv/core/utils/size'
 import type { OptimisticLocalStore } from 'convex/browser'
@@ -239,6 +241,22 @@ export function useDeleteMessageParts() {
         .catch(console.error)
     },
     [deleteMutation, messageStore],
+  )
+}
+
+export function useDeleteMessageAttachment() {
+  const messageStore = useMessageStore()
+  const remove = useMutation(api.chat.deleteMessageAttachment)
+
+  return useCallback(
+    async (args: DeleteMessageAttachmentArgs) => {
+      try {
+        if (await remove(args)) messageStore.evict(args.messageId)
+      } catch (error) {
+        toastError(error, 'Could not delete the attachment.')
+      }
+    },
+    [messageStore, remove],
   )
 }
 

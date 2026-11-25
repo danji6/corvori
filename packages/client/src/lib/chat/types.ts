@@ -90,6 +90,8 @@ export type MessageRecord = Pick<
   /** Sum of the loaded segments' serialized sizes. */
   sizeBytes: number
   segments: MessageSegmentInfo[]
+  /** Total files for an attachment-only message across all selected segments. */
+  attachmentReplyCount?: number
   /** Whether older segments of this message exist but aren't loaded. */
   hasOlderSegments: boolean
   hasNewerSegments: boolean

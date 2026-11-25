@@ -5,6 +5,7 @@ import type { MessageRecord } from '@/lib/chat/types'
 import type { Id } from '@cv/convex/_generated/dataModel'
 import {
   forgetQuotedMessage,
+  getReplyAttachment,
   quoteMessage,
   remapReplyQuote,
 } from '@cv/convex/model/chat/replies'
@@ -21,6 +22,11 @@ const sender = { type: 'user', id: 'user_1' }
 
 const text = (value: string) => ({ type: 'text' as const, text: value })
 const tool = { type: 'tool-shell', toolCallId: 'call_1' }
+const file = {
+  type: 'file' as const,
+  mediaType: 'image/png',
+  url: '/image.png',
+}
 
 describe('quotableText', () => {
   test('quotes an agent turn by its final answer', () => {
@@ -192,6 +198,40 @@ describe('reply block selection', () => {
     ).toBeUndefined()
   })
 
+  test('quotes the whole attachment-only message from a preview or the sender menu', () => {
+    const attachmentMessage = { ...message, parts: [file] }
+    const attachmentRecord = { ...record, segments: [] }
+
+    expect(replyTargetFor(attachmentMessage, attachmentRecord)).toMatchObject({
+      target: { id: message.id },
+      text: '1 attachment',
+    })
+    const preview = replyTargetFor(attachmentMessage, attachmentRecord, {
+      segmentIndex: 0,
+      groupIndex: 0,
+    })
+    expect(preview).toEqual(replyTargetFor(attachmentMessage, attachmentRecord))
+    expect(preview?.target.part).toBeUndefined()
+  })
+
+  test('uses the whole-message count for an incomplete file block', () => {
+    const partialMessage = { ...message, parts: [file] }
+    const partialRecord = { ...record, segments: [], hasNewerSegments: true }
+
+    expect(
+      replyTargetFor(partialMessage, {
+        ...partialRecord,
+        attachmentReplyCount: 3,
+      })?.text,
+    ).toBe('3 attachments')
+    expect(
+      replyTargetFor(partialMessage, {
+        ...partialRecord,
+        attachmentReplyCount: 0,
+      }),
+    ).toBeUndefined()
+  })
+
   test.each([
     { type: 'reasoning' as const, text: 'Thinking' },
     { type: 'file' as const, mediaType: 'image/png', url: '/image.png' },
@@ -290,6 +330,43 @@ describe('quoteMessage', () => {
     await expect(quote(message({ sessionId: 'session_2' }))).rejects.toThrow()
   })
 
+  test('stores an attachment summary from the selected version across segments', async () => {
+    const row = message({ selectedVersion: 2 })
+    const { ctx } = lifecycleDatabase({
+      messages: [row],
+      messageContents: [
+        {
+          _id: 'old',
+          messageId: row._id,
+          version: 1,
+          segmentIndex: 0,
+          parts: [text('Old version')],
+        },
+        {
+          _id: 'first',
+          messageId: row._id,
+          version: 2,
+          segmentIndex: 0,
+          parts: [file],
+        },
+        {
+          _id: 'second',
+          messageId: row._id,
+          version: 2,
+          segmentIndex: 1,
+          parts: [file],
+        },
+      ],
+    })
+
+    const quote = await quoteMessage(ctx, SESSION, row._id as Id<'messages'>)
+    expect(quote.text).toBe('2 attachments')
+    expect(quote.target).toEqual({
+      id: row._id as Id<'messages'>,
+      creationTime: 1,
+    })
+  })
+
   test('rejects notes, notices and unsettled messages', async () => {
     const unquotable = [
       message({ type: 'presence' }),
@@ -329,5 +406,65 @@ describe('forgetQuotedMessage', () => {
       target: { id: 'kept' },
       text: 'quoted',
     })
+  })
+})
+
+describe('getReplyAttachment', () => {
+  const messageId = 'message_1' as Id<'messages'>
+  const userId = 'guest' as Id<'users'>
+  const first = { ...file, filename: 'first.png', attachmentId: 'first' }
+  const second = { ...file, filename: 'second.png' }
+
+  function database(member: boolean) {
+    const { ctx, rows } = lifecycleDatabase({
+      sessions: [{ _id: SESSION }],
+      userSessions: member
+        ? [{ _id: 'member', sessionId: SESSION, userId }]
+        : [{ _id: 'member', sessionId: 'other-session', userId }],
+      messages: [
+        {
+          _id: messageId,
+          sessionId: SESSION,
+          selectedVersion: 2,
+          status: 'done',
+        },
+      ],
+      messageContents: [
+        { _id: 'old', messageId, version: 1, segmentIndex: 0, parts: [file] },
+        {
+          _id: 'caption',
+          messageId,
+          version: 2,
+          segmentIndex: 0,
+          parts: [text('Caption')],
+        },
+        {
+          _id: 'first',
+          messageId,
+          version: 2,
+          segmentIndex: 1,
+          parts: [first, second],
+        },
+      ],
+    })
+    const auth = Object.assign(ctx, { userId, role: 'user', subject: userId })
+    return { rows, attachment: () => getReplyAttachment(auth, { messageId }) }
+  }
+
+  test('finds the first file in the selected version and follows attachment removal', async () => {
+    const { rows, attachment } = database(true)
+    expect(await attachment()).toEqual(first)
+
+    const segment = rows('messageContents').find(({ _id }) => _id === 'first')!
+    segment.parts = [second]
+    expect(await attachment()).toEqual(second)
+
+    segment.parts = []
+    expect(await attachment()).toBeNull()
+  })
+
+  test('does not expose a file to a nonmember', async () => {
+    const { attachment } = database(false)
+    expect(await attachment()).toBeNull()
   })
 })

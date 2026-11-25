@@ -139,6 +139,7 @@ export function getMessageContextMenuState(
       message: canMutate,
       submenu:
         canMutate &&
+        group?.type !== 'files' &&
         multiGroup &&
         (hasBlockLevelStructure || isReasoningBlock) &&
         blockAddresses.length > 0,

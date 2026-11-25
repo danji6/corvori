@@ -65,6 +65,9 @@ export function lifecycleDatabase(seed: Record<string, Row[]> = {}) {
           unique: async () => selected()[0] ?? null,
           order: () => query,
           take: async (count: number) => selected().slice(0, count),
+          async *[Symbol.asyncIterator]() {
+            yield* selected()
+          },
         }
         return query
       },

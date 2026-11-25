@@ -1,4 +1,9 @@
-import { clipReplyQuote, quotableText } from '@cv/core/reply-quote'
+import {
+  attachmentReplyCount,
+  attachmentReplyLabel,
+  clipReplyQuote,
+  quotableText,
+} from '@cv/core/reply-quote'
 import type { UIMessage } from 'ai'
 import { isTextUIPart } from 'ai'
 
@@ -52,27 +57,35 @@ export function canReplyTo(
   return (message as { status?: string }).status !== 'processing'
 }
 
-/** Quotes a selected text block, leaving other blocks unavailable for replies. */
+/** Quotes the selected text block or the whole message when it only has files. */
 export function replyTargetFor(
   message: UIMessage,
   record: MessageRecord,
   scope?: GroupAddress | null,
 ): ReplyTarget | undefined {
   const selected = scopedReplyPart(message, record, scope)
-  if (!selected) return undefined
-  const text = quotableText([selected.part], false)
+  const text = selected
+    ? quotableText([selected.part], false)
+    : attachmentReplyLabel(fileReplyCount(message, record))
   if (!text) return undefined
 
   return {
     target: {
       id: message.id as ReplyTarget['target']['id'],
       creationTime: record._creationTime,
-      part: selected.address,
+      ...(selected && { part: selected.address }),
     },
     sender: record.sender,
     senderName: record.senderName,
     text: clipReplyQuote(text),
   }
+}
+
+function fileReplyCount(message: UIMessage, record: MessageRecord): number {
+  if (record.hasOlderSegments || record.hasNewerSegments) {
+    return record.attachmentReplyCount ?? 0
+  }
+  return attachmentReplyCount([message.parts])
 }
 
 /** Resolves a scoped text block to its persistent segment and part indices. */

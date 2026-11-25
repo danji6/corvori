@@ -99,6 +99,7 @@ export function CopyMenu({ copy: copyState }: CopyMenuProps) {
 type DeleteMenuProps = {
   deleteState: MenuState['delete']
   contextReset?: boolean
+  onDeleteAttachment?: () => void
   onDeleteBlock: () => void
   onDeleteMessage: () => void
 }
@@ -106,10 +107,11 @@ type DeleteMenuProps = {
 export function DeleteMenu({
   deleteState,
   contextReset,
+  onDeleteAttachment,
   onDeleteBlock,
   onDeleteMessage,
 }: DeleteMenuProps) {
-  if (deleteState.submenu) {
+  if (onDeleteAttachment || deleteState.submenu) {
     return (
       <ContextMenu.Sub>
         <ContextMenu.SubTrigger>
@@ -117,10 +119,20 @@ export function DeleteMenu({
           Delete
         </ContextMenu.SubTrigger>
         <ContextMenu.SubContent>
-          <ContextMenu.Item variant="destructive" onSelect={onDeleteBlock}>
-            <Trash2Icon />
-            Delete Block
-          </ContextMenu.Item>
+          {onDeleteAttachment ? (
+            <ContextMenu.Item
+              variant="destructive"
+              onSelect={onDeleteAttachment}
+            >
+              <Trash2Icon />
+              Delete Attachment
+            </ContextMenu.Item>
+          ) : (
+            <ContextMenu.Item variant="destructive" onSelect={onDeleteBlock}>
+              <Trash2Icon />
+              Delete Block
+            </ContextMenu.Item>
+          )}
           <ContextMenu.Item variant="destructive" onSelect={onDeleteMessage}>
             <Trash2Icon />
             Delete Message

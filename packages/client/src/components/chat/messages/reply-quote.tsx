@@ -12,6 +12,7 @@ import {
   useMessageHighlightRef,
 } from './message-highlight-context'
 import { useMessageSeek } from './message-seek-context'
+import { ReplyAttachmentThumbnail } from './reply-attachment-thumbnail'
 
 const CLAMP = { 1: 'line-clamp-1', 2: 'line-clamp-2' } as const
 
@@ -74,6 +75,7 @@ export function ReplyQuoteCard({
           unavailable ? 'bg-border' : 'bg-m3-primary',
         )}
       />
+      <ReplyAttachmentThumbnail quote={quote} />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 px-3 py-2">
         {!unavailable && <ReplyQuoteSender quote={quote} />}
         <ReplyQuoteExcerpt quote={quote} lines={2} />

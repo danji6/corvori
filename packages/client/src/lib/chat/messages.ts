@@ -3,7 +3,7 @@ import { generateId } from '@/lib/utils'
 import type { Doc } from '@cv/convex/_generated/dataModel'
 import { minRole } from '@cv/convex/lib/roles'
 import { SHELL_TOOL_PART_TYPE } from '@cv/convex/lib/userShell'
-import type { WindowSegment } from '@cv/convex/model/chat/queries'
+import type { WindowMessage } from '@cv/convex/model/chat/queries'
 import type { MessageExtra } from '@cv/convex/model/chat/types'
 import { settleUnansweredToolPart } from '@cv/core/utils/tool-parts'
 import type { FileUIPart, TextUIPart, UIMessage } from 'ai'
@@ -20,13 +20,6 @@ import type { MessageRecord, PartMetadata } from './types'
 
 export type Message = UIMessage & { status: 'processing' | 'done' }
 
-type MessageDoc = Doc<'messages'> & {
-  segments: WindowSegment[]
-  sizeBytes: number
-  hasOlderSegments: boolean
-  hasNewerSegments: boolean
-}
-
 export type Messages = {
   messages: Message[]
   byId: Map<string, MessageRecord>
@@ -42,9 +35,9 @@ type ConvertedEntry = {
 }
 
 // Cache entries to avoid full history reconversions
-const conversionCache = new WeakMap<MessageDoc, ConvertedEntry>()
+const conversionCache = new WeakMap<WindowMessage, ConvertedEntry>()
 
-function convertDoc(doc: MessageDoc): ConvertedEntry {
+function convertDoc(doc: WindowMessage): ConvertedEntry {
   const cached = conversionCache.get(doc)
   if (cached) return cached
 
@@ -84,6 +77,7 @@ function convertDoc(doc: MessageDoc): ConvertedEntry {
       })),
       hasOlderSegments: doc.hasOlderSegments,
       hasNewerSegments: doc.hasNewerSegments,
+      attachmentReplyCount: doc.attachmentReplyCount,
       metadata: pickMessageMetadata(doc.metadata),
     },
     partMeta: {
@@ -97,7 +91,7 @@ function convertDoc(doc: MessageDoc): ConvertedEntry {
   return entry
 }
 
-export function convertMessages(docs: MessageDoc[]): Messages {
+export function convertMessages(docs: WindowMessage[]): Messages {
   const messages: Message[] = []
   const byId = new Map<string, MessageRecord>()
   const partMetaById = new Map<string, PartMetadata>()

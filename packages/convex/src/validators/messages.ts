@@ -126,7 +126,7 @@ export const replyQuoteValidator = v.object({
   ),
   sender: messageSenderValidator,
   senderName: v.union(v.string(), v.null()),
-  /** Markdown excerpt of the quoted message; empty when it has no text. */
+  /** Markdown excerpt or an attachment count for a file-only message. */
   text: v.string(),
   rendered: v.optional(v.literal(true)),
 })
@@ -251,6 +251,18 @@ export const deleteMessagePartsArgsValidator = v.object({
 
 export type DeleteMessagePartsArgs = Infer<
   typeof deleteMessagePartsArgsValidator
+>
+
+export const deleteMessageAttachmentArgsValidator = v.object({
+  messageId: v.id('messages'),
+  address: partAddressValidator,
+  expectedVersion: v.number(),
+  expectedSegmentPartCount: v.number(),
+  expectedFileKey: v.string(),
+})
+
+export type DeleteMessageAttachmentArgs = Infer<
+  typeof deleteMessageAttachmentArgsValidator
 >
 
 export const approveToolArgsValidator = v.object({

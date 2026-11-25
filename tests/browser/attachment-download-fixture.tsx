@@ -1,6 +1,12 @@
 import { ChatComposer } from '@/components/chat/composer/chat-composer'
 import { MessageContextMenu } from '@/components/chat/messages/context-menu/message-context-menu'
 import { FileBlock } from '@/components/chat/messages/file-block'
+import {
+  MessageHighlightLayer,
+  MessageHighlightProvider,
+  useMessageHighlightRef,
+} from '@/components/chat/messages/message-highlight-context'
+import { AttachmentAnchor } from '@/components/markdown/attachment-anchor'
 import { LightboxProvider } from '@/components/ui/lightbox'
 import { AttachmentUrlProvider } from '@/hooks/chat/attachment-urls'
 import { ChatMessagesProvider } from '@/hooks/chat/messages'
@@ -11,7 +17,7 @@ import type { FileUIPart, UIMessage } from 'ai'
 import { ConvexQueryCacheProvider } from 'convex-helpers/react/cache'
 import { ConvexProvider, type ConvexReactClient } from 'convex/react'
 import { type FunctionReference, getFunctionName } from 'convex/server'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 const originalUrl = 'https://storage.example.test/api/storage/image'
 const shareUrl = attachmentShareUrl(originalUrl, 'image')
@@ -106,26 +112,73 @@ const attachmentClient = {
 
 /** Mirrors the pointer-event guard on the virtualized chat list. */
 function AttachmentGalleryFixture() {
-  const ids = Object.keys(images)
   return (
     <LightboxProvider>
       <ConvexProvider client={attachmentClient}>
-        <AttachmentUrlProvider />
-        <div style={{ pointerEvents: 'none' }}>
-          <FileBlock
-            parts={ids.map((id) => ({
-              type: 'file',
-              url: `attachment:${id}`,
-              mediaType: 'image/png',
-              filename: `${id}.png`,
-            }))}
-            attachmentIds={Object.fromEntries(
-              ids.map((id) => [`attachment:${id}`, id]),
-            )}
-          />
-        </div>
+        <ConvexQueryCacheProvider>
+          <ChatMessagesProvider>
+            <AttachmentUrlProvider />
+            <MessageHighlightProvider>
+              <AttachmentGalleryMessage />
+            </MessageHighlightProvider>
+          </ChatMessagesProvider>
+        </ConvexQueryCacheProvider>
       </ConvexProvider>
     </LightboxProvider>
+  )
+}
+
+const galleryIds = Object.keys(images)
+const galleryFiles = galleryIds.map<FileUIPart>((id) => ({
+  type: 'file',
+  url: `attachment:${id}`,
+  mediaType: 'image/png',
+  filename: `${id}.png`,
+}))
+const galleryAttachmentIds = Object.fromEntries(
+  galleryIds.map((id) => [`attachment:${id}`, id]),
+)
+const galleryMessage: UIMessage = {
+  id: 'gallery',
+  role: 'user',
+  parts: [{ type: 'text', text: 'Gallery message' }, ...galleryFiles],
+}
+const galleryRow = {
+  kind: 'header',
+  key: 'gallery',
+  messageId: 'gallery',
+} as const
+const galleryRows = [galleryRow]
+
+function AttachmentGalleryMessage() {
+  const root = useRef<HTMLDivElement>(null)
+  const messageRef = useMessageHighlightRef(galleryMessage.id)
+  return (
+    <div ref={root} className="relative p-8">
+      <MessageHighlightLayer root={root} rows={galleryRows} layoutVersion={0} />
+      <MessageContextMenu
+        message={galleryMessage}
+        row={galleryRow}
+        canMutate={false}
+      >
+        <div
+          ref={messageRef}
+          data-sender-group-id={galleryMessage.id}
+          className="relative"
+        >
+          <p>Gallery message</p>
+          <AttachmentAnchor href="attachment:published/processed.pdf">
+            Inline attachment
+          </AttachmentAnchor>
+          <div style={{ pointerEvents: 'none' }}>
+            <FileBlock
+              parts={galleryFiles}
+              attachmentIds={galleryAttachmentIds}
+            />
+          </div>
+        </div>
+      </MessageContextMenu>
+    </div>
   )
 }
 

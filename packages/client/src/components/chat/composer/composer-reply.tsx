@@ -4,6 +4,7 @@ import { toDisplayName } from '@cv/core/utils/names'
 import { ReplyIcon, XIcon } from 'lucide-react'
 
 import { RippleButton } from '../../ui'
+import { ReplyAttachmentThumbnail } from '../messages/reply-attachment-thumbnail'
 import { ReplyQuoteExcerpt } from '../messages/reply-quote'
 
 type ComposerReplyProps = {
@@ -20,6 +21,7 @@ export function ComposerReply({ target, onCancel }: ComposerReplyProps) {
     <div data-slot="composer-reply" className="order-first w-full px-2 pt-1">
       <div className="bg-m3-surface-container flex min-w-0 items-stretch overflow-hidden rounded-2xl">
         <span aria-hidden className="bg-m3-primary w-1 shrink-0" />
+        <ReplyAttachmentThumbnail quote={target} />
         <div className="flex min-w-0 flex-1 flex-col px-3 py-1.5">
           <span className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs">
             <ReplyIcon className="size-3.5 shrink-0" />

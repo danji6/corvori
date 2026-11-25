@@ -1,15 +1,19 @@
 import { ConfirmDialog } from '@/components/ui'
 import {
   useDeleteMessage,
+  useDeleteMessageAttachment,
   useDeleteMessageParts,
   useDeleteMessagesFrom,
   useHasNewerMessages,
 } from '@/hooks/chat'
 
+import type { AttachmentDeletion } from './attachment-deletion'
 import type { MenuState } from './message-menu-state'
 
+export type DeleteConfirmation = 'part' | 'message' | AttachmentDeletion
+
 type DeleteConfirmationsProps = {
-  open: 'part' | 'message' | null
+  open: DeleteConfirmation | null
   onClose: () => void
   messageId: string
   isSpecialMessage: boolean
@@ -24,10 +28,12 @@ export function DeleteConfirmations({
   deleteState,
 }: DeleteConfirmationsProps) {
   const deleteMessage = useDeleteMessage()
+  const deleteAttachment = useDeleteMessageAttachment()
   const deleteMessageParts = useDeleteMessageParts()
   const deleteMessagesFrom = useDeleteMessagesFrom()
   const hasNewer = useHasNewerMessages(messageId)
   const { blockFrom, blockAddresses } = deleteState
+  const attachment = open && typeof open === 'object' ? open : null
 
   function handleOpenChange(next: boolean) {
     if (!next) onClose()
@@ -35,6 +41,21 @@ export function DeleteConfirmations({
 
   return (
     <>
+      {attachment && (
+        <ConfirmDialog
+          open
+          onOpenChange={handleOpenChange}
+          variant="destructive"
+          title={`Delete attachment?`}
+          description={
+            attachment.isLastContent
+              ? 'This is the only remaining content. Deleting it will also delete the message.'
+              : 'This action cannot be undone.'
+          }
+          confirmText="Delete"
+          onConfirm={() => void deleteAttachment(attachment.args)}
+        />
+      )}
       <ConfirmDialog
         open={open === 'part'}
         onOpenChange={handleOpenChange}

@@ -2,6 +2,7 @@ import {
   MESSAGE_WINDOW_BUDGET_BYTES,
   MESSAGE_WINDOW_MAX_ROWS,
 } from '@cv/core/const'
+import { attachmentReplyCount } from '@cv/core/reply-quote'
 import { serializedSize } from '@cv/core/utils/size'
 import { type IndexKey, getPage } from 'convex-helpers/server/pagination'
 import type { PaginationOptions } from 'convex/server'
@@ -38,6 +39,8 @@ export type WindowSegment = {
 /** A window message carrying an ascending contiguous slice of its segments. */
 export type WindowMessage = Doc<'messages'> & {
   segments: WindowSegment[]
+  /** File count for an attachment-only message, including unloaded segments. */
+  attachmentReplyCount?: number
   /** Sum of the loaded segments' serialized sizes. */
   sizeBytes: number
   hasOlderSegments: boolean
@@ -335,6 +338,9 @@ export async function joinSegmentsWithinBudget(
     messages.push({
       ...row,
       segments,
+      attachmentReplyCount: attachmentReplyCount(
+        stableSegments.map(({ parts }) => parts),
+      ),
       sizeBytes: segments.reduce((sum, segment) => sum + segment.sizeBytes, 0),
       hasOlderSegments: allSegments.some(
         (segment) => segment.segmentIndex < minLoaded,

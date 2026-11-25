@@ -1,11 +1,20 @@
 /// <reference types="bun-types" />
-import { deleteMessageParts, editMessagePart } from '@cv/convex/model/chat'
+import {
+  deleteMessageAttachment,
+  deleteMessageParts,
+  editMessagePart,
+} from '@cv/convex/model/chat'
+import { messageFileKey } from '@cv/core/attachments'
 import { describe, expect, test } from 'bun:test'
+import { lifecycleDatabase } from '~/tests/helpers/lifecycle-db'
 
 type Row = Record<string, unknown> & { _id: string }
 
 /** Fakes enough of the db for `requireMessageMutation` + segment writes. */
-function mutationCtx({ message, segments }: { message: Row; segments: Row[] }) {
+function mutationCtx(
+  { message, segments }: { message: Row; segments: Row[] },
+  userId = 'user_1',
+) {
   const session = { _id: message.sessionId, ownerId: 'user_1', settings: {} }
   const patches: Array<{ id: string; patch: Record<string, unknown> }> = []
   const deletes: string[] = []
@@ -18,7 +27,7 @@ function mutationCtx({ message, segments }: { message: Row; segments: Row[] }) {
   ])
 
   const ctx = {
-    userId: 'user_1',
+    userId,
     role: 'user',
     db: {
       get: async (id: string) => byId.get(id) ?? null,
@@ -161,6 +170,105 @@ describe('deleteMessageParts', () => {
 
     expect(deleted).toBe(true)
     expect(deletes).toContain('m_1')
+  })
+})
+
+describe('deleteMessageAttachment', () => {
+  const first = {
+    type: 'file',
+    url: 'attachment:a',
+    attachmentId: 'a',
+    filename: 'same.png',
+  }
+  const second = { ...first, url: 'attachment:b', attachmentId: 'b' }
+  const caption = text('Keep this caption')
+  const selection = {
+    messageId: 'm_1' as never,
+    address: { segmentIndex: 1, partIndex: 1 },
+    expectedVersion: 1,
+    expectedSegmentPartCount: 3,
+    expectedFileKey: messageFileKey(second)!,
+  }
+
+  function withAttachments() {
+    const { message, segments } = fixture()
+    message.sender = { type: 'user', id: 'user_1' }
+    segments[1].parts = [first, second, caption]
+    return { message, segments }
+  }
+
+  test('removes only the selected occurrence and releases its unused storage', async () => {
+    const { message, segments } = withAttachments()
+    const { ctx, rows, deletedStorage } = lifecycleDatabase({
+      messages: [message],
+      messageContents: segments,
+      sessions: [{ _id: 'session_1', ownerId: 'user_1' }],
+      userSessions: [
+        {
+          _id: 'member_1',
+          userId: 'user_1',
+          sessionId: 'session_1',
+          role: 'owner',
+        },
+      ],
+      attachments: [
+        { _id: 'a', messageId: message._id, fileId: 'file_a' },
+        { _id: 'b', messageId: message._id, fileId: 'file_b' },
+      ],
+      attachmentFiles: [
+        { _id: 'file_a', storageId: 'blob_a' },
+        { _id: 'file_b', storageId: 'blob_b' },
+      ],
+    })
+    const ownerCtx = Object.assign(ctx, { userId: 'user_1', role: 'user' })
+
+    expect(await deleteMessageAttachment(ownerCtx, selection)).toBe(false)
+    expect(rows('messageContents')[0].parts).toEqual([text('a0'), text('a1')])
+    expect(rows('messageContents')[1].parts).toEqual([first, caption])
+    expect(rows('attachments').map((row) => row._id)).toEqual(['a'])
+    expect(deletedStorage).toEqual(['blob_b'])
+  })
+
+  test('deletes the message when only the selected file and empty markers remain', async () => {
+    const { message, segments } = withAttachments()
+    segments[0].parts = [{ type: 'step-start' }]
+    segments[1].parts = [text(' '), second]
+    const { ctx, deletes } = mutationCtx({ message, segments })
+
+    expect(
+      await deleteMessageAttachment(ctx, {
+        ...selection,
+        expectedSegmentPartCount: 2,
+      }),
+    ).toBe(true)
+    expect(deletes).toContain(message._id)
+  })
+
+  test.each([
+    { expectedVersion: 2 },
+    { expectedSegmentPartCount: 4 },
+    { expectedFileKey: messageFileKey(first)! },
+  ])(
+    'rejects a stale selection without changing the message (%o)',
+    async (overrides) => {
+      const { ctx, rows, deletes, patches } = mutationCtx(withAttachments())
+
+      await expect(
+        deleteMessageAttachment(ctx, { ...selection, ...overrides }),
+      ).rejects.toThrow('Reopen the menu')
+      expect(rows[1].parts).toEqual([first, second, caption])
+      expect(deletes).toHaveLength(0)
+      expect(patches).toHaveLength(0)
+    },
+  )
+
+  test('rejects an eligible session member deleting another user’s attachment', async () => {
+    const { ctx, rows } = mutationCtx(withAttachments(), 'another_user')
+
+    await expect(deleteMessageAttachment(ctx, selection)).rejects.toThrow(
+      'Forbidden',
+    )
+    expect(rows[1].parts).toEqual([first, second, caption])
   })
 })
 

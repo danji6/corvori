@@ -120,6 +120,58 @@ test('converts mixed pastes and leaves unmatched URLs editable', async ({
   await expect(editor).toHaveText(`See and today. Also ${fileUrl}`)
 })
 
+test('highlights only the attachment under the context menu', async ({
+  page,
+}) => {
+  await page.route('https://storage.example.test/*.png', (route) =>
+    route.fulfill({ headers: cors, contentType: 'image/png', body: png }),
+  )
+  await page.goto('/?fixture=attachment-download&gallery')
+
+  const text = page.getByText('Gallery message', { exact: true })
+  const message = page.locator('[data-sender-group-id="gallery"]')
+  const highlight = page.locator('[data-slot="message-highlight"]')
+  const inline = page.getByRole('link', { name: 'Inline attachment' })
+
+  await text.click({ button: 'right' })
+  await expectHighlightAround(highlight, message)
+
+  const first = page.getByRole('button', { name: 'Open first.png' })
+  await first.click({ button: 'right', position: { x: 12, y: 110 } })
+  await expectHighlightAround(highlight, first)
+
+  const second = page.getByRole('button', { name: 'Open second.png' })
+  await second.click({ button: 'right' })
+  await expectHighlightAround(highlight, second)
+
+  await inline.click({ button: 'right' })
+  await expectHighlightAround(highlight, inline)
+
+  await text.click({ button: 'right' })
+  await expectHighlightAround(highlight, message)
+
+  await first.click({ button: 'right', position: { x: 12, y: 110 } })
+  await expectHighlightAround(highlight, first)
+  await page.keyboard.press('Escape')
+  await expect(highlight).toHaveCount(0)
+})
+
+async function expectHighlightAround(highlight: Locator, target: Locator) {
+  const bounds = (await target.boundingBox())!
+  await expect
+    .poll(async () => {
+      const surface = await highlight.boundingBox()
+      if (!surface) return null
+      return [
+        bounds.x - surface.x,
+        bounds.y - surface.y,
+        surface.x + surface.width - (bounds.x + bounds.width),
+        surface.y + surface.height - (bounds.y + bounds.height),
+      ].map(Math.round)
+    })
+    .toEqual([8, 12, 8, 12])
+}
+
 test('opens visible thumbnails and displays the selected preview while originals load', async ({
   page,
 }) => {

@@ -4,6 +4,7 @@ import { toast, toastError } from '@/lib/notifications'
 import { DownloadIcon, LinkIcon } from 'lucide-react'
 
 export type MessageTarget = {
+  attachment?: HTMLElement
   link?: string
   download?: { url: string; filename: string }
 }
@@ -24,7 +25,7 @@ export function resolveMessageTarget(
       attachmentUrl && attachmentName
         ? { url: attachmentUrl, filename: attachmentName }
         : undefined
-    return link || download ? { link, download } : null
+    return { attachment, link, download }
   }
 
   const anchor = target?.closest<HTMLAnchorElement>('a[href]:not([href=""])')
