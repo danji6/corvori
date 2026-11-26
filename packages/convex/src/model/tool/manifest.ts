@@ -1,4 +1,19 @@
 import {
+  ASK_TOOL_NAME,
+  CALL_MCP_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+  LIST_SKILLS_TOOL_NAME,
+  MCP_PROTOCOL_TOOL_NAME,
+  READ_MCP_OUTPUT_TOOL_NAME,
+  READ_SKILL_TOOL_NAME,
+  SEARCH_MCP_TOOLS_NAME,
+  SHELL_TOOL_NAME,
+  TASK_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+  YIELD_TOOL_NAME,
+} from '@cv/core/const'
+import {
   TOOL_CAPABILITIES,
   isReservedToolName,
 } from '@cv/core/tool-capabilities'
@@ -126,10 +141,10 @@ export function resolveToolManifest(data: ManifestInput): ToolManifest {
 
   const mcp = directMcpEntries(data, servers)
   names.push(...mcp.map((entry) => entry.name))
-  const roster = names.includes('task')
+  const roster = names.includes(TASK_TOOL_NAME)
     ? buildTaskRoster(data.spawnableAgents)
     : undefined
-  const shell = names.includes('shell') ? resolveShell(data) : undefined
+  const shell = names.includes(SHELL_TOOL_NAME) ? resolveShell(data) : undefined
 
   return {
     version: MCP_MANIFEST_VERSION,
@@ -153,27 +168,27 @@ function builtinEligible(
 ) {
   const subagent = !!data.session.parent
   switch (name) {
-    case 'ask':
-    case 'yield':
-    case 'enter_plan_mode':
-    case 'exit_plan_mode':
+    case ASK_TOOL_NAME:
+    case YIELD_TOOL_NAME:
+    case ENTER_PLAN_MODE_TOOL_NAME:
+    case EXIT_PLAN_MODE_TOOL_NAME:
       return !subagent
-    case 'task':
+    case TASK_TOOL_NAME:
       return !subagent && data.spawnableAgents.length > 0
-    case 'web_search':
+    case WEB_SEARCH_TOOL_NAME:
       return (
         normalizeWebSearchInstances(data.resources.settings?.webSearchInstances)
           .length > 0
       )
-    case 'search_mcp_tools':
-    case 'mcp_protocol':
+    case SEARCH_MCP_TOOLS_NAME:
+    case MCP_PROTOCOL_TOOL_NAME:
       return hasServer
-    case 'call_mcp_tool':
+    case CALL_MCP_TOOL_NAME:
       return canCall
-    case 'read_mcp_output':
+    case READ_MCP_OUTPUT_TOOL_NAME:
       return hasServer || !!data.availability?.storedMcpOutput
-    case 'list_skills':
-    case 'read_skill':
+    case LIST_SKILLS_TOOL_NAME:
+    case READ_SKILL_TOOL_NAME:
       return !!data.availability?.skills
     default:
       return true

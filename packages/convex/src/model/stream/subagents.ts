@@ -1,3 +1,4 @@
+import { ASK_TOOL_NAME, TASK_TOOL_NAME } from '@cv/core/const'
 import { hasPendingQuestions, isPendingAskPart } from '@cv/core/utils/ask'
 import { hasPendingToolApprovals } from '@cv/core/utils/tool-parts'
 import { hasPendingYield } from '@cv/core/utils/yield'
@@ -81,7 +82,7 @@ export async function _suspendStep(
       ? await sessionToolNames(ctx, session._id, agent, stream.invokedBy)
       : []
     const spawnable =
-      agent && tools.includes('task')
+      agent && tools.includes(TASK_TOOL_NAME)
         ? await resolveSpawnableAgents(ctx, agent)
         : []
     for (const part of pending) {
@@ -101,7 +102,7 @@ export async function _suspendStep(
     const names = agent
       ? await sessionToolNames(ctx, session._id, agent, stream.invokedBy)
       : []
-    if (!names.includes('ask')) {
+    if (!names.includes(ASK_TOOL_NAME)) {
       parts = parts.map((part) =>
         isPendingAskPart(part)
           ? {

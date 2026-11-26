@@ -1,3 +1,11 @@
+import {
+  EDIT_FILE_TOOL_NAME,
+  KILL_SHELL_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  SHELL_OUTPUT_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '@cv/core/const'
 import type { ToolExecutionOptions, ToolSet } from 'ai'
 
 import { internal } from '../../_generated/api'
@@ -12,12 +20,12 @@ type FilesystemExecution = {
 }
 
 const FILESYSTEM_TOOLS = new Set([
-  'read_file',
-  'write_file',
-  'edit_file',
-  'shell',
-  'shell_output',
-  'kill_shell',
+  READ_FILE_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  EDIT_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  SHELL_OUTPUT_TOOL_NAME,
+  KILL_SHELL_TOOL_NAME,
 ])
 
 /** Keeps tools on the wire while rejecting calls without current filesystem access. */
@@ -56,7 +64,7 @@ export function guardFilesystemTool(
     },
     execute: !execute
       ? undefined
-      : name === 'shell' || name === 'shell_output'
+      : name === SHELL_TOOL_NAME || name === SHELL_OUTPUT_TOOL_NAME
         ? async function* (input, execution) {
             await assertAccess()
             yield* execute(input, execution) as AsyncIterable<unknown>

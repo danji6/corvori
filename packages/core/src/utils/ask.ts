@@ -1,4 +1,4 @@
-import { ASK_TOOL_NAME } from '../const'
+import { ASK_TOOL_PART_TYPE } from '../const'
 import type {
   AbortedAskToolOutput,
   AgentQuestion,
@@ -15,7 +15,7 @@ export const ABORTED_ASK_TOOL_OUTPUT: AbortedAskToolOutput = {
 }
 
 export type PendingAskPart = {
-  type: `tool-${typeof ASK_TOOL_NAME}`
+  type: typeof ASK_TOOL_PART_TYPE
   toolCallId: string
   state: 'input-available'
   input: AskToolInput
@@ -25,7 +25,7 @@ export type PendingAskPart = {
 export function isPendingAskPart(part: unknown): part is PendingAskPart {
   const typed = part as Partial<PendingAskPart>
   return (
-    typed?.type === `tool-${ASK_TOOL_NAME}` &&
+    typed?.type === ASK_TOOL_PART_TYPE &&
     typed.state === 'input-available' &&
     typeof typed.toolCallId === 'string'
   )

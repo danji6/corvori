@@ -1,6 +1,32 @@
 'use node'
 
-import { ASK_TOOL_NAME, YIELD_TOOL_NAME } from '@cv/core/const'
+import {
+  ASK_TOOL_NAME,
+  ATTACH_FILE_TOOL_NAME,
+  CALL_MCP_TOOL_NAME,
+  COPY_ATTACHMENT_TOOL_NAME,
+  EDIT_FILE_TOOL_NAME,
+  EDIT_PLAN_TOOL_NAME,
+  EDIT_TODO_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+  KILL_SHELL_TOOL_NAME,
+  LIST_SKILLS_TOOL_NAME,
+  MCP_PROTOCOL_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  READ_MCP_OUTPUT_TOOL_NAME,
+  READ_SKILL_TOOL_NAME,
+  SEARCH_MCP_TOOLS_NAME,
+  SHELL_OUTPUT_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  TASK_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  WRITE_PLAN_TOOL_NAME,
+  WRITE_TODO_TOOL_NAME,
+  YIELD_TOOL_NAME,
+} from '@cv/core/const'
 import { READ_ATTACHMENT_TOOL_NAME } from '@cv/core/const'
 import { hasFilesystemTools } from '@cv/core/tool-capabilities'
 import type { WireToolCall } from '@cv/core/tool-dispatch'
@@ -12,7 +38,7 @@ import { internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { error } from '../../errors'
-import { TASK_TOOL_NAME, sharedSessionId } from '../../lib/subagent'
+import { sharedSessionId } from '../../lib/subagent'
 import { mergeToolApprovals } from '../../lib/tool/approval'
 import type { StreamExecutionArgs } from '../../validators/streams'
 import type { Session } from '../session/types'
@@ -187,7 +213,7 @@ export async function getEnabledTools(
               execution: options.execution,
               messageId: options.messageId,
               omitMedia: options.omitMcpMedia,
-              canReadOutput: manifest.names.includes('read_mcp_output'),
+              canReadOutput: manifest.names.includes(READ_MCP_OUTPUT_TOOL_NAME),
             }
           : undefined,
       mcpFailed: ctx
@@ -316,13 +342,13 @@ async function createManifestTool(
   const { workspace, planContext } = build
 
   switch (name) {
-    case 'mcp_protocol':
-    case 'read_mcp_output':
-    case 'search_mcp_tools':
-    case 'call_mcp_tool': {
+    case MCP_PROTOCOL_TOOL_NAME:
+    case READ_MCP_OUTPUT_TOOL_NAME:
+    case SEARCH_MCP_TOOLS_NAME:
+    case CALL_MCP_TOOL_NAME: {
       if (!build.mcpOperation || !build.mcpExecution) return undefined
       const create =
-        name === 'mcp_protocol' || name === 'read_mcp_output'
+        name === MCP_PROTOCOL_TOOL_NAME || name === READ_MCP_OUTPUT_TOOL_NAME
           ? createMcpProtocolTools
           : createMcpBrokerTools
       const broker = await create({
@@ -334,12 +360,12 @@ async function createManifestTool(
       })
       return guardMcpApproval((broker as Record<string, AnyTool>)[name])
     }
-    case 'web_fetch':
+    case WEB_FETCH_TOOL_NAME:
       return createWebFetchTool()
-    case 'web_search':
+    case WEB_SEARCH_TOOL_NAME:
       return createWebSearchTool(build.resources.settings)
-    case 'copy_attachment':
-    case 'attach_file':
+    case COPY_ATTACHMENT_TOOL_NAME:
+    case ATTACH_FILE_TOOL_NAME:
       if (!planContext || !build.execution) return undefined
       return createAttachmentTransferTool(
         name,
@@ -354,34 +380,34 @@ async function createManifestTool(
           build.execution,
         ) as Promise<AnyTool>)
       )
-    case 'read_skill':
+    case READ_SKILL_TOOL_NAME:
       return build.skillsContext && createReadSkillTool(build.skillsContext)
-    case 'list_skills':
+    case LIST_SKILLS_TOOL_NAME:
       return build.skillsContext && createListSkillsTool(build.skillsContext)
-    case 'read_file':
+    case READ_FILE_TOOL_NAME:
       return workspace && createReadFileTool(workspace)
-    case 'write_file':
+    case WRITE_FILE_TOOL_NAME:
       return workspace && createWriteFileTool(workspace)
-    case 'edit_file':
+    case EDIT_FILE_TOOL_NAME:
       return workspace && createEditFileTool(workspace)
     // Streaming tools carry narrower generics than the ToolSet value type
-    case 'shell':
+    case SHELL_TOOL_NAME:
       return workspace && (createShellTool(workspace) as Promise<AnyTool>)
-    case 'shell_output':
+    case SHELL_OUTPUT_TOOL_NAME:
       return workspace && (createShellOutputTool(workspace) as Promise<AnyTool>)
-    case 'kill_shell':
+    case KILL_SHELL_TOOL_NAME:
       return workspace && createKillShellTool(workspace)
-    case 'write_plan':
+    case WRITE_PLAN_TOOL_NAME:
       return planContext && createWritePlanTool(planContext)
-    case 'edit_plan':
+    case EDIT_PLAN_TOOL_NAME:
       return planContext && createEditPlanTool(planContext)
-    case 'enter_plan_mode':
+    case ENTER_PLAN_MODE_TOOL_NAME:
       return planContext && createEnterPlanModeTool(planContext)
-    case 'exit_plan_mode':
+    case EXIT_PLAN_MODE_TOOL_NAME:
       return planContext && createExitPlanModeTool(planContext)
-    case 'write_todo':
+    case WRITE_TODO_TOOL_NAME:
       return planContext && createWriteTodoTool(planContext)
-    case 'edit_todo':
+    case EDIT_TODO_TOOL_NAME:
       return planContext && createEditTodoTool(planContext)
     case ASK_TOOL_NAME:
       return createAskTool()

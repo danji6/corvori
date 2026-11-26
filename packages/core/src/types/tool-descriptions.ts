@@ -1,15 +1,44 @@
+import {
+  ASK_TOOL_NAME,
+  ATTACH_FILE_TOOL_NAME,
+  CALL_MCP_TOOL_NAME,
+  CALL_TOOL_NAME,
+  COPY_ATTACHMENT_TOOL_NAME,
+  EDIT_FILE_TOOL_NAME,
+  EDIT_PLAN_TOOL_NAME,
+  EDIT_TODO_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+  GET_TOOL_NAME,
+  KILL_SHELL_TOOL_NAME,
+  LIST_SKILLS_TOOL_NAME,
+  MCP_PROTOCOL_TOOL_NAME,
+  READ_ATTACHMENT_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  READ_MCP_OUTPUT_TOOL_NAME,
+  READ_SKILL_TOOL_NAME,
+  SEARCH_MCP_TOOLS_NAME,
+  SHELL_OUTPUT_TOOL_NAME,
+  TASK_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  WRITE_PLAN_TOOL_NAME,
+  WRITE_TODO_TOOL_NAME,
+  YIELD_TOOL_NAME,
+} from '../const'
 import { shellLabel } from '../shell/name'
 import { inline } from '../utils/strings'
 
-const web_fetch = 'Fetch a web page and return its main content as markdown.'
+const webFetch = 'Fetch a web page and return its main content as markdown.'
 
-const web_search = 'Search the web and return a list of results.'
+const webSearch = 'Search the web and return a list of results.'
 
-const read_file = inline`Read a bounded text page. Use this instead of cat/sed
+const readFile = inline`Read a bounded text page. Use this instead of cat/sed
   for inspection. When truncated, pass nextByteOffset as byteOffset to continue.
   Paths default to the project workspace.`
 
-const read_attachment = inline`
+const readAttachment = inline`
   Read or search an attachment. Start with reference. Use pattern (Go regexp
   using RE2 syntax) to find matching lines. If done is false, pass only
   operationId to continue. Search hits include a preview, byteOffset for the match,
@@ -17,18 +46,18 @@ const read_attachment = inline`
   start (line) or the end (lineFromEnd). To inspect a hit in context, start a
   plain read with reference and set offset to lineStartOffset.`
 
-const copy_attachment = inline`
+const copyAttachment = inline`
   Copy an attachment to a file you can work with to the session:// folder.`
 
-const attach_file = inline`
+const attachFile = inline`
   Publish a snapshot of a regular session:// file as a downloadable attachment
   in your response.`
 
-const write_file = inline`
+const writeFile = inline`
   Create or overwrite a text file in the selected filesystem scope. Prefer
   edit_file for targeted changes.`
 
-const edit_file = inline`
+const editFile = inline`
   Edit a text file using exact, unique replacements. Pass the changes as
   \`edits: [{ oldText, newText }]\` (array of objects). Use one call with
   multiple edits for parallel changes in the same file. Keep oldText small but
@@ -64,36 +93,36 @@ export function shellToolDescription(
     the user can review it at a glance.`
 }
 
-const shell_output = inline`
+const shellOutput = inline`
   Wait for a running job to exit or until wait_seconds elapses. Returns the
   latest unread output and current status. Background jobs report automatically
   on exit. Use offset only for immediate replay.`
 
-const kill_shell = 'Kill a running shell job.'
+const killShell = 'Kill a running shell job.'
 
-const write_plan = inline`
+const writePlan = inline`
   Create or overwrite the session plan. Use it for the initial draft or a
   complete rewrite; prefer edit_plan for targeted changes.`
 
-const edit_plan = inline`
+const editPlan = inline`
   Edit the session plan using exact, unique replacements. Pass the changes as
   \`edits: [{ oldText, newText }]\` (array of objects). Use one call with
   multiple edits for parallel changes in different places.`
 
-const enter_plan_mode = inline`
+const enterPlanMode = inline`
   Enter plan mode. Use this when the task is large or ambiguous enough that
   researching and agreeing on a plan first would help.`
 
-const exit_plan_mode = inline`
+const exitPlanMode = inline`
   Present the current plan for user approval. Call this once the plan is
   complete.`
 
-const write_todo = inline`
+const writeTodo = inline`
   Create or replace the session todo list. Use it for substantial tasks of 3+
   steps. Tasks matching existing ones keep their status; an empty list clears
   the list. Update statuses with edit_todo.`
 
-const edit_todo = inline`
+const editTodo = inline`
   Update todo statuses. Each edit names the exact text of an existing task and
   its new status. Mark a task 'doing' before starting it (one at a time) and
   'done' immediately when finished; never batch completions.`
@@ -132,17 +161,17 @@ const skills = inline`
   skill name or cursor to continue a page. Read the chosen SKILL.md before
   following its instructions.`
 
-const read_skill = inline`
+const readSkill = inline`
   Read SKILL.md or a bundled text resource from an available skill. Read
   SKILL.md before following related instructions.`
 
-const get_tool =
+const getTool =
   'Read the current description and complete input schema of an enabled tool.'
 
-const call_tool =
+const callTool =
   'Call an enabled tool by name with arguments matching its current input schema.'
 
-const search_mcp_tools = inline`
+const searchMcpTools = inline`
   Discover authorized MCP servers and tools, and retrieve tool definitions
   without loading the whole catalog. Large definitions return text fragments:
   concatenate all ranges until hasMore is false (nextOffset is null) before
@@ -150,11 +179,11 @@ const search_mcp_tools = inline`
   input contract; it is false for fragments, including the last fragment. Reuse
   a previously read input contract for the same callable name and catalogRevision.`
 
-const call_mcp_tool = inline`
+const callMcpTool = inline`
   Call an MCP tool using tool with name returned by search_mcp_tools and a JSON
   arguments object matching its input schema.`
 
-const mcp_protocol = inline`
+const mcpProtocol = inline`
   Access an authorized MCP server's information, prompt templates, and resources.
   Select an operation using method and a server using its name from search_mcp_tools.
   Methods: get_server_info reads the server's identity, capabilities, and
@@ -166,38 +195,38 @@ const mcp_protocol = inline`
   requested by the user. Resource reads do not fetch web links automatically.
   Use read_mcp_output for complete large results.`
 
-const read_mcp_output = inline`
+const readMcpOutput = inline`
   Read the full MCP output in bounded character ranges. Supply output with the
   output name from an MCP result. Follow nextOffset until null before treating
   a large JSON result as complete. Partial ranges are literal fragments, not
   complete JSON.`
 
 export const TOOL_DESCRIPTIONS = {
-  web_fetch,
-  web_search,
-  read_file,
-  read_attachment,
-  copy_attachment,
-  attach_file,
-  write_file,
-  edit_file,
-  shell_output,
-  kill_shell,
-  write_plan,
-  edit_plan,
-  enter_plan_mode,
-  exit_plan_mode,
-  write_todo,
-  edit_todo,
-  ask,
-  yield: _yield,
-  task,
-  skills,
-  read_skill,
-  get_tool,
-  call_tool,
-  search_mcp_tools,
-  call_mcp_tool,
-  mcp_protocol,
-  read_mcp_output,
+  [WEB_FETCH_TOOL_NAME]: webFetch,
+  [WEB_SEARCH_TOOL_NAME]: webSearch,
+  [READ_FILE_TOOL_NAME]: readFile,
+  [READ_ATTACHMENT_TOOL_NAME]: readAttachment,
+  [COPY_ATTACHMENT_TOOL_NAME]: copyAttachment,
+  [ATTACH_FILE_TOOL_NAME]: attachFile,
+  [WRITE_FILE_TOOL_NAME]: writeFile,
+  [EDIT_FILE_TOOL_NAME]: editFile,
+  [SHELL_OUTPUT_TOOL_NAME]: shellOutput,
+  [KILL_SHELL_TOOL_NAME]: killShell,
+  [WRITE_PLAN_TOOL_NAME]: writePlan,
+  [EDIT_PLAN_TOOL_NAME]: editPlan,
+  [ENTER_PLAN_MODE_TOOL_NAME]: enterPlanMode,
+  [EXIT_PLAN_MODE_TOOL_NAME]: exitPlanMode,
+  [WRITE_TODO_TOOL_NAME]: writeTodo,
+  [EDIT_TODO_TOOL_NAME]: editTodo,
+  [ASK_TOOL_NAME]: ask,
+  [YIELD_TOOL_NAME]: _yield,
+  [TASK_TOOL_NAME]: task,
+  [LIST_SKILLS_TOOL_NAME]: skills,
+  [READ_SKILL_TOOL_NAME]: readSkill,
+  [GET_TOOL_NAME]: getTool,
+  [CALL_TOOL_NAME]: callTool,
+  [SEARCH_MCP_TOOLS_NAME]: searchMcpTools,
+  [CALL_MCP_TOOL_NAME]: callMcpTool,
+  [MCP_PROTOCOL_TOOL_NAME]: mcpProtocol,
+  [READ_MCP_OUTPUT_TOOL_NAME]: readMcpOutput,
 } as const

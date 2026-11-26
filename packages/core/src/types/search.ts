@@ -27,7 +27,7 @@ export const webSearchInstanceSchema = z.object({
   url: z.string().url(),
 })
 
-export const webSearchQuerySchema = z.object({
+const webSearchFields = {
   query: z.string().min(1).describe('Search query'),
   category: searchCategorySchema.optional(),
   language: z
@@ -39,7 +39,9 @@ export const webSearchQuerySchema = z.object({
   safesearch: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
   page: z.number().int().min(1).optional(),
   max_results: z.number().int().min(1).max(MAX_WEB_SEARCH_RESULTS).optional(),
-})
+} as const
+
+export const webSearchQuerySchema = z.object(webSearchFields)
 
 export const webSearchSchema = webSearchQuerySchema.extend({
   instances: z.array(webSearchInstanceSchema).min(1),

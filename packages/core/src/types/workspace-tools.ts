@@ -118,3 +118,21 @@ export const editFileFields = {
     })
     .describe('Array of `{ oldText, newText }` replacements to apply.'),
 } as const
+
+export const copyAttachmentFields = {
+  reference: z.string().min(1).describe('Session attachment reference'),
+  destination: z
+    .string()
+    .min(1)
+    .optional()
+    .describe('Optional full session:// destination file path'),
+} as const
+
+export const attachFileFields = {
+  path: z.string().min(1).describe('The session:// file to publish'),
+  filename: z
+    .string()
+    .min(1)
+    .optional()
+    .describe('Name displayed on the attachment'),
+} as const

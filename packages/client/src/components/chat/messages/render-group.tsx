@@ -14,6 +14,11 @@ import {
 } from '@/lib/chat/parts'
 import type { TranscriptLinkPreview } from '@cv/convex/validators/linkPreviews'
 import {
+  READ_ATTACHMENT_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  TASK_TOOL_NAME,
+} from '@cv/core/const'
+import {
   type UIMessage,
   isReasoningUIPart,
   isTextUIPart,
@@ -67,7 +72,7 @@ export const RenderGroup = memo(function RenderGroup(props: RenderGroupProps) {
         />
       )
     }
-    if (group.toolName === 'shell') {
+    if (group.toolName === SHELL_TOOL_NAME) {
       return (
         <ShellGroupBlock
           parts={group.parts}
@@ -77,7 +82,7 @@ export const RenderGroup = memo(function RenderGroup(props: RenderGroupProps) {
         />
       )
     }
-    if (group.toolName === 'task') {
+    if (group.toolName === TASK_TOOL_NAME) {
       return (
         <SubagentGroupBlock
           parts={group.parts}
@@ -86,7 +91,7 @@ export const RenderGroup = memo(function RenderGroup(props: RenderGroupProps) {
         />
       )
     }
-    if (group.toolName === 'read_attachment') {
+    if (group.toolName === READ_ATTACHMENT_TOOL_NAME) {
       return (
         <ReadAttachmentBlock
           parts={group.parts}

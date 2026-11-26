@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const MAX_WEB_FETCH_LENGTH = 50_000
 
-export const webFetchQuerySchema = z.object({
+const webFetchFields = {
   url: z.string().url().describe('The URL to fetch and read as clean markdown'),
   query: z
     .string()
@@ -10,6 +10,8 @@ export const webFetchQuerySchema = z.object({
     .optional()
     .describe('Optional focus query; keeps the most relevant content'),
   max_length: z.number().int().min(1).max(MAX_WEB_FETCH_LENGTH).optional(),
-})
+} as const
+
+export const webFetchQuerySchema = z.object(webFetchFields)
 
 export type WebFetchQuery = z.infer<typeof webFetchQuerySchema>

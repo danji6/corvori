@@ -1,3 +1,4 @@
+import { TASK_TOOL_NAME } from '@cv/core/const'
 import { sha256 } from '@cv/core/sha256'
 import { SIDEBAR_STREAM_BATCH_SIZE } from '@cv/core/sidebar-streams'
 import { isKnownTextFile } from '@cv/core/workspace/files'
@@ -110,7 +111,7 @@ export async function _getContext(
 
   // Sub-agent sessions never spawn further sub-agents (flat only)
   const spawnableAgents =
-    agent.tools?.includes('task') && !session.parent
+    agent.tools?.includes(TASK_TOOL_NAME) && !session.parent
       ? await resolveSpawnableAgents(ctx, agent)
       : []
 

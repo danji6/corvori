@@ -5,6 +5,7 @@ import {
   languageFromPath,
   parseOutputValue,
 } from '@/lib/chat/tool-output'
+import { WRITE_FILE_TOOL_PART_TYPE } from '@cv/core/const'
 import type { ToolUIPart } from 'ai'
 
 import { LoadFullOutput } from './load-full-output'
@@ -64,7 +65,7 @@ export function FileChangeBlock({
   const isPending = !diff && !showContentFallback
 
   const verb =
-    part.type === 'tool-write_file'
+    part.type === WRITE_FILE_TOOL_PART_TYPE
       ? isPending
         ? 'Writing'
         : 'Wrote'

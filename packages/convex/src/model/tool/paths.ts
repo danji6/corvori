@@ -1,3 +1,4 @@
+import { CHECK_PATHS_TOOL_NAME, READ_FILE_TOOL_NAME } from '@cv/core/const'
 import type { PathCheckResult } from '@cv/core/workspace/path-policy'
 
 import {
@@ -16,7 +17,7 @@ export async function checkToolPaths(
   cwd?: string,
 ): Promise<PathCheckResult | null> {
   try {
-    const text = await callMcpTool('check_paths', {
+    const text = await callMcpTool(CHECK_PATHS_TOOL_NAME, {
       sessionId: context.sessionId,
       workspaceId: context.workspaceId,
       workspace: context.workspace,
@@ -51,5 +52,8 @@ export async function fileNeedsApproval(
   if (!result?.complete || !target) return true
   if (target.allowed) return false
   if (target.forbidden || target.outside) return true
-  return name !== 'read_file' && !isToolAutoApproved(name, undefined, approvals)
+  return (
+    name !== READ_FILE_TOOL_NAME &&
+    !isToolAutoApproved(name, undefined, approvals)
+  )
 }

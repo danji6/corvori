@@ -1,3 +1,7 @@
+import {
+  SHELL_OUTPUT_TOOL_PART_TYPE,
+  SHELL_TOOL_PART_TYPE,
+} from '@cv/core/const'
 import type { ShellToolOutput } from '@cv/core/types/tools'
 
 import type { Doc } from '../../_generated/dataModel'
@@ -13,7 +17,7 @@ import { recordToolDeliveries } from './outputDeliveries'
 import { findReference, saveTerminal } from './references'
 
 type WaitingPart = {
-  type: 'tool-shell' | 'tool-shell_output'
+  type: typeof SHELL_TOOL_PART_TYPE | typeof SHELL_OUTPUT_TOOL_PART_TYPE
   state: 'output-available'
   toolCallId: string
   input?: { command?: string }
@@ -24,8 +28,8 @@ type WaitingPart = {
 function isWaitingPart(part: unknown): part is WaitingPart {
   const candidate = part as Partial<WaitingPart> | null
   return Boolean(
-    (candidate?.type === 'tool-shell' ||
-      candidate?.type === 'tool-shell_output') &&
+    (candidate?.type === SHELL_TOOL_PART_TYPE ||
+      candidate?.type === SHELL_OUTPUT_TOOL_PART_TYPE) &&
     candidate.state === 'output-available' &&
     candidate.output?.status === 'running' &&
     typeof candidate.output.waitUntil === 'number',
@@ -98,7 +102,7 @@ async function settleWatch(
   const session = await ctx.db.get(stream.sessionId)
   if (!session) return
   const sessionId = sharedSessionId(session)
-  if (part.type === 'tool-shell_output')
+  if (part.type === SHELL_OUTPUT_TOOL_PART_TYPE)
     await saveTerminal(ctx, sessionId, output)
   if (output.status === 'background') {
     const origin = await findReference(ctx, { sessionId, jobId: output.jobId })

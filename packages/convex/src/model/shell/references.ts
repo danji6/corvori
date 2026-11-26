@@ -1,3 +1,4 @@
+import { SHELL_TOOL_PART_TYPE } from '@cv/core/const'
 import type { ShellToolOutput } from '@cv/core/types/tools'
 import type { Infer } from 'convex/values'
 
@@ -108,7 +109,10 @@ export async function transcriptReference(
   const segment = segments.find(({ parts }) =>
     parts.some((part) => {
       const tool = part as { type?: string; toolCallId?: string } | null
-      return tool?.type === 'tool-shell' && tool.toolCallId === ref.toolCallId
+      return (
+        tool?.type === SHELL_TOOL_PART_TYPE &&
+        tool.toolCallId === ref.toolCallId
+      )
     }),
   )
   if (!segment) return null

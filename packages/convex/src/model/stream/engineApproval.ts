@@ -1,5 +1,10 @@
 'use node'
 
+import {
+  EDIT_FILE_TOOL_PART_TYPE,
+  SHELL_TOOL_PART_TYPE,
+  WRITE_FILE_TOOL_PART_TYPE,
+} from '@cv/core/const'
 import type { FolderWorkspace } from '@cv/core/types/workspace'
 import {
   type PathCheckResult,
@@ -28,9 +33,9 @@ export function hasAwaitingApproval(parts: UIMessage['parts']) {
   })
 }
 
-export const FILE_MUTATION_TOOL_TYPES = new Set([
-  'tool-write_file',
-  'tool-edit_file',
+export const FILE_MUTATION_TOOL_TYPES = new Set<string>([
+  WRITE_FILE_TOOL_PART_TYPE,
+  EDIT_FILE_TOOL_PART_TYPE,
 ])
 
 export type ApprovalContext = {
@@ -84,7 +89,9 @@ async function withApprovalPreview(
       ? withPreviewDiff(context, checked)
       : checked
   }
-  return part.type === 'tool-shell' ? withApprovalPaths(context, part) : part
+  return part.type === SHELL_TOOL_PART_TYPE
+    ? withApprovalPaths(context, part)
+    : part
 }
 
 async function withFileApprovalPaths(

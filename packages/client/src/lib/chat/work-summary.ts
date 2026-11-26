@@ -1,5 +1,14 @@
 import { formatDuration } from '@/lib/utils'
 import type { ReasoningPart } from '@cv/convex/model/chat/types'
+import {
+  EDIT_FILE_TOOL_PART_TYPE,
+  LIST_SKILLS_TOOL_PART_TYPE,
+  READ_ATTACHMENT_TOOL_PART_TYPE,
+  READ_FILE_TOOL_PART_TYPE,
+  SHELL_OUTPUT_TOOL_PART_TYPE,
+  SHELL_TOOL_PART_TYPE,
+  WRITE_FILE_TOOL_PART_TYPE,
+} from '@cv/core/const'
 import type { ShellToolOutput } from '@cv/core/types/tools'
 import { type ToolUIPart, isReasoningUIPart } from 'ai'
 
@@ -96,7 +105,7 @@ function isThinking(group: PartGroup): boolean {
 }
 
 function shellJobId(part: ToolUIPart): string | undefined {
-  if (part.type !== 'tool-shell') return
+  if (part.type !== SHELL_TOOL_PART_TYPE) return
   return parseOutputValue<ShellToolOutput>(part.output)?.jobId
 }
 
@@ -110,20 +119,21 @@ function activityLabel(tools: ToolUIPart[], reportCommands: number): string {
 
   for (const part of tools) {
     const path = toolPath(part)
-    if (part.type === 'tool-read_file' && path) {
+    if (part.type === READ_FILE_TOOL_PART_TYPE && path) {
       reads.add(path)
-    } else if (part.type === 'tool-read_attachment') {
+    } else if (part.type === READ_ATTACHMENT_TOOL_PART_TYPE) {
       attachmentCalls++
     } else if (
-      ['tool-write_file', 'tool-edit_file'].includes(part.type) &&
+      (part.type === WRITE_FILE_TOOL_PART_TYPE ||
+        part.type === EDIT_FILE_TOOL_PART_TYPE) &&
       path
     ) {
       changes.add(path)
-    } else if (part.type === 'tool-shell') {
+    } else if (part.type === SHELL_TOOL_PART_TYPE) {
       commands++
-    } else if (part.type === 'tool-list_skills') {
+    } else if (part.type === LIST_SKILLS_TOOL_PART_TYPE) {
       listedSkills = true
-    } else if (part.type !== 'tool-shell_output') {
+    } else if (part.type !== SHELL_OUTPUT_TOOL_PART_TYPE) {
       other++
     }
   }

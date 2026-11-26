@@ -1,5 +1,10 @@
 import { v } from 'convex/values'
 
+export const sessionTaskDirectorySchema = v.object({
+  rootId: v.id('sessions'),
+  name: v.string(),
+})
+
 const operationFields = {
   sessionId: v.id('sessions'),
   nextAttemptAt: v.number(),

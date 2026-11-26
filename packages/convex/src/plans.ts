@@ -1,3 +1,7 @@
+import {
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+} from '@cv/core/const'
 import { v } from 'convex/values'
 
 import { internalMutation, internalQuery } from './_generated/server'
@@ -41,8 +45,8 @@ export const _applyModeTransition = internalMutation({
   args: {
     sessionId: v.id('sessions'),
     toolName: v.union(
-      v.literal('enter_plan_mode'),
-      v.literal('exit_plan_mode'),
+      v.literal(ENTER_PLAN_MODE_TOOL_NAME),
+      v.literal(EXIT_PLAN_MODE_TOOL_NAME),
     ),
   },
   handler: (ctx, { sessionId, toolName }) =>

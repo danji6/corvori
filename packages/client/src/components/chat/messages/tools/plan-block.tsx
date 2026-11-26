@@ -7,6 +7,12 @@ import {
 import { useScrollIntoView } from '@/hooks/chat/scroll-into-view'
 import type { SourceMessagePart } from '@/lib/chat/combine'
 import { api } from '@cv/convex/_generated/api'
+import {
+  EDIT_PLAN_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+  WRITE_PLAN_TOOL_NAME,
+} from '@cv/core/const'
 import type { ToolUIPart } from 'ai'
 import { useQuery } from 'convex/react'
 import { useLayoutEffect, useRef } from 'react'
@@ -15,10 +21,10 @@ import { useMessageList } from '../message-list/message-list-context'
 import { ToolShell, useToolPart } from './tool-shell'
 
 const PLAN_TOOL_LABELS: Record<string, string> = {
-  write_plan: 'Write plan',
-  edit_plan: 'Edit plan',
-  enter_plan_mode: 'Enter plan mode',
-  exit_plan_mode: 'Present plan',
+  [WRITE_PLAN_TOOL_NAME]: 'Write plan',
+  [EDIT_PLAN_TOOL_NAME]: 'Edit plan',
+  [ENTER_PLAN_MODE_TOOL_NAME]: 'Enter plan mode',
+  [EXIT_PLAN_MODE_TOOL_NAME]: 'Present plan',
 }
 
 const PRE_APPROVAL_STATES: ReadonlySet<string> = new Set([
@@ -42,14 +48,14 @@ export function PlanBlock({
   const processingMessageId = useStreamProcessingMessageId()
   const plan = useQuery(
     api.plans.get,
-    session && toolName === 'exit_plan_mode'
+    session && toolName === EXIT_PLAN_MODE_TOOL_NAME
       ? { sessionId: session._id }
       : 'skip',
   )
   const edits = (part.input as { edits?: unknown[] } | undefined)?.edits
-  const editCount = toolName === 'edit_plan' ? (edits?.length ?? 0) : 0
+  const editCount = toolName === EDIT_PLAN_TOOL_NAME ? (edits?.length ?? 0) : 0
 
-  if (toolName === 'exit_plan_mode' && plan) {
+  if (toolName === EXIT_PLAN_MODE_TOOL_NAME && plan) {
     const sourceMessageId =
       (part as SourceMessagePart).sourceMessageId ?? messageId
 

@@ -1,5 +1,6 @@
 'use node'
 
+import { READ_FILE_TOOL_NAME } from '@cv/core/const'
 import type { EvaluationResult } from '@cv/core/interpreter/request'
 
 import { internal } from '../../_generated/api'
@@ -203,7 +204,8 @@ async function sidecarInput(
     model: options.model ?? data.model,
   })
 
-  const canReadFiles = context.isAdmin && toolNames.includes('read_file')
+  const canReadFiles =
+    context.isAdmin && toolNames.includes(READ_FILE_TOOL_NAME)
 
   return {
     texts: inputTexts(data),

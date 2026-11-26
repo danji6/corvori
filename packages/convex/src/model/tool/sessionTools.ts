@@ -1,5 +1,12 @@
 'use node'
 
+import {
+  CALL_TOOL_NAME,
+  DISPATCH_ERROR_TOOL,
+  GET_TOOL_NAME,
+  SHELL_OUTPUT_TOOL_NAME,
+  SHELL_TOOL_NAME,
+} from '@cv/core/const'
 import type { WireToolCall } from '@cv/core/tool-dispatch'
 import { TOOL_DESCRIPTIONS } from '@cv/core/types/tool-descriptions'
 import type { ToolExecutionOptions, ToolSet } from 'ai'
@@ -15,10 +22,15 @@ import {
   frozenDefinitions,
   toolDefinitions,
 } from './definitions'
+import {
+  callToolFields,
+  dispatchErrorSchema,
+  getToolFields,
+} from './dispatcherFields'
 import type { ToolDefinition, ToolManifest } from './manifest'
 import { guardMcpApproval } from './mcpApproval'
 
-export const DISPATCH_ERROR_TOOL = '__cv_tool_error'
+export { DISPATCH_ERROR_TOOL } from '@cv/core/const'
 
 export type ToolReplay = {
   wireDefinitions: ToolDefinition[]
@@ -178,7 +190,7 @@ async function executionTools(
   const current = Object.fromEntries(
     Object.entries(tools).map(([name, definition]) => [
       name,
-      name === 'get_tool' || name === 'call_tool'
+      name === GET_TOOL_NAME || name === CALL_TOOL_NAME
         ? definition
         : guardToolAccess(name, definition, assertAccess),
     ]),
@@ -196,11 +208,7 @@ async function executionTools(
   }
 
   current[DISPATCH_ERROR_TOOL] = tool({
-    inputSchema: jsonSchema<{ error: string }>({
-      type: 'object',
-      properties: { error: { type: 'string' } },
-      required: ['error'],
-    }),
+    inputSchema: jsonSchema<{ error: string }>(dispatchErrorSchema),
     execute: async ({ error }): Promise<unknown> => {
       throw new ToolError(error)
     },
@@ -217,17 +225,14 @@ export async function createDispatcherTools(
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
 
   return {
-    get_tool: tool({
-      description: TOOL_DESCRIPTIONS.get_tool,
-      inputSchema: z.object({ name: z.string().min(1).max(1024) }),
+    [GET_TOOL_NAME]: tool({
+      description: TOOL_DESCRIPTIONS[GET_TOOL_NAME],
+      inputSchema: z.object(getToolFields),
       execute: async ({ name }) => inspectTool(manifest, assertAccess, name),
     }),
-    call_tool: tool({
-      description: TOOL_DESCRIPTIONS.call_tool,
-      inputSchema: z.object({
-        name: z.string().min(1).max(1024),
-        arguments: z.object({}).catchall(z.unknown()),
-      }),
+    [CALL_TOOL_NAME]: tool({
+      description: TOOL_DESCRIPTIONS[CALL_TOOL_NAME],
+      inputSchema: z.object(callToolFields),
       execute: async (): Promise<unknown> => {
         throw new ToolError(
           'Invalid dispatcher call; get_tool before calling a target',
@@ -270,7 +275,7 @@ function guardToolAccess(
       : !!needsApproval
   }
   const guarded: typeof execute =
-    name === 'shell' || name === 'shell_output'
+    name === SHELL_TOOL_NAME || name === SHELL_OUTPUT_TOOL_NAME
       ? async function* (input, options) {
           await assertAccess(name)
           yield* execute(input, options) as AsyncIterable<unknown>

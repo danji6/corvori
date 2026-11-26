@@ -1,3 +1,8 @@
+import {
+  CALL_MCP_TOOL_NAME,
+  MCP_PROTOCOL_TOOL_NAME,
+  SHELL_TOOL_NAME,
+} from '@cv/core/const'
 import { mcpApprovalKey } from '@cv/core/types/mcp-catalog'
 import { mcpProtocolApprovalKey } from '@cv/core/types/mcp-protocol'
 import type { RememberScope } from '@cv/core/types/tools'
@@ -35,7 +40,7 @@ export async function rememberApproval(
     return
   }
 
-  if (matched.toolName === 'shell') {
+  if (matched.toolName === SHELL_TOOL_NAME) {
     const command = (matched.input as { command?: string } | undefined)?.command
     const additions = command
       ? analyzeShellCommand(command, approvals.shell ?? []).unapproved
@@ -48,14 +53,14 @@ export async function rememberApproval(
 
   const tools = approvals.tools ?? []
   const targetKey =
-    matched.toolName === 'call_mcp_tool'
+    matched.toolName === CALL_MCP_TOOL_NAME
       ? mcpApprovalKey(await approvalTarget(ctx, session._id, matched.input))
-      : matched.toolName === 'mcp_protocol'
+      : matched.toolName === MCP_PROTOCOL_TOOL_NAME
         ? await protocolApproval(ctx, session, matched.input)
         : undefined
-  if (matched.toolName === 'call_mcp_tool' && !targetKey) return
+  if (matched.toolName === CALL_MCP_TOOL_NAME && !targetKey) return
 
-  if (matched.toolName === 'mcp_protocol' && !targetKey) return
+  if (matched.toolName === MCP_PROTOCOL_TOOL_NAME && !targetKey) return
 
   const names = targetKey ? [targetKey] : toolNamesForApproval(matched.toolName)
   const additions = names.filter((toolName) => !tools.includes(toolName))
@@ -82,7 +87,7 @@ async function rememberPaths(
   matched: ApprovedTool,
 ) {
   const supportsPathGrants =
-    matched.toolName === 'shell' || isFileTool(matched.toolName)
+    matched.toolName === SHELL_TOOL_NAME || isFileTool(matched.toolName)
   if (!supportsPathGrants) return
 
   if (matched.paths?.length) {
@@ -93,7 +98,7 @@ async function rememberPaths(
     return
   }
 
-  if (matched.toolName !== 'shell' || !session.workspace) return
+  if (matched.toolName !== SHELL_TOOL_NAME || !session.workspace) return
   const command = (matched.input as { command?: string } | undefined)?.command
   if (!command) return
 

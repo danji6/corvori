@@ -1,4 +1,9 @@
 import { isToolInFlight } from '@/lib/chat'
+import {
+  EDIT_FILE_TOOL_NAME,
+  EDIT_FILE_TOOL_PART_TYPE,
+  WRITE_FILE_TOOL_PART_TYPE,
+} from '@cv/core/const'
 import type { ToolUIPart } from 'ai'
 
 import { CollapsibleBlock } from '../collapsible-block'
@@ -27,7 +32,7 @@ export function FileChangeGroupBlock({
       collapsible={false}
       dense
       fullWidth
-      leadingIcon={<ToolIcon name="edit_file" />}
+      leadingIcon={<ToolIcon name={EDIT_FILE_TOOL_NAME} />}
       label={
         <>
           {verb}{' '}
@@ -54,10 +59,10 @@ export function FileChangeGroupBlock({
 }
 
 function changeVerb(parts: ToolUIPart[], running: boolean): string {
-  if (parts.every((part) => part.type === 'tool-write_file')) {
+  if (parts.every((part) => part.type === WRITE_FILE_TOOL_PART_TYPE)) {
     return running ? 'Writing' : 'Wrote'
   }
-  if (parts.every((part) => part.type === 'tool-edit_file')) {
+  if (parts.every((part) => part.type === EDIT_FILE_TOOL_PART_TYPE)) {
     return running ? 'Editing' : 'Edited'
   }
   return running ? 'Changing' : 'Changed'

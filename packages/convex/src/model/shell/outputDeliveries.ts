@@ -1,3 +1,7 @@
+import {
+  SHELL_OUTPUT_TOOL_PART_TYPE,
+  SHELL_TOOL_PART_TYPE,
+} from '@cv/core/const'
 import type { ShellOutputRange, ShellToolOutput } from '@cv/core/types/tools'
 
 import type { Doc, Id } from '../../_generated/dataModel'
@@ -45,7 +49,8 @@ function isFinalShellRead(part: unknown): part is FinalShellReadPart {
 
   const result = part as ShellReadPart
   const completed =
-    (result.type === 'tool-shell_output' || result.type === 'tool-shell') &&
+    (result.type === SHELL_OUTPUT_TOOL_PART_TYPE ||
+      result.type === SHELL_TOOL_PART_TYPE) &&
     result.state === 'output-available' &&
     result.output?.status !== 'running'
 

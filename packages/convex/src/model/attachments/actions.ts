@@ -1,5 +1,10 @@
 'use node'
 
+import {
+  ATTACH_FILE_TOOL_NAME,
+  COPY_ATTACHMENT_TOOL_NAME,
+} from '@cv/core/const'
+
 import { internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
@@ -52,10 +57,10 @@ export async function cleanAttachmentTransfer(
   const request = {
     operationId: row._id,
     rollback:
-      !row.result && row.kind === 'copy_attachment'
+      !row.result && row.kind === COPY_ATTACHMENT_TOOL_NAME
         ? transferTarget(row)
         : undefined,
-    discardUpload: !row.result && row.kind === 'attach_file',
+    discardUpload: !row.result && row.kind === ATTACH_FILE_TOOL_NAME,
   }
   const { storageId } = await postSidecar<{ storageId?: Id<'_storage'> }>(
     '/session-files/cleanup-transfer',

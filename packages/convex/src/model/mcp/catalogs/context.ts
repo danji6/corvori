@@ -3,6 +3,7 @@
 import { internal } from '@cv/convex/_generated/api'
 import type { ActionCtx } from '@cv/convex/_generated/server'
 import type { StreamExecutionArgs } from '@cv/convex/validators/streams'
+import { MCP_PROTOCOL_TOOL_NAME, SEARCH_MCP_TOOLS_NAME } from '@cv/core/const'
 import { sha256 } from '@cv/core/sha256'
 import { contextDependencies } from '@cv/core/tool-context'
 import { mcpToolName } from '@cv/core/types'
@@ -102,7 +103,8 @@ export async function prepareMcpCatalogContext(
     execution,
   )
   const hasBrokerAccess =
-    names.includes('search_mcp_tools') || names.includes('mcp_protocol')
+    names.includes(SEARCH_MCP_TOOLS_NAME) ||
+    names.includes(MCP_PROTOCOL_TOOL_NAME)
   const visibleServers = available.filter(
     (server) =>
       hasBrokerAccess ||
@@ -137,7 +139,7 @@ export async function prepareMcpCatalogContext(
       )?.name,
       initialization: runtime.initialization,
     })),
-    names.includes('mcp_protocol'),
+    names.includes(MCP_PROTOCOL_TOOL_NAME),
   )
   const content = mcpContextNote(catalog, guidance)
   if (!content) return true
@@ -182,7 +184,7 @@ export function guidanceSnapshot(
         complete: initialization.length <= length,
         ...(protocolAvailable && {
           fullGuidance: {
-            tool: 'mcp_protocol',
+            tool: MCP_PROTOCOL_TOOL_NAME,
             method: 'get_server_info',
             server: runtime.server,
           },

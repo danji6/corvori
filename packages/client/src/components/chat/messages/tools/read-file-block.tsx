@@ -1,5 +1,6 @@
 import { getToolErrorText, getToolStatus } from '@/lib/chat'
 import { cn } from '@/lib/utils'
+import { READ_FILE_TOOL_NAME } from '@cv/core/const'
 import type { ToolUIPart } from 'ai'
 
 import { CollapsibleBlock } from '../collapsible-block'
@@ -34,7 +35,7 @@ export function ReadFileBlock({
       data-slot="read-file-block"
       collapsible={false}
       dense
-      leadingIcon={<ToolIcon name="read_file" />}
+      leadingIcon={<ToolIcon name={READ_FILE_TOOL_NAME} />}
       label={label}
     >
       <ToolList>

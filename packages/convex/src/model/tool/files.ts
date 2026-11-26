@@ -1,4 +1,9 @@
 import {
+  EDIT_FILE_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '@cv/core/const'
+import {
   TOOL_DESCRIPTIONS,
   editFileFields,
   fileToolDescription,
@@ -15,14 +20,15 @@ export async function createReadFileTool(context: WorkspaceToolContext) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
   return tool({
     description: fileToolDescription(
-      TOOL_DESCRIPTIONS.read_file,
+      TOOL_DESCRIPTIONS[READ_FILE_TOOL_NAME],
       context.hasAgentHome ?? !!context.workspace?.agentHome,
       context.workspace?.sessionFiles,
     ),
     inputSchema: z.strictObject(readFileFields),
-    needsApproval: ({ path }) => fileNeedsApproval('read_file', path, context),
+    needsApproval: ({ path }) =>
+      fileNeedsApproval(READ_FILE_TOOL_NAME, path, context),
     execute: async ({ path, offset, limit, byteOffset }) =>
-      callMcpTool('read_file', {
+      callMcpTool(READ_FILE_TOOL_NAME, {
         ...(await approvedFileArgs(context)),
         path,
         offset,
@@ -53,15 +59,16 @@ export async function createWriteFileTool(context: WorkspaceToolContext) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
   return tool({
     description: fileToolDescription(
-      TOOL_DESCRIPTIONS.write_file,
+      TOOL_DESCRIPTIONS[WRITE_FILE_TOOL_NAME],
       context.hasAgentHome ?? !!context.workspace?.agentHome,
       context.workspace?.sessionFiles,
     ),
     inputSchema: z.strictObject(writeFileFields),
-    needsApproval: ({ path }) => fileNeedsApproval('write_file', path, context),
+    needsApproval: ({ path }) =>
+      fileNeedsApproval(WRITE_FILE_TOOL_NAME, path, context),
     execute: async ({ path, content }) => {
       await assertNotPlanMode(context)
-      return callMcpTool('write_file', {
+      return callMcpTool(WRITE_FILE_TOOL_NAME, {
         ...(await approvedFileArgs(context)),
         path,
         content,
@@ -74,15 +81,16 @@ export async function createEditFileTool(context: WorkspaceToolContext) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
   return tool({
     description: fileToolDescription(
-      TOOL_DESCRIPTIONS.edit_file,
+      TOOL_DESCRIPTIONS[EDIT_FILE_TOOL_NAME],
       context.hasAgentHome ?? !!context.workspace?.agentHome,
       context.workspace?.sessionFiles,
     ),
     inputSchema: z.strictObject(editFileFields),
-    needsApproval: ({ path }) => fileNeedsApproval('edit_file', path, context),
+    needsApproval: ({ path }) =>
+      fileNeedsApproval(EDIT_FILE_TOOL_NAME, path, context),
     execute: async ({ path, edits }) => {
       await assertNotPlanMode(context)
-      return callMcpTool('edit_file', {
+      return callMcpTool(EDIT_FILE_TOOL_NAME, {
         ...(await approvedFileArgs(context)),
         path,
         edits,

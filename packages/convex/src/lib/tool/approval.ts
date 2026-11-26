@@ -1,3 +1,9 @@
+import {
+  EDIT_FILE_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '@cv/core/const'
 import type { AgentAutoApprove } from '@cv/core/types/agents'
 import type { ToolApprovals } from '@cv/core/types/tools'
 import { isPathForbidden } from '@cv/core/workspace/path-policy'
@@ -36,7 +42,11 @@ export type { ShellPathAnalysis } from './shellPathAnalysis'
 
 /** Identifies file calls whose approval can grant access to a resolved path. */
 export function isFileTool(name: string): boolean {
-  return name === 'read_file' || name === 'write_file' || name === 'edit_file'
+  return (
+    name === READ_FILE_TOOL_NAME ||
+    name === WRITE_FILE_TOOL_NAME ||
+    name === EDIT_FILE_TOOL_NAME
+  )
 }
 
 /**
@@ -198,7 +208,7 @@ export function isToolAutoApproved(
   approvals: ToolApprovals | undefined,
 ): boolean {
   if (isUnrestrictedAccess(approvals)) return true
-  if (name === 'shell') {
+  if (name === SHELL_TOOL_NAME) {
     const command = (input as { command?: string } | undefined)?.command
     return (
       typeof command === 'string' &&
@@ -215,7 +225,7 @@ export function isToolAutoApproved(
  * Tools that share one approval grant. Approving one of these remembers
  * (and covers) the whole group.
  */
-const FILE_EDIT_TOOLS = ['write_file', 'edit_file']
+const FILE_EDIT_TOOLS = [WRITE_FILE_TOOL_NAME, EDIT_FILE_TOOL_NAME]
 
 /** All tool names covered by approving `name`. */
 export function toolNamesForApproval(name: string): string[] {

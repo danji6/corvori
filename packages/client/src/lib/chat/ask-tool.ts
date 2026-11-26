@@ -1,4 +1,5 @@
 import { api } from '@cv/convex/_generated/api'
+import { ASK_TOOL_PART_TYPE } from '@cv/core/const'
 import type {
   AgentQuestion,
   AskToolInput,
@@ -16,7 +17,7 @@ import type { AnswerDraft } from './question-draft-store'
 type AnswerQuestionsArgs = FunctionArgs<typeof api.chat.answerQuestions>
 
 export type AskPart = ToolUIPart & {
-  type: 'tool-ask'
+  type: typeof ASK_TOOL_PART_TYPE
   state: 'input-available'
   input: AskToolInput
 }
@@ -24,7 +25,7 @@ export type AskPart = ToolUIPart & {
 /** Narrows a message part to an unanswered question. */
 export function isPendingQuestion(part: unknown): part is AskPart {
   const typed = part as { type?: unknown; state?: unknown }
-  return typed?.type === 'tool-ask' && typed.state === 'input-available'
+  return typed?.type === ASK_TOOL_PART_TYPE && typed.state === 'input-available'
 }
 
 /** Hydrates answer state while discarding stale option indices. */

@@ -10,6 +10,7 @@ import { parseOutputValue } from '@/lib/chat/tool-output'
 import { toast } from '@/lib/notifications'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
+import { SHELL_OUTPUT_TOOL_PART_TYPE } from '@cv/core/const'
 import { needsEmulator } from '@cv/core/shell/ansi'
 import type { ToolUIPart } from 'ai'
 import { useAction, useQuery } from 'convex/react'
@@ -35,7 +36,7 @@ type ShellBlockProps = {
 }
 
 export function ShellBlock(props: ShellBlockProps) {
-  return props.part.type === 'tool-shell_output' ? (
+  return props.part.type === SHELL_OUTPUT_TOOL_PART_TYPE ? (
     <ShellReadBlock {...props} />
   ) : (
     <ShellCommandBlock {...props} />

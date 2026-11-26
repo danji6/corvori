@@ -1,19 +1,31 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
+import {
+  CHECK_PATHS_TOOL_NAME,
+  EDIT_FILE_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '@cv/core/const'
 import {
   TOOL_DESCRIPTIONS,
-  editFileFields,
-  readFileFields,
   webFetchQuerySchema,
   webSearchSchema,
-  writeFileFields,
 } from '@cv/core/types'
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import type { Context } from 'hono'
 import { z } from 'zod'
 
 import { fetchWeb } from './fetch/web_fetch'
+import {
+  checkPathsFields,
+  editFileFields,
+  readFileFields,
+  shellFields,
+  writeFileFields,
+} from './tool-fields'
 import { searchWeb } from './web_search'
-import { workspaceContextSchema } from './workspace/context'
 import {
   checkFlaggedPaths,
   editWorkspaceFile,
@@ -55,9 +67,9 @@ function buildMcpServer(): McpServer {
   const server = new McpServer({ name: 'chat-tools', version: '1.0.0' })
 
   server.registerTool(
-    'web_fetch',
+    WEB_FETCH_TOOL_NAME,
     {
-      description: TOOL_DESCRIPTIONS.web_fetch,
+      description: TOOL_DESCRIPTIONS[WEB_FETCH_TOOL_NAME],
       inputSchema: webFetchQuerySchema.shape,
     },
     async (input, { signal }) => {
@@ -67,9 +79,9 @@ function buildMcpServer(): McpServer {
   )
 
   server.registerTool(
-    'web_search',
+    WEB_SEARCH_TOOL_NAME,
     {
-      description: TOOL_DESCRIPTIONS.web_search,
+      description: TOOL_DESCRIPTIONS[WEB_SEARCH_TOOL_NAME],
       inputSchema: webSearchSchema.shape,
     },
     async (input, { signal }) => {
@@ -78,22 +90,11 @@ function buildMcpServer(): McpServer {
     },
   )
 
-  const workspaceFields = {
-    sessionId: z.string(),
-    workspaceId: z.string(),
-    workspace: workspaceContextSchema,
-  }
-
   server.registerTool(
-    'read_file',
+    READ_FILE_TOOL_NAME,
     {
-      description: TOOL_DESCRIPTIONS.read_file,
-      inputSchema: z.strictObject({
-        ...workspaceFields,
-        ...readFileFields,
-        allowedPaths: z.array(z.string()).optional(),
-        allowOutsideWorkspace: z.boolean().optional(),
-      }),
+      description: TOOL_DESCRIPTIONS[READ_FILE_TOOL_NAME],
+      inputSchema: z.strictObject(readFileFields),
     },
     async ({
       sessionId,
@@ -122,15 +123,10 @@ function buildMcpServer(): McpServer {
   )
 
   server.registerTool(
-    'write_file',
+    WRITE_FILE_TOOL_NAME,
     {
-      description: TOOL_DESCRIPTIONS.write_file,
-      inputSchema: z.strictObject({
-        ...workspaceFields,
-        ...writeFileFields,
-        allowedPaths: z.array(z.string()).optional(),
-        allowOutsideWorkspace: z.boolean().optional(),
-      }),
+      description: TOOL_DESCRIPTIONS[WRITE_FILE_TOOL_NAME],
+      inputSchema: z.strictObject(writeFileFields),
     },
     async ({
       sessionId,
@@ -155,15 +151,10 @@ function buildMcpServer(): McpServer {
   )
 
   server.registerTool(
-    'edit_file',
+    EDIT_FILE_TOOL_NAME,
     {
-      description: TOOL_DESCRIPTIONS.edit_file,
-      inputSchema: z.strictObject({
-        ...workspaceFields,
-        ...editFileFields,
-        allowedPaths: z.array(z.string()).optional(),
-        allowOutsideWorkspace: z.boolean().optional(),
-      }),
+      description: TOOL_DESCRIPTIONS[EDIT_FILE_TOOL_NAME],
+      inputSchema: z.strictObject(editFileFields),
     },
     async ({
       sessionId,
@@ -188,17 +179,11 @@ function buildMcpServer(): McpServer {
   )
 
   server.registerTool(
-    'shell',
+    SHELL_TOOL_NAME,
     {
       description:
         'Run a (bash) shell command in the configured session workspace and return stdout/stderr.',
-      inputSchema: z.strictObject({
-        ...workspaceFields,
-        command: z.string(),
-        cwd: z.string().optional(),
-        allowedPaths: z.array(z.string()).optional(),
-        timeout: z.number().optional(),
-      }),
+      inputSchema: z.strictObject(shellFields),
     },
     async ({
       sessionId,
@@ -223,17 +208,11 @@ function buildMcpServer(): McpServer {
   )
 
   server.registerTool(
-    'check_paths',
+    CHECK_PATHS_TOOL_NAME,
     {
       description:
         'Report which of the given paths are sensitive (git-ignored or outside the workspace). Globs are expanded.',
-      inputSchema: z.strictObject({
-        ...workspaceFields,
-        paths: z.array(z.string()),
-        allowedPaths: z.array(z.string()).optional(),
-        literal: z.boolean().optional(),
-        cwd: z.string().optional(),
-      }),
+      inputSchema: z.strictObject(checkPathsFields),
     },
     async ({
       sessionId,

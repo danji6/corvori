@@ -1,3 +1,7 @@
+import {
+  ENTER_PLAN_MODE_TOOL_NAME,
+  type EXIT_PLAN_MODE_TOOL_NAME,
+} from '@cv/core/const'
 import { applyEdits } from '@cv/core/workspace/edit'
 
 import type { Id } from '../_generated/dataModel'
@@ -75,10 +79,10 @@ export async function setStatus(
 export async function applyModeTransition(
   ctx: MutationCtx,
   sessionId: Id<'sessions'>,
-  toolName: 'enter_plan_mode' | 'exit_plan_mode',
+  toolName: typeof ENTER_PLAN_MODE_TOOL_NAME | typeof EXIT_PLAN_MODE_TOOL_NAME,
   streamId?: Id<'streams'>,
 ) {
-  const mode = toolName === 'enter_plan_mode' ? 'plan' : undefined
+  const mode = toolName === ENTER_PLAN_MODE_TOOL_NAME ? 'plan' : undefined
   if (mode) await demoteToDraft(ctx, sessionId)
   else await setStatus(ctx, sessionId, 'approved')
 

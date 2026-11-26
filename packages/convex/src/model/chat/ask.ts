@@ -1,3 +1,4 @@
+import { ASK_TOOL_NAME } from '@cv/core/const'
 import {
   MAX_ASK_OPTIONS,
   MAX_ASK_OPTION_DESCRIPTION_CHARS,
@@ -53,7 +54,7 @@ export async function answerQuestions(
   const names = agent
     ? await sessionToolNames(ctx, stream.sessionId, agent, stream.invokedBy)
     : []
-  const completed = names.includes('ask')
+  const completed = names.includes(ASK_TOOL_NAME)
     ? {
         ...part,
         state: 'output-available',

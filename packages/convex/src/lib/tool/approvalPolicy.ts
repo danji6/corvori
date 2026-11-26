@@ -1,5 +1,6 @@
 import { formatAlwaysAllowLabel } from '@cv/core/approval-label'
 import { type ApprovalHold, getCommand } from '@cv/core/approval-presentation'
+import { CALL_MCP_TOOL_NAME, SHELL_TOOL_NAME } from '@cv/core/const'
 import type { ToolApprovals } from '@cv/core/types/tools'
 import type { PathApprovalStatus } from '@cv/core/workspace/path-policy'
 
@@ -16,9 +17,9 @@ export function alwaysLabel(
   input: unknown,
   approvals: ToolApprovals | undefined,
 ): string | null {
-  if (toolName === 'call_mcp_tool')
+  if (toolName === CALL_MCP_TOOL_NAME)
     return 'Always allow this MCP target for this session'
-  if (toolName !== 'shell') {
+  if (toolName !== SHELL_TOOL_NAME) {
     return toolNamesForApproval(toolName).length > 1
       ? 'Allow edits for this session'
       : 'Always allow for this session'
@@ -47,7 +48,7 @@ export function approvalHold(
   mode: string | undefined,
   pathStatus?: PathApprovalStatus,
 ): ApprovalHold {
-  if (toolName !== 'shell') {
+  if (toolName !== SHELL_TOOL_NAME) {
     if (isFileTool(toolName) && pathStatus) return pathStatus
     const path = (input as { path?: string } | undefined)?.path
     return typeof path === 'string' && isPathForbidden(path)

@@ -1,3 +1,4 @@
+import { SHELL_TOOL_PART_TYPE } from '@cv/core/const'
 import type { ShellToolOutput } from '@cv/core/types/tools'
 import type { UIMessage } from 'ai'
 
@@ -126,7 +127,7 @@ function registerWorkJobs(
     )?.groups[address.groupIndex]
     if (!group) continue
     for (const part of toolsInGroup(group)) {
-      if (part.type !== 'tool-shell') continue
+      if (part.type !== SHELL_TOOL_PART_TYPE) continue
       const output = parseOutputValue<ShellToolOutput>(part.output)
       if (output?.jobId) jobs.set(output.jobId, row)
     }

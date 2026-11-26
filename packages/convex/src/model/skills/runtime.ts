@@ -1,5 +1,6 @@
 'use node'
 
+import { LIST_SKILLS_TOOL_NAME, READ_SKILL_TOOL_NAME } from '@cv/core/const'
 import { catalogEntryText } from '@cv/core/skills/catalog'
 import type { AgentHome, SkillCatalogPage } from '@cv/core/skills/types'
 import { stableStringify } from '@cv/core/stable-json'
@@ -109,18 +110,18 @@ async function sessionSkillCatalog(
 
 export function catalogNote(
   page: SkillCatalogPage,
-  names: readonly string[] = ['list_skills', 'read_skill'],
+  names: readonly string[] = [LIST_SKILLS_TOOL_NAME, READ_SKILL_TOOL_NAME],
 ) {
   if (!page.entries.length && page.isDone) return ''
   return [
     'Available skills: read the relevant SKILL.md before following its instructions.',
-    ...(names.includes('read_skill')
+    ...(names.includes(READ_SKILL_TOOL_NAME)
       ? [
           'Use read_skill with a skill_id below. A unique skill name also works.',
         ]
       : []),
     ...page.entries.map(catalogEntryText),
-    ...(!page.isDone && names.includes('list_skills')
+    ...(!page.isDone && names.includes(LIST_SKILLS_TOOL_NAME)
       ? [
           `More skills are available. Use list_skills to search by name or continue with cursor ${page.cursor}.`,
         ]

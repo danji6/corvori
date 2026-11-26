@@ -1,3 +1,4 @@
+import { ASK_TOOL_PART_TYPE, TASK_TOOL_PART_TYPE } from '@cv/core/const'
 import { YIELD_TOOL_PART_TYPE } from '@cv/core/utils/yield'
 import {
   type ToolUIPart,
@@ -64,8 +65,8 @@ export function toolsInGroup(group: PartGroup): ToolUIPart[] {
 
 /** Tool calls people act on, which stay visible outside collapsed work. */
 const INTERACTIVE_TOOL_TYPES: ReadonlySet<string> = new Set([
-  'tool-ask',
-  'tool-task',
+  ASK_TOOL_PART_TYPE,
+  TASK_TOOL_PART_TYPE,
   YIELD_TOOL_PART_TYPE,
 ])
 

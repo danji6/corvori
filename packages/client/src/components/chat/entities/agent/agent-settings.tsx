@@ -48,6 +48,7 @@ import {
 import { extractErrorMessage } from '@/lib/errors'
 import { cn } from '@/lib/utils'
 import { ThemeScope } from '@/providers/theme-scope'
+import { TASK_TOOL_NAME } from '@cv/core/const'
 import {
   ActivityIcon,
   BookOpenIcon,
@@ -183,7 +184,7 @@ function AgentSettingsDialog() {
   const editingAgent = useStableValue(liveAgent, loading)
   const skillAccessEnabled = editingAgent?.tools?.includes('skills') ?? false
   const mcpAccessEnabled = editingAgent?.tools?.includes('mcp_access') ?? false
-  const taskEnabled = editingAgent?.tools?.includes('task') ?? false
+  const taskEnabled = editingAgent?.tools?.includes(TASK_TOOL_NAME) ?? false
 
   useEffect(() => {
     if (!open || loading) return

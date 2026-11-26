@@ -1,4 +1,5 @@
 import { attachmentRef } from '@cv/core/attachments'
+import { COPY_ATTACHMENT_TOOL_NAME } from '@cv/core/const'
 import { transitionActive } from '@cv/core/workspace/transition'
 import type { Infer } from 'convex/values'
 
@@ -153,7 +154,8 @@ export async function advanceCopyPath(
   },
 ) {
   const { row } = await requireActive(ctx, args.id, args)
-  if (row.kind !== 'copy_attachment') error('Invalid attachment transfer', 409)
+  if (row.kind !== COPY_ATTACHMENT_TOOL_NAME)
+    error('Invalid attachment transfer', 409)
   if (row.result || row.path !== args.previousPath) return row
 
   await ctx.db.patch(row._id, { path: args.nextPath })

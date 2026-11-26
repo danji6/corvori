@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { type api } from '@cv/convex/_generated/api'
 import { HOLD_HINTS } from '@cv/convex/lib/tool/approvalPolicy'
 import { summarizeInput, toolDisplayName } from '@cv/core/approval-presentation'
+import { SHELL_TOOL_NAME } from '@cv/core/const'
 import type { FunctionReturnType } from 'convex/server'
 import { type RefObject, Suspense, lazy, useRef } from 'react'
 
@@ -101,7 +102,7 @@ export function ToolApprovalPicker({
           <>
             <Code
               text={summarizeInput(part.input)}
-              language={toolName === 'shell' ? 'shell' : undefined}
+              language={toolName === SHELL_TOOL_NAME ? 'shell' : undefined}
               className="mx-auto w-full"
               innerClassName="max-h-40 border-0 py-0"
               noLoadingIndicator

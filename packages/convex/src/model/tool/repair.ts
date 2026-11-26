@@ -1,4 +1,10 @@
 import type { LanguageModelV3ToolCall } from '@ai-sdk/provider'
+import {
+  EDIT_FILE_TOOL_NAME,
+  EDIT_PLAN_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  WRITE_PLAN_TOOL_NAME,
+} from '@cv/core/const'
 
 type JsonObject = Record<string, unknown>
 
@@ -12,11 +18,11 @@ export function repairToolCall(
   toolCall: LanguageModelV3ToolCall,
 ): LanguageModelV3ToolCall | null {
   switch (toolCall.toolName) {
-    case 'edit_file':
+    case EDIT_FILE_TOOL_NAME:
       return repairEditFileCall(toolCall)
-    case 'write_file':
+    case WRITE_FILE_TOOL_NAME:
       return repairWriteFileCall(toolCall)
-    case 'edit_plan':
+    case EDIT_PLAN_TOOL_NAME:
       return repairEditPlanCall(toolCall)
     default:
       return null
@@ -65,7 +71,7 @@ function repairEditFileCall(
   if (typeof obj.content === 'string') {
     return {
       ...toolCall,
-      toolName: 'write_file',
+      toolName: WRITE_FILE_TOOL_NAME,
       input: JSON.stringify({ path, content: obj.content }),
     }
   }
@@ -101,7 +107,7 @@ function repairEditPlanCall(
   if (typeof obj.content === 'string') {
     return {
       ...toolCall,
-      toolName: 'write_plan',
+      toolName: WRITE_PLAN_TOOL_NAME,
       input: JSON.stringify({ content: obj.content }),
     }
   }

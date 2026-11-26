@@ -1,4 +1,5 @@
 import { SettingsList } from '@/components/ui'
+import { EDIT_FILE_TOOL_NAME, WRITE_FILE_TOOL_NAME } from '@cv/core/const'
 import { approvalPathsError } from '@cv/core/workspace/path-policy'
 import type { Control } from 'react-hook-form'
 import { useController } from 'react-hook-form'
@@ -8,8 +9,8 @@ import { ApprovalList } from './approval-list'
 
 /** Approval-gated tools an agent can be trusted to run unprompted. */
 const APPROVAL_GATED_TOOLS = [
-  { name: 'write_file', description: 'Create or overwrite files.' },
-  { name: 'edit_file', description: 'Edit files.' },
+  { name: WRITE_FILE_TOOL_NAME, description: 'Create or overwrite files.' },
+  { name: EDIT_FILE_TOOL_NAME, description: 'Edit files.' },
 ]
 
 export function AutoApproveSettings({

@@ -1,4 +1,8 @@
 import {
+  MCP_PROTOCOL_TOOL_NAME,
+  READ_MCP_OUTPUT_TOOL_NAME,
+} from '@cv/core/const'
+import {
   mcpOutputReadSchema,
   mcpProtocolApprovalKey,
   mcpProtocolBrokerSchema,
@@ -24,8 +28,8 @@ type Input = McpProtocolRequest & { server: string }
 export async function createMcpProtocolTools(context: McpBrokerContext) {
   const { tool } = await import('ai')
   return {
-    mcp_protocol: tool({
-      description: TOOL_DESCRIPTIONS.mcp_protocol,
+    [MCP_PROTOCOL_TOOL_NAME]: tool({
+      description: TOOL_DESCRIPTIONS[MCP_PROTOCOL_TOOL_NAME],
       inputSchema: mcpProtocolBrokerSchema,
       toModelOutput: (options) =>
         mcpToModelOutput(
@@ -75,8 +79,8 @@ export async function createMcpProtocolTools(context: McpBrokerContext) {
         })
       },
     }),
-    read_mcp_output: tool({
-      description: TOOL_DESCRIPTIONS.read_mcp_output,
+    [READ_MCP_OUTPUT_TOOL_NAME]: tool({
+      description: TOOL_DESCRIPTIONS[READ_MCP_OUTPUT_TOOL_NAME],
       inputSchema: mcpOutputReadSchema,
       execute: async (input) => {
         const { readMcpOutput } = await import('../mcp/outputActions')
@@ -94,7 +98,7 @@ function invocation(serverKey: string, input: Input, toolCallId: string) {
   const { server: _server, ...args } = input
   return {
     serverKey,
-    name: 'mcp_protocol',
+    name: MCP_PROTOCOL_TOOL_NAME,
     toolName: input.method,
     protocolMethod: input.method,
     args,

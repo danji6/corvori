@@ -1,3 +1,7 @@
+import {
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+} from '@cv/core/const'
 import { hasPendingToolApprovals } from '@cv/core/utils/tool-parts'
 
 import type { Doc } from '../../_generated/dataModel'
@@ -91,7 +95,11 @@ export async function applyPlanModeTransition(
   stream: Doc<'streams'>,
   toolName: string,
 ) {
-  if (toolName !== 'enter_plan_mode' && toolName !== 'exit_plan_mode') return
+  if (
+    toolName !== ENTER_PLAN_MODE_TOOL_NAME &&
+    toolName !== EXIT_PLAN_MODE_TOOL_NAME
+  )
+    return
   await applyModeTransition(ctx, stream.sessionId, toolName, stream._id)
 }
 

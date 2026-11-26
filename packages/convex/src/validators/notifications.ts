@@ -77,3 +77,8 @@ export const notificationSchema = v.object({
   requestState: v.optional(notificationRequestStateValidator),
   attention: v.optional(v.literal(true)),
 })
+
+export const notificationUnreadCountSchema = v.object({
+  recipientId: v.id('users'),
+  count: v.number(),
+})

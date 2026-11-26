@@ -1,3 +1,7 @@
+import {
+  SHELL_OUTPUT_TOOL_PART_TYPE,
+  SHELL_TOOL_PART_TYPE,
+} from '@cv/core/const'
 import { isMcpResult, mcpResultPreview } from '@cv/core/types/mcp-result'
 
 import type { Id } from '../../_generated/dataModel'
@@ -45,7 +49,10 @@ export function isOffloadableToolPart(part: unknown): part is ToolPartRecord {
 }
 
 function isPendingShellOutput(record: ToolPartRecord) {
-  if (record.type !== 'tool-shell' && record.type !== 'tool-shell_output')
+  if (
+    record.type !== SHELL_TOOL_PART_TYPE &&
+    record.type !== SHELL_OUTPUT_TOOL_PART_TYPE
+  )
     return false
   const output = record.output as { waitUntil?: unknown } | null
   return typeof output?.waitUntil === 'number'

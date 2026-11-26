@@ -1,4 +1,4 @@
-import { DEFAULT_YIELD_CONFIRM_MS } from '@cv/core/const'
+import { DEFAULT_YIELD_CONFIRM_MS, YIELD_TOOL_NAME } from '@cv/core/const'
 import { hasPendingQuestions } from '@cv/core/utils/ask'
 import { hasPendingToolApprovals } from '@cv/core/utils/tool-parts'
 import {
@@ -68,7 +68,8 @@ async function resolveRequest(
   const tools = agent
     ? await sessionToolNames(ctx, session._id, agent, stream.invokedBy)
     : []
-  if (!tools.includes('yield')) return 'Handing off turns is no longer enabled.'
+  if (!tools.includes(YIELD_TOOL_NAME))
+    return 'Handing off turns is no longer enabled.'
 
   const name = String(calls[0].input?.name ?? '').trim()
   const targets = await listYieldTargets(ctx, stream)

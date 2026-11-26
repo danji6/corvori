@@ -1,5 +1,4 @@
 import { defineSchema, defineTable } from 'convex/server'
-import { v } from 'convex/values'
 
 import * as V from './validators'
 
@@ -215,10 +214,8 @@ export default defineSchema({
     .index('by_recipientId_sessionId', ['recipientId', 'sessionId'])
     .index('by_sessionId', ['sessionId']),
 
-  notificationUnreadCounts: defineTable({
-    recipientId: v.id('users'),
-    count: v.number(),
-  }).index('by_recipientId', ['recipientId']),
+  notificationUnreadCounts: defineTable(V.notificationUnreadCountSchema)
+    .index('by_recipientId', ['recipientId']),
 
   typing: defineTable(V.typingSchema)
     .index('by_sessionId', ['sessionId'])
@@ -253,10 +250,8 @@ export default defineSchema({
   sessionFileOperations: defineTable(V.sessionFileOperationSchema)
     .index('by_nextAttemptAt', ['nextAttemptAt']),
 
-  sessionTaskDirectories: defineTable({
-    rootId: v.id('sessions'),
-    name: v.string(),
-  }).index('by_rootId_name', ['rootId', 'name']),
+  sessionTaskDirectories: defineTable(V.sessionTaskDirectorySchema)
+    .index('by_rootId_name', ['rootId', 'name']),
 
   attachmentSends: defineTable(V.attachmentSendSchema)
     .index('by_sessionId', ['sessionId'])

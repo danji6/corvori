@@ -1,5 +1,12 @@
 'use node'
 
+import {
+  EDIT_FILE_TOOL_NAME,
+  LIST_SKILLS_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  TASK_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '@cv/core/const'
 import { stableStringify } from '@cv/core/stable-json'
 import {
   hasFilesystemTools,
@@ -50,7 +57,7 @@ export async function readStepContext(
     (invokesTools || !data.sessionCache) &&
     !!data.toolkitCount &&
     (contextEnabled('mcp', selectedTools) ||
-      selectedTools.includes('list_skills')) &&
+      selectedTools.includes(LIST_SKILLS_TOOL_NAME)) &&
     minRole(data.invoker.role, 'admin')
   if (observesToolkits) {
     const { observeLinkedToolkits } = await import('../toolkits/actions') // prettier-ignore
@@ -70,7 +77,12 @@ export async function prepareStepTools(step: StepContext) {
   const capturesTools =
     invokesTools &&
     selectedTools.some((name) =>
-      ['write_file', 'edit_file', 'shell', 'task'].includes(name),
+      [
+        WRITE_FILE_TOOL_NAME,
+        EDIT_FILE_TOOL_NAME,
+        SHELL_TOOL_NAME,
+        TASK_TOOL_NAME,
+      ].includes(name),
     )
   const capturesFiles = minRole(data.invoker.role, 'admin') && capturesTools
   if (capturesFiles && !(await prepareStepChanges(step))) return null
@@ -113,7 +125,8 @@ async function prepareWorkspaceAndShell({
   invokesTools,
 }: StepContext) {
   const needsPersonalWorkspace =
-    hasFilesystemTools(selectedTools) || selectedTools.includes('list_skills')
+    hasFilesystemTools(selectedTools) ||
+    selectedTools.includes(LIST_SKILLS_TOOL_NAME)
   if (needsPersonalWorkspace && minRole(data.invoker.role, 'admin')) {
     data.session.workspace = await resolvePersonalWorkspace(
       data.agent,
@@ -124,7 +137,7 @@ async function prepareWorkspaceAndShell({
   // The shell default is only needed when resolving a manifest.
   const needsShell =
     (invokesTools || !data.sessionCache) &&
-    data.agent.tools?.includes('shell') &&
+    data.agent.tools?.includes(SHELL_TOOL_NAME) &&
     minRole(data.invoker.role, 'admin')
   if (needsShell) return sidecarDefaultShell()
 }

@@ -1,3 +1,10 @@
+import {
+  LIST_SKILLS_TOOL_NAME,
+  READ_MCP_OUTPUT_TOOL_NAME,
+  READ_SKILL_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  TASK_TOOL_NAME,
+} from '@cv/core/const'
 import { stableStringify } from '@cv/core/stable-json'
 import { TOOL_CAPABILITIES } from '@cv/core/tool-capabilities'
 import { MCP_BROKER_TOOLS } from '@cv/core/types/mcp-catalog'
@@ -31,7 +38,7 @@ export async function assertToolAccess(
   const external = args.manifest.mcp?.find((entry) => entry.name === args.name)
   const target = current.mcp?.find((entry) => entry.name === args.name)
   const externalChanged = external && stableStringify(external) !== stableStringify(target) // prettier-ignore
-  const shellChanged = args.name === 'shell' && current.shell !== args.manifest.shell // prettier-ignore
+  const shellChanged = args.name === SHELL_TOOL_NAME && current.shell !== args.manifest.shell // prettier-ignore
   if (externalChanged || shellChanged)
     error('Tool contract changed; get_tool before calling it again', 409)
 
@@ -93,13 +100,15 @@ async function currentManifest(
     settings,
     resources: { settings, mcpServers },
     spawnableAgents:
-      args.name === 'task' ? await resolveSpawnableAgents(ctx, agent) : [],
+      args.name === TASK_TOOL_NAME
+        ? await resolveSpawnableAgents(ctx, agent)
+        : [],
     defaultShell: args.manifest.shell,
     availability: {
       skills:
-        args.manifest.names.includes('list_skills') ||
-        args.manifest.names.includes('read_skill'),
-      storedMcpOutput: args.manifest.names.includes('read_mcp_output'),
+        args.manifest.names.includes(LIST_SKILLS_TOOL_NAME) ||
+        args.manifest.names.includes(READ_SKILL_TOOL_NAME),
+      storedMcpOutput: args.manifest.names.includes(READ_MCP_OUTPUT_TOOL_NAME),
     },
   })
 }

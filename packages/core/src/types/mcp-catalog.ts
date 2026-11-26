@@ -1,22 +1,33 @@
 import { z } from 'zod'
 
-import { APP_ID } from '../const'
+import {
+  APP_ID,
+  CALL_MCP_TOOL_NAME,
+  LIST_SKILLS_TOOL_NAME,
+  MCP_PROTOCOL_TOOL_NAME,
+  READ_MCP_OUTPUT_TOOL_NAME,
+  READ_SKILL_TOOL_NAME,
+  SEARCH_MCP_TOOLS_NAME,
+} from '../const'
 
 export const MCP_BROKER_TOOLS = [
-  'search_mcp_tools',
-  'call_mcp_tool',
-  'mcp_protocol',
-  'read_mcp_output',
+  SEARCH_MCP_TOOLS_NAME,
+  CALL_MCP_TOOL_NAME,
+  MCP_PROTOCOL_TOOL_NAME,
+  READ_MCP_OUTPUT_TOOL_NAME,
 ] as const
 
-export const SKILL_BROKER_TOOLS = ['list_skills', 'read_skill'] as const
+export const SKILL_BROKER_TOOLS = [
+  LIST_SKILLS_TOOL_NAME,
+  READ_SKILL_TOOL_NAME,
+] as const
 export const MCP_MANIFEST_VERSION = 7
 export const MAX_MCP_CATALOG_TOOLS = 5_000
 export const MAX_MCP_CATALOG_BYTES = 64 * 1024 * 1024
 export const MAX_MCP_DEFINITION_BYTES = 8 * 1024 * 1024
 export const MCP_DEFINITION_CONTENT_TYPE = `application/vnd.${APP_ID}.mcp-definition+json` // prettier-ignore
 
-export const mcpBrokerCallSchema = z.object({
+const mcpBrokerCallFields = {
   tool: z
     .string()
     .min(1)
@@ -25,7 +36,9 @@ export const mcpBrokerCallSchema = z.object({
       'Callable name returned by search_mcp_tools. Copy any numeric suffix exactly.',
     ),
   arguments: z.object({}).catchall(z.unknown()),
-})
+} as const
+
+export const mcpBrokerCallSchema = z.object(mcpBrokerCallFields)
 
 export const mcpDefinitionViewSchema = z.enum([
   'input',
@@ -35,7 +48,7 @@ export const mcpDefinitionViewSchema = z.enum([
 ])
 export type McpDefinitionView = z.infer<typeof mcpDefinitionViewSchema>
 
-export const mcpBrokerSearchSchema = z.object({
+const mcpBrokerSearchFields = {
   query: z
     .string()
     .max(200)
@@ -91,7 +104,9 @@ export const mcpBrokerSearchSchema = z.object({
     .max(32_768)
     .default(16_384)
     .describe('Maximum characters returned per definition read.'),
-})
+} as const
+
+export const mcpBrokerSearchSchema = z.object(mcpBrokerSearchFields)
 
 export type McpBrokerCall = z.infer<typeof mcpBrokerCallSchema>
 

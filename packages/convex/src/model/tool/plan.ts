@@ -1,5 +1,12 @@
-import { MAX_PLAN_CONTENT_CHARS } from '@cv/core/limits'
-import { TOOL_DESCRIPTIONS, editFileFields } from '@cv/core/types'
+import {
+  EDIT_PLAN_TOOL_NAME,
+  EDIT_TODO_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+  WRITE_PLAN_TOOL_NAME,
+  WRITE_TODO_TOOL_NAME,
+} from '@cv/core/const'
+import { TOOL_DESCRIPTIONS } from '@cv/core/types'
 import type { ShellToolOutput } from '@cv/core/types/tools'
 import { systemReminder } from '@cv/core/utils/blocks'
 import type { ToolSet } from 'ai'
@@ -11,17 +18,17 @@ import { ToolError } from '../../errors'
 import { isUnrestrictedAccess } from '../../lib/tool/approval'
 import { modeNoteBody } from '../chat/notes'
 import type { PlanToolContext } from './context'
+import {
+  editPlanFields,
+  planModeFields,
+  writePlanFields,
+} from './planningFields'
 
 export async function createWritePlanTool(context: PlanToolContext) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
   return tool({
-    description: TOOL_DESCRIPTIONS.write_plan,
-    inputSchema: z.object({
-      content: z
-        .string()
-        .max(MAX_PLAN_CONTENT_CHARS)
-        .describe('Complete plan content (markdown)'),
-    }),
+    description: TOOL_DESCRIPTIONS[WRITE_PLAN_TOOL_NAME],
+    inputSchema: z.object(writePlanFields),
     execute: async ({ content }) => {
       await context.ctx.runMutation(internal.plans._write, {
         sessionId: context.sessionId,
@@ -35,8 +42,8 @@ export async function createWritePlanTool(context: PlanToolContext) {
 export async function createEditPlanTool(context: PlanToolContext) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
   return tool({
-    description: TOOL_DESCRIPTIONS.edit_plan,
-    inputSchema: z.object({ edits: editFileFields.edits }),
+    description: TOOL_DESCRIPTIONS[EDIT_PLAN_TOOL_NAME],
+    inputSchema: z.object(editPlanFields),
     execute: async ({ edits }) => {
       const result = await context.ctx.runMutation(internal.plans._edit, {
         sessionId: context.sessionId,
@@ -53,14 +60,14 @@ export async function createEnterPlanModeTool(context: PlanToolContext) {
   const planMode = () => isPlanMode(context.ctx, context.sessionId)
 
   return tool({
-    description: TOOL_DESCRIPTIONS.enter_plan_mode,
-    inputSchema: z.object({}),
+    description: TOOL_DESCRIPTIONS[ENTER_PLAN_MODE_TOOL_NAME],
+    inputSchema: z.object(planModeFields),
     // Entering an already active plan mode is a no-op
     needsApproval: async () =>
       !isUnrestrictedAccess(await context.approvals?.()) && !(await planMode()),
     execute: async () => {
       if (!(await planMode())) {
-        await transitionMode(context, 'enter_plan_mode')
+        await transitionMode(context, ENTER_PLAN_MODE_TOOL_NAME)
       }
       // The tools only exist for a non sub-agent session that has them
       return modeNoteBody('plan', {
@@ -77,8 +84,8 @@ export async function createExitPlanModeTool(context: PlanToolContext) {
     context.ctx.runQuery(internal.plans._get, { sessionId: context.sessionId })
 
   return tool({
-    description: TOOL_DESCRIPTIONS.exit_plan_mode,
-    inputSchema: z.object({}),
+    description: TOOL_DESCRIPTIONS[EXIT_PLAN_MODE_TOOL_NAME],
+    inputSchema: z.object(planModeFields),
     needsApproval: async () => {
       if (isUnrestrictedAccess(await context.approvals?.())) return false
       const plan = await getPlan()
@@ -91,7 +98,7 @@ export async function createExitPlanModeTool(context: PlanToolContext) {
           'No plan exists yet. Create one with write_plan first.',
         )
       }
-      await transitionMode(context, 'exit_plan_mode')
+      await transitionMode(context, EXIT_PLAN_MODE_TOOL_NAME)
       return `The plan was approved. Here is the approved plan:\n\n${plan.content}\n\nPlan mode is over, proceed with the implementation.`
     },
   })
@@ -99,7 +106,7 @@ export async function createExitPlanModeTool(context: PlanToolContext) {
 
 async function transitionMode(
   context: PlanToolContext,
-  toolName: 'enter_plan_mode' | 'exit_plan_mode',
+  toolName: typeof ENTER_PLAN_MODE_TOOL_NAME | typeof EXIT_PLAN_MODE_TOOL_NAME,
 ) {
   await context.ctx.runMutation(internal.plans._applyModeTransition, {
     sessionId: context.sessionId,
@@ -122,12 +129,12 @@ const PLAN_MODE_REMINDER = systemReminder(
 
 /** Tools whose outputs skip the plan mode reminder. */
 const REMINDER_EXEMPT_TOOL_NAMES = new Set([
-  'write_plan',
-  'edit_plan',
-  'enter_plan_mode',
-  'exit_plan_mode',
-  'write_todo',
-  'edit_todo',
+  WRITE_PLAN_TOOL_NAME,
+  EDIT_PLAN_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+  WRITE_TODO_TOOL_NAME,
+  EDIT_TODO_TOOL_NAME,
 ])
 
 /** Adds the plan mode reminder to tool outputs by wrapping `execute`. */

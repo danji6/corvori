@@ -1,4 +1,8 @@
-import { TODO_NUDGE_INTERVAL_STEPS } from '@cv/core/const'
+import {
+  EDIT_TODO_TOOL_NAME,
+  TODO_NUDGE_INTERVAL_STEPS,
+  WRITE_TODO_TOOL_NAME,
+} from '@cv/core/const'
 import type { ReminderPrompt } from '@cv/core/types'
 import { systemReminder } from '@cv/core/utils/blocks'
 
@@ -163,7 +167,11 @@ async function injectTodoNudge(
     sender.agent,
     invokerId,
   )
-  if (!tools.includes('write_todo') || !tools.includes('edit_todo')) return
+  if (
+    !tools.includes(WRITE_TODO_TOOL_NAME) ||
+    !tools.includes(EDIT_TODO_TOOL_NAME)
+  )
+    return
 
   const todo = await getTodosBySession(ctx, session._id)
   if (!todo || !isTodoNudgeDue(todo, stepCount)) return

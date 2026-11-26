@@ -1,3 +1,8 @@
+import {
+  KILL_SHELL_TOOL_NAME,
+  SHELL_OUTPUT_TOOL_NAME,
+  SHELL_TOOL_NAME,
+} from '@cv/core/const'
 import { TOOL_DESCRIPTIONS, shellToolDescription } from '@cv/core/types'
 import type { ShellToolOutput } from '@cv/core/types/tools'
 import { defaultShellDirectory } from '@cv/core/workspace/personal'
@@ -24,9 +29,8 @@ import {
   killShell,
   shellToModelOutput,
 } from './shell'
+import { killShellFields, shellFields, shellOutputFields } from './shellFields'
 import { shellWaitSeconds, waitForShell } from './shellTimedWait'
-
-const JOB_NUMBER = /^[1-9][0-9]*$/
 
 export async function createShellTool(context: WorkspaceToolContext) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
@@ -35,25 +39,7 @@ export async function createShellTool(context: WorkspaceToolContext) {
       context.shell,
       context.hasAgentHome ?? !!context.workspace?.agentHome,
     ),
-    inputSchema: z.strictObject({
-      cwd: z
-        .string()
-        .optional()
-        .describe(
-          'Working directory. session://, workspace:// and agent:// are accepted when available.',
-        ),
-      command: z.string().describe('Shell command to execute'),
-      description: z
-        .string()
-        .optional()
-        .describe('Short one-line summary of what the command does.'),
-      wait_seconds: z
-        .number()
-        .optional()
-        .describe(
-          'Maximum seconds to wait for exit (default 60, maximum 600). Set to 0 to start in the background and return the job ID immediately.',
-        ),
-    }),
+    inputSchema: z.strictObject(shellFields),
     needsApproval: (input) =>
       shellNeedsApproval(input.command, context, input.cwd),
     toModelOutput: shellToModelOutput,
@@ -92,27 +78,8 @@ export async function createShellTool(context: WorkspaceToolContext) {
 export async function createShellOutputTool(context: WorkspaceToolContext) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
   return tool<ShellOutputInput, ShellToolOutput, never>({
-    description: TOOL_DESCRIPTIONS.shell_output,
-    inputSchema: z.object({
-      jobId: z
-        .string()
-        .regex(JOB_NUMBER)
-        .describe('Job ID returned by shell, as a string.'),
-      wait_seconds: z
-        .number()
-        .optional()
-        .describe(
-          'Maximum seconds to wait for exit (default 60, maximum 600). Use 0 for the next unread page immediately. An explicit offset also replays immediately.',
-        ),
-      offset: z
-        .number()
-        .int()
-        .nonnegative()
-        .optional()
-        .describe(
-          'Omit for automatic reads. Set it to 0 to replay from the oldest retained output, then use the returned next offset to continue replay. An explicit offset leaves the automatic read position unchanged.',
-        ),
-    }),
+    description: TOOL_DESCRIPTIONS[SHELL_OUTPUT_TOOL_NAME],
+    inputSchema: z.object(shellOutputFields),
     toModelOutput: shellToModelOutput,
     execute: async function* (input, { abortSignal }) {
       const ref = await requireShellReference(context, input.jobId)
@@ -157,13 +124,8 @@ export async function createShellOutputTool(context: WorkspaceToolContext) {
 export async function createKillShellTool(context: WorkspaceToolContext) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
   return tool({
-    description: TOOL_DESCRIPTIONS.kill_shell,
-    inputSchema: z.object({
-      jobId: z
-        .string()
-        .regex(JOB_NUMBER)
-        .describe('Job ID returned by shell, as a string.'),
-    }),
+    description: TOOL_DESCRIPTIONS[KILL_SHELL_TOOL_NAME],
+    inputSchema: z.object(killShellFields),
     execute: async ({ jobId: handle }) => {
       const { jobId } = await requireShellReference(context, handle)
       // Killing it is the agent saying it no longer wants the result
@@ -232,7 +194,7 @@ async function shellNeedsApproval(
   if (!isReadOnlyShellCommand(command) && (await context.isPlanMode?.())) {
     return true
   }
-  if (!isToolAutoApproved('shell', { command }, approvals)) return true
+  if (!isToolAutoApproved(SHELL_TOOL_NAME, { command }, approvals)) return true
   const { candidates, complete } = analyzeShellPathCandidates(command)
   if (!complete) return true
   const result = await checkToolPaths(

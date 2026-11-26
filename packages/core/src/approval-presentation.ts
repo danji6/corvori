@@ -1,3 +1,9 @@
+import {
+  CALL_MCP_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+  SHELL_TOOL_NAME,
+} from './const'
 import type { RememberScope } from './types/tools'
 
 /** Explains why an otherwise remembered call still needs approval. */
@@ -21,13 +27,13 @@ export function approvalRememberOption(
 
 /** Describes plan transitions consistently across approval surfaces. */
 export const PLAN_APPROVALS: Record<string, PlanApprovalMeta> = {
-  exit_plan_mode: {
+  [EXIT_PLAN_MODE_TOOL_NAME]: {
     heading: 'The agent wants to start implementing the plan.',
     approveLabel: 'Approve plan',
     denyLabel: 'Keep planning',
     denyAborts: true,
   },
-  enter_plan_mode: {
+  [ENTER_PLAN_MODE_TOOL_NAME]: {
     heading: 'The agent wants to plan before making changes.',
     approveLabel: 'Enter plan mode',
     denyLabel: 'Decline',
@@ -69,7 +75,7 @@ export function summarizeInput(input: unknown): string {
 export function approvalSummary(toolName: string, input: unknown): string {
   const plan = PLAN_APPROVALS[toolName]
   if (plan) return plan.heading
-  if (toolName === 'shell')
+  if (toolName === SHELL_TOOL_NAME)
     return getDescription(input) ?? 'Run a shell command'
   return `${toolDisplayName(toolName, input)}: ${summarizeInput(input)}`
 }
@@ -80,7 +86,7 @@ export function toolDisplayName(
   input: unknown,
   title?: string,
 ) {
-  if (toolName !== 'call_mcp_tool') return title || toolName
+  if (toolName !== CALL_MCP_TOOL_NAME) return title || toolName
   const tool =
     input && typeof input === 'object'
       ? (input as { tool?: unknown }).tool

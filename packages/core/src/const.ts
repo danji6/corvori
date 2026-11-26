@@ -42,6 +42,44 @@ export const DEFAULT_YIELD_CONFIRM_MS = 5000
 /** Built-in tool for reading attachments. */
 export const READ_ATTACHMENT_TOOL_NAME = 'read_attachment'
 
+export const TASK_TOOL_NAME = 'task'
+export const COPY_ATTACHMENT_TOOL_NAME = 'copy_attachment'
+export const ATTACH_FILE_TOOL_NAME = 'attach_file'
+export const READ_FILE_TOOL_NAME = 'read_file'
+export const WRITE_FILE_TOOL_NAME = 'write_file'
+export const EDIT_FILE_TOOL_NAME = 'edit_file'
+export const CHECK_PATHS_TOOL_NAME = 'check_paths'
+export const SHELL_TOOL_NAME = 'shell'
+export const SHELL_OUTPUT_TOOL_NAME = 'shell_output'
+export const KILL_SHELL_TOOL_NAME = 'kill_shell'
+export const WRITE_PLAN_TOOL_NAME = 'write_plan'
+export const EDIT_PLAN_TOOL_NAME = 'edit_plan'
+export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode'
+export const EXIT_PLAN_MODE_TOOL_NAME = 'exit_plan_mode'
+export const WRITE_TODO_TOOL_NAME = 'write_todo'
+export const EDIT_TODO_TOOL_NAME = 'edit_todo'
+export const WEB_FETCH_TOOL_NAME = 'web_fetch'
+export const WEB_SEARCH_TOOL_NAME = 'web_search'
+export const LIST_SKILLS_TOOL_NAME = 'list_skills'
+export const READ_SKILL_TOOL_NAME = 'read_skill'
+export const SEARCH_MCP_TOOLS_NAME = 'search_mcp_tools'
+export const CALL_MCP_TOOL_NAME = 'call_mcp_tool'
+export const MCP_PROTOCOL_TOOL_NAME = 'mcp_protocol'
+export const READ_MCP_OUTPUT_TOOL_NAME = 'read_mcp_output'
+export const GET_TOOL_NAME = 'get_tool'
+export const CALL_TOOL_NAME = 'call_tool'
+export const DISPATCH_ERROR_TOOL = '__cv_tool_error'
+
+export const ASK_TOOL_PART_TYPE = `tool-${ASK_TOOL_NAME}` as const
+export const TASK_TOOL_PART_TYPE = `tool-${TASK_TOOL_NAME}` as const
+export const SHELL_TOOL_PART_TYPE = `tool-${SHELL_TOOL_NAME}` as const
+export const SHELL_OUTPUT_TOOL_PART_TYPE = `tool-${SHELL_OUTPUT_TOOL_NAME}` as const // prettier-ignore
+export const READ_ATTACHMENT_TOOL_PART_TYPE = `tool-${READ_ATTACHMENT_TOOL_NAME}` as const // prettier-ignore
+export const READ_FILE_TOOL_PART_TYPE = `tool-${READ_FILE_TOOL_NAME}` as const
+export const WRITE_FILE_TOOL_PART_TYPE = `tool-${WRITE_FILE_TOOL_NAME}` as const
+export const EDIT_FILE_TOOL_PART_TYPE = `tool-${EDIT_FILE_TOOL_NAME}` as const
+export const LIST_SKILLS_TOOL_PART_TYPE = `tool-${LIST_SKILLS_TOOL_NAME}` as const // prettier-ignore
+
 /** Large plain text pastes become attachments at this UTF-8 byte size. */
 export const LARGE_PASTE_BYTES = 16 * 1024
 

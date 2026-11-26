@@ -5,6 +5,7 @@ import {
   ATTACHMENT_READ_DEFAULT_BYTES,
   ATTACHMENT_READ_MAX_BYTES,
   READ_ATTACHMENT_TOOL_NAME,
+  READ_ATTACHMENT_TOOL_PART_TYPE,
 } from '@cv/core/const'
 import {
   type ReadAttachmentInput,
@@ -70,7 +71,7 @@ export async function createReadAttachmentTool(
 ) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
   return tool<ReadAttachmentInput, AttachmentOutput, never>({
-    description: TOOL_DESCRIPTIONS.read_attachment,
+    description: TOOL_DESCRIPTIONS[READ_ATTACHMENT_TOOL_NAME],
     inputSchema: z.strictObject(readAttachmentFields),
     execute: (input, options) =>
       readAttachment(ctx, input, {
@@ -358,7 +359,7 @@ export function expireAttachmentToolPart(part: unknown): unknown {
   if (
     typeof part !== 'object' ||
     part === null ||
-    (part as { type?: unknown }).type !== `tool-${READ_ATTACHMENT_TOOL_NAME}` ||
+    (part as { type?: unknown }).type !== READ_ATTACHMENT_TOOL_PART_TYPE ||
     (part as { state?: unknown }).state !== 'output-available'
   ) {
     return part

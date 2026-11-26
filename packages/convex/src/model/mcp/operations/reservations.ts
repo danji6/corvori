@@ -2,6 +2,7 @@ import type { Doc, Id } from '@cv/convex/_generated/dataModel'
 import type { MutationCtx } from '@cv/convex/_generated/server'
 import { error } from '@cv/convex/errors'
 import type { McpReserveArgs } from '@cv/convex/validators/mcpOperations'
+import { CALL_MCP_TOOL_NAME, MCP_PROTOCOL_TOOL_NAME } from '@cv/core/const'
 import { mcpOperationTimeouts } from '@cv/core/types/mcp-operation'
 
 import {
@@ -118,7 +119,7 @@ async function authorize(
     const matchesTarget =
       binding?.target === target._id &&
       JSON.stringify(input.arguments) === args.args
-    if (!matchesTarget || args.name !== 'call_mcp_tool')
+    if (!matchesTarget || args.name !== CALL_MCP_TOOL_NAME)
       error('MCP broker invocation target changed', 409)
   }
 
@@ -179,7 +180,8 @@ async function checkpoint(
 
 function assertProtocolIdentity(args: McpReserveArgs) {
   const methodIdentityChanged =
-    args.name !== 'mcp_protocol' || args.toolName !== args.protocolMethod
+    args.name !== MCP_PROTOCOL_TOOL_NAME ||
+    args.toolName !== args.protocolMethod
   if (methodIdentityChanged)
     error('MCP protocol operation identity changed', 409)
   const request = JSON.parse(args.args)

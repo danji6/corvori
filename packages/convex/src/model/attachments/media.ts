@@ -1,3 +1,5 @@
+import { READ_ATTACHMENT_TOOL_PART_TYPE } from '@cv/core/const'
+
 import type { Doc, Id } from '../../_generated/dataModel'
 
 /** Finds user messages whose media belongs to the current response turn. */
@@ -27,7 +29,7 @@ export function hasLoadedAttachmentMedia(parts: unknown[]): boolean {
     if (
       typeof part !== 'object' ||
       part === null ||
-      (part as { type?: unknown }).type !== 'tool-read_attachment' ||
+      (part as { type?: unknown }).type !== READ_ATTACHMENT_TOOL_PART_TYPE ||
       (part as { state?: unknown }).state !== 'output-available'
     ) {
       return false

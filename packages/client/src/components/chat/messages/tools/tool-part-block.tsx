@@ -1,3 +1,20 @@
+import {
+  ASK_TOOL_NAME,
+  EDIT_FILE_TOOL_NAME,
+  EDIT_PLAN_TOOL_NAME,
+  EDIT_TODO_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+  LIST_SKILLS_TOOL_NAME,
+  SHELL_OUTPUT_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  TASK_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  WRITE_PLAN_TOOL_NAME,
+  WRITE_TODO_TOOL_NAME,
+  YIELD_TOOL_NAME,
+} from '@cv/core/const'
 import type { ToolUIPart } from 'ai'
 
 import { ToolBlock } from '../tool-block'
@@ -20,10 +37,10 @@ export type ToolRendererProps = {
 
 export function ToolPartBlock(props: ToolRendererProps) {
   switch (props.part.type.slice('tool-'.length)) {
-    case 'write_file':
-    case 'edit_file':
+    case WRITE_FILE_TOOL_NAME:
+    case EDIT_FILE_TOOL_NAME:
       return <FileChangeBlock {...props} />
-    case 'shell':
+    case SHELL_TOOL_NAME:
       return (
         <ShellGroupBlock
           parts={[props.part]}
@@ -31,26 +48,26 @@ export function ToolPartBlock(props: ToolRendererProps) {
           toolErrors={props.forceError ? [props.part.toolCallId] : undefined}
         />
       )
-    case 'shell_output':
+    case SHELL_OUTPUT_TOOL_NAME:
       return <ShellBlock {...props} />
-    case 'web_fetch':
+    case WEB_FETCH_TOOL_NAME:
       return <WebFetchBlock {...props} />
-    case 'list_skills':
+    case LIST_SKILLS_TOOL_NAME:
       return <ListSkillsBlock {...props} />
-    case 'task':
+    case TASK_TOOL_NAME:
       return <SubagentBlock {...props} />
-    case 'write_plan':
-    case 'edit_plan':
-    case 'enter_plan_mode':
-    case 'exit_plan_mode':
+    case WRITE_PLAN_TOOL_NAME:
+    case EDIT_PLAN_TOOL_NAME:
+    case ENTER_PLAN_MODE_TOOL_NAME:
+    case EXIT_PLAN_MODE_TOOL_NAME:
       return <PlanBlock {...props} />
-    case 'write_todo':
+    case WRITE_TODO_TOOL_NAME:
       return <WriteTodoBlock {...props} />
-    case 'edit_todo':
+    case EDIT_TODO_TOOL_NAME:
       return <EditTodoBlock {...props} />
-    case 'ask':
+    case ASK_TOOL_NAME:
       return <QuestionBlock {...props} />
-    case 'yield':
+    case YIELD_TOOL_NAME:
       return <YieldBlock {...props} />
     default:
       return <ToolBlock {...props} />

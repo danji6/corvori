@@ -5,16 +5,17 @@ import type {
   LanguageModelV4StreamPart,
   LanguageModelV4ToolCall,
 } from '@ai-sdk/provider'
+import {
+  CALL_TOOL_NAME,
+  DISPATCH_ERROR_TOOL,
+  GET_TOOL_NAME,
+} from '@cv/core/const'
 import { wireToolCall } from '@cv/core/tool-dispatch'
 import type { LanguageModel, LanguageModelMiddleware, UIMessage } from 'ai'
 
 import { extractErrorMessage } from '../../errors'
 import { sameDefinition } from './manifest'
-import {
-  DISPATCH_ERROR_TOOL,
-  type SessionTools,
-  type ToolReplay,
-} from './sessionTools'
+import type { SessionTools, ToolReplay } from './sessionTools'
 
 /** Freezes wire definitions and translates dispatch before SDK validation and lifecycle handling. */
 export async function dispatchLanguageModel(
@@ -121,8 +122,8 @@ function dispatchStream(runtime: SessionTools) {
 }
 
 function needsRouting(name: string, runtime: SessionTools) {
-  if (name === 'call_tool') return true
-  if (name === 'get_tool') return false
+  if (name === CALL_TOOL_NAME) return true
+  if (name === GET_TOOL_NAME) return false
   return !sameDefinition(
     runtime.frozen.definitions?.find((entry) => entry.name === name),
     runtime.current.definitions?.find((entry) => entry.name === name),
@@ -136,9 +137,9 @@ async function routeToolCall(
   let input: unknown
   try {
     input = JSON.parse(call.input)
-    if (call.toolName === 'get_tool') return call
+    if (call.toolName === GET_TOOL_NAME) return call
     const target = resolveTarget(call, input, runtime)
-    if (call.toolName === 'call_tool') {
+    if (call.toolName === CALL_TOOL_NAME) {
       runtime.wireCalls.set(call.toolCallId, { name: call.toolName, input })
     }
     await runtime.assertAccess(target.toolName)
@@ -161,7 +162,7 @@ function resolveTarget(
   input: unknown,
   runtime: SessionTools,
 ) {
-  if (call.toolName !== 'call_tool') {
+  if (call.toolName !== CALL_TOOL_NAME) {
     if (needsRouting(call.toolName, runtime)) {
       throw new Error(
         'Native tool is unavailable or changed; use get_tool and call_tool',

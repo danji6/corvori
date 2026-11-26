@@ -20,6 +20,7 @@ import { uploadAttachmentBlob } from '@/lib/chat/upload-attachment-blob'
 import { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
 import type { MessageSender, ReplyQuote } from '@cv/convex/validators/messages'
+import { SHELL_TOOL_PART_TYPE } from '@cv/core/const'
 import { parseFileMentions } from '@cv/core/mentions/parse'
 import { parseShellCommand, unescapeShellPrefix } from '@cv/core/shell/command'
 import type { WorkspaceLinkSnapshot } from '@cv/core/types/workspace'
@@ -356,7 +357,7 @@ function buildOptimisticMessage(
   const parts = command
     ? [
         {
-          type: 'tool-shell',
+          type: SHELL_TOOL_PART_TYPE,
           toolCallId: args.clientSendId,
           state: 'input-available',
           input: { command },

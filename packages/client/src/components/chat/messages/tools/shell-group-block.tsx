@@ -1,6 +1,7 @@
 import { createOptionalContext } from '@/hooks'
 import { isToolInFlight } from '@/lib/chat'
 import { type ShellReportPart, isShellReportPart } from '@/lib/chat/parts'
+import { SHELL_TOOL_NAME } from '@cv/core/const'
 import type { ToolUIPart } from 'ai'
 import { useCallback, useMemo, useState } from 'react'
 
@@ -59,7 +60,7 @@ export function ShellGroupBlock({
         collapsible={false}
         dense
         fullWidth
-        leadingIcon={<ToolIcon name="shell" />}
+        leadingIcon={<ToolIcon name={SHELL_TOOL_NAME} />}
         label={
           <>
             {inFlight ? 'Running' : 'Ran'}{' '}

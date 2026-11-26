@@ -1,3 +1,4 @@
+import { CALL_MCP_TOOL_NAME, SEARCH_MCP_TOOLS_NAME } from '@cv/core/const'
 import {
   type McpBrokerCall,
   type McpBrokerSearch,
@@ -43,20 +44,20 @@ export async function createMcpBrokerTools(context: McpBrokerContext) {
   }
 
   return {
-    search_mcp_tools: tool({
-      description: TOOL_DESCRIPTIONS.search_mcp_tools,
+    [SEARCH_MCP_TOOLS_NAME]: tool({
+      description: TOOL_DESCRIPTIONS[SEARCH_MCP_TOOLS_NAME],
       inputSchema: mcpBrokerSearchSchema,
       toModelOutput: (options) => mcpToModelOutput(options),
       execute: (input) => searchTools(broker, input),
     }),
-    call_mcp_tool: tool({
+    [CALL_MCP_TOOL_NAME]: tool({
       toModelOutput: (options) =>
         mcpToModelOutput(
           options,
           context.operation.omitMedia,
           context.operation.canReadOutput,
         ),
-      description: TOOL_DESCRIPTIONS.call_mcp_tool,
+      description: TOOL_DESCRIPTIONS[CALL_MCP_TOOL_NAME],
       inputSchema: mcpBrokerCallSchema,
       needsApproval: async (input, options) => {
         const target = await targetTool(broker, input)
@@ -86,7 +87,7 @@ async function targetTool(context: BrokerContext, input: McpBrokerCall) {
 
   return createExternalMcpTool(
     {
-      name: 'call_mcp_tool',
+      name: CALL_MCP_TOOL_NAME,
       serverId: target.server.id,
       toolName: target.tool.name,
       description: definition.description,

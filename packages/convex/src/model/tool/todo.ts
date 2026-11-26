@@ -1,21 +1,20 @@
-import { TODO_EDIT_STATUSES } from '@cv/core/const'
-import { MAX_TODO_CONTENT_CHARS, MAX_TODO_ITEMS } from '@cv/core/limits'
+import {
+  EDIT_TODO_TOOL_NAME,
+  TODO_EDIT_STATUSES,
+  WRITE_TODO_TOOL_NAME,
+} from '@cv/core/const'
 import { TOOL_DESCRIPTIONS } from '@cv/core/types'
 
 import { internal } from '../../_generated/api'
 import { ToolError } from '../../errors'
 import type { PlanToolContext } from './context'
+import { editTodoFields, writeTodoFields } from './planningFields'
 
 export async function createWriteTodoTool(context: PlanToolContext) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
   return tool({
-    description: TOOL_DESCRIPTIONS.write_todo,
-    inputSchema: z.object({
-      todos: z
-        .array(z.string().min(1).max(MAX_TODO_CONTENT_CHARS))
-        .max(MAX_TODO_ITEMS)
-        .describe('Every task as a short string; replaces the previous list'),
-    }),
+    description: TOOL_DESCRIPTIONS[WRITE_TODO_TOOL_NAME],
+    inputSchema: z.object(writeTodoFields),
     execute: async ({ todos }) => {
       await context.ctx.runMutation(internal.todos._write, {
         sessionId: context.sessionId,
@@ -29,15 +28,8 @@ export async function createWriteTodoTool(context: PlanToolContext) {
 export async function createEditTodoTool(context: PlanToolContext) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
   return tool({
-    description: TOOL_DESCRIPTIONS.edit_todo,
-    inputSchema: z.object({
-      edits: z.array(
-        z.object({
-          task: z.string().describe('Exact text of an existing task'),
-          status: z.enum(['todo', 'doing', 'done']),
-        }),
-      ),
-    }),
+    description: TOOL_DESCRIPTIONS[EDIT_TODO_TOOL_NAME],
+    inputSchema: z.object(editTodoFields),
     execute: async ({ edits }) => {
       const result = await context.ctx.runMutation(internal.todos._edit, {
         sessionId: context.sessionId,

@@ -1,60 +1,92 @@
+import {
+  ASK_TOOL_NAME,
+  ATTACH_FILE_TOOL_NAME,
+  CALL_MCP_TOOL_NAME,
+  CALL_TOOL_NAME,
+  COPY_ATTACHMENT_TOOL_NAME,
+  DISPATCH_ERROR_TOOL,
+  EDIT_FILE_TOOL_NAME,
+  EDIT_PLAN_TOOL_NAME,
+  EDIT_TODO_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+  GET_TOOL_NAME,
+  KILL_SHELL_TOOL_NAME,
+  LIST_SKILLS_TOOL_NAME,
+  MCP_PROTOCOL_TOOL_NAME,
+  READ_ATTACHMENT_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  READ_MCP_OUTPUT_TOOL_NAME,
+  READ_SKILL_TOOL_NAME,
+  SEARCH_MCP_TOOLS_NAME,
+  SHELL_OUTPUT_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  TASK_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  WRITE_PLAN_TOOL_NAME,
+  WRITE_TODO_TOOL_NAME,
+  YIELD_TOOL_NAME,
+} from './const'
+
 /** One opt-in setting for each coherent built-in workflow. */
 export const TOOL_CAPABILITIES = [
   {
-    name: 'ask',
+    name: ASK_TOOL_NAME,
     label: 'Ask questions',
     description: 'Ask you for decisions when needed.',
     category: 'general',
-    tools: ['ask'],
+    tools: [ASK_TOOL_NAME],
   },
   {
-    name: 'read_attachment',
+    name: READ_ATTACHMENT_TOOL_NAME,
     label: 'Read attachments',
     description: 'Read attached files.',
     category: 'general',
-    tools: ['read_attachment'],
+    tools: [READ_ATTACHMENT_TOOL_NAME],
   },
   {
     name: 'process_attachments',
     label: 'Process attachments',
     description: 'Copy and present attachments.',
     category: 'general',
-    tools: ['copy_attachment', 'attach_file'],
+    tools: [COPY_ATTACHMENT_TOOL_NAME, ATTACH_FILE_TOOL_NAME],
   },
   {
-    name: 'task',
+    name: TASK_TOOL_NAME,
     label: 'Delegate tasks',
     description: 'Delegate work to subagents.',
     category: 'collaboration',
-    tools: ['task'],
+    tools: [TASK_TOOL_NAME],
   },
   {
-    name: 'yield',
+    name: YIELD_TOOL_NAME,
     label: 'Hand off turns',
     description: 'Let another agent respond next.',
     category: 'collaboration',
-    tools: ['yield'],
+    tools: [YIELD_TOOL_NAME],
   },
   {
-    name: 'web_fetch',
+    name: WEB_FETCH_TOOL_NAME,
     label: 'Web fetch',
     description: 'Fetch a web page as readable text.',
     category: 'web',
-    tools: ['web_fetch'],
+    tools: [WEB_FETCH_TOOL_NAME],
   },
   {
-    name: 'web_search',
+    name: WEB_SEARCH_TOOL_NAME,
     label: 'Web search',
     description: 'Search through your configured search engines.',
     category: 'web',
-    tools: ['web_search'],
+    tools: [WEB_SEARCH_TOOL_NAME],
   },
   {
-    name: 'read_file',
+    name: READ_FILE_TOOL_NAME,
     label: 'Read files',
     description: 'Read files in source directories and agent folders.',
     category: 'workspace',
-    tools: ['read_file'],
+    tools: [READ_FILE_TOOL_NAME],
     requiresAdmin: true,
   },
   {
@@ -62,15 +94,15 @@ export const TOOL_CAPABILITIES = [
     label: 'Edit files',
     description: 'Create, replace, and edit files.',
     category: 'workspace',
-    tools: ['write_file', 'edit_file'],
+    tools: [WRITE_FILE_TOOL_NAME, EDIT_FILE_TOOL_NAME],
     requiresAdmin: true,
   },
   {
-    name: 'shell',
+    name: SHELL_TOOL_NAME,
     label: 'Shell',
     description: 'Run shell commands on the host machine.',
     category: 'workspace',
-    tools: ['shell', 'shell_output', 'kill_shell'],
+    tools: [SHELL_TOOL_NAME, SHELL_OUTPUT_TOOL_NAME, KILL_SHELL_TOOL_NAME],
     requiresAdmin: true,
   },
   {
@@ -78,7 +110,12 @@ export const TOOL_CAPABILITIES = [
     label: 'Planning',
     description: 'Write plans and enter or leave plan mode.',
     category: 'planning',
-    tools: ['write_plan', 'edit_plan', 'enter_plan_mode', 'exit_plan_mode'],
+    tools: [
+      WRITE_PLAN_TOOL_NAME,
+      EDIT_PLAN_TOOL_NAME,
+      ENTER_PLAN_MODE_TOOL_NAME,
+      EXIT_PLAN_MODE_TOOL_NAME,
+    ],
     requiresAdmin: true,
   },
   {
@@ -86,7 +123,7 @@ export const TOOL_CAPABILITIES = [
     label: 'Todo list',
     description: 'Create and update a task list.',
     category: 'planning',
-    tools: ['write_todo', 'edit_todo'],
+    tools: [WRITE_TODO_TOOL_NAME, EDIT_TODO_TOOL_NAME],
   },
   {
     name: 'mcp_access',
@@ -94,10 +131,10 @@ export const TOOL_CAPABILITIES = [
     description: 'Discover and call MCP servers.',
     category: 'mcp-skills',
     tools: [
-      'search_mcp_tools',
-      'call_mcp_tool',
-      'mcp_protocol',
-      'read_mcp_output',
+      SEARCH_MCP_TOOLS_NAME,
+      CALL_MCP_TOOL_NAME,
+      MCP_PROTOCOL_TOOL_NAME,
+      READ_MCP_OUTPUT_TOOL_NAME,
     ],
   },
   {
@@ -105,7 +142,7 @@ export const TOOL_CAPABILITIES = [
     label: 'Skills',
     description: 'Make use of available skills.',
     category: 'mcp-skills',
-    tools: ['list_skills', 'read_skill'],
+    tools: [LIST_SKILLS_TOOL_NAME, READ_SKILL_TOOL_NAME],
     requiresAdmin: true,
   },
 ] as const
@@ -123,9 +160,9 @@ const capabilityNames = new Set<string>(
 const reserved = new Set<string>([
   ...BUILTIN_TOOL_NAMES,
   ...capabilityNames,
-  'get_tool',
-  'call_tool',
-  '__cv_tool_error',
+  GET_TOOL_NAME,
+  CALL_TOOL_NAME,
+  DISPATCH_ERROR_TOOL,
 ])
 
 /** Protects both callable names and selection keys from external aliases. */
@@ -144,12 +181,12 @@ export function selectedBuiltinTools(
 }
 
 export const FILESYSTEM_TOOL_NAMES = [
-  'read_file',
-  'write_file',
-  'edit_file',
-  'shell',
-  'shell_output',
-  'kill_shell',
+  READ_FILE_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  EDIT_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  SHELL_OUTPUT_TOOL_NAME,
+  KILL_SHELL_TOOL_NAME,
 ] as const
 
 export function hasFilesystemTools(names: readonly string[]) {
@@ -183,12 +220,12 @@ export function toggleToolSelection(
 }
 
 export const SESSION_FILE_TOOL_NAMES = [
-  'copy_attachment',
-  'attach_file',
-  'read_file',
-  'write_file',
-  'edit_file',
-  'shell',
+  COPY_ATTACHMENT_TOOL_NAME,
+  ATTACH_FILE_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  EDIT_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
 ] as const
 
 export function hasSessionFileTools(names: readonly string[]) {

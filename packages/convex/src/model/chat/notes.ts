@@ -1,3 +1,10 @@
+import {
+  EDIT_FILE_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  WRITE_PLAN_TOOL_NAME,
+} from '@cv/core/const'
 import type { MessageRole } from '@cv/core/types'
 import { systemNote } from '@cv/core/utils/blocks'
 import { inline } from '@cv/core/utils/strings'
@@ -231,7 +238,7 @@ export async function injectModeNote(
       type: 'mode',
       role: 'system',
       content: buildModeNoteContent(next, {
-        planTools: Array.isArray(tools) && tools.includes('write_plan'),
+        planTools: Array.isArray(tools) && tools.includes(WRITE_PLAN_TOOL_NAME),
         subagent: !!session.parent,
       }),
       extra: insert satisfies MessageExtra['mode'],
@@ -288,12 +295,14 @@ function workspaceNoteBody(
   next: Workspace,
   names?: readonly string[],
 ): string[] {
-  const shell = !names || names.includes('shell')
+  const shell = !names || names.includes(SHELL_TOOL_NAME)
 
   const files =
     !names ||
     names.some((name) =>
-      ['read_file', 'write_file', 'edit_file'].includes(name),
+      [READ_FILE_TOOL_NAME, WRITE_FILE_TOOL_NAME, EDIT_FILE_TOOL_NAME].includes(
+        name,
+      ),
     )
 
   if (!next) {

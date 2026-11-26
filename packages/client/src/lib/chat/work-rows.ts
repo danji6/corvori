@@ -1,3 +1,4 @@
+import { SHELL_TOOL_PART_TYPE } from '@cv/core/const'
 import type { ShellJobSummary, ShellToolOutput } from '@cv/core/types/tools'
 import type { UIMessage } from 'ai'
 
@@ -78,7 +79,7 @@ function waitingTools(
 
   return toolsInGroup(group)
     .filter((part) => {
-      if (part.type !== 'tool-shell') return false
+      if (part.type !== SHELL_TOOL_PART_TYPE) return false
 
       const output = parseOutputValue<ShellToolOutput>(part.output)
       // Settled historical tools must not attach to a reused call id

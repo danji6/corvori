@@ -1,3 +1,4 @@
+import { SEARCH_MCP_TOOLS_NAME } from '@cv/core/const'
 import {
   type McpContent,
   type McpResult,
@@ -199,7 +200,7 @@ export function mcpHistoryTools(
     toModelOutput: (options: { output: unknown }) =>
       mcpToModelOutput(options, omitMedia, canReadOutput),
   } as unknown as Tool
-  const tools: ToolSet = { search_mcp_tools: converter }
+  const tools: ToolSet = { [SEARCH_MCP_TOOLS_NAME]: converter }
   for (const message of messages) {
     for (const part of message.parts) {
       if (!part.type.startsWith('tool-')) continue

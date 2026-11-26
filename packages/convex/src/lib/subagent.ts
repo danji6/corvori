@@ -1,7 +1,8 @@
+import { TASK_TOOL_PART_TYPE } from '@cv/core/const'
+
 import type { Doc, Id } from '../_generated/dataModel'
 
-export const TASK_TOOL_NAME = 'task'
-export const TASK_TOOL_PART_TYPE = `tool-${TASK_TOOL_NAME}`
+export { TASK_TOOL_NAME, TASK_TOOL_PART_TYPE } from '@cv/core/const'
 
 export type TaskToolInput = {
   agent_name: string

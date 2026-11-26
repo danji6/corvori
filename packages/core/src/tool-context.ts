@@ -1,3 +1,8 @@
+import {
+  LIST_SKILLS_TOOL_NAME,
+  READ_MCP_OUTPUT_TOOL_NAME,
+  READ_SKILL_TOOL_NAME,
+} from './const'
 import { isContextNote } from './context-notes'
 import {
   BUILTIN_TOOL_NAMES,
@@ -23,7 +28,9 @@ export function contextDependencies(
     )
   }
   if (type === 'skills') {
-    return names.filter((name) => ['list_skills', 'read_skill'].includes(name))
+    return names.filter((name) =>
+      [LIST_SKILLS_TOOL_NAME, READ_SKILL_TOOL_NAME].includes(name),
+    )
   }
   return names
     .filter(
@@ -39,9 +46,9 @@ export function contextEnabled(
   names: readonly string[],
 ) {
   if (type === 'workspace') return hasSessionFileTools(names)
-  if (type === 'skills') return names.includes('list_skills')
+  if (type === 'skills') return names.includes(LIST_SKILLS_TOOL_NAME)
   return contextDependencies('mcp', names).some(
-    (name) => name !== 'read_mcp_output',
+    (name) => name !== READ_MCP_OUTPUT_TOOL_NAME,
   )
 }
 
@@ -93,7 +100,8 @@ export function canReplayToolContext(
 
   if (!Array.isArray(dependencies) || !dependencies.length) return false
   if (note.type === 'workspace' && !hasSessionFileTools(names)) return false
-  if (note.type === 'skills' && !names.includes('list_skills')) return false
+  if (note.type === 'skills' && !names.includes(LIST_SKILLS_TOOL_NAME))
+    return false
 
   return dependencies.every(
     (name) => typeof name === 'string' && names.includes(name),

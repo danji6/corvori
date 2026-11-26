@@ -15,6 +15,7 @@ import { setSelectedSessionFolder } from '@/lib/ui-settings'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
 import type { ApprovalMode } from '@cv/convex/validators/approvals'
+import { READ_FILE_TOOL_NAME } from '@cv/core/const'
 import { selectedBuiltinTools } from '@cv/core/tool-capabilities'
 import { useQuery } from 'convex-helpers/react/cache/hooks'
 import { useAction } from 'convex/react'
@@ -88,7 +89,7 @@ export function EmptyChat({
   const canReadProject = Boolean(
     workspaceRoot &&
     isAdmin &&
-    selectedBuiltinTools(agent?.tools).includes('read_file'),
+    selectedBuiltinTools(agent?.tools).includes(READ_FILE_TOOL_NAME),
   )
 
   async function clearAgent() {

@@ -1,3 +1,4 @@
+import { SHELL_OUTPUT_TOOL_NAME, SHELL_TOOL_NAME } from '@cv/core/const'
 import { stripTerminalCodes } from '@cv/core/shell/ansi'
 import type { ShellJobStatus } from '@cv/core/shell/job-protocol'
 import {
@@ -41,7 +42,7 @@ export function shellToModelOutput({
 /** Minimal tool mappers for convertToModelMessages without terminal scrollback. */
 export function shellHistoryTools(): ToolSet {
   const mapper = { toModelOutput: shellToModelOutput } as unknown as Tool
-  return { shell: mapper, shell_output: mapper }
+  return { [SHELL_TOOL_NAME]: mapper, [SHELL_OUTPUT_TOOL_NAME]: mapper }
 }
 
 export function runningPart(jobId: string, state: WatchState): ShellToolOutput {

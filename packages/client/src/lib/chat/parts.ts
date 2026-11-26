@@ -1,5 +1,13 @@
 import type { FileItem } from '@/hooks'
 import type { Id } from '@cv/convex/_generated/dataModel'
+import {
+  EDIT_FILE_TOOL_NAME,
+  READ_ATTACHMENT_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  TASK_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '@cv/core/const'
 import type { WorkspaceLinkSnapshot } from '@cv/core/types/workspace'
 import { collapseToolError } from '@cv/core/utils/tool-errors'
 import type { FileUIPart, ToolUIPart, UIMessage } from 'ai'
@@ -88,7 +96,12 @@ export function isShellReportPart(part: unknown): part is ShellReportPart {
 }
 
 // Tools whose consecutive calls collapse into a single grouped block
-const GROUPED_TOOLS = new Set(['read_file', 'read_attachment', 'shell', 'task'])
+const GROUPED_TOOLS = new Set([
+  READ_FILE_TOOL_NAME,
+  READ_ATTACHMENT_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  TASK_TOOL_NAME,
+])
 
 export function groupParts(parts: UIMessage['parts']): PartGroup[] {
   const groups: PartGroup[] = []
@@ -321,7 +334,8 @@ function groupableToolName(
 ): string | undefined {
   if (!part.type.startsWith('tool-')) return undefined
   const name = part.type.slice('tool-'.length)
-  if (name === 'write_file' || name === 'edit_file') return 'file_change'
+  if (name === WRITE_FILE_TOOL_NAME || name === EDIT_FILE_TOOL_NAME)
+    return 'file_change'
   return GROUPED_TOOLS.has(name) ? name : undefined
 }
 

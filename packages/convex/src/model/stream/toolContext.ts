@@ -1,5 +1,6 @@
 'use node'
 
+import { LIST_SKILLS_TOOL_NAME, SHELL_TOOL_NAME } from '@cv/core/const'
 import { sha256 } from '@cv/core/sha256'
 import {
   hasFilesystemTools,
@@ -70,8 +71,9 @@ export async function prepareToolContext(
   }
 
   const preparesSkills =
-    (!!availability?.catalog && names.includes('list_skills')) ||
-    (!names.includes('list_skills') && previous.includes('list_skills'))
+    (!!availability?.catalog && names.includes(LIST_SKILLS_TOOL_NAME)) ||
+    (!names.includes(LIST_SKILLS_TOOL_NAME) &&
+      previous.includes(LIST_SKILLS_TOOL_NAME))
   if (preparesSkills) {
     return prepareSkills(ctx, execution, names, contextId, availability)
   }
@@ -113,7 +115,7 @@ function sessionDirectoryGuidance(data: StreamContext, names: string[]) {
     ...(taskDirectory
       ? [`Use session://tasks/${taskDirectory}/ for your task files.`]
       : []),
-    ...(names.includes('shell')
+    ...(names.includes(SHELL_TOOL_NAME)
       ? ['Use cwd: "session://" or $SESSION_DIR in Shell.']
       : []),
   ].join('\n')
@@ -128,7 +130,7 @@ async function prepareSkills(
 ) {
   const page = availability?.catalog
   const capabilities = contextDependencies('skills', names)
-  const content = page && names.includes('list_skills') ? catalogNote(page, names) : '' // prettier-ignore
+  const content = page && names.includes(LIST_SKILLS_TOOL_NAME) ? catalogNote(page, names) : '' // prettier-ignore
   return ctx.runMutation(internal.streams._prepareSkillContext, {
     ...execution,
     contextId,

@@ -1,3 +1,7 @@
+import {
+  SHELL_OUTPUT_TOOL_PART_TYPE,
+  SHELL_TOOL_PART_TYPE,
+} from '@cv/core/const'
 import { CONTEXT_NOTE_TYPES } from '@cv/core/context-notes'
 import { hasInterpolation, parse } from '@cv/core/interpreter/parse'
 import {
@@ -172,7 +176,7 @@ export function finalizeMessageParts(parts: unknown[]) {
       const waiting =
         part.output.status === 'running' &&
         typeof part.output.waitUntil === 'number'
-      if (waiting && part.type === 'tool-shell_output') {
+      if (waiting && part.type === SHELL_OUTPUT_TOOL_PART_TYPE) {
         const { output: _output, preliminary: _preliminary, ...base } = part
         return {
           ...base,
@@ -180,7 +184,7 @@ export function finalizeMessageParts(parts: unknown[]) {
           errorText: 'Shell output wait was cancelled.',
         }
       }
-      if (waiting && part.type === 'tool-shell') {
+      if (waiting && part.type === SHELL_TOOL_PART_TYPE) {
         const { waitUntil: _deadline, ...output } = part.output
         return {
           ...part,

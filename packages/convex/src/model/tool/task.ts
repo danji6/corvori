@@ -1,4 +1,7 @@
+import { TASK_TOOL_NAME } from '@cv/core/const'
 import { TOOL_DESCRIPTIONS } from '@cv/core/types'
+
+import { taskFields } from './collaborationFields'
 
 /**
  * Delegates a task to a spawnable sub-agent. The engine spawns a hidden
@@ -10,18 +13,7 @@ export async function createTaskTool(roster: string) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
 
   return tool({
-    description: `${TOOL_DESCRIPTIONS.task}\n\nAvailable agents:\n${roster}`,
-    inputSchema: z.object({
-      agent_name: z.string().describe('Name of the agent to delegate to'),
-      prompt: z
-        .string()
-        .describe(
-          'Complete standalone task, including what the report must contain',
-        ),
-      title: z
-        .string()
-        .optional()
-        .describe('Short task title (3-6 words), shown to the user'),
-    }),
+    description: `${TOOL_DESCRIPTIONS[TASK_TOOL_NAME]}\n\nAvailable agents:\n${roster}`,
+    inputSchema: z.object(taskFields),
   })
 }

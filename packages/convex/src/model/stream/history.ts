@@ -1,6 +1,10 @@
 'use node'
 
-import { READ_ATTACHMENT_TOOL_NAME } from '@cv/core/const'
+import {
+  COPY_ATTACHMENT_TOOL_NAME,
+  READ_ATTACHMENT_TOOL_NAME,
+  READ_MCP_OUTPUT_TOOL_NAME,
+} from '@cv/core/const'
 import { contextNoteSegments } from '@cv/core/context-notes'
 import { selectedBuiltinTools } from '@cv/core/tool-capabilities'
 import {
@@ -111,7 +115,7 @@ export async function buildProviderHistory(
       await resolveParts(ctx, message.parts, message.role, {
         mediaActive: activeMediaMessages.has(message._id),
         readerEnabled,
-        copyEnabled: names.includes('copy_attachment'),
+        copyEnabled: names.includes(COPY_ATTACHMENT_TOOL_NAME),
         toolMediaActive:
           !data.stream.omitActiveMedia &&
           message._id === data.stream.state.processingMessageId,
@@ -165,7 +169,7 @@ export async function buildProviderHistory(
       ...mcpHistoryTools(
         attributed,
         data.stream.omitActiveMedia,
-        names.includes('read_mcp_output'),
+        names.includes(READ_MCP_OUTPUT_TOOL_NAME),
       ),
     },
   })
@@ -177,7 +181,7 @@ export async function buildProviderHistory(
         content: block(
           'attachment-error',
           'The provider rejected the media payload as too large. Continue without media; stored attachment links and MCP results remain available.' +
-            (names.includes('read_mcp_output')
+            (names.includes(READ_MCP_OUTPUT_TOOL_NAME)
               ? ' Use read_mcp_output to retrieve full MCP output.'
               : ''),
         ),

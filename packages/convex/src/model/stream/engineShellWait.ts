@@ -1,5 +1,6 @@
 'use node'
 
+import { SHELL_TOOL_PART_TYPE } from '@cv/core/const'
 import type { ShellToolOutput } from '@cv/core/types/tools'
 
 import { internal } from '../../_generated/api'
@@ -29,7 +30,7 @@ export async function resumeShellWaits(
     const settled = await Promise.all(
       parts.map(async (part) => {
         const { jobId, jobNumber, waitUntil } = part.output
-        const launch = part.type === 'tool-shell'
+        const launch = part.type === SHELL_TOOL_PART_TYPE
         const target = { ...execution, toolCallId: part.toolCallId }
 
         try {

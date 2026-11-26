@@ -1,10 +1,14 @@
+import {
+  ATTACH_FILE_TOOL_NAME,
+  COPY_ATTACHMENT_TOOL_NAME,
+} from '@cv/core/const'
 import { v } from 'convex/values'
 
 import { streamExecutionArgsValidator } from './streams'
 
 export const attachmentTransferKind = v.union(
-  v.literal('copy_attachment'),
-  v.literal('attach_file'),
+  v.literal(COPY_ATTACHMENT_TOOL_NAME),
+  v.literal(ATTACH_FILE_TOOL_NAME),
 )
 
 export const attachmentTransferCall = v.object({

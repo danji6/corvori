@@ -8,6 +8,7 @@ import {
   type AttachmentSearchHit,
   parseOutputValue,
 } from '@/lib/chat/tool-output'
+import { READ_ATTACHMENT_TOOL_NAME } from '@cv/core/const'
 import type { ToolUIPart } from 'ai'
 
 import { CollapsibleBlock } from '../collapsible-block'
@@ -68,7 +69,7 @@ function AttachmentReadRow({
       surface={hasPreview ? 'inset-row' : false}
       dense
       shimmer={running}
-      leadingIcon={<ToolIcon name="read_attachment" />}
+      leadingIcon={<ToolIcon name={READ_ATTACHMENT_TOOL_NAME} />}
       label={
         <span className="flex flex-wrap items-center gap-x-2">
           <span className={running ? undefined : 'text-foreground font-medium'}>

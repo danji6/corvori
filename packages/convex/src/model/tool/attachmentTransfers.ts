@@ -1,6 +1,14 @@
 'use node'
 
+import {
+  ATTACH_FILE_TOOL_NAME,
+  COPY_ATTACHMENT_TOOL_NAME,
+} from '@cv/core/const'
 import { TOOL_DESCRIPTIONS } from '@cv/core/types/tool-descriptions'
+import {
+  attachFileFields,
+  copyAttachmentFields,
+} from '@cv/core/types/workspace-tools'
 import { suffixFilename } from '@cv/core/utils/attachment-names'
 
 import { internal } from '../../_generated/api'
@@ -32,17 +40,10 @@ export async function createAttachmentTransferTool(
 ) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
 
-  if (name === 'copy_attachment') {
+  if (name === COPY_ATTACHMENT_TOOL_NAME) {
     return tool({
-      description: TOOL_DESCRIPTIONS.copy_attachment,
-      inputSchema: z.strictObject({
-        reference: z.string().min(1).describe('Session attachment reference'),
-        destination: z
-          .string()
-          .min(1)
-          .optional()
-          .describe('Optional full session:// destination file path'),
-      }),
+      description: TOOL_DESCRIPTIONS[COPY_ATTACHMENT_TOOL_NAME],
+      inputSchema: z.strictObject(copyAttachmentFields),
       execute: (input, { toolCallId, abortSignal }) =>
         copyAttachment(
           { ctx, execution, callId: toolCallId, signal: abortSignal },
@@ -52,15 +53,8 @@ export async function createAttachmentTransferTool(
   }
 
   return tool({
-    description: TOOL_DESCRIPTIONS.attach_file,
-    inputSchema: z.strictObject({
-      path: z.string().min(1).describe('The session:// file to publish'),
-      filename: z
-        .string()
-        .min(1)
-        .optional()
-        .describe('Name displayed on the attachment'),
-    }),
+    description: TOOL_DESCRIPTIONS[ATTACH_FILE_TOOL_NAME],
+    inputSchema: z.strictObject(attachFileFields),
     execute: (input, { toolCallId, abortSignal }) =>
       attachFile(
         { ctx, execution, callId: toolCallId, signal: abortSignal },
@@ -87,7 +81,7 @@ async function copyAttachment(
   const filename = safeFilename(file.filename)
   const operation = await begin(
     call,
-    'copy_attachment',
+    COPY_ATTACHMENT_TOOL_NAME,
     [reference, input.destination],
     input.destination ?? DEFAULT_COPY_DIRECTORY + filename,
   )
@@ -223,7 +217,7 @@ async function attachFile(
 
   const operation = await begin(
     call,
-    'attach_file',
+    ATTACH_FILE_TOOL_NAME,
     [input.path, input.filename],
     input.path,
   )
