@@ -28,6 +28,7 @@ import { releaseEvaluation } from '../promptEvaluation/records'
 import { reserveSegmentEvaluation } from '../promptEvaluation/reserve'
 import { cancelByMessage } from '../scheduledEvents'
 import * as Memberships from '../session/memberships'
+import { refreshMessagePreviews } from '../session/messagePreviews'
 import { removeDeliveriesForParts } from '../shell/outputDeliveries'
 import { collectToolOutputStorageIds } from '../stream/toolOutput'
 import { clearAnnouncedMode } from './notes'
@@ -191,6 +192,7 @@ async function deleteSelectedParts(
 
   if (plans.every(({ kept }) => kept.length === 0)) {
     await deleteMessageDoc(ctx, message)
+    await refreshMessagePreviews(ctx, message.sessionId)
     return true
   }
 
@@ -230,6 +232,7 @@ export async function deleteMessage(
   })
   await deleteMessageDoc(ctx, message)
   await forgetDeletedModeNotes(ctx, message.sessionId, [message])
+  await refreshMessagePreviews(ctx, message.sessionId)
 }
 
 export async function deleteMessagesFrom(
@@ -255,6 +258,7 @@ export async function deleteMessagesFrom(
     await deleteMessageDoc(ctx, doc)
   }
   await forgetDeletedModeNotes(ctx, message.sessionId, range)
+  await refreshMessagePreviews(ctx, message.sessionId)
 }
 
 async function forgetDeletedModeNotes(

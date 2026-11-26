@@ -242,6 +242,7 @@ import type * as model_session_folderTransitions from "../model/session/folderTr
 import type * as model_session_folderTree from "../model/session/folderTree.js";
 import type * as model_session_folders from "../model/session/folders.js";
 import type * as model_session_memberships from "../model/session/memberships.js";
+import type * as model_session_messagePreviews from "../model/session/messagePreviews.js";
 import type * as model_session_models from "../model/session/models.js";
 import type * as model_session_personalFolders from "../model/session/personalFolders.js";
 import type * as model_session_presence from "../model/session/presence.js";
@@ -744,6 +745,7 @@ declare const fullApi: ApiFromModules<{
   "model/session/folderTree": typeof model_session_folderTree;
   "model/session/folders": typeof model_session_folders;
   "model/session/memberships": typeof model_session_memberships;
+  "model/session/messagePreviews": typeof model_session_messagePreviews;
   "model/session/models": typeof model_session_models;
   "model/session/personalFolders": typeof model_session_personalFolders;
   "model/session/presence": typeof model_session_presence;

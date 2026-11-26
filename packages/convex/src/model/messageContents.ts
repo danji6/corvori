@@ -420,6 +420,7 @@ export async function finalizeTurn(
     status: 'done',
     contextEligible,
   })
+  return segments
 }
 
 export async function reconcileFinishedLinkPreviews(

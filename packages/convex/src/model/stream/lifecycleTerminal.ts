@@ -307,8 +307,10 @@ export async function _finalizeStopped(
   const restored =
     row && message ? await restoreEmptyRetry(ctx, stream, message, row) : false
 
+  let previewParts = parts
   if (!restored && row && message) {
-    await finalizeTurn(ctx, { message, row, parts, metadata })
+    const segments = await finalizeTurn(ctx, { message, row, parts, metadata })
+    previewParts = segments.flatMap((segment) => segment.parts)
   } else if (!restored) {
     await ctx.db.patch(processingMessageId, {
       status: 'done',
@@ -334,11 +336,13 @@ export async function _finalizeStopped(
     })
   }
 
-  if (stream.command.kind === 'invoke') {
-    await syncActivity(ctx, stream.sessionId, parts)
-    await scheduleTitle(ctx, stream.sessionId)
-  } else if (!restored && (await isLatestRetry(ctx, stream, message))) {
-    await syncActivity(ctx, stream.sessionId, parts)
+  const shouldSyncActivity =
+    stream.command.kind === 'invoke' ||
+    (!restored && (await isLatestRetry(ctx, stream, message)))
+  if (shouldSyncActivity) {
+    await syncActivity(ctx, stream.sessionId, previewParts, {
+      keepPreviewIfEmpty: true,
+    })
     await scheduleTitle(ctx, stream.sessionId)
   }
 

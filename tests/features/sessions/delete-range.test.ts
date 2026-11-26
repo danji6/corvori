@@ -103,7 +103,10 @@ describe('assertRangeDeletable', () => {
 
 test('deletes from the position of an anchored note in the transcript', async () => {
   const { ctx, db, rows } = skillsDatabase()
-  const sessionId = await db.insert('sessions', { ownerId: ctx.userId })
+  const sessionId = await db.insert('sessions', {
+    ownerId: ctx.userId,
+    lastMessagePreview: 'Removed tail',
+  })
   await db.insert('userSessions', {
     sessionId,
     userId: ctx.userId,
@@ -114,6 +117,7 @@ test('deletes from the position of an anchored note in the transcript', async ()
     const _id = await db.insert('messages', {
       ...message({ _creationTime: time }),
       sessionId,
+      selectedVersion: 1,
     })
     ids.push(_id)
     await db.patch(_id, {
@@ -126,9 +130,22 @@ test('deletes from the position of an anchored note in the transcript', async ()
     { anchor: { _id: anchor, _creationTime: 2 }, kind: 'contextNote' },
   )
   await db.patch(note, { position, type: 'workspace', hidden: true })
+  await db.patch(earlier, {
+    role: 'user',
+    sender: { type: 'user', id: ctx.userId },
+  })
+  await db.insert('messageContents', {
+    messageId: earlier,
+    version: 1,
+    segmentIndex: 0,
+    parts: [
+      { type: 'tool-shell', toolCallId: 'shell', input: { command: 'pwd' } },
+    ],
+  })
   await deleteMessagesFrom(ctx, { messageId: note as Id<'messages'> })
   expect(rows('messages').map((row) => row._id)).toEqual([earlier])
   expect(await db.get(intervening)).toBeNull()
+  expect((await db.get(sessionId))?.lastMessagePreview).toBe('$ pwd')
 })
 
 const text = (text: string) => ({ type: 'text', text })

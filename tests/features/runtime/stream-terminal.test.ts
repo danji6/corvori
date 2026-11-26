@@ -87,6 +87,49 @@ describe('_honorSoftStop', () => {
 
 describe('_finalizeStopped', () => {
   test.each([
+    { earlierParts: [], expected: 'Previous preview' },
+    {
+      earlierParts: [{ type: 'text', text: '**Partial response**' }],
+      expected: 'Partial response',
+    },
+  ])(
+    'keeps a readable preview when the active segment has no text (%j)',
+    async ({ earlierParts, expected }) => {
+      const session = {
+        _id: 'session_1',
+        title: 'Existing chat',
+        lastMessagePreview: 'Previous preview',
+      }
+      const stream = {
+        _id: 'stream_1',
+        sessionId: session._id,
+        command: { kind: 'invoke' },
+        state: {
+          phase: 'stopping',
+          processingMessageId: 'message_1',
+          processingContentId: 'content_2',
+        },
+      }
+      const { ctx } = fakeCtx({
+        docs: [session, stream, { _id: 'message_1', selectedVersion: 1 }],
+        contents: [
+          {
+            _id: 'content_1',
+            version: 1,
+            segmentIndex: 0,
+            parts: earlierParts,
+          },
+          { _id: 'content_2', version: 1, segmentIndex: 1, parts: [] },
+        ],
+      })
+
+      await _finalizeStopped(ctx, { streamId: stream._id as never })
+
+      expect(session.lastMessagePreview).toBe(expected)
+    },
+  )
+
+  test.each([
     { parts: [] },
     { parts: [{ type: 'step-start' }, { type: 'text', text: '' }] },
   ])(

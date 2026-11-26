@@ -54,18 +54,16 @@ export async function syncActivity(
   ctx: MutationCtx,
   sessionId: Id<'sessions'>,
   content: unknown[] | string,
+  { keepPreviewIfEmpty = false } = {},
 ) {
   const now = Date.now()
-  const preview =
-    typeof content === 'string'
-      ? limitPreview(content, PREVIEW_LENGTH) || undefined
-      : messagePreview(content)
-
+  const preview = messagePreview(content)
   const session = await ctx.db.get(sessionId)
 
   await ctx.db.patch(sessionId, {
     lastMessageAt: now,
-    lastMessagePreview: preview,
+    lastMessagePreview:
+      preview ?? (keepPreviewIfEmpty ? session?.lastMessagePreview : undefined),
     ...(preview && !session?.firstMessagePreview
       ? { firstMessagePreview: preview }
       : {}),
@@ -82,8 +80,12 @@ export async function syncActivity(
   return members
 }
 
-/** Builds a session preview from the visible text parts of a message. */
-export function messagePreview(parts: unknown[]) {
+/** Limits plain text or extracts a preview from visible message parts. */
+export function messagePreview(parts: unknown[] | string) {
+  if (typeof parts === 'string') {
+    return limitPreview(parts, PREVIEW_LENGTH) || undefined
+  }
+
   const text: string[] = []
   let codeFallback = ''
   for (const part of parts) {
