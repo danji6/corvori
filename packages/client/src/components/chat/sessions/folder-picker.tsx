@@ -5,6 +5,7 @@ import { usePageShrink } from '@/hooks/chat/page-shrink'
 import { PAGE_STEP, usePaginationWindow } from '@/hooks/chat/pagination-window'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
+import type { FolderView } from '@cv/convex/model/session/types'
 import { usePaginatedQuery, useQuery } from 'convex-helpers/react/cache/hooks'
 import { FolderIcon, XIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -44,6 +45,7 @@ export function FolderPicker({
   const listContent = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [pickedFolder, setPickedFolder] = useState<FolderView>()
 
   const selected = useQuery(
     api.sessionFolders.get,
@@ -95,9 +97,20 @@ export function FolderPicker({
       loadMore(PAGE_STEP)
   }, [search, available.length, status, loadMore])
 
-  const loadingSelection = Boolean(value) && selected === undefined
+  // The popup can discard the chosen option while its detail query loads.
+  const displayedFolder =
+    selected === undefined && pickedFolder?._id === value
+      ? pickedFolder
+      : selected
+  const loadingSelection = Boolean(value) && displayedFolder === undefined
   const loading = loadingSelection || status === 'LoadingFirstPage'
   const controlsDisabled = disabled || loading
+  const folderLabel = showPath ? displayedFolder?.folderPath : displayedFolder?.name // prettier-ignore
+
+  function changeSelection(folderId: string | null) {
+    setPickedFolder(available.find((folder) => folder._id === folderId))
+    onChange(folderId)
+  }
 
   return (
     <Combobox
@@ -111,24 +124,24 @@ export function FolderPicker({
       }}
       value={value ?? 'ungrouped'}
       onValueChange={(next) =>
-        onChange(!next || next === 'ungrouped' ? null : next)
+        changeSelection(!next || next === 'ungrouped' ? null : next)
       }
     >
       <div className="flex max-w-xs min-w-0 items-center gap-1.5">
         <Combobox.Trigger
           ref={triggerRef}
           aria-label={label}
-          title={selected?.folderPath ?? rootLabel}
+          title={displayedFolder?.folderPath ?? rootLabel}
           variant="input"
           className="min-w-0 flex-1"
           disabled={controlsDisabled}
           aria-busy={loading || undefined}
         >
-          <FolderIconView icon={selected?.icon} />
+          <FolderIconView icon={displayedFolder?.icon} />
           <Combobox.DisplayValue
             label={
               value
-                ? ((showPath ? selected?.folderPath : selected?.name) ??
+                ? (folderLabel ??
                   (loadingSelection ? label : 'Folder unavailable'))
                 : rootLabel
             }
@@ -143,7 +156,7 @@ export function FolderPicker({
             title="Clear folder"
             disabled={controlsDisabled}
             onClick={() => {
-              onChange(null)
+              changeSelection(null)
               triggerRef.current?.focus()
             }}
           >

@@ -301,3 +301,38 @@ test('empty chat keeps the previous welcome inactive until the selected folder l
   await chat.getByRole('button', { name: 'Clear session folder' }).click()
   await expect(chat.getByText(genericLabel, { exact: true })).toBeVisible()
 })
+
+test('composer picker displays the chosen folder while its details load', async ({
+  page,
+}) => {
+  await page.goto(
+    '/?fixture=session-folders&emptyChat&slowFolders&manyFolders&folder=a',
+  )
+  const chat = page.getByTestId('empty-chat')
+  const picker = chat.getByRole('combobox', { name: 'Session folder' })
+  const resolveQueries = page.getByRole('button', {
+    name: 'Resolve session queries',
+  })
+  await expect(picker).toBeDisabled()
+  await resolveQueries.click()
+  await expect(picker).toHaveText('Portfolio')
+
+  await picker.click()
+  await page
+    .getByRole('option', { name: 'Portfolio / Child folder 1', exact: true })
+    .click()
+
+  await expect(picker).toHaveAttribute('aria-expanded', 'false')
+  await expect(picker).toHaveText('Child folder 1')
+  await expect(picker).toHaveAttribute('title', 'Portfolio / Child folder 1')
+  await expect(picker).toBeEnabled()
+  await expect(
+    chat.getByRole('button', { name: 'Create session' }),
+  ).toBeDisabled()
+
+  await resolveQueries.click()
+  await expect(
+    chat.getByRole('button', { name: 'Create session' }),
+  ).toBeEnabled()
+  await expect(picker).toHaveText('Child folder 1')
+})
