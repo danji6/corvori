@@ -52,7 +52,7 @@
     --message-surface-outset: 0px;
     --message-surface-edge-inset: 0px;
     --message-gutter-headroom: calc(
-      max(4rem, var(--avatar-gutter-size, 0px)) +
+      max(4rem, var(--avatar-gutter-size, 0px)) + 1rem +
         var(--message-surface-edge-inset)
     );
     --message-gutter: clamp(
@@ -87,7 +87,7 @@
       var(--message-column-margin, 0px) - var(--message-surface-edge-inset),
       var(--message-background-padding-inline)
     );
-    --message-sender-gap: --spacing(12);
+    --message-sender-gap: --spacing(8);
     --message-note-gap: var(--message-compact-block-gap);
   }
 

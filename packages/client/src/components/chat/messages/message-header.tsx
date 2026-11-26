@@ -54,7 +54,7 @@ export function MessageHeader({
   return (
     <div
       data-slot="message-header"
-      className="flex min-w-0 items-center justify-start gap-4 px-1"
+      className="flex min-w-0 items-center justify-start gap-4"
     >
       <AvatarWithLightbox
         ref={avatarRef}

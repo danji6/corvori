@@ -76,6 +76,7 @@ export function FileStrip(props: FileStripProps) {
   const gallery = [...previewsById.values()].flatMap(({ media }) =>
     media ? [media] : [],
   )
+
   const list = files.length > 0 && (
     <FilterableList<FileItem>
       data-slot="file-strip"
@@ -152,15 +153,13 @@ function FileStripItem(props: FileStripItemProps) {
         'relative isolate max-w-full rounded-lg',
         square
           ? 'aspect-square'
-          : 'bg-m3-surface-container-high/70 border-input flex w-72 flex-wrap items-center border',
+          : 'bg-m3-surface-container-high/60 hover:bg-m3-surface-container-high/80 border-input flex w-72 flex-wrap items-center border transition-[background]',
       )}
       style={square ? { width: size } : undefined}
       data-attachment-index={actionsInContextMenu ? index : undefined}
       data-attachment-name={actionsInContextMenu ? item.file.name : undefined}
       data-attachment-url={actionsInContextMenu ? item.originalUrl : undefined}
-      data-attachment-share-url={
-        actionsInContextMenu ? item.shareUrl : undefined
-      }
+      data-attachment-share-url={actionsInContextMenu ? item.shareUrl : undefined} // prettier-ignore
     >
       {square ? <SquarePreview {...props} /> : <FileCardPreview item={item} />}
       <FileStripItemActions {...props} square={square} />

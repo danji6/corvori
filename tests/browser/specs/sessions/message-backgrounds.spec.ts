@@ -129,7 +129,7 @@ test('uses the sender palette in both modes and keeps highlights above the tint'
 test('moves the avatar into the gutter only when the padded background fits', async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 790, height: 1000 })
+  await page.setViewportSize({ width: 840, height: 1000 })
   await openTranscript(page)
   const header = page.locator(row('work', 'header'))
   const avatar = header.locator('[data-slot="avatar"]')
