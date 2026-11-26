@@ -1,3 +1,4 @@
+import { AccountScope } from '@/hooks/account-scope'
 import { useMessageWindow } from '@/hooks/chat/message-window'
 import type { Id } from '@cv/convex/_generated/dataModel'
 import type { WindowMessage } from '@cv/convex/model/chat/queries'
@@ -67,7 +68,9 @@ async function mount() {
     root!.render(
       <StrictMode>
         <ConvexProvider client={source.client}>
-          <Harness />
+          <AccountScope userId="viewer">
+            <Harness />
+          </AccountScope>
         </ConvexProvider>
       </StrictMode>,
     )

@@ -1,26 +1,27 @@
 import type { LocalFilePreview } from '@/hooks/file-previews'
 import type { Id } from '@cv/convex/_generated/dataModel'
 import type { AttachmentImageDimensions } from '@cv/convex/validators/attachments'
+import { isKnownTextFile } from '@cv/core/workspace/files'
+
+import { createLocalAttachmentPreview } from './local-attachment-preview'
 
 export type StagedAttachment = {
   id: Id<'attachments'>
-  filename: string
-  mediaType: string
-  byteLength: number
   imageDimensions?: AttachmentImageDimensions
 }
 
 type LocalAttachment = {
   url: string
-  source: string | Blob
-  byteLength?: number
+  file: File
 }
 
-type SendPreview = Partial<
-  Pick<StagedAttachment, 'byteLength' | 'imageDimensions'>
-> & {
+type SendPreview = {
   key: string
-  preview: LocalFilePreview
+  byteLength: number
+  imageDimensions?: AttachmentImageDimensions
+  preview?: LocalFilePreview
+  fallbackUrl?: string
+  file?: File
 }
 
 const HANDOFF_MS = 60_000
@@ -32,36 +33,56 @@ export function getAttachmentSendPreview(id: string) {
 
 /** Keeps each preview available before and after its attachment ID is assigned. */
 export function keepAttachmentSendPreviews(files: LocalAttachment[]) {
-  const objectUrls: string[] = []
-  const previews = files.map(({ url, source, byteLength }) => {
-    const src = typeof source === 'string' ? source : URL.createObjectURL(source) // prettier-ignore
-    if (typeof source !== 'string') objectUrls.push(src)
-    const local = { key: url, byteLength, preview: { url: src } }
-    staged.set(url, local)
-    return local
+  const owned = files.map(({ url, file }) => {
+    const local = createLocalAttachmentPreview(file)
+    const textUrl =
+      !local && isKnownTextFile(file.type, file.name)
+        ? URL.createObjectURL(file)
+        : undefined
+    const entry: SendPreview = {
+      key: url,
+      byteLength: file.size,
+      file,
+      preview: local?.preview,
+      fallbackUrl: textUrl,
+    }
+    staged.set(url, entry)
+    return { url, entry, local, textUrl }
   })
+  const confirmed = new Set<Id<'attachments'>>()
 
-  let confirmed: StagedAttachment[] = []
   return {
     confirm(attachments: StagedAttachment[]) {
-      confirmed = attachments
-      // Upload results preserve the composer order.
-      attachments.forEach(({ id, byteLength, imageDimensions }, index) => {
+      attachments.forEach(({ id, imageDimensions }, index) => {
+        confirmed.add(id)
+        const { entry } = owned[index]
         staged.set(id, {
-          ...previews[index],
-          byteLength,
+          ...entry,
           imageDimensions,
         })
       })
     },
     releaseWhenFinished(sent: boolean) {
-      for (const { url } of files) staged.delete(url)
-      const release = () => {
-        for (const { id } of confirmed) staged.delete(id)
-        for (const url of objectUrls) URL.revokeObjectURL(url)
+      for (const { url, entry } of owned) {
+        staged.delete(url)
+        delete entry.file
       }
-      if (sent) setTimeout(release, HANDOFF_MS)
-      else release()
+      const release = () => {
+        for (const id of confirmed) staged.delete(id)
+        for (const { local, textUrl } of owned) {
+          local?.release()
+          if (textUrl) URL.revokeObjectURL(textUrl)
+        }
+      }
+      if (!sent) {
+        release()
+        return
+      }
+      for (const id of confirmed) {
+        const entry = staged.get(id)
+        if (entry) delete entry.file
+      }
+      setTimeout(release, HANDOFF_MS)
     },
   }
 }

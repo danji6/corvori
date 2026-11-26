@@ -8,61 +8,18 @@ import {
 } from '@cv/core/utils/attachment-names'
 import type { FileUIPart } from 'ai'
 
-import { ImageTool } from '../io'
-import { fileToDataUrl } from '../utils'
-
 type ExportResult = { type: 'png' | 'json'; data: string; name: string }
 
-// TODO make this configurable in an "Advanced" settings tab in ChatSettings
-const MAX_IMAGE_DIMENSION = 640
-
-export type ProcessedFile = {
-  part: FileUIPart
-  originalFile?: File
-}
-
-export async function processFileForUpload(file: File): Promise<ProcessedFile> {
+/** Describes a local file without opening or copying its contents. */
+export function describeUpload(file: File, id: string): FileUIPart {
   const filename = file.name.trim()
     ? file.name
     : suffixFilename(namelessAttachment(file.type), attachmentNameSuffix())
-  let url: string
-
-  if (file.type.startsWith('image/')) {
-    const bitmap = await createImageBitmap(file)
-    const scale = Math.min(
-      MAX_IMAGE_DIMENSION / bitmap.width,
-      MAX_IMAGE_DIMENSION / bitmap.height,
-      1,
-    )
-    const width = Math.round(bitmap.width * scale)
-    const height = Math.round(bitmap.height * scale)
-
-    url = await new ImageTool(file)
-      .resize({ width, height })
-      .compress(0.8)
-      .format('image/jpeg')
-      .toBase64()
-
-    return {
-      originalFile: file,
-      part: {
-        type: 'file',
-        url,
-        mediaType: file.type,
-        filename,
-      },
-    }
-  }
-
-  url = await fileToDataUrl(file)
   return {
-    originalFile: file,
-    part: {
-      type: 'file',
-      url,
-      mediaType: file.type,
-      filename,
-    },
+    type: 'file',
+    url: `attachment:${id}`,
+    mediaType: file.type || 'application/octet-stream',
+    filename,
   }
 }
 

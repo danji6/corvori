@@ -14,6 +14,7 @@ import type {
   CreateGeneratedAttachmentArgs,
 } from '../../validators/attachments'
 import type { StreamExecutionArgs } from '../../validators/streams'
+import { requireAttachmentSend } from '../chat/attachmentSendRecords'
 import { allVersionParts } from '../messageContents'
 import {
   getMember,
@@ -35,14 +36,42 @@ export async function confirm(
   args: ConfirmAttachmentWithDimensionsArgs,
   uploaderId: Id<'users'>,
 ) {
-  const { imageDimensions, ...attachment } = args
+  const { imageDimensions, pendingSend, ...attachment } = args
   const { session } = await requireMember(ctx, args.sessionId, uploaderId)
+
   requireEnabled(session)
+
+  if (pendingSend) {
+    const send = await requireAttachmentSend(
+      ctx,
+      pendingSend.id,
+      args.sessionId,
+      uploaderId,
+    )
+    const slot = send.slots.find(
+      ({ occurrenceId }) => occurrenceId === pendingSend.occurrenceId,
+    )
+    if (!slot) error('Unknown attachment occurrence', 409)
+    if (slot.attachmentId) return slot.attachmentId
+    const { attachmentId } = await storeAttachment(ctx, {
+      ...attachment,
+      imageDimensions,
+      uploaderId,
+      pendingSendId: send._id,
+    })
+    const slots = send.slots.map((item) =>
+      item === slot ? { ...item, attachmentId } : item,
+    )
+    await ctx.db.patch(send._id, { slots })
+    return attachmentId
+  }
+
   const stored = await storeAttachment(ctx, {
     ...attachment,
     imageDimensions,
     uploaderId,
   })
+
   return stored.attachmentId
 }
 
@@ -105,7 +134,7 @@ export async function _get(
   { attachmentId }: { attachmentId: Id<'attachments'> },
 ) {
   const attachment = await ctx.db.get(attachmentId)
-  if (!attachment) return null
+  if (!attachment || attachment.pendingSendId) return null
 
   const file = await ctx.db.get(attachment.fileId)
   if (!file) return null
@@ -130,7 +159,8 @@ export async function getToolFile(
   const id = ctx.db.normalizeId('attachments', args.attachmentId)
   if (!id) return null
   const attachment = await ctx.db.get(id)
-  if (attachment?.sessionId !== stream.sessionId) return null
+  if (attachment?.sessionId !== stream.sessionId || attachment.pendingSendId)
+    return null
 
   const member = await getMember(ctx, stream.sessionId, stream.invokedBy)
   if (!member) return null
@@ -146,6 +176,7 @@ export async function listBySession(
   return ctx.db
     .query('attachments')
     .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+    .filter((q) => q.eq(q.field('pendingSendId'), undefined))
     .collect()
 }
 
@@ -155,11 +186,17 @@ export async function remove(
 ) {
   const attachment = await ctx.db.get(attachmentId)
   if (!attachment) return
+  if (attachment.pendingSendId)
+    error('Discard the pending message instead', 409)
+
   const { session } = await requireMember(ctx, attachment.sessionId, ctx.userId)
-  if (attachment.messageId) error('Delete the owning message instead', 409)
+  if (attachment.messageId) {
+    error('Delete the owning message instead', 409)
+  }
   if (attachment.uploaderId !== ctx.userId && session.ownerId !== ctx.userId) {
     error('Forbidden', 403)
   }
+
   await removeAttachment(ctx, attachment)
 }
 
@@ -314,7 +351,7 @@ export async function pruneOrphans(ctx: MutationCtx) {
     .collect()
 
   for (const attachment of staged) {
-    if (attachment._creationTime < cutoff)
+    if (!attachment.pendingSendId && attachment._creationTime < cutoff)
       await removeAttachment(ctx, attachment)
   }
 
@@ -413,7 +450,7 @@ async function requireReadable(
   attachmentId: Id<'attachments'>,
 ) {
   const attachment = await ctx.db.get(attachmentId)
-  if (!attachment) error('Not found', 404)
+  if (!attachment || attachment.pendingSendId) error('Not found', 404)
   await requireMember(ctx, attachment.sessionId, ctx.userId)
   return attachment
 }
@@ -423,7 +460,7 @@ async function readableOrNull(
   attachmentId: Id<'attachments'>,
 ) {
   const attachment = await ctx.db.get(attachmentId)
-  if (!attachment) return null
+  if (!attachment || attachment.pendingSendId) return null
   const member = await getMember(ctx, attachment.sessionId, ctx.userId)
   return member ? attachment : null
 }

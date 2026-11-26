@@ -181,6 +181,7 @@ export const workspaceSnapshotValidator = v.union(
 export const sendMessageArgsValidator = v.object({
   sessionId: v.id('sessions'),
   clientSendId: v.optional(v.string()),
+  attachmentSendId: v.optional(v.id('attachmentSends')),
   content: v.string(),
   role: v.optional(roleValidator),
   silent: v.optional(v.boolean()), // skips agent invocation (and eventually, notifications)

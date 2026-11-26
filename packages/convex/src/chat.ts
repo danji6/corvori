@@ -6,11 +6,13 @@ import { authMutation, authQuery } from './functions'
 import * as ChangeLocations from './model/changes/locations'
 import * as Changes from './model/changes/sets'
 import * as Chat from './model/chat'
+import * as AttachmentSends from './model/chat/attachmentSends'
 import { getReplyAttachment } from './model/chat/replies'
 import {
   publishLinkPreview,
   readLinkPreviewWork,
 } from './model/linkPreviews/records'
+import { beginAttachmentSendArgs } from './validators/attachmentSends'
 import * as ChangesV from './validators/changes'
 import {
   linkPreviewJobArgs,
@@ -70,6 +72,26 @@ export const searchMessages = authQuery({
 export const sendMessage = authMutation({
   args: V.sendMessageArgsValidator.fields,
   handler: Chat.sendMessage,
+})
+
+export const beginAttachmentSend = authMutation({
+  args: beginAttachmentSendArgs.fields,
+  handler: AttachmentSends.beginAttachmentSend,
+})
+
+export const renewAttachmentSend = authMutation({
+  args: { id: v.id('attachmentSends') },
+  handler: AttachmentSends.renewAttachmentSend,
+})
+
+export const discardAttachmentSend = authMutation({
+  args: { id: v.id('attachmentSends') },
+  handler: AttachmentSends.discardAttachmentSend,
+})
+
+export const _sweepAttachmentSends = internalMutation({
+  args: {},
+  handler: AttachmentSends.sweepAttachmentSends,
 })
 
 export const invokeAgent = authMutation({

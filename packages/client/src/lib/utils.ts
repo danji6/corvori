@@ -65,22 +65,6 @@ export async function imageLoad(image: HTMLImageElement) {
   })
 }
 
-export async function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onloadend = () => resolve(reader.result as string)
-    reader.onerror = reject
-    reader.readAsDataURL(blob)
-  })
-}
-
-export function fileToDataUrl(file: File): Promise<string> {
-  const blob = file.type
-    ? file
-    : file.slice(0, file.size, 'application/octet-stream')
-  return blobToBase64(blob)
-}
-
 export function dataUrlToFile(dataUrl: string, filename = 'file'): File {
   const [header, base64] = dataUrl.split(',')
   const mime = header.match(/:(.*?);/)?.[1] ?? 'application/octet-stream'

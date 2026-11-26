@@ -117,7 +117,8 @@ export function ChatSessionView({
   // Composer
   const { typingUsers, notify, clearTyping, stopTyping } = useTypingIndicator(session?._id) // prettier-ignore
   const passiveSend = session?.settings?.passiveSend ?? false
-  const isStopping = useStreamRawStatus() === 'stopping'
+  const streamStatus = useStreamRawStatus()
+  const isStopping = streamStatus === 'stopping'
   const cooldownUntil = useSendCooldownUntil()
   const cooldownElapsed = useHasElapsed(cooldownUntil)
   const sendDisabled = !!cooldownUntil && !cooldownElapsed
@@ -219,7 +220,12 @@ export function ChatSessionView({
 
   const unseenActivity = useUnseenTailActivity(isAtBottom)
   const hasActivity = isOngoingStream(status) || unseenActivity
-  const agentWaiting = awaitingApproval || awaitingAnswer
+  const agentActivity =
+    streamStatus === 'awaiting_attachments'
+      ? 'waiting for attachments'
+      : awaitingApproval || awaitingAnswer
+        ? 'waiting'
+        : 'working'
   const composerDocked =
     !isEditing && (isPinned || isAtBottom || hasContent || hasReply)
 
@@ -406,7 +412,7 @@ export function ChatSessionView({
                     isOngoingStream(status)
                       ? {
                           name: activeAgentName ?? 'Agent',
-                          state: agentWaiting ? 'waiting' : 'working',
+                          state: agentActivity,
                         }
                       : undefined
                   }

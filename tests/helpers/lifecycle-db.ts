@@ -47,6 +47,10 @@ export function lifecycleDatabase(seed: Record<string, Row[]> = {}) {
             predicates.push((row) => Number(field(row, key)) < value)
             return range
           },
+          gt: (key: string, value: number) => {
+            predicates.push((row) => Number(field(row, key)) > value)
+            return range
+          },
         }
         const selected = () =>
           rows(table).filter((row) =>

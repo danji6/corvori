@@ -1,4 +1,5 @@
 import {
+  type AttachmentUploadStatus,
   type FileItem,
   type FilePreview,
   isTextFileItem,
@@ -22,13 +23,21 @@ import {
   VideoIcon,
   XIcon,
 } from 'lucide-react'
-import { AnimatePresence, motion } from 'motion/react'
+import {
+  AnimatePresence,
+  motion,
+  useIsPresent,
+  usePresenceData,
+  useReducedMotion,
+} from 'motion/react'
+import type { ReactNode } from 'react'
 import { useState } from 'react'
 
 import { FilterableList, RippleButton, Skeleton } from '../ui'
 import type { FilterableListProps } from '../ui'
 import { type LightboxEntry, useLightbox } from './lightbox'
 import { TextFileViewer } from './text-file-viewer'
+import { WavyProgressBar } from './wavy-progress-bar'
 
 const DEFAULT_SIZE = 120
 const NO_ITEM_ANIMATION = {
@@ -49,9 +58,12 @@ export type FileStripProps = Omit<
   files: FileItem[]
   onRemove?: (id: string) => void
   onInsertInline?: (id: string) => void
+  discardMessage?: { fileId: string; onClick: () => void }
   actionsInContextMenu?: boolean
   size?: number
   noAnimation?: boolean
+  /** Hides outgoing cards while the strip still animates its height. */
+  hideOnExit?: boolean
 }
 
 export function FileStrip(props: FileStripProps) {
@@ -60,9 +72,11 @@ export function FileStrip(props: FileStripProps) {
     files,
     onRemove,
     onInsertInline,
+    discardMessage,
     actionsInContextMenu = false,
     size = DEFAULT_SIZE,
     noAnimation = false,
+    hideOnExit = false,
     ...rest
   } = props
   const previews = useFilePreviews(files)
@@ -99,6 +113,11 @@ export function FileStrip(props: FileStripProps) {
             actionsInContextMenu={actionsInContextMenu}
             onRemove={onRemove}
             onInsertInline={onInsertInline}
+            onDiscardMessage={
+              discardMessage?.fileId === item.id
+                ? discardMessage.onClick
+                : undefined
+            }
             onOpen={
               lightbox
                 ? (trigger) => lightbox.openGallery(gallery, item.id, trigger)
@@ -113,19 +132,32 @@ export function FileStrip(props: FileStripProps) {
 
   if (noAnimation) return list || null
   return (
-    <AnimatePresence mode="wait">
-      {list && (
-        <motion.div
-          className="w-full shrink-0 overflow-hidden"
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          transition={{ duration: 0.2, ease: 'easeInOut' }}
-        >
-          {list}
-        </motion.div>
-      )}
+    <AnimatePresence mode="wait" custom={hideOnExit}>
+      {list && <CollapsibleFileStrip>{list}</CollapsibleFileStrip>}
     </AnimatePresence>
+  )
+}
+
+function CollapsibleFileStrip({ children }: { children: ReactNode }) {
+  const present = useIsPresent()
+  const hideOnExit = usePresenceData() === true
+  const reducedMotion = useReducedMotion()
+
+  return (
+    <motion.div
+      className={cn(
+        'w-full shrink-0 overflow-hidden',
+        !present && hideOnExit && 'invisible',
+      )}
+      inert={!present}
+      aria-hidden={!present || undefined}
+      initial={{ height: 0, opacity: 0 }}
+      animate={{ height: 'auto', opacity: 1 }}
+      exit={{ height: 0, opacity: 0 }}
+      transition={{ duration: reducedMotion ? 0 : 0.2, ease: 'easeInOut' }}
+    >
+      {children}
+    </motion.div>
   )
 }
 
@@ -139,6 +171,7 @@ type FileStripItemProps = {
   actionsInContextMenu: boolean
   onRemove?: (id: string) => void
   onInsertInline?: (id: string) => void
+  onDiscardMessage?: () => void
   onOpen?: MediaThumbnailProps['onOpen']
 }
 
@@ -162,6 +195,19 @@ function FileStripItem(props: FileStripItemProps) {
       data-attachment-share-url={actionsInContextMenu ? item.shareUrl : undefined} // prettier-ignore
     >
       {square ? <SquarePreview {...props} /> : <FileCardPreview item={item} />}
+      {item.upload?.phase === 'failed' && item.upload.retry && (
+        <button
+          type="button"
+          aria-label={`Retry upload for ${item.file.name}`}
+          onClick={item.upload.retry}
+          className={cn(
+            'bg-m3-surface-container-high text-primary rounded-md px-2 py-1 text-xs hover:underline',
+            square ? 'absolute right-1 bottom-1 z-10' : 'mr-2',
+          )}
+        >
+          Retry
+        </button>
+      )}
       <FileStripItemActions {...props} square={square} />
     </div>
   )
@@ -173,10 +219,29 @@ function FileStripItemActions({
   actionsInContextMenu,
   onInsertInline,
   onRemove,
+  onDiscardMessage,
 }: Pick<
   FileStripItemProps,
-  'item' | 'actionsInContextMenu' | 'onInsertInline' | 'onRemove'
+  | 'item'
+  | 'actionsInContextMenu'
+  | 'onInsertInline'
+  | 'onRemove'
+  | 'onDiscardMessage'
 > & { square: boolean }) {
+  if (onDiscardMessage) {
+    return (
+      <RippleButton
+        size="icon"
+        variant="surface"
+        onClick={onDiscardMessage}
+        className={cn('size-7', square ? 'absolute top-1 right-1' : 'mr-2')}
+        aria-label="Discard message"
+        title="Discard message"
+      >
+        <XIcon className="size-3" />
+      </RippleButton>
+    )
+  }
   if (actionsInContextMenu && !onRemove) return null
 
   return (
@@ -332,25 +397,45 @@ function galleryEntry(
 }
 
 function SquarePreview({ item, media, preview, onOpen }: FileStripItemProps) {
-  if (!media) return <Skeleton className="size-full rounded-lg" />
-
   const { byteLength } = item
   return (
     <>
-      <MediaThumbnail
-        src={
-          media.kind === 'video'
-            ? media.poster
-            : (preview.thumbnailUrl ?? undefined)
-        }
-        video={media.kind === 'video'}
-        alt={item.file.name}
-        onOpen={onOpen}
-      />
+      {media ? (
+        <MediaThumbnail
+          src={
+            media.kind === 'video'
+              ? media.poster
+              : (preview.thumbnailUrl ?? undefined)
+          }
+          localVideo={
+            item.localPreview?.kind === 'video'
+              ? item.localPreview.url
+              : undefined
+          }
+          video={media.kind === 'video'}
+          alt={item.file.name}
+          onOpen={onOpen}
+        />
+      ) : (
+        <Skeleton className="size-full rounded-lg" />
+      )}
       {byteLength !== undefined && byteLength > 0 && preview.thumbnailUrl && (
         <span className="bg-m3-surface-container/90 pointer-events-none absolute top-1 left-1 rounded-full px-2 py-0.5 text-[10px]">
           {formatByteLength(byteLength)}
         </span>
+      )}
+      {item.upload && (
+        <div
+          className={cn(
+            'bg-m3-surface-container/95 absolute inset-x-1 bottom-1 rounded-md px-2 py-1 text-xs',
+            item.upload.phase === 'failed' && item.upload.retry && 'pr-12',
+          )}
+        >
+          <AttachmentUploadFeedback
+            name={item.file.name}
+            status={item.upload}
+          />
+        </div>
       )}
     </>
   )
@@ -359,13 +444,29 @@ function SquarePreview({ item, media, preview, onOpen }: FileStripItemProps) {
 type MediaThumbnailProps = {
   src?: string
   video: boolean
+  localVideo?: string
   alt: string
   onOpen?: (trigger: HTMLElement) => void
 }
 
-function MediaThumbnail({ src, video, alt, onOpen }: MediaThumbnailProps) {
+function MediaThumbnail({
+  src,
+  video,
+  localVideo,
+  alt,
+  onOpen,
+}: MediaThumbnailProps) {
   const content = src ? (
     <img src={src} alt={alt} className="size-full object-cover" />
+  ) : localVideo ? (
+    <video
+      src={localVideo}
+      muted
+      playsInline
+      preload="metadata"
+      aria-hidden
+      className="size-full object-cover"
+    />
   ) : video ? (
     <span className="bg-m3-surface-container-high flex size-full items-center justify-center">
       <VideoIcon />
@@ -389,12 +490,19 @@ function MediaThumbnail({ src, video, alt, onOpen }: MediaThumbnailProps) {
 
 function FileCardPreview({ item }: { item: FileItem }) {
   const { name } = item.file
-  const details = <FileCardDetails name={name} byteLength={item.byteLength} />
+  const details = (
+    <FileCardDetails
+      name={name}
+      byteLength={item.byteLength}
+      upload={item.upload}
+    />
+  )
   const link = item.shareUrl && item.originalUrl
 
   return (
     <div className="min-w-0 flex-[1_1_6rem]">
-      {isTextFileItem(item) ? (
+      {isTextFileItem(item) &&
+      (item.originalFile || isDisplayableUrl(item.url)) ? (
         <TextFileViewer item={item}>{details}</TextFileViewer>
       ) : link ? (
         <a
@@ -416,9 +524,11 @@ function FileCardPreview({ item }: { item: FileItem }) {
 function FileCardDetails({
   name,
   byteLength,
+  upload,
 }: {
   name: string
   byteLength?: number
+  upload?: AttachmentUploadStatus
 }) {
   return (
     <span className="flex min-h-15 items-center gap-2.5 px-3 py-2">
@@ -431,9 +541,48 @@ function FileCardDetails({
           {name}
         </span>
         <span className="text-m3-on-surface-variant block min-h-4 text-xs leading-4">
-          {byteLength !== undefined && formatByteLength(byteLength)}
+          {upload ? (
+            <AttachmentUploadFeedback name={name} status={upload} />
+          ) : (
+            byteLength !== undefined && formatByteLength(byteLength)
+          )}
         </span>
       </span>
     </span>
+  )
+}
+
+function AttachmentUploadFeedback({
+  name,
+  status,
+}: {
+  name: string
+  status: AttachmentUploadStatus
+}) {
+  if (status.phase === 'failed') {
+    return (
+      <span
+        role="status"
+        title={status.error}
+        className="text-destructive block wrap-break-word"
+      >
+        {status.error}
+      </span>
+    )
+  }
+
+  const finishing = status.phase === 'finishing'
+  return (
+    <WavyProgressBar
+      aria-label={`Uploading ${name}`}
+      aria-valuetext={finishing ? 'Finishing upload' : undefined}
+      value={
+        finishing
+          ? 1
+          : status.phase === 'uploading'
+            ? status.fraction
+            : undefined
+      }
+    />
   )
 }

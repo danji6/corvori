@@ -15,6 +15,7 @@ const skillAvailabilityValidator = v.object({ skills: v.boolean() })
 
 export const streamStatusValidator = v.union(
   v.literal('pending'),
+  v.literal('awaiting_attachments'),
   v.literal('streaming'),
   v.literal('stopping'),
   v.literal('retrying'),
@@ -116,6 +117,11 @@ const requiredOutput = {
 /** Stores only the data owned by the current lifecycle phase. */
 export const streamStateValidator = v.union(
   v.object({ phase: v.literal('reserved'), ...optionalOutput }),
+  v.object({
+    phase: v.literal('awaiting_attachments'),
+    fireAt: v.optional(v.number()),
+    ...optionalOutput,
+  }),
   v.object({
     phase: v.literal('pending'),
     jobId: v.id('_scheduled_functions'),
@@ -234,6 +240,8 @@ export const streamSchema = v.object({
   state: streamStateValidator,
   contextBoundaryMessageId: v.optional(v.id('messages')),
   contextBoundaryCreationTime: v.optional(v.number()),
+  /** A pending attachment send arrived after this turn took its input. */
+  deferInterjections: v.optional(v.boolean()),
   attempt: v.number(),
   leaseExpiresAt: v.number(),
   /** A stop to honor after the current provider step. */

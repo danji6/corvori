@@ -1,5 +1,6 @@
 import { useAccountId } from '@/hooks/account-scope'
 import type { FileItem } from '@/hooks/file-previews'
+import { useLocalFilePreviews } from '@/hooks/local-file-previews'
 import { normalizeBrowserUrl } from '@/lib/auth/site-url'
 import {
   type ComposerAttachmentDraft,
@@ -8,7 +9,7 @@ import {
   sharedFilePart,
   writeComposerAttachmentDraft,
 } from '@/lib/chat/composer-attachment-draft-store'
-import { processFileForUpload } from '@/lib/chat/io'
+import { describeUpload } from '@/lib/chat/io'
 import { buildFileItemFromPart } from '@/lib/chat/parts'
 import type {
   PendingFilePart,
@@ -38,7 +39,8 @@ export type ComposerFileBatch = File[] | Promise<File[]>
 
 type AttachmentQueue = {
   signal: AbortSignal
-  tail: Promise<unknown>
+  nextOrder: number
+  order: Map<string, number>
   pending: number
 }
 
@@ -69,7 +71,8 @@ export function useComposerAttachments({
     const controller = new AbortController()
     attachmentQueue.current = {
       signal: controller.signal,
-      tail: Promise.resolve(),
+      nextOrder: 0,
+      order: new Map(),
       pending: 0,
     }
     retainedFiles.current.clear()
@@ -132,12 +135,18 @@ export function useComposerAttachments({
     }
   }
 
+  const localPreviews = useLocalFilePreviews(originalFiles)
   const files = useMemo<FileItem[]>(
     () =>
-      fileParts.map((part) =>
-        buildDraftFileItem(part, part.id in pastedText, originalFiles[part.id]),
-      ),
-    [fileParts, originalFiles, pastedText],
+      fileParts.map((part) => ({
+        ...buildDraftFileItem(
+          part,
+          part.id in pastedText,
+          originalFiles[part.id],
+        ),
+        localPreview: localPreviews[part.id],
+      })),
+    [fileParts, originalFiles, pastedText, localPreviews],
   )
 
   const restoreAttachments = useCallback((message: PendingMessage) => {
@@ -150,6 +159,7 @@ export function useComposerAttachments({
 
   const resetAttachments = useCallback(() => {
     revision.current++
+    attachmentQueue.current?.order.clear()
     filePartsRef.current = []
     setFileParts([])
     setOriginalFiles({})
@@ -160,104 +170,95 @@ export function useComposerAttachments({
     if (draftKey) void clearComposerAttachmentDraft(draftKey)
   }, [draftKey])
 
-  // Keep later picks and pastes from overtaking files still being processed.
-  const enqueueAttachment = useCallback(
-    <T>(add: (signal: AbortSignal) => Promise<T>, canceled: T) => {
-      const queue = attachmentQueue.current
-      if (!queue) return Promise.resolve(canceled)
-      const { signal } = queue
-      queue.pending++
-      setProcessingKey(draftKey ?? null)
-      const result = queue.tail
-        .then(() => (signal.aborted ? canceled : add(signal)))
-        .finally(() => {
-          queue.pending--
-          if (attachmentQueue.current === queue && !queue.pending)
-            setProcessingKey(undefined)
-        })
-      queue.tail = result.catch(() => undefined)
-      return result
+  const insertBatch = useCallback(
+    (queue: AttachmentQueue, order: number, parts: PendingFilePart[]) => {
+      if (queue.signal.aborted || !parts.length) return
+      for (const part of parts) {
+        if (!queue.order.has(part.id)) queue.order.set(part.id, order)
+      }
+      revision.current++
+      setFileParts((previous) => {
+        const unique = new Map(previous.map((part) => [part.id, part]))
+        for (const part of parts) unique.set(part.id, part)
+        const position = (part: PendingFilePart) =>
+          queue.order.get(part.id) ?? -1
+        return [...unique.values()].sort((a, b) => position(a) - position(b))
+      })
     },
-    [draftKey],
+    [],
   )
 
   const addFiles = useCallback(
-    (picked: ComposerFileBatch) => {
-      // Read the drop immediately, but commit it in the same queue as picks and pastes.
-      const batch = Promise.resolve(picked).then(
-        (files) => ({ files }),
-        (error: unknown) => ({ error }),
-      )
-      return enqueueAttachment(async (signal) => {
-        try {
-          const result = await batch
-          if (signal.aborted) return false
-          if ('error' in result) throw result.error
-          for (const file of result.files) {
-            const { part, originalFile } = await processComposerFile(file)
-            if (signal.aborted) return false
-            revision.current++
-            setFileParts((previous) => [...previous, part])
-            if (originalFile) {
-              setOriginalFiles((previous) => ({
-                ...previous,
-                [part.id]: originalFile,
-              }))
-            }
-          }
-          return result.files.length > 0
-        } catch (error) {
-          if (!signal.aborted) toastError(error, 'Failed to process file')
-          return false
+    async (picked: ComposerFileBatch) => {
+      const queue = attachmentQueue.current
+      if (!queue) return false
+      const order = queue.nextOrder++
+      const isDeferred = !Array.isArray(picked)
+      if (isDeferred) {
+        queue.pending++
+        setProcessingKey(draftKey ?? null)
+      }
+      try {
+        const files = Array.isArray(picked) ? picked : await picked
+        if (queue.signal.aborted || !files.length) return false
+        const parts = files.map((file) => describeComposerFile(file))
+        insertBatch(queue, order, parts)
+        setOriginalFiles((previous) => ({
+          ...previous,
+          ...Object.fromEntries(
+            parts.map((part, index) => [part.id, files[index]]),
+          ),
+        }))
+        return true
+      } catch (error) {
+        if (!queue.signal.aborted) toastError(error, 'Failed to attach files')
+        return false
+      } finally {
+        if (
+          isDeferred &&
+          --queue.pending === 0 &&
+          attachmentQueue.current === queue
+        ) {
+          setProcessingKey(undefined)
         }
-      }, false)
+      }
     },
-    [enqueueAttachment],
+    [draftKey, insertBatch],
   )
 
   const addLargeTextPaste = useCallback(
     (text: string, position: number) => {
+      const queue = attachmentQueue.current
+      if (!queue || queue.signal.aborted) return
       const filename = suffixFilename('pasted-text.txt', attachmentNameSuffix())
       const file = new File([text], filename, {
         type: 'text/plain;charset=utf-8',
       })
-
-      return enqueueAttachment(async (signal) => {
-        try {
-          const { part, originalFile } = await processComposerFile(file)
-          if (signal.aborted) return
-          revision.current++
-          setFileParts((previous) => [...previous, part])
-          setOriginalFiles((previous) => ({
-            ...previous,
-            [part.id]: originalFile ?? file,
-          }))
-          setPastedText((previous) => ({
-            ...previous,
-            [part.id]: { text, position },
-          }))
-        } catch (error) {
-          if (!signal.aborted) toastError(error, 'Failed to attach pasted text')
-        }
-      }, undefined)
+      const part = describeComposerFile(file)
+      insertBatch(queue, queue.nextOrder++, [part])
+      setOriginalFiles((previous) => ({ ...previous, [part.id]: file }))
+      setPastedText((previous) => ({
+        ...previous,
+        [part.id]: { text, position },
+      }))
     },
-    [enqueueAttachment],
+    [insertBatch],
   )
 
-  const addSharedFiles = useCallback((shares: SharedAttachment[]) => {
-    if (shares.length === 0) return
-    revision.current++
-    setFileParts((previous) => {
-      const parts = new Map(previous.map((part) => [part.id, part]))
-      for (const share of shares) parts.set(share.fileId, sharedFilePart(share))
-      return [...parts.values()]
-    })
-  }, [])
+  const addSharedFiles = useCallback(
+    (shares: SharedAttachment[]) => {
+      const queue = attachmentQueue.current
+      if (queue)
+        insertBatch(queue, queue.nextOrder++, shares.map(sharedFilePart))
+    },
+    [insertBatch],
+  )
 
   const removeFile = useCallback((id: string) => {
     revision.current++
     setFileParts((previous) => previous.filter((item) => item.id !== id))
     setOriginalFiles((previous) => omitKey(previous, id))
+    attachmentQueue.current?.order.delete(id)
     setPastedText((previous) => omitKey(previous, id))
   }, [])
 
@@ -354,17 +355,11 @@ async function restoreAttachmentDraft(
   draftKey: string,
 ): Promise<RestoredAttachmentDraft | null> {
   const saved = await readComposerAttachmentDraft(draftKey)
-  const processed = await Promise.allSettled(
-    saved.map(async (item): Promise<RestoredDraftFile> => {
-      if ('share' in item) return { part: sharedFilePart(item.share) }
-      const { id, file, pastePosition } = item
-      const { part } = await processComposerFile(file, id)
-      return { part, file, pastePosition }
-    }),
-  )
-  const restored = processed.flatMap((result) =>
-    result.status === 'fulfilled' ? [result.value] : [],
-  )
+  const restored = saved.map((item): RestoredDraftFile => {
+    if ('share' in item) return { part: sharedFilePart(item.share) }
+    const { id, file, pastePosition } = item
+    return { part: describeComposerFile(file, id), file, pastePosition }
+  })
   if (restored.length === 0) return null
 
   const pastedEntries = await Promise.allSettled(
@@ -394,10 +389,9 @@ async function restoreAttachmentDraft(
   }
 }
 
-/** Assigns an occurrence ID independently of the processed file's content. */
-async function processComposerFile(file: File, id = generateId()) {
-  const processed = await processFileForUpload(file)
-  return { ...processed, part: { ...processed.part, id } }
+/** Assigns an occurrence ID independently of the local file contents. */
+function describeComposerFile(file: File, id = generateId()) {
+  return { ...describeUpload(file, id), id }
 }
 
 function omitKey<T>(record: Record<string, T>, key: string): Record<string, T> {

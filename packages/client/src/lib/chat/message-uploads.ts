@@ -1,11 +1,27 @@
+import { useAccountId } from '@/hooks/account-scope'
+import type { AttachmentUploadStatus } from '@/hooks/file-previews'
 import type { Id } from '@cv/convex/_generated/dataModel'
 import type { WindowMessage } from '@cv/convex/model/chat/queries'
 import { useSyncExternalStore } from 'react'
 
 const prefix = 'optimistic:'
 const empty: WindowMessage[] = []
-const uploadsBySession = new Map<Id<'sessions'>, WindowMessage[]>()
+const uploadsBySession = new Map<string, WindowMessage[]>()
 const listeners = new Set<() => void>()
+const jobs = new Map<string, UploadJob>()
+
+export type MessageUploadState = {
+  files: Record<string, AttachmentUploadStatus | undefined>
+  error?: string
+  retry?: () => void
+  discard?: () => void
+}
+
+type UploadJob = {
+  account: string
+  state: MessageUploadState
+  close: () => void
+}
 
 export function createOptimisticMessageId(clientSendId: string) {
   return `${prefix}${clientSendId}` as Id<'messages'>
@@ -20,32 +36,71 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener)
 }
 
-function update(sessionId: Id<'sessions'>, uploads: WindowMessage[]) {
-  if (uploads.length > 0) uploadsBySession.set(sessionId, uploads)
-  else uploadsBySession.delete(sessionId)
+function publish() {
   listeners.forEach((listener) => listener())
 }
 
-export function showMessageUpload(message: WindowMessage) {
-  const { sessionId } = message
-  update(sessionId, [...(uploadsBySession.get(sessionId) ?? empty), message])
+function sessionKey(account: string, sessionId: Id<'sessions'>) {
+  return JSON.stringify([account, sessionId])
+}
+
+export function showMessageUpload(
+  account: string,
+  message: WindowMessage,
+  state: MessageUploadState,
+  close: () => void,
+) {
+  const key = sessionKey(account, message.sessionId)
+  jobs.set(message._id, { account, state, close })
+  uploadsBySession.set(key, [...(uploadsBySession.get(key) ?? empty), message])
+  publish()
 
   return {
+    update(state: MessageUploadState) {
+      if (!jobs.has(message._id)) return
+      jobs.set(message._id, { account, state, close })
+      publish()
+    },
     finish() {
-      const uploads = uploadsBySession.get(sessionId) ?? empty
-      update(
-        sessionId,
-        uploads.filter((item) => item !== message),
+      jobs.delete(message._id)
+      const remaining = (uploadsBySession.get(key) ?? empty).filter(
+        (item) => item !== message,
       )
+      if (remaining.length) uploadsBySession.set(key, remaining)
+      else uploadsBySession.delete(key)
+      publish()
     },
   }
 }
 
+/** Stops local transfers when their authenticated account leaves the app. */
+export function closeAccountMessageUploads(account: string) {
+  for (const job of jobs.values()) {
+    if (job.account === account) job.close()
+  }
+}
+
 export function useMessageUploads(sessionId: Id<'sessions'> | null) {
+  const account = useAccountId()
   return useSyncExternalStore(
     subscribe,
-    () => (sessionId ? (uploadsBySession.get(sessionId) ?? empty) : empty),
+    () =>
+      sessionId
+        ? (uploadsBySession.get(sessionKey(account, sessionId)) ?? empty)
+        : empty,
     () => empty,
+  )
+}
+
+export function useMessageUploadState(messageId: string | undefined) {
+  const account = useAccountId()
+  return useSyncExternalStore(
+    subscribe,
+    () => {
+      const job = messageId ? jobs.get(messageId) : undefined
+      return job?.account === account ? job.state : undefined
+    },
+    () => undefined,
   )
 }
 

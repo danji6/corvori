@@ -3,6 +3,8 @@ import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import type { StreamExecutionArgs, StreamState } from '../../validators/streams'
+import { latestAttachmentSend } from '../chat/attachmentSendRecords'
+import { isHistoricalTurn } from './historyBoundary'
 import { STREAM_LEASE_MS } from './lease'
 import type { RunningStream } from './types'
 
@@ -59,6 +61,35 @@ type ScheduleOptions =
       retryError: string
     }
 
+export function startsFreshResponse(stream: Doc<'streams'>) {
+  if (stream.state.processingMessageId || isHistoricalTurn(stream.command)) {
+    return false
+  }
+  return (
+    stream.command.kind !== 'compact' || !stream.command.preserveContextBoundary
+  )
+}
+
+/** Parks a fresh turn until the last live send reservation is released. */
+export async function deferForAttachments(
+  ctx: MutationCtx,
+  stream: Doc<'streams'>,
+  generation: number,
+  fireAt?: number,
+) {
+  if (!startsFreshResponse(stream)) return false
+  const pending = await latestAttachmentSend(ctx, stream.sessionId)
+  if (!pending) return false
+
+  await ctx.db.patch(stream._id, {
+    generation,
+    state: { phase: 'awaiting_attachments', fireAt },
+    leaseExpiresAt: pending.expiresAt + STREAM_LEASE_MS,
+  })
+
+  return true
+}
+
 /** Replaces scheduled work atomically and invalidates the previous execution. */
 export async function scheduleStream(
   ctx: MutationCtx,
@@ -73,6 +104,15 @@ export async function scheduleStream(
   await cancelScheduledExecution(ctx, stream)
 
   const generation = stream.generation + 1
+  if (options.kind !== 'retrying') {
+    const deferred = await deferForAttachments(
+      ctx,
+      stream,
+      generation,
+      options.fireAt,
+    )
+    if (deferred) return
+  }
   const args = { streamId, generation }
   const next =
     options.kind === 'retrying'
@@ -80,6 +120,24 @@ export async function scheduleStream(
       : await schedulePendingState(ctx, stream, args, options)
 
   await ctx.db.patch(streamId, { generation, ...next })
+}
+
+export async function wakeAttachmentTurn(
+  ctx: MutationCtx,
+  sessionId: Id<'sessions'>,
+) {
+  const stream = await ctx.db
+    .query('streams')
+    .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+    .first()
+  if (stream?.state.phase !== 'awaiting_attachments') return
+  if (await latestAttachmentSend(ctx, sessionId)) return
+
+  const { fireAt } = stream.state
+  await scheduleStream(ctx, stream._id, {
+    fireAt,
+    delayMs: fireAt === undefined ? 0 : Math.max(0, fireAt - Date.now()),
+  })
 }
 
 /** Schedules a fresh action without consuming another provider retry attempt. */

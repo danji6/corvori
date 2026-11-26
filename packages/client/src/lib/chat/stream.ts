@@ -12,5 +12,7 @@ export function isOngoingStream(status: ChatStatus): boolean {
 
 export function normalizeStatus(stream: ActiveStream | null | undefined) {
   if (!stream) return 'ready'
-  return stream.status === 'pending' ? 'submitted' : 'streaming'
+  return stream.status === 'pending' || stream.status === 'awaiting_attachments'
+    ? 'submitted'
+    : 'streaming'
 }

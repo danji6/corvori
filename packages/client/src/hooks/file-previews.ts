@@ -14,10 +14,18 @@ export type FileItem = {
   imageDimensions?: AttachmentImageDimensions
   canInsertInline?: boolean
   localPreview?: LocalFilePreview
+  upload?: AttachmentUploadStatus
 }
+
+export type AttachmentUploadStatus =
+  | { phase: 'queued' | 'finishing' }
+  | { phase: 'uploading'; fraction?: number }
+  | { phase: 'failed'; error: string; retry?: () => void }
 
 export type LocalFilePreview = {
   url: string
+  kind?: 'image' | 'video'
+  loadThumbnail?: () => Promise<string | null>
   thumbnail?: Promise<string | null>
   thumbnailUrl?: string | null
 }
@@ -49,10 +57,12 @@ function localThumbnail(preview: LocalFilePreview) {
 
 function loadThumbnail(url: string, local?: LocalFilePreview) {
   if (!local) return thumbnail(url)
-  local.thumbnail ??= thumbnail(url).then((result) => {
-    local.thumbnailUrl = result
-    return result
-  })
+  local.thumbnail ??= (local.loadThumbnail?.() ?? thumbnail(url)).then(
+    (result) => {
+      local.thumbnailUrl = result
+      return result
+    },
+  )
   return local.thumbnail
 }
 
@@ -111,7 +121,7 @@ export function useFilePreviews(items: FileItem[]): FilePreview[] {
   return items.map((item) => {
     if (isTextFileItem(item)) {
       return {
-        url: item.originalUrl ?? item.url,
+        url: item.originalUrl ?? item.localPreview?.url ?? item.url,
         previewUrl: item.url,
         isThumbnailable: false,
         thumbnailUrl: null,
@@ -124,7 +134,7 @@ export function useFilePreviews(items: FileItem[]): FilePreview[] {
     const thumbnailUrl = result ?? fallback ?? null
     const awaitingThumbnail = result === undefined && !item.localPreview
     return {
-      url: item.originalUrl ?? item.url,
+      url: item.originalUrl ?? item.localPreview?.url ?? item.url,
       previewUrl: item.url,
       isThumbnailable: pending || thumbnailUrl !== null || awaitingThumbnail,
       thumbnailUrl,

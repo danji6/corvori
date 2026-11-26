@@ -64,6 +64,7 @@ export async function remove(
   await removeSessionCache(ctx, sessionId)
 
   const sessionTables = [
+    'attachmentSends',
     'userSessions',
     'sessionShares',
     'sessionAgents',

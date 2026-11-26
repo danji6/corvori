@@ -1,11 +1,16 @@
 import type { Doc } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import type { StreamExecutionArgs } from '../../validators/streams'
+import { latestAttachmentSend } from '../chat/attachmentSendRecords'
 import { resolveStreamSender } from '../chat/identities'
 import { injectModeNote } from '../chat/notes'
 import { injectDueReminders } from '../chat/reminders'
 import { getProcessingSegmentRow, insertMessage } from '../messageContents'
-import { matchesExecution, ownsExecution } from './execution'
+import {
+  deferForAttachments,
+  matchesExecution,
+  ownsExecution,
+} from './execution'
 import { scheduleStream, startExecution } from './execution'
 import { latestClaimAnchor } from './historyBoundary'
 import { renewStreamLease } from './lease'
@@ -27,6 +32,10 @@ export async function _claim(
   if (!scheduled) return null
 
   if (!stream.state.processingMessageId) {
+    const fireAt =
+      stream.state.phase === 'pending' ? stream.state.fireAt : undefined
+    if (await deferForAttachments(ctx, stream, generation + 1, fireAt))
+      return null
     const claimed = await claimFreshTurn(ctx, stream)
     return claimed
   }
@@ -48,11 +57,13 @@ export async function _claim(
     (stream.command.kind === 'compact' || stream.command.kind === 'invoke') &&
     stream.command.preserveContextBoundary
 
-  if (fresh && !preserveContextBoundary) {
+  if (fresh && !preserveContextBoundary && !stream.deferInterjections) {
     // Only compute the context boundary for a fresh segment to preserve tool approvals
-    const boundary = await latestClaimAnchor(ctx, stream)
-    boundaryId = boundary?._id
-    boundaryCreationTime = boundary?._creationTime
+    if (!(await latestAttachmentSend(ctx, stream.sessionId))) {
+      const boundary = await latestClaimAnchor(ctx, stream)
+      boundaryId = boundary?._id
+      boundaryCreationTime = boundary?._creationTime
+    }
   } else if (stream.command.kind === 'invoke') {
     const current = await ctx.db.get(stream.state.processingMessageId)
     // Only this stream's own turn may roll over. /resume and retry streams point

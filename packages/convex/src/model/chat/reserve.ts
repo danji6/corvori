@@ -139,7 +139,8 @@ function canDebounceInvoke(
 ): stream is Doc<'streams'> {
   if (!stream) return false
   return (
-    stream.state.phase === 'pending' &&
+    (stream.state.phase === 'pending' ||
+      stream.state.phase === 'awaiting_attachments') &&
     stream.command.kind === 'invoke' &&
     !stream.command.preserveContextBoundary
   )

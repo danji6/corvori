@@ -29,11 +29,16 @@ function fakeCtx(initial: Record<string, InputRow[]>) {
 
   const allRows = () => [...tables.values()].flat()
   const tableRows = (table: string) => tables.get(table) ?? []
+  type Condition = (row: Row) => boolean
   const indexConditions = () => {
-    const conditions: Array<[string, unknown]> = []
+    const conditions: Condition[] = []
     const q = {
       eq: (field: string, value: unknown) => {
-        conditions.push([field, value])
+        conditions.push((row) => row[field] === value)
+        return q
+      },
+      gt: (field: string, value: number) => {
+        conditions.push((row) => Number(row[field]) > value)
         return q
       },
     }
@@ -41,10 +46,10 @@ function fakeCtx(initial: Record<string, InputRow[]>) {
   }
 
   const query = (table: string) => {
-    let conditions: Array<[string, unknown]> = []
+    let conditions: Condition[] = []
     const matching = () =>
       tableRows(table).filter((row) =>
-        conditions.every(([field, value]) => row[field] === value),
+        conditions.every((condition) => condition(row)),
       )
     const chain = {
       withIndex: (

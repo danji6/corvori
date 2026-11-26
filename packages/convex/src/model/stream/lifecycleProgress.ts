@@ -9,6 +9,7 @@ import type {
   StreamExecutionArgs,
 } from '../../validators/streams'
 import { mergePublishedAttachments } from '../attachments/transfers'
+import { latestAttachmentSend } from '../chat/attachmentSendRecords'
 import { injectModeNote } from '../chat/notes'
 import { injectDueReminders } from '../chat/reminders'
 import { mergeOperationParts } from '../mcp/operations/parts'
@@ -68,6 +69,7 @@ export async function consumeInterjections(
 ) {
   const command = stream.command
   if (command.kind === 'compact' || isHistoricalTurn(command)) return false
+  if (stream.deferInterjections) return false
   if (!stream.state.processingMessageId) return false
 
   const current = await ctx.db.get(stream.state.processingMessageId)
@@ -102,6 +104,7 @@ export async function consumeInterjections(
     .first()
 
   if (!newer) return false
+  if (await latestAttachmentSend(ctx, stream.sessionId)) return false
 
   if (row) {
     await finalizeTurn(ctx, {

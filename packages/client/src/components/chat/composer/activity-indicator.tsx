@@ -7,7 +7,7 @@ const MAX_LENGTH = 20
 
 type AgentActivity = {
   name: string
-  state: 'working' | 'waiting'
+  state: 'working' | 'waiting' | 'waiting for attachments'
 }
 
 type ActivityIndicatorProps = {

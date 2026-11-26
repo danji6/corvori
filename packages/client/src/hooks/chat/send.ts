@@ -1,3 +1,4 @@
+import { useAccountId } from '@/hooks/account-scope'
 import { useActiveAgent } from '@/hooks/chat/agent'
 import type { ActiveAgent } from '@/hooks/chat/agent'
 import { useUserProfile } from '@/hooks/chat/profile'
@@ -6,25 +7,25 @@ import { generateId } from '@/lib'
 import { normalizeBrowserUrl } from '@/lib/auth/site-url'
 import type { MessageRole, PendingFilePart, PendingMessage } from '@/lib/chat'
 import {
-  type StagedAttachment,
-  keepAttachmentSendPreviews,
-} from '@/lib/chat/attachment-send-previews'
+  type FileToUpload,
+  startAttachmentSend,
+} from '@/lib/chat/attachment-send-job'
+import type { StagedAttachment } from '@/lib/chat/attachment-send-previews'
 import {
   createOptimisticMessageId,
   hasMessageSend,
-  showMessageUpload,
 } from '@/lib/chat/message-uploads'
 import type { SharedAttachment } from '@/lib/chat/types'
+import { uploadAttachmentBlob } from '@/lib/chat/upload-attachment-blob'
 import { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
-import type { ConfirmAttachmentArgs } from '@cv/convex/validators/attachments'
 import type { MessageSender, ReplyQuote } from '@cv/convex/validators/messages'
 import { parseFileMentions } from '@cv/core/mentions/parse'
 import { parseShellCommand, unescapeShellPrefix } from '@cv/core/shell/command'
 import type { WorkspaceLinkSnapshot } from '@cv/core/types/workspace'
 import type { FileUIPart } from 'ai'
 import type { OptimisticLocalStore } from 'convex/browser'
-import { useAction, useMutation } from 'convex/react'
+import { type ReactMutation, useAction, useMutation } from 'convex/react'
 import type { FunctionArgs, FunctionReturnType } from 'convex/server'
 import { useCallback } from 'react'
 
@@ -48,18 +49,13 @@ type UploadMeta = { mediaType: string; filename: string }
 
 type MessageFile = FileUIPart & { attachmentId?: Id<'attachments'> }
 
-type StoreBlob = (blob: Blob, mediaType: string) => Promise<Id<'_storage'>>
-
-type ConfirmAttachment = (
-  args: Omit<ConfirmAttachmentArgs, 'sessionId'>,
-) => Promise<Pick<StagedAttachment, 'id' | 'imageDimensions'>>
-
 type ResolveFileLinks = (args: {
   sessionId: Id<'sessions'>
   paths: string[]
 }) => Promise<ResolvedFileLink[]>
 
 export function useSendMessage() {
+  const account = useAccountId()
   const session = useActiveSession()
   const profile = useUserProfile()
   const agent = useActiveAgent()
@@ -67,254 +63,246 @@ export function useSendMessage() {
   const generateUploadUrl = useMutation(api.attachments.generateUploadUrl)
   const confirmAttachment = useMutation(api.attachments.confirm)
   const confirmImageAttachment = useAction(api.actions.attachments.confirmImage)
-  const removeAttachment = useMutation(api.attachments.remove)
   const resolveFileLinks = useAction(api.actions.workspaces.resolveFileLinks)
   const isWorkspaceAdmin = useIsWorkspaceAdmin()
-
   const sendMutation = useMutation(api.chat.sendMessage)
+  const begin = useMutation(api.chat.beginAttachmentSend)
+  const renew = useMutation(api.chat.renewAttachmentSend)
+  const discard = useMutation(api.chat.discardAttachmentSend)
 
   return useCallback(
     async (pending: PendingMessage, role?: MessageRole) => {
       if (!session) throw new Error('Chat session is unavailable')
 
-      const content = pending.content.trim()
-      const messageRole = role ?? pending.role ?? 'user'
-      const clientSendId = generateId()
-
-      const args: SendArgs = {
+      const prepared = prepareSend({
+        pending,
         sessionId: session._id,
-        clientSendId,
-        content,
-        ...(messageRole !== 'user' ? { role: messageRole } : {}),
-        ...(pending.silent ? { silent: true } : {}),
-        ...(pending.replyTo && {
-          replyToId: pending.replyTo.target.id,
-          ...(pending.replyTo.target.part && {
-            replyToPart: pending.replyTo.target.part,
-          }),
-        }),
-      }
-
-      const optimisticId = createOptimisticMessageId(clientSendId)
-      const sender = optimisticSender(messageRole, profile, agent, optimisticId)
-      const senderName = (sender.type === 'agent' ? assistant : user) ?? null
-      const attribution = { sender, senderName }
-      const uploadsOnly = pending.files.filter((part) => !part.share)
-
-      const localFiles = uploadsOnly.map((part) =>
-        localAttachment(part, pending.originalFiles?.[part.id], optimisticId),
-      )
-      const localById = new Map(
-        uploadsOnly.map((part, index) => [part.id, localFiles[index].part]),
-      )
-
-      const storeBlob: StoreBlob = async (blob, mediaType) => {
-        const uploadUrl = normalizeBrowserUrl(await generateUploadUrl({}))
-        if (!uploadUrl) throw new Error('Upload URL not available')
-
-        const response = await fetch(uploadUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': mediaType },
-          body: blob,
-        })
-        if (!response.ok) {
-          throw new Error(`Upload failed: ${response.statusText}`)
-        }
-
-        const { storageId } = (await response.json()) as {
-          storageId: Id<'_storage'>
-        }
-        return storageId
-      }
-
-      const canResolveLinks =
-        Boolean(session.workspace) &&
-        isWorkspaceAdmin &&
-        // Don't resolve `@path` links if this is a shell command
-        parseShellCommand(content) === null
-
-      let attachments: StagedAttachment[] = []
-
-      const previews = localFiles.length
-        ? keepAttachmentSendPreviews(localFiles)
-        : undefined
-
-      const optimistic = buildOptimisticMessage(
-        args,
-        pending.files.map((part) =>
-          part.share ? sharedFilePreview(part.share) : localById.get(part.id)!,
+        role,
+        profile,
+        agent,
+        user,
+        assistant,
+      })
+      const links = captureFileLinks(() =>
+        resolveMentionedFileLinks(
+          prepared.args.content,
+          session._id,
+          isWorkspaceAdmin &&
+            Boolean(session.workspace) &&
+            !parseShellCommand(prepared.args.content),
+          resolveFileLinks,
         ),
-        attribution,
-        optimisticId,
-        pending.replyTo,
       )
-
-      const upload =
-        previews && optimistic ? showMessageUpload(optimistic) : undefined
-
-      let sent = false
-      try {
-        const [uploads, links] = await Promise.allSettled([
-          uploadFiles(
-            uploadsOnly,
-            pending.originalFiles,
-            storeBlob,
-            async (args) => {
-              const input = { ...args, sessionId: session._id }
-              if (args.mediaType.startsWith('image/')) {
-                return confirmImageAttachment(input)
-              }
-              return { id: await confirmAttachment(input) }
-            },
-            (id) => removeAttachment({ attachmentId: id }),
-          ),
-          resolveMentionedFileLinks(
-            content,
-            session._id,
-            canResolveLinks,
-            resolveFileLinks,
-          ),
-        ])
-
-        if (uploads.status === 'rejected') throw uploads.reason
-        attachments = uploads.value
-        if (links.status === 'rejected') throw links.reason
-
-        const uploadedById = new Map(
-          uploadsOnly.map((part, index) => [part.id, attachments[index]]),
-        )
-
-        const confirmedMessage = previews
-          ? buildOptimisticMessage(
-              args,
-              pending.files.map((part) =>
-                part.share
-                  ? sharedFilePreview(part.share)
-                  : confirmedFilePart(uploadedById.get(part.id)!),
-              ),
-              attribution,
-              optimisticId,
-              pending.replyTo,
-            )
-          : optimistic
-
-        previews?.confirm(attachments)
-        const messageId = await sendMutation.withOptimisticUpdate((store) => {
-          if (confirmedMessage)
-            optimisticallyInsertMessage(store, confirmedMessage)
-        })({
-          ...args,
-          ...(pending.files.length > 0 && {
-            attachments: pending.files.map((part) =>
-              part.share
-                ? { shareUrl: part.share.shareUrl }
-                : { id: uploadedById.get(part.id)!.id },
-            ),
-          }),
-          ...(links.value !== undefined ? { fileLinks: links.value } : {}),
+      const { files, args } = prepared
+      const deliver = async (
+        attachments: StagedAttachment[],
+        attachmentSendId?: Id<'attachmentSends'>,
+      ) =>
+        deliverMessage(sendMutation, prepared, {
+          attachments,
+          attachmentSendId,
+          fileLinks: await links.read(),
         })
 
-        sent = true
-        return messageId
-      } catch (error) {
-        upload?.finish()
-        await Promise.allSettled(
-          attachments.map(({ id }) => removeAttachment({ attachmentId: id })),
-        )
-        throw error
-      } finally {
-        if (sent) upload?.finish()
-        previews?.releaseWhenFinished(sent)
-      }
+      if (!files.length) return deliver([])
+      return startAttachmentSend({
+        account,
+        optimistic: optimisticUpload(prepared),
+        files,
+        register: async () => {
+          const registration = await begin({
+            sessionId: args.sessionId,
+            clientSendId: args.clientSendId,
+            occurrenceIds: files.map((file) => file.occurrenceId),
+          })
+          if ('pendingId' in registration) links.start()
+          return registration
+        },
+        renew: (id) => renew({ id }),
+        discard: (id) => discard({ id }),
+        store: async (blob, mediaType, signal, progress) => {
+          const url = normalizeBrowserUrl(await generateUploadUrl({}))
+          if (!url) throw new Error('Upload URL is unavailable')
+          return uploadAttachmentBlob(url, blob, mediaType, signal, progress)
+        },
+        confirm: async (input) =>
+          input.mediaType.startsWith('image/')
+            ? confirmImageAttachment(input)
+            : { id: await confirmAttachment(input) },
+        deliver: (id, attachments) => deliver(attachments, id),
+      })
     },
     [
+      account,
       session,
       sendMutation,
       generateUploadUrl,
       confirmAttachment,
       confirmImageAttachment,
-      removeAttachment,
       resolveFileLinks,
       isWorkspaceAdmin,
       profile,
       agent,
       user,
       assistant,
+      begin,
+      renew,
+      discard,
     ],
   )
 }
 
-async function uploadFiles(
-  files: PendingMessage['files'],
-  originalFiles: Record<string, File> | undefined,
-  storeBlob: StoreBlob,
-  confirm: ConfirmAttachment,
-  remove: (id: Id<'attachments'>) => Promise<unknown>,
-): Promise<StagedAttachment[]> {
-  const settled = await Promise.allSettled(
-    files.map(async (part) => {
-      const original = originalFiles?.[part.id]
-      const meta = fileMeta(part, original)
-      const isImage = meta.mediaType.startsWith('image/')
-      const blob = original ?? (await dataUrlToBlob(part.url))
+type SendSnapshotOptions = {
+  pending: PendingMessage
+  sessionId: Id<'sessions'>
+  role?: MessageRole
+  profile: Doc<'users'> | null
+  agent: ActiveAgent | null
+  user?: string | null
+  assistant?: string | null
+}
 
-      const storageId = await storeBlob(blob, meta.mediaType)
-      const previewStorageId =
-        isImage && original
-          ? await storeBlob(await dataUrlToBlob(part.url), 'image/jpeg')
-          : undefined
-
-      const confirmed = await confirm({
-        storageId,
-        previewStorageId,
-        ...meta,
-      })
-      return {
-        ...confirmed,
-        ...meta,
-        byteLength: blob.size,
-      }
+function prepareSend(options: SendSnapshotOptions) {
+  const { pending, sessionId, profile, agent, user, assistant } = options
+  const clientSendId = generateId()
+  const role = options.role ?? pending.role ?? 'user'
+  const reply = pending.replyTo?.target
+  const args: SendArgs = {
+    sessionId,
+    clientSendId,
+    content: pending.content.trim(),
+    ...(role !== 'user' && { role }),
+    ...(pending.silent && { silent: true }),
+    ...(reply && {
+      replyToId: reply.id,
+      ...(reply.part && { replyToPart: reply.part }),
     }),
-  )
-
-  const uploaded = settled.flatMap((result) =>
-    result.status === 'fulfilled' ? [result.value] : [],
-  )
-  const failed = settled.find((result) => result.status === 'rejected')
-
-  if (failed?.status === 'rejected') {
-    await Promise.allSettled(uploaded.map(({ id }) => remove(id)))
-    throw failed.reason
   }
-
-  return uploaded
-}
-
-function localAttachment(
-  part: PendingFilePart,
-  original: File | undefined,
-  messageId: Id<'messages'>,
-) {
-  const meta = fileMeta(part, original)
-  const url = `attachment:${messageId}:${part.id}`
+  const id = createOptimisticMessageId(clientSendId)
+  const sender = optimisticSender(role, profile, agent, id)
+  const senderName = (sender.type === 'agent' ? assistant : user) ?? null
   return {
-    url,
-    source: meta.mediaType.startsWith('image/')
-      ? part.url
-      : (original ?? part.url),
-    byteLength: original?.size,
-    part: { type: 'file', url, ...meta } satisfies MessageFile,
+    args,
+    parts: pending.files,
+    files: localFilesForSend(pending, id),
+    optimistic: (parts: MessageFile[]) =>
+      buildOptimisticMessage(
+        args,
+        parts,
+        { sender, senderName },
+        id,
+        pending.replyTo,
+      ),
   }
 }
 
-function confirmedFilePart({ id, mediaType, filename }: StagedAttachment) {
+type PreparedSend = ReturnType<typeof prepareSend>
+
+function optimisticUpload({ files, parts, optimistic }: PreparedSend) {
+  const local = new Map(
+    files.map(({ occurrenceId, url, mediaType, filename }) => [
+      occurrenceId,
+      { type: 'file', url, mediaType, filename } satisfies MessageFile,
+    ]),
+  )
+  return optimistic(
+    parts.map((part) =>
+      part.share ? sharedFilePreview(part.share) : local.get(part.id)!,
+    ),
+  )!
+}
+
+type Delivery = {
+  attachments: StagedAttachment[]
+  attachmentSendId?: Id<'attachmentSends'>
+  fileLinks?: ResolvedFileLink[]
+}
+
+function deliverMessage(
+  mutation: ReactMutation<typeof api.chat.sendMessage>,
+  prepared: PreparedSend,
+  { attachments, attachmentSendId, fileLinks }: Delivery,
+) {
+  const { args, files, parts } = prepared
+  const confirmed = new Map(
+    files.map((file, index) => [file.occurrenceId, attachments[index]]),
+  )
+  const optimistic = prepared.optimistic(
+    parts.map((part) =>
+      part.share
+        ? sharedFilePreview(part.share)
+        : confirmedPart(part, confirmed.get(part.id)!),
+    ),
+  )
+  const references = parts.map((part) =>
+    part.share
+      ? { shareUrl: part.share.shareUrl }
+      : { id: confirmed.get(part.id)!.id },
+  )
+  return mutation.withOptimisticUpdate((store) => {
+    if (optimistic) optimisticallyInsertMessage(store, optimistic)
+  })({
+    ...args,
+    ...(attachmentSendId && { attachmentSendId }),
+    ...(references.length && { attachments: references }),
+    ...(fileLinks !== undefined && { fileLinks }),
+  })
+}
+
+/** Snapshots workspace links at send time and reuses them on delivery retry. */
+function captureFileLinks(load: () => Promise<ResolvedFileLink[] | undefined>) {
+  let snapshot: ReturnType<typeof load> | undefined
+  function start() {
+    if (!snapshot) {
+      snapshot = load()
+      void snapshot.catch(() => undefined)
+    }
+    return snapshot
+  }
+  return {
+    start,
+    async read() {
+      try {
+        return await start()
+      } catch (error) {
+        snapshot = undefined
+        throw error
+      }
+    },
+  }
+}
+
+function localFilesForSend(
+  pending: PendingMessage,
+  optimisticId: Id<'messages'>,
+): FileToUpload[] {
+  return pending.files.flatMap((part) => {
+    if (part.share) return []
+    const file = pending.originalFiles?.[part.id]
+    if (!file) throw new Error('The original attachment is unavailable')
+    const meta = fileMeta(part, file)
+    return [
+      {
+        ...meta,
+        occurrenceId: part.id,
+        url: `attachment:${optimisticId}:${part.id}`,
+        file,
+      },
+    ]
+  })
+}
+
+function confirmedPart(
+  part: PendingFilePart,
+  { id }: StagedAttachment,
+): MessageFile {
   return {
     type: 'file',
     url: `attachment:${id}`,
     attachmentId: id,
-    mediaType,
-    filename,
-  } satisfies MessageFile
+    mediaType: part.mediaType,
+    filename: part.filename,
+  }
 }
 
 function sharedFilePreview({
@@ -337,11 +325,6 @@ function fileMeta(part: FileUIPart, original: File | undefined): UploadMeta {
     (original?.name || part.filename) ??
     `attachment.${mediaType.split('/')[1]?.split('+')[0] ?? 'bin'}`
   return { mediaType, filename }
-}
-
-async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
-  const response = await fetch(dataUrl)
-  return response.blob()
 }
 
 async function resolveMentionedFileLinks(

@@ -4,6 +4,12 @@ import { internal } from './_generated/api'
 
 const crons = cronJobs()
 
+crons.interval(
+  'expire interrupted attachment sends',
+  { minutes: 1 },
+  internal.chat._sweepAttachmentSends,
+)
+
 crons.daily(
   'prune abandoned join avatar uploads',
   { hourUTC: 2, minuteUTC: 30 },

@@ -2,7 +2,6 @@ import { AccountScope } from '@/hooks/account-scope'
 /// <reference types="bun-types" />
 import type { useComposerAttachments } from '@/hooks/chat/composer-attachments'
 import * as draftStore from '@/lib/chat/composer-attachment-draft-store'
-import * as chatIO from '@/lib/chat/io'
 import type { PendingMessage, SharedAttachment } from '@/lib/chat/types'
 import { editorKit } from '@/lib/tiptap/kit'
 import { Editor } from '@tiptap/core'
@@ -89,16 +88,26 @@ function file(name = 'same.txt') {
   return new File(['identical content'], name, { type: 'text/plain' })
 }
 
-test('preparing a video preserves bytes beyond the JavaScript argument limit', async () => {
-  const bytes = new Uint8Array(1024 * 1024).fill(0xab)
-  const video = new File([bytes], 'clip.webm', { type: 'video/webm' })
-  const { part, originalFile } = await chatIO.processFileForUpload(video)
-  const prefix = 'data:video/webm;base64,'
-
-  expect(originalFile).toBe(video)
-  expect(part.url.startsWith(prefix)).toBe(true)
-  const decoded = Buffer.from(part.url.slice(prefix.length), 'base64')
-  expect(decoded.equals(Buffer.from(bytes))).toBe(true)
+test('adding a large archive uses file metadata without reading its contents', async () => {
+  await mount()
+  const archive = new File([], 'backup.zip', { type: 'application/zip' })
+  Object.defineProperty(archive, 'size', { value: 1_272_925_388 })
+  const read = spyOn(FileReader.prototype, 'readAsDataURL')
+  try {
+    await act(async () => {
+      await attachments.addFiles([archive])
+    })
+    const [part] = attachments.fileParts
+    expect(part).toMatchObject({
+      filename: 'backup.zip',
+      mediaType: 'application/zip',
+    })
+    expect(attachments.files[0]?.byteLength).toBe(archive.size)
+    expect(attachments.originalFiles[part!.id]).toBe(archive)
+    expect(read).not.toHaveBeenCalled()
+  } finally {
+    read.mockRestore()
+  }
 })
 
 test('gives nameless files and large pastes readable filenames', async () => {
@@ -140,60 +149,39 @@ test('restores pasted attachment links as removable cards and deduplicates them'
   expect(attachments.fileParts).toHaveLength(0)
 })
 
-test('overlapping file additions and text pastes append in invocation order', async () => {
-  await mount()
-  const first = file('first.txt')
-  const ready = Promise.withResolvers<void>()
-  const { part } = await chatIO.processFileForUpload(first)
-  const process = spyOn(chatIO, 'processFileForUpload').mockImplementation(
-    async (picked) => {
-      if (picked === first) await ready.promise
-      return { part: { ...part, filename: picked.name }, originalFile: picked }
-    },
-  )
-  const pending: Promise<unknown>[] = []
-  try {
-    await act(async () => {
-      pending.push(
-        attachments.addFiles([first]),
-        attachments.addLargeTextPaste('pasted text', 0),
-        attachments.addFiles([file('last.txt')]),
-      )
-    })
-    await act(async () => {
-      ready.resolve()
-      await Promise.all(pending)
-    })
-
-    const [firstPart, pastedPart, lastPart] = attachments.fileParts
-    expect(firstPart?.filename).toBe('first.txt')
-    expect(attachments.pastedText[pastedPart?.id]?.text).toBe('pasted text')
-    expect(lastPart?.filename).toBe('last.txt')
-  } finally {
-    process.mockRestore()
-  }
-})
-
-test('a drop reserves its position before its files have been read', async () => {
+test('later picks and pastes render while a drop is pending and keep submission order', async () => {
   await mount()
   const drop = Promise.withResolvers<File[]>()
-  await act(async () => {
-    const first = attachments.addFiles(drop.promise)
-    const second = attachments.addFiles([file('picked.txt')])
-    drop.resolve([file('dropped.txt')])
-    await Promise.all([first, second])
+  let pending!: Promise<boolean>
+  act(() => {
+    pending = attachments.addFiles(drop.promise)
   })
+  await act(async () => {
+    attachments.addLargeTextPaste('pasted text', 0)
+    await attachments.addFiles([file('picked.txt')])
+  })
+  expect(attachments.fileParts).toHaveLength(2)
+  expect(attachments.files[1]?.file.name).toBe('picked.txt')
+  expect(attachments.processing).toBe(true)
 
-  expect(attachments.fileParts.map((part) => part.filename)).toEqual([
-    'dropped.txt',
-    'picked.txt',
-  ])
+  await act(async () => {
+    drop.resolve([file('dropped.txt')])
+    await pending
+  })
+  const [first, pasted, last] = attachments.fileParts
+  expect(first?.filename).toBe('dropped.txt')
+  expect(attachments.pastedText[pasted!.id]?.text).toBe('pasted text')
+  expect(last?.filename).toBe('picked.txt')
+  expect(attachments.processing).toBe(false)
 })
 
 test('pending drops cannot attach to or hold up the next draft', async () => {
   const renderDraft = await mount('first-draft')
   const drop = Promise.withResolvers<File[]>()
-  const pending = attachments.addFiles(drop.promise)
+  let pending!: Promise<boolean>
+  act(() => {
+    pending = attachments.addFiles(drop.promise)
+  })
   await renderDraft('next-draft')
   await act(async () => {
     await attachments.addFiles([file('picked.txt')])
@@ -214,7 +202,7 @@ test('removing one of three identical attachments preserves the other occurrence
   })
 
   const [first, middle, last] = attachments.files
-  expect(new Set(attachments.files.map((item) => item.url)).size).toBe(1)
+  expect(new Set(attachments.files.map((item) => item.id)).size).toBe(3)
   expect(new Set(attachments.files.map((item) => item.id)).size).toBe(3)
   act(() => attachments.removeFile(middle.id))
 
@@ -247,7 +235,7 @@ test('equal file contents retain each occurrence’s original filename and uploa
   })
   const [first, second] = attachments.fileParts
 
-  expect(first.url).toBe(second.url)
+  expect(first.url).not.toBe(second.url)
   expect(attachments.originalFiles[first.id]).toBe(firstFile)
   expect(attachments.originalFiles[second.id]).toBe(secondFile)
   act(() => attachments.removeFile(first.id))
@@ -289,7 +277,7 @@ test('inserting one duplicate text paste uses its own position and preserves the
     await attachments.addLargeTextPaste('same', 8)
   })
   const [first, second] = attachments.files
-  expect(first.url).toBe(second.url)
+  expect(first.url).not.toBe(second.url)
   expect(attachments.pastedText[first.id].position).toBe(2)
   expect(attachments.pastedText[second.id].position).toBe(8)
 
@@ -313,7 +301,7 @@ test('legacy drafts receive distinct IDs and surviving occurrences keep their ID
   expect(first.id).toBe('existing-id')
   expect(second.id).toBeTruthy()
   expect(second.id).not.toBe(first.id)
-  expect(first.url).toBe(second.url)
+  expect(first.url).not.toBe(second.url)
   expect(attachments.pastedText[first.id].position).toBe(2)
   expect(attachments.pastedText[second.id].position).toBe(8)
 

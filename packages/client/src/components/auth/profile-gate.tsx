@@ -1,4 +1,5 @@
 import { AccountScope } from '@/hooks/account-scope'
+import { closeAccountMessageUploads } from '@/lib/chat/message-uploads'
 import { api } from '@cv/convex/_generated/api'
 import { useConvexAuth, useMutation } from 'convex/react'
 import { useEffect, useState } from 'react'
@@ -32,6 +33,12 @@ export function ProfileGate({
       active = false
     }
   }, [ensureProfile, isAuthenticated, subject])
+
+  useEffect(() => {
+    if (isAuthenticated && userId) {
+      return () => closeAccountMessageUploads(userId)
+    }
+  }, [isAuthenticated, subject, userId])
 
   if (!isAuthenticated || !userId) return null
   return <AccountScope userId={userId}>{children}</AccountScope>

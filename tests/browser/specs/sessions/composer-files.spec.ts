@@ -208,22 +208,47 @@ test('shows mixed attachments immediately and keeps them visible through confirm
   try {
     await editor.fill('Send these files')
     await sendButton(page).click()
-    await expect(sendingButton(page)).toBeDisabled()
+    await expect(sendingButton(page)).toHaveCount(0)
+    await expect(
+      files.getByRole('progressbar', { name: 'Uploading screen.png' }),
+    ).toBeVisible()
+    await expect(
+      files.getByRole('progressbar', { name: 'Uploading notes.log' }),
+    ).toBeVisible()
+    const pendingPicture = files.locator('[data-attachment-name="screen.png"]')
+    await expect(
+      pendingPicture.getByRole('button', { name: 'Discard message' }),
+    ).toBeVisible()
     await expect(editor).toHaveText('')
     await expect(
       composer(page).locator('[data-slot="file-strip"]'),
     ).toHaveCount(0)
     await expect(submitted).toHaveCount(1)
     await expect(preview).toBeInViewport()
-    await expect(preview).toHaveAttribute('src', /^data:image/)
+    await expect(preview).toHaveAttribute('src', /^blob:/)
     await expect(notes).toBeVisible()
+    uploadingThumbnail = await preview.elementHandle()
+
+    await editor.fill('Sent while the files upload')
+    await sendButton(page).click()
+    await expect(sendingButton(page)).toBeVisible()
+    await completeSend(page, true)
+    const later = page
+      .locator('[data-message-id="sent-0"]')
+      .getByText('Sent while the files upload')
+    await expect(later).toBeVisible()
+    await page.getByRole('button', { name: 'View child' }).click()
+    await expect(submitted).toHaveCount(0)
+    await page.getByRole('button', { name: 'View parent' }).click()
+    await expect(submitted).toBeVisible()
+    await expect(preview).toBeVisible()
     uploadingThumbnail = await preview.elementHandle()
   } finally {
     upload.resolve()
   }
 
   await expect(page.getByTestId('approval-mutations')).toContainText(
-    'chat:sendMessage',
+    'attachmentSendId',
   )
   const mutations = JSON.parse(
     (await page.getByTestId('approval-mutations').textContent()) ?? '[]',
@@ -244,15 +269,18 @@ test('shows mixed attachments immediately and keeps them visible through confirm
       uploadingThumbnail,
     ),
   ).toBe(true)
-  await expect(preview).toHaveAttribute('src', /^data:image/)
+  await expect(preview).toHaveAttribute('src', /^blob:/)
   await expect(notes).toBeVisible()
 
   await completeSend(page, true)
   await expect(
-    page.locator('[data-message-id="sent-0"]').first(),
-  ).toBeAttached()
-  await expect(preview).toHaveAttribute('src', /^data:image/)
+    page.locator('[data-message-id="sent-1"]').getByText('Send these files'),
+  ).toBeVisible()
+  await expect(preview).toHaveAttribute('src', /^blob:/)
   await expect(notes).toBeVisible()
+  await expect(
+    files.getByRole('button', { name: 'Discard message' }),
+  ).toHaveCount(0)
   await expect(sendingButton(page)).toHaveCount(0)
   await expect(submitted).toHaveCount(1)
 
@@ -272,7 +300,7 @@ test('shows mixed attachments immediately and keeps them visible through confirm
     await expect(
       page.getByRole('menuitem', { name: 'Download', exact: true }),
     ).toBeVisible()
-    await expect(preview).toHaveAttribute('src', /^data:image/)
+    await expect(preview).toHaveAttribute('src', /^blob:/)
     await page.keyboard.press('Escape')
   } finally {
     remote.resolve()
@@ -280,61 +308,157 @@ test('shows mixed attachments immediately and keeps them visible through confirm
   await expect(preview).toHaveAttribute('src', /^blob:/)
 })
 
-test('restores an attachment-only draft when its send fails', async ({
+test('collapses the composer strip when sending and restores it if registration fails', async ({
   page,
 }) => {
-  await page.route('**/composer-upload', (route) =>
-    route.fulfill({ json: { storageId: 'staged' } }),
+  await page.goto('/?fixture=subagent-approvals&id=parent&deferSend&deferRegistration') // prettier-ignore
+  const editor = composer(page).locator('[contenteditable="true"]')
+  await editor.fill('Restore my draft')
+  await picker(page).setInputFiles({
+    name: 'draft.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('draft attachment'),
+  })
+  const strip = composer(page).locator('[data-slot="file-strip"]')
+  await strip.getByRole('button', { name: 'Remove file draft.txt' }).waitFor()
+  await expect
+    .poll(() =>
+      strip.evaluate(
+        (list) =>
+          list.parentElement!.getBoundingClientRect().height >=
+          list.getBoundingClientRect().height,
+      ),
+    )
+    .toBe(true)
+
+  const frames = await strip.evaluate((list) => {
+    const wrapper = list.parentElement!
+    const composer = list.closest('[data-slot="chat-box"]')!
+    const startHeight = wrapper.getBoundingClientRect().height
+    const transcript =
+      '[data-slot="file-block"] [data-attachment-name="draft.txt"]'
+    let intermediateHeight = false
+    let duplicated = false
+
+    composer
+      .querySelector<HTMLButtonElement>('button[aria-label="Send"]')!
+      .click()
+    return new Promise<{ intermediateHeight: boolean; duplicated: boolean }>(
+      (resolve) => {
+        const observe = () => {
+          const height = wrapper.getBoundingClientRect().height
+          intermediateHeight ||= height > 0 && height < startHeight
+          const draftStrip = composer.querySelector('[data-slot="file-strip"]')
+          if (draftStrip && document.querySelector(transcript)) {
+            duplicated ||= getComputedStyle(draftStrip).visibility === 'visible'
+          }
+          if (wrapper.isConnected) requestAnimationFrame(observe)
+          else resolve({ intermediateHeight, duplicated })
+        }
+        requestAnimationFrame(observe)
+      },
+    )
+  })
+  expect(frames).toEqual({ intermediateHeight: true, duplicated: false })
+  const transcriptFile = page.locator('[data-slot="file-block"] [data-attachment-name="draft.txt"]') // prettier-ignore
+  await expect(transcriptFile).toBeVisible()
+  await expect(editor).toHaveText('')
+  await expect(sendingButton(page)).toBeVisible()
+
+  await page.evaluate(() =>
+    window.dispatchEvent(
+      new CustomEvent('complete-attachment-registration', { detail: false }),
+    ),
   )
-  await openSendFixture(page)
+  await expect(transcriptFile).toHaveCount(0)
+  await expect(editor).toHaveText('Restore my draft')
+  await expect(
+    strip.getByRole('button', { name: 'Remove file draft.txt' }),
+  ).toBeVisible()
+})
+
+test('retries final delivery with the staged file and leaves newer composer text intact', async ({
+  page,
+}) => {
+  let uploads = 0
+  await page.route('**/composer-upload', (route) =>
+    route.fulfill({ json: { storageId: `staged-${++uploads}` } }),
+  )
+  const editor = await openSendFixture(page)
   await picker(page).setInputFiles({
     name: 'restore.txt',
     mimeType: 'text/plain',
     buffer: Buffer.from('restore'),
   })
   await sendButton(page).click()
+  await expect(editor).toHaveText('')
+  await editor.fill('New draft')
   const file = page.getByRole('button', { name: 'Preview restore.txt' })
   await expect(file).toBeVisible()
-  await expect(
-    composer(page).getByRole('button', { name: 'Preview restore.txt' }),
-  ).toHaveCount(0)
   await expect(page.getByTestId('approval-mutations')).toContainText(
-    'chat:sendMessage',
+    'attachmentSendId',
   )
   await completeSend(page, false)
+  await expect(page.getByText('Fixture send failure')).toBeVisible()
   await expect(file).toHaveCount(1)
+  await expect(editor).toHaveText('New draft')
+  await page.getByRole('button', { name: 'Retry message' }).click()
+  await expect(async () => {
+    const mutations = await page.getByTestId('approval-mutations').textContent()
+    expect(
+      JSON.parse(mutations ?? '[]').filter(
+        ({ name }: { name: string }) => name === 'chat:sendMessage',
+      ),
+    ).toHaveLength(2)
+  }).toPass()
+  await completeSend(page, true)
   await expect(
-    composer(page).getByRole('button', { name: 'Preview restore.txt' }),
-  ).toBeVisible()
-  await expect(sendButton(page)).toBeEnabled()
+    page.locator('[data-message-id="sent-0"]').first(),
+  ).toBeAttached()
+  expect(uploads).toBe(1)
 })
 
-test('removes the optimistic message and restores its attachment when upload fails', async ({
+test('keeps a failed file inline, retries only that file, and discards the pending message', async ({
   page,
 }) => {
-  const upload = Promise.withResolvers<void>()
+  const attempts = new Map<string, number>()
   await page.route('**/composer-upload', async (route) => {
-    await upload.promise
-    await route.fulfill({ status: 500 })
+    const type = route.request().headers()['content-type']
+    const attempt = (attempts.get(type) ?? 0) + 1
+    attempts.set(type, attempt)
+    await route.fulfill(
+      type === 'text/markdown'
+        ? { status: 500 }
+        : { json: { storageId: 'staged' } },
+    )
   })
-  await openSendFixture(page)
-  await picker(page).setInputFiles(await imageFile(page))
+  const editor = await openSendFixture(page)
+  await picker(page).setInputFiles([
+    { name: 'good.txt', mimeType: 'text/plain', buffer: Buffer.from('works') },
+    {
+      name: 'bad.txt',
+      mimeType: 'text/markdown',
+      buffer: Buffer.from('fails'),
+    },
+  ])
+  await sendButton(page).click()
+  await expect(editor).toHaveText('')
   const row = page.locator('[data-slot="file-block"]')
-  try {
-    await sendButton(page).click()
-    await expect(row.getByRole('img', { name: 'screen.png' })).toBeVisible()
-    await expect(
-      composer(page).getByRole('img', { name: 'screen.png' }),
-    ).toHaveCount(0)
-  } finally {
-    upload.resolve()
-  }
-
-  await expect(row).toHaveCount(0)
+  const failed = row.locator('[data-attachment-name="bad.txt"]')
+  await expect(row.getByText('good.txt')).toBeVisible()
+  await expect(failed.getByText('Upload failed (HTTP 500)')).toBeVisible()
+  await failed.getByRole('button', { name: 'Retry upload for bad.txt' }).click()
+  await expect.poll(() => attempts.get('text/markdown')).toBe(2)
+  await expect(failed.getByText('Upload failed (HTTP 500)')).toBeVisible()
+  expect(attempts.get('text/plain')).toBe(1)
   await expect(
-    composer(page).getByRole('img', { name: 'screen.png' }),
-  ).toBeVisible()
-  await expect(sendButton(page)).toBeEnabled()
+    row.getByRole('button', { name: 'Discard message' }),
+  ).toHaveCount(1)
+  await failed.getByRole('button', { name: 'Discard message' }).click()
+  await expect(row).toHaveCount(0)
+  await expect(page.getByTestId('approval-mutations')).toContainText(
+    'chat:discardAttachmentSend',
+  )
 })
 
 test('retries a failed send without replacing newer composer text', async ({

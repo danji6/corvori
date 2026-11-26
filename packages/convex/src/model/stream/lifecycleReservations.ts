@@ -1,8 +1,5 @@
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
-import { injectModeNote } from '../chat/notes'
-import { injectDueReminders } from '../chat/reminders'
-import { insertMessage } from '../messageContents'
 import { notATranscriptMarker, notAUserKilledReport } from '../messages'
 import { getSessionWithWorkspace } from '../session/folderContext'
 import { scheduleStream } from './execution'
@@ -119,30 +116,12 @@ export async function reserveInvokeTurn(
     .unique()
   if (!link) return
 
-  await injectModeNote(ctx, session, invokedBy)
-  await injectDueReminders(ctx, session, invokedBy)
-
-  const { messageId: processingMessageId, contentId } = await insertMessage(
-    ctx,
-    {
-      sessionId: session._id,
-      sender: { type: 'agent', id: agent._id },
-      role: 'assistant',
-      status: 'processing',
-    },
-    [],
-  )
-
   const nextStreamId = await ctx.db.insert('streams', {
     generation: 0,
     sessionId: session._id,
     agentId: agent._id,
     invokedBy,
-    state: {
-      phase: 'reserved',
-      processingMessageId,
-      processingContentId: contentId,
-    },
+    state: { phase: 'reserved' },
     contextBoundaryMessageId: boundaryMessage._id,
     contextBoundaryCreationTime: boundaryMessage._creationTime,
     command: { kind: 'invoke' },

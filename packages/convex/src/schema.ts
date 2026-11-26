@@ -2,12 +2,6 @@ import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
 
 import * as V from './validators'
-import { attachmentTransferSchema } from './validators/attachmentTransfers'
-import {
-  sessionAuthorSchema,
-  sessionProfileSchema,
-} from './validators/sessionAuthors'
-import { sessionFileOperationSchema } from './validators/sessionFiles'
 
 const schemaValidation = true
 
@@ -197,11 +191,11 @@ export default defineSchema({
     .index('by_messageId_version_segment', ['messageId', 'version', 'segmentIndex'])
     .searchIndex('search_contents', { searchField: 'searchText', filterFields: ['sessionId'] }),
 
-  sessionProfiles: defineTable(sessionProfileSchema)
+  sessionProfiles: defineTable(V.sessionProfileSchema)
     .index('by_sessionId_sender', ['sessionId', 'sender.type', 'sender.id'])
     .index('by_avatarId', ['avatarId']),
 
-  sessionAuthors: defineTable(sessionAuthorSchema)
+  sessionAuthors: defineTable(V.sessionAuthorSchema)
     .index('by_sessionId', ['sessionId'])
     .index('by_avatarId', ['avatarId']),
 
@@ -256,7 +250,7 @@ export default defineSchema({
   attachmentFiles: defineTable(V.attachmentFileSchema)
     .index('by_storageId', ['storageId']),
 
-  sessionFileOperations: defineTable(sessionFileOperationSchema)
+  sessionFileOperations: defineTable(V.sessionFileOperationSchema)
     .index('by_nextAttemptAt', ['nextAttemptAt']),
 
   sessionTaskDirectories: defineTable({
@@ -264,7 +258,13 @@ export default defineSchema({
     name: v.string(),
   }).index('by_rootId_name', ['rootId', 'name']),
 
-  attachmentTransfers: defineTable(attachmentTransferSchema)
+  attachmentSends: defineTable(V.attachmentSendSchema)
+    .index('by_sessionId', ['sessionId'])
+    .index('by_sessionId_expiresAt', ['sessionId', 'expiresAt'])
+    .index('by_sessionId_clientSendId', ['sessionId', 'clientSendId'])
+    .index('by_expiresAt', ['expiresAt']),
+
+  attachmentTransfers: defineTable(V.attachmentTransferSchema)
     .index('by_streamId', ['streamId'])
     .index('by_contentId_callId', ['contentId', 'callId'])
     .index('by_cleaned_expiresAt', ['cleaned', 'expiresAt']),

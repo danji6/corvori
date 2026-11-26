@@ -1,5 +1,7 @@
 import { type Infer, v } from 'convex/values'
 
+import { attachmentSendSlot } from './attachmentSends'
+
 export const attachmentImageDimensions = v.object({
   width: v.number(),
   height: v.number(),
@@ -13,6 +15,7 @@ export const confirmAttachmentArgsValidator = v.object({
   sessionId: v.id('sessions'),
   filename: v.string(),
   mediaType: v.string(),
+  pendingSend: v.optional(attachmentSendSlot),
 })
 
 export type ConfirmAttachmentArgs = Infer<typeof confirmAttachmentArgsValidator>
@@ -51,6 +54,7 @@ export const attachmentSchema = v.object({
   uploaderId: v.id('users'),
   sessionId: v.id('sessions'),
   messageId: v.optional(v.id('messages')),
+  pendingSendId: v.optional(v.id('attachmentSends')),
   /** Present when it's a generated image. */
   streamId: v.optional(v.id('streams')),
   filename: v.string(),

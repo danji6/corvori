@@ -33,7 +33,7 @@ import type { Slice } from '@tiptap/pm/model'
 import type { Editor } from '@tiptap/react'
 import type { ChatStatus } from 'ai'
 import { MessageSquareWarningIcon } from 'lucide-react'
-import { Suspense, lazy, useEffect, useRef } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 
 import type { DropZoneHandle, InputGroupProps } from '../../ui'
 import {
@@ -149,6 +149,7 @@ export function ChatComposer({
 
   const { compact, layout, toolbarRef } = useMeasuredComposerLayout()
   const attachments = useComposerAttachments({ draftKey, editorRef })
+  const [hideAttachmentExit, setHideAttachmentExit] = useState(false)
   const shares = useComposerSharePaste(draftKey, attachments.addSharedFiles)
   const { sending, failed, isSending, send, discardFailed } =
     useComposerSubmission(draftKey, onSubmit)
@@ -263,7 +264,7 @@ export function ChatComposer({
       handleCommandSelect(matchedCommand, silent)
       return
     }
-    if (sendDisabled || shellBlocked) return
+    if (sendDisabled || shellBlocked || attachments.processing) return
 
     const editor = editorRef.current
     const pending: PendingMessage = {
@@ -275,6 +276,7 @@ export function ChatComposer({
     }
     void send(pending, {
       clearDraft: () => {
+        if (pending.files.length) setHideAttachmentExit(true)
         clearComposer()
         attachments.resetAttachments()
         const clearedDoc = editor?.state.doc
@@ -488,9 +490,15 @@ export function ChatComposer({
             <FileStrip
               files={attachments.files}
               className="max-h-[min(40dvh,20rem)] overflow-x-hidden overflow-y-auto"
-              onRemove={attachments.removeFile}
-              onInsertInline={attachments.insertInline}
-              noAnimation={sending}
+              hideOnExit={hideAttachmentExit}
+              onRemove={(id) => {
+                setHideAttachmentExit(false)
+                attachments.removeFile(id)
+              }}
+              onInsertInline={(id) => {
+                setHideAttachmentExit(false)
+                attachments.insertInline(id)
+              }}
             />
             <FullscreenEditor.Toolbar className="mr-1 self-stretch group-data-fullscreen/fullscreen:mr-0" />
             <div
@@ -542,6 +550,7 @@ export function ChatComposer({
                   disabled={
                     (isStop ? stopDisabled : !hasContent && !canContinue) ||
                     (!isStop && shares.isResolving) ||
+                    (!isStop && attachments.processing) ||
                     (sendDisabled && hasContent) ||
                     shellBlocked
                   }

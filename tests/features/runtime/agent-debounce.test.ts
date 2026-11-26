@@ -26,6 +26,9 @@ function rescheduleCtx(
   const ctx = {
     db: {
       get: async (id: string) => (id === stream._id ? stream : boundary),
+      query: () => ({
+        withIndex: () => ({ order: () => ({ first: async () => null }) }),
+      }),
       patch: async (id: string, patch: Record<string, unknown>) => {
         patches.push({ id, patch })
       },

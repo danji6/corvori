@@ -37,6 +37,7 @@ const hasLocalApproval = new URLSearchParams(location.search).has('localApproval
 const hasQuestion = new URLSearchParams(location.search).has('question')
 const hasParentRequest = hasLocalApproval || hasQuestion
 const deferSend = new URLSearchParams(location.search).has('deferSend')
+const deferRegistration = new URLSearchParams(location.search).has('deferRegistration') // prettier-ignore
 const savedPreview = new URLSearchParams(location.search).has('savedPreview')
 
 const questionPart = {
@@ -306,6 +307,16 @@ type FixtureOptimisticUpdate = (
   args: Record<string, unknown>,
 ) => void
 
+function waitForSendResult(eventName: string) {
+  return new Promise<boolean>((resolve) => {
+    window.addEventListener(
+      eventName,
+      (event) => resolve((event as CustomEvent<boolean>).detail),
+      { once: true },
+    )
+  })
+}
+
 async function sendMessage(
   args: Record<string, unknown>,
   update?: FixtureOptimisticUpdate,
@@ -317,18 +328,12 @@ async function sendMessage(
       (query) =>
         query.args.sessionId === args.sessionId && query.args.anchor === null,
     )
-  const pending = windowQuery?.value?.page.at(-1)
+  const pending = windowQuery?.value?.page.find(
+    (message) => message.clientSendId === args.clientSendId,
+  )
   notify()
 
-  const success = await new Promise<boolean>((resolve) => {
-    window.addEventListener(
-      'complete-send',
-      (event) => {
-        resolve((event as CustomEvent<boolean>).detail)
-      },
-      { once: true },
-    )
-  })
+  const success = await waitForSendResult('complete-send')
   if (success && pending) {
     sent.push({
       ...pending,
@@ -445,6 +450,17 @@ export const approvalFixtureClient = {
       return 'sent-message'
     } else if (name === 'attachments:generateUploadUrl') {
       return `${location.origin}/composer-upload`
+    } else if (name === 'chat:beginAttachmentSend') {
+      if (deferRegistration) {
+        const success = await waitForSendResult('complete-attachment-registration') // prettier-ignore
+        if (!success) throw new Error('Fixture attachment registration failure')
+      }
+      return { pendingId: `pending-${args.clientSendId}` }
+    } else if (name === 'chat:renewAttachmentSend') {
+      return true
+    } else if (name === 'chat:discardAttachmentSend') {
+      notify()
+      return
     } else if (name === 'attachments:confirm') {
       return `attachment-${++attachmentCount}`
     } else if (name === 'attachments:remove') {

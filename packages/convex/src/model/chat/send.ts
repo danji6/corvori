@@ -20,7 +20,15 @@ import {
 import { reserveSegmentEvaluation } from '../promptEvaluation/reserve'
 import { resolveAuthor } from '../session/authorProfiles'
 import * as Memberships from '../session/memberships'
+import { wakeAttachmentTurn } from '../stream/execution'
 import { latestHistoryAnchor } from '../stream/historyBoundary'
+import {
+  CLIENT_SEND_ID,
+  findAttachmentSend,
+  findDeliveredSend,
+  ownsDeliveredSend,
+  requireAttachmentSend,
+} from './attachmentSendRecords'
 import { resolveSender } from './identities'
 import { injectDueReminders } from './reminders'
 import { quoteMessage } from './replies'
@@ -46,8 +54,13 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
   const role = args.role ?? 'user'
   const now = Date.now()
 
-  // Slow mode: each user may only send once per configured interval
-  if (role === 'user') {
+  const pendingSend = args.attachmentSendId
+    ? await loadPendingSend(ctx, args)
+    : undefined
+  if (pendingSend && 'messageId' in pendingSend) return pendingSend.messageId
+
+  // Attachment sends consume slow mode when the reservation is accepted.
+  if (role === 'user' && !pendingSend) {
     const remainingMs = slowModeRemainingMs(
       membership,
       session.settings?.slowModeMs,
@@ -58,7 +71,7 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
     }
   }
 
-  await assertClientSendIdAvailable(ctx, args)
+  if (!pendingSend) await assertClientSendIdAvailable(ctx, args)
 
   const activeStream = await Memberships.getActiveStream(ctx, args.sessionId)
   const command = role === 'user' ? parseShellCommand(args.content) : null
@@ -127,8 +140,12 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
   )
 
   for (const { attachment } of attachments) {
-    await ctx.db.patch(attachment._id, { messageId })
+    await ctx.db.patch(attachment._id, {
+      messageId,
+      ...(pendingSend && { pendingSendId: undefined }),
+    })
   }
+  if (pendingSend) await ctx.db.delete(pendingSend._id)
 
   // A long send may comprise several segments, each evaluated on its own row
   for (const [segmentIndex, segmentParts] of segments.entries()) {
@@ -159,7 +176,7 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
     })
   }
 
-  if (role === 'user') {
+  if (role === 'user' && !pendingSend) {
     await ctx.db.patch(membership._id, { lastSendAt: now })
   }
 
@@ -171,12 +188,53 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
     activeStream,
     deferTitle: role === 'user' && partsHaveScript(parts),
   })
+  if (pendingSend) await wakeAttachmentTurn(ctx, args.sessionId)
 
   return messageId
 }
 
-const ID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+async function loadPendingSend(ctx: AuthMutationCtx, args: SendMessageArgs) {
+  const { clientSendId, sessionId, attachmentSendId } = args
+  if (
+    !clientSendId ||
+    !attachmentSendId ||
+    (args.role && args.role !== 'user')
+  ) {
+    error('Invalid attachment send', 400)
+  }
+
+  if (parseShellCommand(args.content) !== null) {
+    error('Shell commands cannot carry attachments', 400)
+  }
+
+  const delivered = await findDeliveredSend(ctx, { sessionId, clientSendId })
+  if (delivered && ownsDeliveredSend(delivered, ctx.userId)) {
+    return { messageId: delivered._id }
+  }
+
+  const send = await requireAttachmentSend(
+    ctx,
+    attachmentSendId,
+    sessionId,
+    ctx.userId,
+  )
+  if (send.clientSendId !== clientSendId) {
+    error('Invalid attachment send', 409)
+  }
+
+  const staged = send.slots.map(({ attachmentId }) => attachmentId)
+  const supplied = (args.attachments ?? []).flatMap((input) =>
+    'id' in input ? [input.id] : [],
+  )
+  if (
+    staged.length !== supplied.length ||
+    staged.some((id, index) => id !== supplied[index])
+  ) {
+    error('Attachments are not ready', 409)
+  }
+
+  return send
+}
 
 async function assertClientSendIdAvailable(
   ctx: MutationCtx,
@@ -187,16 +245,13 @@ async function assertClientSendIdAvailable(
 ) {
   if (clientSendId === undefined) return
 
-  if (!ID_PATTERN.test(clientSendId)) error('Invalid client send ID', 400)
+  if (!CLIENT_SEND_ID.test(clientSendId)) error('Invalid client send ID', 400)
 
-  const existing = await ctx.db
-    .query('messages')
-    .withIndex('by_sessionId_clientSendId', (q) =>
-      q.eq('sessionId', sessionId).eq('clientSendId', clientSendId),
-    )
-    .first()
+  const key = { sessionId, clientSendId }
+  const existing = await findDeliveredSend(ctx, key)
+  const pending = await findAttachmentSend(ctx, key)
 
-  if (existing) error('Client send ID is already in use', 409)
+  if (existing || pending) error('Client send ID is already in use', 409)
 }
 
 export async function invokeAgent(
@@ -361,7 +416,8 @@ async function loadStagedAttachments(
       !attachment ||
       attachment.sessionId !== args.sessionId ||
       attachment.uploaderId !== ctx.userId ||
-      attachment.messageId
+      attachment.messageId ||
+      attachment.pendingSendId !== args.attachmentSendId
     ) {
       error('Invalid staged attachment', 409)
     }
