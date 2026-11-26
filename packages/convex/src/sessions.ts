@@ -186,11 +186,6 @@ export const _getMemberWorkspaceContext = internalQuery({
   handler: Sessions._getMemberWorkspaceContext,
 })
 
-export const _allowToolPaths = internalMutation({
-  args: { sessionId: v.id('sessions'), paths: v.array(v.string()) },
-  handler: Sessions._allowToolPaths,
-})
-
 export const _patchSessionLog = internalMutation({
   args: { sessionId: v.id('sessions'), storageId: v.id('_storage') },
   handler: Sessions._patchSessionLog,

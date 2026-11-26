@@ -48,6 +48,7 @@ export type OpenStream = (
 
 export type ShellJobOptions = {
   abortSignal?: AbortSignal
+  bindSessionDir?: true
   /**
    * Stops watching a job at this timestamp, yielding one last `running` output.
    * Lets a caller hand the job to another watcher before it runs out of time.

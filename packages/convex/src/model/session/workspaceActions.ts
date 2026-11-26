@@ -67,27 +67,6 @@ export async function listFilesByRoot(
   })
 }
 
-type FlaggedPathArgs = {
-  sessionId: Id<'sessions'>
-  workspaceId: string
-  workspace?: FolderWorkspace
-  command: string
-  cwd?: string
-}
-
-export async function rememberFlaggedPaths(
-  ctx: ActionCtx,
-  args: FlaggedPathArgs,
-): Promise<void> {
-  const { getFlaggedPaths } = await import('../tool/shellTools')
-  const flagged = await getFlaggedPaths(args.command, args, args.cwd)
-  if (!flagged || flagged.length === 0) return
-  await ctx.runMutation(internal.sessions._allowToolPaths, {
-    sessionId: args.sessionId,
-    paths: flagged,
-  })
-}
-
 /**
  * Read a linked file's contents for context injection.
  * Called only from an authorized action.

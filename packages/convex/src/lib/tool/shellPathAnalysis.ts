@@ -16,19 +16,29 @@ import {
   WRAPPER_PROGRAMS,
   isInterpreterPayloadFlag,
 } from './shellConfig'
+import { isShellLoopSegment, shellFileLoopPaths } from './shellFileLoop'
 import {
+  type ChainSegment,
   type ShellToken,
   expandShellControlSegment,
   splitShellChain,
   tokenizeShell,
 } from './shellParse'
 import { readOnlyShellQuery } from './shellQueries'
+import {
+  hasStaticSessionDirBinding,
+  markSessionDirOperands,
+} from './shellSessionDir'
 
 export interface ShellPathAnalysis {
   /** Explicit path operands found in the command. */
   candidates: string[]
   /** Whether every segment's explicit path operands were classified. */
   complete: boolean
+  /** Expand loop globs as filename patterns in a fixed directory. */
+  fileLoop?: true
+  /** Literal operands rooted in the sidecar's session directory. */
+  sessionPaths?: string[]
 }
 
 /** Pattern arguments that are data rather than paths. */
@@ -68,33 +78,83 @@ interface Invocation {
 
 /** Analyze the explicit path operands of a shell command. */
 export function analyzeShellPathCandidates(command: string): ShellPathAnalysis {
+  const segments = splitShellChain(command)
+  const loop = shellFileLoopPaths(segments)
+  if (loop) {
+    const candidates: string[] = []
+    for (const path of loop) addPathCandidate(candidates, path)
+    return {
+      ...limitPathCandidates(candidates, true),
+      ...(candidates.some((path) => path.includes('*')) && { fileLoop: true }),
+    }
+  }
+
+  return analyzeSegmentPaths(command, segments)
+}
+
+function analyzeSegmentPaths(
+  command: string,
+  segments: ChainSegment[],
+): ShellPathAnalysis {
   const candidates: string[] = []
+  const sessionPaths: string[] = []
+  const canBind =
+    command.includes('SESSION_DIR') &&
+    !command.includes('\0') &&
+    hasStaticSessionDirBinding(segments)
+  const operands = canBind ? new Map<string, string>() : undefined
   let complete = true
 
-  for (const segment of splitShellChain(command)) {
+  for (const segment of segments) {
     if (segment.hasSubstitution) {
       complete = false
       continue
     }
     if (!segment.text) continue
+    if (isShellLoopSegment(segment.text)) complete = false
 
     for (const text of expandShellControlSegment(segment.text)) {
-      const analysis = pathValuesFromSegment(text)
+      const analysis = pathValuesFromSegment(text, operands)
       complete &&= analysis.complete
-      for (const value of analysis.values) addPathCandidate(candidates, value)
+      for (const value of analysis.values) {
+        const suffix = operands?.get(value)
+        if (suffix === undefined) addPathCandidate(candidates, value)
+        else if (!sessionPaths.includes(suffix)) sessionPaths.push(suffix)
+      }
     }
   }
 
-  if (candidates.length > MAX_PATH_CANDIDATES) complete = false
-  return { candidates: candidates.slice(0, MAX_PATH_CANDIDATES), complete }
+  const withinLimit =
+    candidates.length + sessionPaths.length <= MAX_PATH_CANDIDATES
+  const result = limitPathCandidates(candidates, complete && withinLimit)
+  const scopedCandidates = sessionPaths.slice(
+    0,
+    MAX_PATH_CANDIDATES - result.candidates.length,
+  )
+
+  return scopedCandidates.length
+    ? { ...result, sessionPaths: scopedCandidates }
+    : result
+}
+
+function limitPathCandidates(candidates: string[], complete: boolean) {
+  return {
+    candidates: candidates.slice(0, MAX_PATH_CANDIDATES),
+    complete: complete && candidates.length <= MAX_PATH_CANDIDATES,
+  }
 }
 
 export function extractPathCandidates(command: string): string[] {
-  return analyzeShellPathCandidates(command).candidates
+  const { candidates, sessionPaths = [] } = analyzeShellPathCandidates(command)
+  return [...candidates, ...sessionPaths]
 }
 
-function pathValuesFromSegment(text: string): SegmentPathAnalysis {
-  const tokens = tokenizeShell(text)
+function pathValuesFromSegment(
+  text: string,
+  sessionOperands?: Map<string, string>,
+): SegmentPathAnalysis {
+  let tokens = tokenizeShell(text)
+  if (sessionOperands) tokens = markSessionDirOperands(tokens, sessionOperands)
   const query = readOnlyShellQuery(tokens)
   if (query) return { values: query.paths, complete: true }
 

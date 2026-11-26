@@ -49,5 +49,8 @@ export const checkPathsFields = {
   paths: z.array(z.string()),
   allowedPaths: z.array(z.string()).optional(),
   literal: z.boolean().optional(),
+  fileLoop: z.literal(true).optional(),
+  sessionPaths: z.array(z.string()).max(32).optional(),
+  shell: z.string().optional(),
   cwd: z.string().optional(),
 } as const

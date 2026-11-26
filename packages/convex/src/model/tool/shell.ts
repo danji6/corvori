@@ -49,6 +49,7 @@ export async function* executeShellJob(
     workspaceId: context.workspaceId,
     workspace: context.workspace,
     command: input.command,
+    ...(options.bindSessionDir && { bindSessionDir: true }),
     cwd: input.cwd,
     allowedPaths: context.allowedPaths,
     background,

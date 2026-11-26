@@ -221,6 +221,9 @@ function buildMcpServer(): McpServer {
       paths,
       allowedPaths,
       literal,
+      fileLoop,
+      sessionPaths,
+      shell,
       cwd,
     }) => {
       const result = await checkFlaggedPaths({
@@ -230,6 +233,9 @@ function buildMcpServer(): McpServer {
         paths,
         allowedPaths,
         literal,
+        fileLoop,
+        sessionPaths,
+        shell,
         cwd,
       })
       return { content: [{ type: 'text' as const, text: formatJson(result) }] }

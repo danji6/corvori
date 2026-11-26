@@ -50,15 +50,14 @@ describe('sidecar path resolution', () => {
     for (const input of ['.', root, './src/..', `${root}/src/..`]) {
       const result = await checkPaths(root, { paths: [input, 'src/file.txt'] })
       expect(result.complete).toBe(true)
-      expect(result.flagged).toEqual([])
       expect(result.uncovered).toEqual([])
     }
     const result = await checkPaths(external, { paths: ['.', 'file.txt'] })
     expect(result.complete).toBe(true)
-    expect(result.flagged).toEqual([])
+    expect(result.uncovered).toEqual([])
   })
 
-  test('keeps ignored paths flagged when the root is also checked', async () => {
+  test('reports ignored paths needing approval when the root is also checked', async () => {
     const result = await checkPaths(root, {
       paths: ['.', 'alias.txt', 'ignored/file.txt'],
     })
@@ -222,13 +221,15 @@ describe('sidecar path resolution', () => {
     ])
   })
 
-  test('retains ignored-path metadata while covering grants', async () => {
+  test('validates ignored globs against grants and rejects dynamic operands', async () => {
     const result = await checkPaths(root, {
       paths: ['ignored/*.txt'],
       allowedPaths: [path.join(root, 'ignored')],
     })
     expect(result.complete).toBe(true)
-    expect(result.flagged).toEqual(['ignored/file.txt'])
+    expect(result.resolved).toMatchObject([
+      { path: 'ignored/file.txt', allowed: true },
+    ])
     expect(result.uncovered).toEqual([])
     const alias = await checkPaths(root, { paths: ['alias.txt'] })
     expect(alias.uncovered).toEqual(['src/file.txt'])

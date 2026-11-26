@@ -27,7 +27,6 @@ export { _patchEnvironment } from './sessionSettings'
 export { _getWorkspaceContext } from './sessionWorkspace'
 export { _getMemberWorkspaceContext } from './sessionWorkspace'
 export { _patchSessionLog } from './sessionWorkspace'
-export { _allowToolPaths } from './sessionWorkspace'
 
 export async function create(
   ctx: AuthMutationCtx,

@@ -29,7 +29,7 @@ import {
   writeStdin,
 } from './registry'
 import { pumpShellJobStream } from './stream'
-import { shellPath } from './system-shell'
+import { canBindSessionDir, shellPath } from './system-shell'
 
 const jobFields = {
   sessionId: z.string(),
@@ -45,6 +45,7 @@ const startSchema = z.strictObject({
   workspaceId: z.string(),
   workspace: workspaceContextSchema,
   command: z.string().min(1),
+  bindSessionDir: z.literal(true).optional(),
   cwd: z.string().optional(),
   allowedPaths: z.array(z.string()).optional(),
   background: z.boolean().optional(),
@@ -125,6 +126,10 @@ export const startShell: Handler = async (c) => {
                 homeId: input.workspace.agentHome?.homeId,
                 cwd: directory.cwd,
                 environment: directory.environment,
+                boundSessionDir:
+                  input.bindSessionDir && canBindSessionDir(input.shell)
+                    ? directory.environment.SESSION_DIR
+                    : undefined,
               },
               roots,
             )

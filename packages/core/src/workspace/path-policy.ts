@@ -93,7 +93,6 @@ export type CheckedPath = {
 }
 
 export type PathCheckResult = {
-  flagged: string[]
   uncovered: string[]
   resolved: CheckedPath[]
   complete: boolean

@@ -182,7 +182,7 @@ describe('argument-gated safe programs', () => {
 })
 
 describe('command chains', () => {
-  test('shell loop keywords are always approved', () => {
+  test('classifies loop bodies for command approval', () => {
     const readOnlyLoop = 'for file in a b; do echo "$file"; done'
     expect(isShellCommandAutoApproved(readOnlyLoop, [])).toBe(true)
     expect(analyzeShellCommand(readOnlyLoop, []).patterns).toEqual([
@@ -199,6 +199,27 @@ describe('command chains', () => {
     const mutatingLoop = 'for file in a b; do rm "$file"; done'
     expect(analyzeShellCommand(mutatingLoop, []).unapproved).toEqual(['rm'])
     expect(isShellCommandAutoApproved(mutatingLoop, [])).toBe(false)
+  })
+
+  test('binds quoted loop references to literal paths and filename globs', () => {
+    const command = [
+      'for file in README.md "docs/with space.md" src/js/*.js',
+      'do',
+      '  echo "$file"',
+      '  head -n 12 "${file}"',
+      '  cat -- "$file" package.json',
+      'done',
+    ].join('\n')
+    expect(analyzeShellPathCandidates(command)).toEqual({
+      candidates: [
+        'README.md',
+        'docs/with space.md',
+        'src/js/*.js',
+        'package.json',
+      ],
+      complete: true,
+      fileLoop: true,
+    })
   })
 
   test('every segment must be covered', () => {

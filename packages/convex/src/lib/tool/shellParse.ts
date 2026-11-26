@@ -2,11 +2,14 @@ export interface ChainSegment {
   text: string
   hasSubstitution: boolean
   hasRiskyRedirect: boolean
+  hasRedirection: boolean
+  separator: 'list' | 'operator' | 'end'
 }
 
 export interface ShellToken {
   value: string
   quoted: boolean
+  raw: string
 }
 
 /** Keeps a loop's `do` keyword from hiding an inline body command. */
@@ -21,14 +24,22 @@ export function splitShellChain(command: string): ChainSegment[] {
   let text = ''
   let hasSubstitution = false
   let hasRiskyRedirect = false
+  let hasRedirection = false
 
-  const flush = () => {
+  const flush = (separator: ChainSegment['separator']) => {
     const trimmed = text.trim()
-    if (trimmed || hasSubstitution || hasRiskyRedirect)
-      segments.push({ text: trimmed, hasSubstitution, hasRiskyRedirect })
+    if (trimmed || hasSubstitution || hasRedirection)
+      segments.push({
+        text: trimmed,
+        hasSubstitution,
+        hasRiskyRedirect,
+        hasRedirection,
+        separator,
+      })
     text = ''
     hasSubstitution = false
     hasRiskyRedirect = false
+    hasRedirection = false
   }
 
   let i = 0
@@ -53,28 +64,31 @@ export function splitShellChain(command: string): ChainSegment[] {
       text += ch
       i++
     } else if (ch === '<' && next === '<') {
+      hasRedirection = true
       const heredoc = consumeHeredoc(command, i)
       if (heredoc.consumed) {
         i = heredoc.next
-        flush()
+        flush('list')
       } else {
         text += command.slice(i, heredoc.next)
         i = heredoc.next
       }
     } else if (ch === '\n' || ch === ';') {
-      flush()
+      flush('list')
       i++
     } else if (ch === '|') {
-      flush()
+      flush('operator')
       i += next === '|' ? 2 : 1
     } else if (ch === '&' && next === '>') {
+      hasRedirection = true
       const redirect = consumeRedirect(command, i + 1)
       hasRiskyRedirect ||= redirect.risky
       i = redirect.next
     } else if (ch === '&') {
-      flush()
+      flush('operator')
       i += next === '&' ? 2 : 1
     } else if (ch === '>') {
+      hasRedirection = true
       text = text.replace(/(^|\s)\d+$/, '$1')
       const redirect = consumeRedirect(command, i)
       hasRiskyRedirect ||= redirect.risky
@@ -84,7 +98,7 @@ export function splitShellChain(command: string): ChainSegment[] {
       i++
     }
   }
-  flush()
+  flush('end')
 
   return segments
 }
@@ -180,15 +194,18 @@ export function tokenizeShell(text: string): ShellToken[] {
   const tokens: ShellToken[] = []
   let current: string | null = null
   let quoted = false
+  let start = 0
+  let i = 0
   const append = (chunk: string) => (current = (current ?? '') + chunk)
   const flush = () => {
-    if (current !== null) tokens.push({ value: current, quoted })
+    if (current !== null)
+      tokens.push({ value: current, quoted, raw: text.slice(start, i) })
     current = null
     quoted = false
   }
 
-  let i = 0
   while (i < text.length) {
+    if (current === null) start = i
     const ch = text[i]!
     if (ch === "'") {
       const end = text.indexOf("'", i + 1)

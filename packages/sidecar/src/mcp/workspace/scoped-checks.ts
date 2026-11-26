@@ -1,3 +1,4 @@
+import { isSessionDirOperand } from '@cv/core/shell/session-dir'
 import type { FolderWorkspace } from '@cv/core/types/workspace'
 import type { PathCheckResult } from '@cv/core/workspace/path-policy'
 import { assertPersonalScope } from '@cv/core/workspace/personal'
@@ -6,7 +7,11 @@ import {
   scopedDisplayPath,
 } from '@cv/core/workspace/scoped-path'
 
-import { inspectShellDirectory } from '../../shell/directory'
+import {
+  inspectShellDirectory,
+  resolveShellSessionRoot,
+} from '../../shell/directory'
+import { canBindSessionDir } from '../../shell/system-shell'
 import { checkPaths } from './check-paths'
 import { selectFileToolScope } from './file-path'
 import { assertInside } from './paths'
@@ -19,6 +24,9 @@ type CheckInput = {
   paths: string[]
   allowedPaths?: string[]
   literal?: boolean
+  fileLoop?: true
+  sessionPaths?: string[]
+  shell?: string
   cwd?: string
 }
 
@@ -26,11 +34,12 @@ type CheckInput = {
 export async function checkScopedPaths(
   input: CheckInput,
 ): Promise<PathCheckResult> {
+  if (input.sessionPaths?.length && (input.cwd === undefined || input.literal))
+    throw new Error('Session operands require a shell path check')
   if (input.cwd !== undefined) return checkShellPaths(input)
   const result: PathCheckResult = {
     complete: true,
     resolved: [],
-    flagged: [],
     uncovered: [],
   }
   for (const filePath of input.paths) {
@@ -85,22 +94,50 @@ async function checkShellPaths(input: CheckInput) {
   )
   const result = canonicalGrants(cwdResult)
   appendResult(result, canonicalGrants(operands))
+  if (input.sessionPaths?.length) {
+    const sessionResult = await checkSessionOperands(
+      input,
+      input.sessionPaths,
+      directory.grantRoot,
+    )
+    appendResult(result, canonicalGrants(sessionResult))
+  }
   return result
 }
 
+async function checkSessionOperands(
+  input: CheckInput,
+  paths: string[],
+  grantRoot: string,
+) {
+  if (
+    !canBindSessionDir(input.shell) ||
+    paths.some((path) => !isSessionDirOperand(path))
+  )
+    throw new Error('Session operands cannot be resolved for this command')
+  const root = await resolveShellSessionRoot(input)
+  if (!root) throw new Error('Session directory is not available')
+  return checkPaths(
+    root,
+    { paths, allowedPaths: input.allowedPaths, quoted: true },
+    [root],
+    grantRoot,
+  )
+}
+
 function canonicalGrants(result: PathCheckResult): PathCheckResult {
-  const resolve = (value: string) =>
-    result.resolved.find((item) => item.path === value)?.absolutePath ?? value
+  const { resolved, uncovered } = result
   return {
     ...result,
-    flagged: result.flagged.map(resolve),
-    uncovered: result.uncovered.map(resolve),
+    uncovered: uncovered.map(
+      (value) =>
+        resolved.find((item) => item.path === value)?.absolutePath ?? value,
+    ),
   }
 }
 
 function appendResult(target: PathCheckResult, source: PathCheckResult) {
   target.complete &&= source.complete
   target.resolved.push(...source.resolved)
-  target.flagged = [...new Set([...target.flagged, ...source.flagged])]
   target.uncovered = [...new Set([...target.uncovered, ...source.uncovered])]
 }

@@ -5,7 +5,6 @@ import {
 } from '@cv/core/const'
 import { TOOL_DESCRIPTIONS, shellToolDescription } from '@cv/core/types'
 import type { ShellToolOutput } from '@cv/core/types/tools'
-import { defaultShellDirectory } from '@cv/core/workspace/personal'
 import { parseScopedPath } from '@cv/core/workspace/scoped-path'
 
 import { ToolError } from '../../errors'
@@ -20,7 +19,7 @@ import {
   type WorkspaceToolContext,
   workspaceArgs,
 } from './context'
-import { checkToolPaths } from './paths'
+import { checkShellToolPaths } from './paths'
 import {
   type ShellJobInput,
   type ShellOutputInput,
@@ -62,6 +61,7 @@ export async function createShellTool(context: WorkspaceToolContext) {
           },
           {
             abortSignal,
+            bindSessionDir: shouldBindSessionDir(input.command, context),
             windowDeadline: context.shellWindowDeadline,
             onStarted:
               context.bindShell &&
@@ -73,6 +73,13 @@ export async function createShellTool(context: WorkspaceToolContext) {
       )
     },
   })
+}
+
+function shouldBindSessionDir(command: string, context: WorkspaceToolContext) {
+  if (!context.workspace?.sessionFiles || !command.includes('SESSION_DIR'))
+    return undefined
+  const { complete, sessionPaths } = analyzeShellPathCandidates(command)
+  return complete && sessionPaths ? true : undefined
 }
 
 export async function createShellOutputTool(context: WorkspaceToolContext) {
@@ -195,38 +202,13 @@ async function shellNeedsApproval(
     return true
   }
   if (!isToolAutoApproved(SHELL_TOOL_NAME, { command }, approvals)) return true
-  const { candidates, complete } = analyzeShellPathCandidates(command)
-  if (!complete) return true
-  const result = await checkToolPaths(
-    candidates,
+  const result = await checkShellToolPaths(
+    command,
     context,
     approvals?.paths,
-    false,
-    cwd ?? defaultShellDirectory(context.workspace),
+    cwd,
   )
   return !result?.complete || result.uncovered.length > 0
-}
-
-/**
- * Ask the sidecar which paths referenced by the command are sensitive
- * (git-ignored or outside the workspace).
- */
-export async function getFlaggedPaths(
-  command: string,
-  context: Pick<WorkspaceToolContext, 'sessionId' | 'workspaceId' | 'workspace'>, // prettier-ignore
-  cwd?: string,
-): Promise<string[] | null> {
-  const { candidates: paths, complete } = analyzeShellPathCandidates(command)
-  if (!complete) return null
-
-  const result = await checkToolPaths(
-    paths,
-    context,
-    [],
-    false,
-    cwd ?? defaultShellDirectory(context.workspace),
-  )
-  return result?.complete ? result.flagged : null
 }
 
 async function* withJobNumber(

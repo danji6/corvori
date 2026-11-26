@@ -56,6 +56,19 @@ function shellFlavor(file: string): ShellFlavor {
   return 'posix'
 }
 
+export function canBindSessionDir(shell?: string): boolean {
+  return !isWindows && shellBasename(shellPath(shell)) === 'bash'
+}
+
+/** Install the checked value inside Bash, after its startup scripts run. */
+export function withBoundSessionDir(
+  command: string,
+  directory: string,
+): string {
+  const quoted = `'${directory.replaceAll("'", "'\\''")}'`
+  return `builtin declare -rx SESSION_DIR=${quoted} && [[ "$SESSION_DIR" == ${quoted} ]] || exit 1\n${command}`
+}
+
 /** Turns a configured shell into something spawnable. */
 function resolveShell(shell: string): string {
   if (/[\\/]/.test(shell)) return shell

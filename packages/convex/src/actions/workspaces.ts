@@ -4,7 +4,6 @@ import { v } from 'convex/values'
 
 import { action, internalAction } from '../_generated/server'
 import { settleChangesArgsValidator } from '../validators/changes'
-import { workspaceRefValidator } from '../validators/workspaces'
 
 export const listDirectories = action({
   args: { path: v.optional(v.string()), showHidden: v.optional(v.boolean()) },
@@ -37,20 +36,6 @@ export const resolveFileLinks = action({
   handler: async (ctx, args) => {
     const { resolveFileLinks } = await import('../model/session/workspaceActions') // prettier-ignore
     return resolveFileLinks(ctx, args)
-  },
-})
-
-export const _rememberFlaggedPaths = internalAction({
-  args: {
-    sessionId: v.id('sessions'),
-    workspaceId: v.string(),
-    workspace: v.optional(workspaceRefValidator),
-    command: v.string(),
-    cwd: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const { rememberFlaggedPaths } = await import('../model/session/workspaceActions') // prettier-ignore
-    await rememberFlaggedPaths(ctx, args)
   },
 })
 

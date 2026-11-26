@@ -10,19 +10,14 @@ import {
   type PathCheckResult,
   pathApprovalStatus,
 } from '@cv/core/workspace/path-policy'
-import { defaultShellDirectory } from '@cv/core/workspace/personal'
 import type { UIMessage } from 'ai'
 
 import { internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
-import {
-  analyzeShellPathCandidates,
-  isFileTool,
-  mergeToolApprovals,
-} from '../../lib/tool/approval'
+import { isFileTool, mergeToolApprovals } from '../../lib/tool/approval'
 import { postSidecar } from '../sidecar'
-import { checkToolPaths } from '../tool/paths'
+import { checkShellToolPaths, checkToolPaths } from '../tool/paths'
 import { type prepare } from './engineSetup'
 
 export function hasAwaitingApproval(parts: UIMessage['parts']) {
@@ -42,6 +37,7 @@ export type ApprovalContext = {
   sessionId: Id<'sessions'>
   workspaceId: string
   workspace?: FolderWorkspace
+  shell?: string
   allowedPaths?: string[]
 }
 
@@ -64,6 +60,7 @@ export async function attachApprovalPreviews(
     sessionId: setup.workspaceSessionId,
     workspaceId,
     workspace: setup.workspace,
+    shell: setup.toolRuntime?.current.shell,
     allowedPaths: mergeToolApprovals(
       approvals ?? undefined,
       setup.agent.autoApprove,
@@ -104,7 +101,7 @@ async function withFileApprovalPaths(
     [input.path],
     context,
     context.allowedPaths,
-    true,
+    { literal: true },
   )
   return withPathApprovalResult(part, result)
 }
@@ -147,16 +144,12 @@ export async function withApprovalPaths(
   const command = input?.command
   if (typeof command !== 'string') return part
 
-  const { candidates, complete } = analyzeShellPathCandidates(command)
-  const result = complete
-    ? await checkToolPaths(
-        candidates,
-        context,
-        context.allowedPaths,
-        false,
-        input?.cwd ?? defaultShellDirectory(context.workspace),
-      )
-    : null
+  const result = await checkShellToolPaths(
+    command,
+    context,
+    context.allowedPaths,
+    input?.cwd,
+  )
 
   return withPathApprovalResult(part, result)
 }

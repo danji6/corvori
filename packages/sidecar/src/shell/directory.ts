@@ -48,9 +48,7 @@ export async function resolveShellDirectory(input: ShellDirectoryInput) {
   return {
     ...directory,
     environment: {
-      SESSION_DIR: input.workspace?.sessionFiles
-        ? await ensureSessionDirectory(input.sessionId)
-        : undefined,
+      SESSION_DIR: await resolveShellSessionRoot(input),
       AGENT_DIR: input.workspace?.agentHome?.path,
       WORKSPACE_DIR:
         input.workspace?.agentOnly || input.workspace?.sessionOnly
@@ -58,4 +56,12 @@ export async function resolveShellDirectory(input: ShellDirectoryInput) {
           : input.workspace?.path,
     },
   }
+}
+
+/** Resolve the managed session root shared by shell execution and path checks. */
+export async function resolveShellSessionRoot(
+  input: Pick<ShellDirectoryInput, 'sessionId' | 'workspace'>,
+) {
+  if (input.workspace?.sessionFiles)
+    return ensureSessionDirectory(input.sessionId)
 }

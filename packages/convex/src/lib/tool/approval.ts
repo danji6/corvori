@@ -24,7 +24,7 @@ import {
   splitShellChain,
   tokenizeShell,
 } from './shellParse'
-import { analyzeShellPathCandidates } from './shellPathAnalysis'
+import { extractPathCandidates } from './shellPathAnalysis'
 import { prettierCheckPattern, readOnlyShellQuery } from './shellQueries'
 
 export {
@@ -234,7 +234,7 @@ export function toolNamesForApproval(name: string): string[] {
 
 /** Whether an explicit path operand references a forbidden path. */
 export function commandReferencesForbiddenPath(command: string): boolean {
-  return analyzeShellPathCandidates(command).candidates.some(isPathForbidden)
+  return extractPathCandidates(command).some(isPathForbidden)
 }
 
 /**

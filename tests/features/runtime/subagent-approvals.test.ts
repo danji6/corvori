@@ -319,7 +319,7 @@ describe('shared remembered approvals', () => {
     }
   })
 
-  test('discovers paths asynchronously when the request has no resolved paths', async () => {
+  test('approves once when the request has no verified paths to remember', async () => {
     const { ctx, byId, scheduled } = setup([
       approval('shell'),
       approval('write', 'tool-write_file'),
@@ -339,12 +339,11 @@ describe('shared remembered approvals', () => {
       approved: true,
       remember: 'paths',
     })
-    expect(scheduled).toHaveLength(1)
-    expect(scheduled[0].args[2]).toMatchObject({
-      sessionId: childId,
-      command: 'git push',
-      workspaceId: 'folder-1',
-    })
+    expect(byId.get('content')?.parts).toMatchObject([
+      { state: 'approval-responded', approval: { approved: true } },
+      { state: 'approval-requested' },
+    ])
+    expect(scheduled).toHaveLength(0)
     expect((await getApprovals(ctx, parentId)).paths).toBeUndefined()
   })
 

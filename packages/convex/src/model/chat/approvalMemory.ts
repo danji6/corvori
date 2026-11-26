@@ -7,7 +7,6 @@ import { mcpApprovalKey } from '@cv/core/types/mcp-catalog'
 import { mcpProtocolApprovalKey } from '@cv/core/types/mcp-protocol'
 import type { RememberScope } from '@cv/core/types/tools'
 
-import { internal } from '../../_generated/api'
 import type { AuthMutationCtx } from '../../functions'
 import {
   analyzeShellCommand,
@@ -15,7 +14,7 @@ import {
   toolNamesForApproval,
 } from '../../lib/tool/approval'
 import { approvalTarget, findName } from '../mcp/brokerNames'
-import { _allowToolPaths as allowToolPaths } from '../session/sessions'
+import { allowToolPaths } from '../session/sessionWorkspace'
 import { appendApprovals, getApprovals } from '../session/state'
 import type { Session } from '../session/types'
 
@@ -33,12 +32,12 @@ export async function rememberApproval(
   matched: ApprovedTool,
   scope: RememberScope,
 ) {
-  const approvals = await getApprovals(ctx, session._id)
-
   if (scope === 'paths') {
     await rememberPaths(ctx, session, matched)
     return
   }
+
+  const approvals = await getApprovals(ctx, session._id)
 
   if (matched.toolName === SHELL_TOOL_NAME) {
     const command = (matched.input as { command?: string } | undefined)?.command
@@ -80,7 +79,7 @@ async function protocolApproval(
   return binding ? mcpProtocolApprovalKey(input, binding.target) : undefined
 }
 
-/** Saves resolved paths or schedules discovery against the current workspace. */
+/** Saves the verified paths attached to the approval request. */
 async function rememberPaths(
   ctx: AuthMutationCtx,
   session: Session,
@@ -88,29 +87,10 @@ async function rememberPaths(
 ) {
   const supportsPathGrants =
     matched.toolName === SHELL_TOOL_NAME || isFileTool(matched.toolName)
-  if (!supportsPathGrants) return
+  if (!supportsPathGrants || !matched.paths?.length) return
 
-  if (matched.paths?.length) {
-    await allowToolPaths(ctx, {
-      sessionId: session._id,
-      paths: matched.paths,
-    })
-    return
-  }
-
-  if (matched.toolName !== SHELL_TOOL_NAME || !session.workspace) return
-  const command = (matched.input as { command?: string } | undefined)?.command
-  if (!command) return
-
-  await ctx.scheduler.runAfter(
-    0,
-    internal.actions.workspaces._rememberFlaggedPaths,
-    {
-      sessionId: session._id,
-      workspaceId: session.workspace.workspaceId,
-      workspace: session.workspace,
-      command,
-      cwd: (matched.input as { cwd?: string }).cwd,
-    },
-  )
+  await allowToolPaths(ctx, {
+    sessionId: session._id,
+    paths: matched.paths,
+  })
 }

@@ -49,7 +49,7 @@ export async function _patchSessionLog(
   }
 }
 
-export async function _allowToolPaths(
+export async function allowToolPaths(
   ctx: MutationCtx,
   args: { sessionId: Id<'sessions'>; paths: string[] },
 ) {

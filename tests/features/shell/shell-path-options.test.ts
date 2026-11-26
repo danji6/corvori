@@ -57,7 +57,7 @@ describe('shell path option classification', () => {
     'classifies reported command: $command',
     ({ command, candidates }) => {
       expect(isReadOnlyShellCommand(command)).toBe(true)
-      expect(analyzeShellPathCandidates(command)).toEqual({
+      expect(analyzeShellPathCandidates(command)).toMatchObject({
         candidates,
         complete: true,
       })

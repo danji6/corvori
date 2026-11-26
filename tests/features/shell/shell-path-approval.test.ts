@@ -28,6 +28,7 @@ async function createFixture() {
   for (const directory of [
     'src/server',
     'src/main',
+    'src/js',
     'src/composition',
     'ignored',
     'node_modules/.bun/example',
@@ -40,6 +41,7 @@ async function createFixture() {
   for (const file of [
     'README.md',
     'src/main.ts',
+    'src/js/example.js',
     'src/server/createServer.ts',
     'ignored/patterns.txt',
     'node_modules/.bun/example/input.ts',
@@ -312,6 +314,51 @@ describe('shell approval through scoped MCP path checks', () => {
     const command = `head -n 50 ${external}/file.txt`
     expect(await needsApproval(command)).toBe(true)
     expect(await needsApproval(command, { paths: [external] })).toBe(false)
+  })
+
+  test('checks loop operands from the actual cwd and handles an unmatched glob', async () => {
+    const command = 'for f in *; do head -n 12 -- "$f"; done'
+    expect(await needsApproval(command, { cwd: 'workspace://src/js' })).toBe(
+      false,
+    )
+    expect(
+      await needsApproval('for f in src/js/*.missing; do cat "$f"; done'),
+    ).toBe(false)
+  })
+
+  test('applies path grants to ignored and symlinked loop matches', async () => {
+    const cases = [
+      ['ignored/*.txt', path.join(root, 'ignored/patterns.txt'), 'ignored'],
+      ['src/escape/*.txt', path.join(external, 'file.txt'), external],
+    ] as const
+    for (const [glob, file, grant] of cases) {
+      const command = 'for f in ' + glob + '; do head -12 "$f"; done'
+      expect(await needsApproval(command)).toBe(true)
+      expect(await approvalPreview(command)).toMatchObject({
+        approvalPathStatus: 'paths',
+        approvalPaths: [file],
+      })
+      expect(await needsApproval(command, { paths: [grant] })).toBe(false)
+    }
+  })
+
+  test.each([
+    'for f in $(git ls-files); do head "$f"; done',
+    'for f in src/js/*.js; do head $f; done',
+    'for f in src/js/*.js; do cd ignored; head "$f"; done',
+    'for f in src/js/*.js; do printf -v f ignored/patterns.txt; head "$f"; done',
+    'for f in src/js/*.js; do printf \'%n\' f; head "$f"; done',
+    'for f in *; do head "$f" --; done',
+    'for f in src/js/*.js; do head -n "$f"; done',
+    'for f in src/js/*.js; do head "$f" > /dev/null; done',
+    'for f in src/js/*.js; do echo "$f" | head -n 1; done',
+    'for f in src/js/*.js; do head "$f"; done; head "$f"',
+  ])('keeps unsupported or ambiguous loops gated: %s', async (command) => {
+    expect(
+      await needsApproval(command, {
+        shell: ['git ls-files', 'head', 'printf', 'cd', 'echo'],
+      }),
+    ).toBe(true)
   })
 
   test('honors a grant for dependency files reached through a package symlink', async () => {

@@ -27,4 +27,8 @@ export const REPORTED_APPROVAL_COMMANDS = [
     command: String.raw`rg -n 'main|error\(' src/main.ts; rg -n -i 'sidecar' README.md src --hidden --glob '!**/.env*' || test "$?" -eq 1`,
     candidates: ['src/main.ts', 'README.md', 'src'],
   },
+  {
+    command: String.raw`for f in src/js/*.js; do printf '\n--- %s ---\n' "$f"; head -n 12 "$f"; done`,
+    candidates: ['src/js/*.js'],
+  },
 ]

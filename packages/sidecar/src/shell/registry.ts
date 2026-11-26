@@ -11,6 +11,7 @@ import { type ShellJob } from './job-state'
 import { OutputRing } from './output-ring'
 import { type PtyMode, spawnJob } from './pty'
 import { ShellJobSubscriber } from './subscriber'
+import { withBoundSessionDir } from './system-shell'
 
 export type { ShellJobStatus } from './job-protocol'
 export type { StartShellJobInput } from './job-protocol'
@@ -68,7 +69,9 @@ export async function startShellJob(
   }
 
   const proc = await spawnJob({
-    command: input.command,
+    command: input.boundSessionDir
+      ? withBoundSessionDir(input.command, input.boundSessionDir)
+      : input.command,
     cwd: input.cwd,
     environment: input.environment,
     cols: input.cols ?? 80,

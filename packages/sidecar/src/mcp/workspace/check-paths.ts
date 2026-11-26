@@ -13,6 +13,7 @@ import {
   pathCandidate,
   resolvePathGrants,
 } from './access'
+import { expandFileLoopGlob } from './file-loop-glob'
 
 const MAX_GLOB_MATCHES = 256
 const GLOB_CHARS = /[*?[\]{}]/
@@ -27,14 +28,13 @@ const SAFE_DEVICE_PATHS = new Set([
 /** Resolve paths against allowlist grants and identify sensitive paths that still need approval. */
 export async function checkPaths(
   root: string,
-  input: { paths: string[]; allowedPaths?: string[]; literal?: boolean },
+  input: PathCheckInput,
   roots: string[] = [root],
   grantRoot = root,
 ): Promise<PathCheckResult> {
   const grants = await resolvePathGrants(grantRoot, input.allowedPaths ?? [])
 
   const result: PathCheckResult = {
-    flagged: [],
     uncovered: [],
     resolved: [],
     complete: true,
@@ -42,30 +42,35 @@ export async function checkPaths(
 
   for (const candidate of input.paths) {
     try {
-      if (!input.literal && (/^~/.test(candidate) || /\$/.test(candidate)))
+      const shellExpansion = !input.literal && !input.quoted
+      if (shellExpansion && (/^~/.test(candidate) || /\$/.test(candidate)))
         throw new Error('Dynamic path')
-      const candidates = input.literal
-        ? [candidate]
-        : await expandCandidate(root, candidate)
+      const candidates = await expandCandidate(root, candidate, input)
       for (const value of candidates) {
         // These special devices retain their existing shell exemption
-        if (!input.literal && SAFE_DEVICE_PATHS.has(path.resolve(root, value)))
+        if (shellExpansion && SAFE_DEVICE_PATHS.has(path.resolve(root, value)))
           continue
         result.resolved.push(await inspectPath(root, value, grants, roots))
       }
     } catch {
       result.complete = false
-      result.flagged.push(candidate)
       result.uncovered.push(candidate)
     }
   }
-  await flagSensitivePaths(root, roots, result, Boolean(input.literal))
-  result.flagged = [...new Set(result.flagged)]
+  await collectUncoveredPaths(root, roots, result, Boolean(input.literal))
   result.uncovered = [...new Set(result.uncovered)]
   return result
 }
 
-async function flagSensitivePaths(
+type PathCheckInput = {
+  paths: string[]
+  allowedPaths?: string[]
+  literal?: boolean
+  quoted?: true
+  fileLoop?: true
+}
+
+async function collectUncoveredPaths(
   cwd: string,
   roots: string[],
   result: PathCheckResult,
@@ -84,9 +89,9 @@ async function flagSensitivePaths(
   }
 
   for (const item of result.resolved) {
-    if (item.outside || item.forbidden || ignored.has(item.path)) {
-      result.flagged.push(item.path)
-      if (!item.allowed) result.uncovered.push(item.path)
+    const sensitive = item.outside || item.forbidden || ignored.has(item.path)
+    if (sensitive && !item.allowed) {
+      result.uncovered.push(item.path)
     }
   }
 }
@@ -132,14 +137,17 @@ function gitRelativePath(root: string, target: string): string {
 async function expandCandidate(
   root: string,
   candidate: string,
+  { literal, quoted, fileLoop }: PathCheckInput,
 ): Promise<string[]> {
-  if (!GLOB_CHARS.test(candidate)) return [candidate]
+  if (literal || quoted || !GLOB_CHARS.test(candidate)) return [candidate]
 
-  const matches = await glob(pathCandidate(root, candidate), {
-    dot: true,
-    onlyFiles: false,
-    followSymbolicLinks: false,
-  })
+  const matches = fileLoop
+    ? await expandFileLoopGlob(root, candidate)
+    : await glob(pathCandidate(root, candidate), {
+        dot: true,
+        onlyFiles: false,
+        followSymbolicLinks: false,
+      })
   if (matches.length > MAX_GLOB_MATCHES)
     throw new Error('Too many glob matches')
 
