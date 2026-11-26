@@ -481,17 +481,14 @@ export function ChatSessionView({
                     <DockWidgets
                       ref={widgetsRef}
                       className={cn(showInteractionPicker && 'hidden')}
-                      actions={
-                        reviewInDock && (
-                          <>
-                            {reviewAction}
-                            {showToolbar && (
-                              <ChatToolbar
-                                {...toolbar}
-                                className="pointer-events-auto shrink-0"
-                              />
-                            )}
-                          </>
+                      review={reviewInDock && reviewAction}
+                      toolbar={
+                        reviewInDock &&
+                        showToolbar && (
+                          <ChatToolbar
+                            {...toolbar}
+                            className="pointer-events-auto ml-auto shrink-0"
+                          />
                         )
                       }
                     />

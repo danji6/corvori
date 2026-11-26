@@ -45,11 +45,11 @@ function FolderMenuItems({
         {pinned ? <PinOffIcon /> : <PinIcon />}
         {pinned ? 'Unpin' : 'Pin'}
       </Item>
-      <Item disabled={pending} {...select(actions.createChild)}>
-        <FolderTreeIcon /> New subfolder…
-      </Item>
       <Item disabled={pending} {...select(actions.edit)}>
         <PencilIcon /> Edit…
+      </Item>
+      <Item disabled={pending} {...select(actions.createChild)}>
+        <FolderTreeIcon /> New subfolder…
       </Item>
       <Separator />
       <Item disabled={pending} {...select(actions.move)}>

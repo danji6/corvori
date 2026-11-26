@@ -9,11 +9,13 @@ const WIDGET = 'bg-background/80 pointer-events-auto h-9 px-3 backdrop-blur-md'
 export function DockWidgets({
   ref,
   className,
-  actions,
+  review,
+  toolbar,
 }: {
   ref?: React.Ref<HTMLDivElement>
   className?: string
-  actions?: React.ReactNode
+  review?: React.ReactNode
+  toolbar?: React.ReactNode
 }) {
   // Reserve a row even when there are no widgets.
   return (
@@ -22,20 +24,17 @@ export function DockWidgets({
       data-slot="dock-widgets"
       className={cn(
         'pointer-events-none mb-(--dock-widgets-gap) flex items-center gap-2 px-1',
-        actions
+        review
           ? 'min-h-(--dock-widgets-height) flex-wrap'
           : 'h-(--dock-widgets-height)',
         className,
       )}
     >
+      {review}
       <TerminalsWidget className={WIDGET} />
       <TodosWidget className={WIDGET} />
       <SubagentsWidget className={WIDGET} />
-      {actions && (
-        <div className="flex flex-1 items-center justify-between gap-2">
-          {actions}
-        </div>
-      )}
+      {toolbar}
     </div>
   )
 }
