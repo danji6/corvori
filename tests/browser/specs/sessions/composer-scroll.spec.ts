@@ -1,4 +1,117 @@
-import { expect, test } from '@playwright/test'
+import { type Page, expect, test } from '@playwright/test'
+
+function watchTranscriptGap(page: Page) {
+  return page.evaluateHandle(() => {
+    const transcript = document.querySelector(
+      '[data-slot="transcript-window"]',
+    )!
+    const composer = document.querySelector('[data-slot="chat-box"]')!
+    const gaps: number[] = []
+    const sample = () => {
+      gaps.push(
+        composer.getBoundingClientRect().top -
+          transcript.getBoundingClientRect().bottom,
+      )
+    }
+    const observer = new ResizeObserver(sample)
+    observer.observe(transcript)
+    observer.observe(composer)
+    sample()
+    return () => {
+      observer.disconnect()
+      sample()
+      return Math.max(...gaps) - Math.min(...gaps)
+    }
+  })
+}
+
+function waitForBottom(page: Page) {
+  return expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollHeight - scrollY - innerHeight,
+      ),
+    )
+    .toBeLessThanOrEqual(1)
+}
+
+test('keeps the transcript against the dock when discarding a pending attachment send', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1100, height: 780 })
+  await page.route('**/composer-upload', (route) =>
+    route.fulfill(
+      route.request().headers()['content-type'] === 'application/zip'
+        ? { status: 500 }
+        : { json: { storageId: 'staged' } },
+    ),
+  )
+  await page.goto('/?fixture=subagent-approvals&id=parent&deferSend&history')
+  await page.locator('input[name="attachment"]').setInputFiles([
+    {
+      name: 'screen.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aOh0AAAAASUVORK5CYII=',
+        'base64',
+      ),
+    },
+    {
+      name: 'data.zip',
+      mimeType: 'application/zip',
+      buffer: Buffer.from('zip'),
+    },
+  ])
+  const composer = page.locator('[data-slot="chat-box"]')
+  await composer.getByRole('button', { name: 'Send', exact: true }).click()
+  await expect(composer.locator('[data-slot="file-strip"]')).toHaveCount(0)
+  const attachment = page.locator('[data-slot="file-block"]')
+  await expect(attachment.getByText('Upload failed (HTTP 500)')).toBeVisible()
+  const discard = attachment.getByRole('button', { name: 'Discard message' })
+  await expect(discard).toBeInViewport()
+  await waitForBottom(page)
+  const gap = await watchTranscriptGap(page)
+  await discard.click()
+  await expect(attachment).toHaveCount(0)
+  await waitForBottom(page)
+  expect(await gap.evaluate((stop) => stop())).toBeLessThanOrEqual(2)
+})
+
+test('keeps the transcript against the dock when deleting above a taller tail row', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1100, height: 780 })
+  await page.goto('/?fixture=notes&id=notes&composer')
+  const editor = page.locator('[data-slot="chat-box"] [contenteditable="true"]')
+  const message = 'Short message to delete'
+  const tail = `${'A line of text that will wrap. '.repeat(25)}Tail message`
+  for (const text of [message, tail]) {
+    await editor.fill(text)
+    await editor.press('Enter')
+    await expect(editor).toHaveText('')
+  }
+  await expect(page.getByText(/Tail message$/)).toBeVisible()
+  await waitForBottom(page)
+  await expect(page.locator('[data-slot="transcript-window"]')).toHaveCSS(
+    'pointer-events',
+    'auto',
+  )
+
+  const row = page.getByText(message, { exact: true })
+  await expect(row).toBeInViewport({ ratio: 1 })
+  await row.click({ button: 'right' })
+  await page
+    .getByRole('menuitem', { name: 'Delete Message', exact: true })
+    .click()
+  const confirm = page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Delete', exact: true })
+  const gap = await watchTranscriptGap(page)
+  await confirm.click()
+  await expect(row).toHaveCount(0)
+  await waitForBottom(page)
+  expect(await gap.evaluate((stop) => stop())).toBeLessThanOrEqual(2)
+})
 
 test('keeps the selected message line in place as the mobile viewport shrinks', async ({
   page,
@@ -69,13 +182,7 @@ test('preserves the dock height and scroll position in fullscreen', async ({
   const expand = page.getByRole('button', { name: 'Full screen', exact: true })
   await expect(expand).toBeInViewport()
   await page.evaluate(() => document.fonts.ready.then(() => undefined))
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () => document.documentElement.scrollHeight - scrollY - innerHeight,
-      ),
-    )
-    .toBeLessThanOrEqual(1)
+  await waitForBottom(page)
 
   const dock = page.locator('[data-slot="chat-dock"]')
   const dockHeight = () =>
@@ -113,13 +220,7 @@ test('keeps following the bottom across consecutive keyboard sends', async ({
     await editor.press('Enter')
     await expect(editor).toHaveText('')
     await expect(page.getByText(marker, { exact: false })).toBeAttached()
-    await expect
-      .poll(() =>
-        page.evaluate(
-          () => document.documentElement.scrollHeight - scrollY - innerHeight,
-        ),
-      )
-      .toBeLessThanOrEqual(1)
+    await waitForBottom(page)
   }
 })
 

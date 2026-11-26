@@ -5,7 +5,7 @@ export type ScrollLayoutAnchor = 'top' | 'bottom'
 
 type LayoutPositionOptions = {
   anchor: ScrollLayoutAnchor
-  pending: () => boolean
+  pending?: () => boolean
   done: () => void
 }
 

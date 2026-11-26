@@ -145,6 +145,25 @@ describe('streaming scroll holds', () => {
 })
 
 describe('following streamed output', () => {
+  test('compensates shrink remeasurement until the user scrolls away', async () => {
+    intersect()
+    await Promise.resolve()
+
+    scrollHeight -= 200
+    content.scrollTop = 1000
+    resize()
+    scrollHeight += 160
+    resize()
+    expect(content.scrollTop).toBe(1160)
+
+    content.dispatchEvent(new WheelEvent('wheel', { deltaY: -100 }))
+    content.scrollTop = 1060
+    scrollHeight += 80
+    resize()
+    expect(content.scrollTop).toBe(1060)
+    expect(scroller.autoScrolling).toBe(false)
+  })
+
   test('keeps following after an extra downward wheel event at the bottom', async () => {
     scroller.setImmediate(true)
     intersect()

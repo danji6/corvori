@@ -83,7 +83,7 @@ function detailGroupId(row: MessageRow) {
   if (row.kind === 'group' && !row.promotedToolCallIds) return row.workId
 }
 
-/** Keeps Virtua's window driver while remapping sizes for interior detail edits. */
+/** Keeps Virtua's window driver while remapping sizes for interior row edits. */
 export function createTranscriptVirtualizer(initialRows: readonly LayoutRow[]) {
   const layout = createTranscriptLayout(initialRows)
   const store: WindowStore = createVirtualStore(layout)
@@ -191,23 +191,18 @@ function needsReconciliation(
   previous: readonly LayoutRow[],
   next: readonly LayoutRow[],
 ) {
-  if (sameKeys(previous, next)) {
+  const [shorter, longer] =
+    previous.length <= next.length ? [previous, next] : [next, previous]
+  const sharedPrefix = shorter.every(
+    (row, index) => row.key === longer[index]!.key,
+  )
+  // Reuse measurements by key when a row moves to a different index.
+  if (!sharedPrefix) return true
+
+  if (previous.length === next.length) {
     return previous.some((row, index) => openingFinished(row, next[index]!))
   }
 
   const isTransitioning = (row: LayoutRow) => !!row.detail?.phase
-  if (previous.some(isTransitioning) || next.some(isTransitioning)) return true
-  // Check the ordinary rows so unanimated expansion, seeking and finished
-  // collapse can move measurements without changing unrelated list updates.
-  return sameKeys(
-    previous.filter((row) => !row.detail),
-    next.filter((row) => !row.detail),
-  )
-}
-
-function sameKeys(previous: readonly LayoutRow[], next: readonly LayoutRow[]) {
-  return (
-    previous.length === next.length &&
-    previous.every((row, index) => row.key === next[index]!.key)
-  )
+  return previous.some(isTransitioning) || next.some(isTransitioning)
 }

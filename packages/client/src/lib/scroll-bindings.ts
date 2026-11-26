@@ -15,7 +15,7 @@ const suppressors = new Set<() => boolean>()
 type ScrollCallbacks = {
   ownsScroll(): boolean
   intersect(): void
-  content(): void
+  content(heightShrank?: boolean): void
   movement(value: ScrollMovement): void
   start(): void
   end(): void

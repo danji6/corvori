@@ -1,4 +1,5 @@
 import { ScrollFrameLoop, followDelta } from './scroll-animation'
+import { preserveLayoutPosition } from './scroll-layout'
 import type { ScrollTarget } from './scroll-target'
 
 type FollowOptions = {
@@ -17,6 +18,7 @@ type FollowOptions = {
 export class FollowAnimation {
   private loop = new ScrollFrameLoop()
   private lastTime = 0
+  private layoutPosition: ReturnType<typeof preserveLayoutPosition> | null = null // prettier-ignore
 
   constructor(private options: FollowOptions) {}
 
@@ -26,7 +28,31 @@ export class FollowAnimation {
   }
 
   cancel() {
+    this.layoutPosition?.cancel()
     this.loop.cancel()
+  }
+
+  /** Keeps a clamped tail aligned while a shrink is remeasured. */
+  syncLayout(heightShrank = false) {
+    if (this.layoutPosition) {
+      this.layoutPosition.restore()
+      return
+    }
+    const target = this.options.target()
+    if (!target || !heightShrank) return
+
+    const distance =
+      target.getScrollHeight() -
+      target.getClientHeight() -
+      target.getScrollTop()
+    if (distance > 1) return
+
+    this.layoutPosition = preserveLayoutPosition(target, {
+      anchor: 'bottom',
+      done: () => {
+        this.layoutPosition = null
+      },
+    })
   }
 
   private idle() {

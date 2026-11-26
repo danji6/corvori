@@ -430,6 +430,12 @@ export class Scroller {
   syncLayoutPosition = () => {
     const position = this.layoutPosition
     if (position?.anchor === 'bottom') position.restore()
+    this._syncFollowLayout()
+  }
+
+  private _syncFollowLayout(heightShrank?: boolean) {
+    if (!this.isFollowing || this._stopCondition !== null) return
+    if (this._ownsScroll()) this.animation.syncLayout(heightShrank)
   }
 
   scrollToBottom = (immediate = false) => {
@@ -497,7 +503,7 @@ export class Scroller {
             queueMicrotask(() => this.lockScroll())
           }
         },
-        content: () => {
+        content: (heightShrank) => {
           if (this.layoutPosition) {
             this.layoutPosition.restore()
             return
@@ -525,6 +531,7 @@ export class Scroller {
           if (shouldFollowContent) {
             this.lockScroll()
           }
+          this._syncFollowLayout(heightShrank)
           this.onPositionChange?.(this.autoScrolling)
         },
         movement: ({

@@ -5,22 +5,29 @@ export function observeScrollContent(
   target: ScrollTarget,
   content: HTMLElement,
   sentinel: HTMLElement,
-  changed: () => void,
+  changed: (heightShrank?: boolean) => void,
 ) {
-  const mutations = new MutationObserver(changed)
+  let height = target.getScrollHeight()
+  const notify = (notifyUnchanged: boolean) => {
+    const next = target.getScrollHeight()
+    if (next === height && !notifyUnchanged) return
+    const heightShrank = next < height
+    height = next
+    changed(heightShrank)
+  }
+
+  const mutations = new MutationObserver((records) => {
+    // A row removal can clamp the scroll position before resize delivery.
+    if (records.some((record) => record.removedNodes.length > 0)) notify(true)
+    else changed()
+  })
   mutations.observe(content, {
     childList: true,
     subtree: true,
     characterData: true,
   })
 
-  let height = target.getScrollHeight()
-  const resize = new ResizeObserver(() => {
-    const next = target.getScrollHeight()
-    if (next === height) return
-    height = next
-    changed()
-  })
+  const resize = new ResizeObserver(() => notify(false))
   resize.observe(content)
   for (const child of Array.from(content.children))
     if (child !== sentinel) resize.observe(child)
