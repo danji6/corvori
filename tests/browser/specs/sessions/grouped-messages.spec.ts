@@ -397,6 +397,47 @@ test('expanding and collapsing todos keeps the header in place', async ({
   expect(await headerGeometry(trigger)).toEqual(collapsed)
 })
 
+test('failed tools show a label and keep error details collapsed', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=notes&id=notes&todoWork=malformed')
+  await page.locator('[data-slot="work-block"]').click()
+
+  const failures = [
+    {
+      name: 'write_todo failed',
+      error: 'Todo entries must be strings.',
+      input: '"task": "Review the changes"',
+    },
+    {
+      name: 'edit_todo failed',
+      error: 'Unknown todo status.',
+      input: '"status": "constructor"',
+    },
+    {
+      name: 'missing.txt failed',
+      error: 'The file could not be read.',
+    },
+    {
+      name: 'Read attachment failed',
+      error: 'The attachment could not be read.',
+    },
+  ]
+  for (const { name, error, input } of failures) {
+    const trigger = page.getByRole('button', { name, exact: true })
+    const detail = page.getByText(error, { exact: true })
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    await expect(detail).toBeHidden()
+    await trigger.click()
+    await expect(detail).toBeVisible()
+    if (input) await expect(page.getByText(input)).toBeVisible()
+    await trigger.click()
+    await expect(detail).toBeHidden()
+  }
+
+  await expect(page.getByText('The todo update failed.')).toBeVisible()
+})
+
 test('transcript chevrons reveal on hover and keyboard focus', async ({
   page,
 }) => {
@@ -410,7 +451,7 @@ test('transcript chevrons reveal on hover and keyboard focus', async ({
   await expect(chevron(work)).toHaveCSS('opacity', '1')
   await work.click()
 
-  const first = page.getByRole('button', { name: 'first.ts', expanded: false })
+  const first = page.getByRole('button', { name: 'first.ts', exact: true })
   const second = page.getByRole('button', { name: 'second.ts' })
   await first.hover()
   await expect(chevron(work)).toHaveCSS('opacity', '0')
@@ -461,7 +502,10 @@ test('file changes share a list with independent, persistent diff toggles', asyn
   const firstTrigger = first.getByRole('button', { name: 'first.ts' })
   await expect(first.locator('[data-slot="code-container"]')).toBeHidden()
   await expect(second.locator('[data-slot="code-container"]')).toBeHidden()
-  await expect(rows.nth(2)).toContainText('Original text was not found')
+  const failed = rows.nth(2)
+  const failedTrigger = failed.getByRole('button', { name: 'first.ts failed' })
+  await expect(failedTrigger).toHaveAttribute('aria-expanded', 'false')
+  await expect(failed.getByText('Original text was not found')).toBeHidden()
 
   const collapsed = await headerGeometry(firstTrigger)
   await firstTrigger.focus()

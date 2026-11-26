@@ -8,6 +8,7 @@ import { ToolList, ToolListItem } from './tool-list'
 /** Renders one or more consecutive `task` calls as a list of sub-agents. */
 export function SubagentGroupBlock({
   parts,
+  toolErrors,
 }: {
   parts: ToolUIPart[]
   messageId: string
@@ -32,16 +33,28 @@ export function SubagentGroupBlock({
     >
       <ToolList>
         {parts.map((part) => (
-          <SubagentGroupItem key={part.toolCallId} part={part} />
+          <SubagentGroupItem
+            key={part.toolCallId}
+            part={part}
+            forceError={toolErrors?.includes(part.toolCallId)}
+          />
         ))}
       </ToolList>
     </CollapsibleBlock>
   )
 }
 
-function SubagentGroupItem({ part }: { part: ToolUIPart }) {
-  const { input, childSessionId, live, status, openSession } =
-    useSubagentInfo(part)
+function SubagentGroupItem({
+  part,
+  forceError,
+}: {
+  part: ToolUIPart
+  forceError?: boolean
+}) {
+  const { input, childSessionId, live, status, openSession } = useSubagentInfo(
+    part,
+    forceError,
+  )
 
   const label = (
     <SubagentLabel

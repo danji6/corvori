@@ -1,4 +1,4 @@
-import { getToolErrorText, getToolStatus } from '@/lib/chat'
+import { getToolStatus, hasToolFailed } from '@/lib/chat/parts'
 import { cn } from '@/lib/utils'
 import { READ_FILE_TOOL_NAME } from '@cv/core/const'
 import type { ToolUIPart } from 'ai'
@@ -6,6 +6,7 @@ import type { ToolUIPart } from 'ai'
 import { CollapsibleBlock } from '../collapsible-block'
 import { ToolIcon } from './tool-icon'
 import { ToolList, ToolListItem } from './tool-list'
+import { ToolShell } from './tool-shell'
 
 type ReadFileInput = {
   path?: string
@@ -16,9 +17,11 @@ type ReadFileInput = {
 /** Renders one or more consecutive read_file calls as a list. */
 export function ReadFileBlock({
   parts,
+  messageId,
   toolErrors,
 }: {
   parts: ToolUIPart[]
+  messageId: string
   toolErrors?: string[]
 }) {
   const label = (
@@ -39,55 +42,54 @@ export function ReadFileBlock({
       label={label}
     >
       <ToolList>
-        {parts.map((part) => {
-          const error = partError(part, toolErrors)
-          const running = !error && partRunning(part, toolErrors)
-          return (
-            <ToolListItem key={part.toolCallId}>
-              <div className="flex flex-wrap items-baseline gap-x-2">
-                <span
-                  className={cn(
-                    'chat-tool-list-label font-mono break-all',
-                    running ? 'text-shimmer' : 'text-foreground',
-                  )}
-                >
-                  {partPersonalPath(part) && 'Personal folder · '}
-                  {partPath(part) ?? '…'}
-                </span>
-                {error && (
-                  <span className="text-destructive wrap-break-word">
-                    {error}
-                  </span>
-                )}
-              </div>
-            </ToolListItem>
-          )
-        })}
+        {parts.map((part) => (
+          <ToolListItem key={part.toolCallId}>
+            <ReadFileRow
+              part={part}
+              messageId={messageId}
+              forceError={toolErrors?.includes(part.toolCallId)}
+            />
+          </ToolListItem>
+        ))}
       </ToolList>
     </CollapsibleBlock>
   )
 }
 
-function partPath(part: ToolUIPart): string | undefined {
-  return (part.input as ReadFileInput | undefined)?.path
+type ReadFileRowProps = {
+  part: ToolUIPart
+  messageId: string
+  forceError?: boolean
 }
 
-function partError(
-  part: ToolUIPart,
-  toolErrors?: string[],
-): string | undefined {
-  if (toolErrors?.includes(part.toolCallId)) {
-    return getToolErrorText(part) ?? 'Failed to read file'
+function ReadFileRow({ part, messageId, forceError }: ReadFileRowProps) {
+  const path = (part.input as ReadFileInput | undefined)?.path
+  const failed = hasToolFailed(part, forceError)
+  const running = !failed && getToolStatus(part) === 'running'
+
+  const label = (
+    <span
+      className={cn(
+        'chat-tool-list-label font-mono break-all',
+        running ? 'text-shimmer' : 'text-foreground',
+      )}
+    >
+      {path?.startsWith('agent://') && 'Personal folder · '}
+      {path ?? '…'}
+    </span>
+  )
+
+  if (!failed) {
+    return <div className="flex items-baseline">{label}</div>
   }
-  return getToolErrorText(part)
-}
 
-function partRunning(part: ToolUIPart, toolErrors?: string[]): boolean {
-  if (toolErrors?.includes(part.toolCallId)) return false
-  return getToolStatus(part) === 'running'
-}
-
-function partPersonalPath(part: ToolUIPart): boolean {
-  const input = part.input as ReadFileInput | undefined
-  return !!input?.path?.startsWith('agent://')
+  return (
+    <ToolShell
+      part={part}
+      messageId={messageId}
+      forceError={forceError}
+      leadingIcon={null}
+      label={label}
+    />
+  )
 }

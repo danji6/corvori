@@ -1,11 +1,8 @@
 import { useToolOutput } from '@/hooks/chat/tool-output'
-import {
-  attachmentToolActivity,
-  getToolErrorText,
-  getToolStatus,
-} from '@/lib/chat'
+import { getToolStatus, hasToolFailed } from '@/lib/chat/parts'
 import {
   type AttachmentSearchHit,
+  attachmentToolActivity,
   parseOutputValue,
 } from '@/lib/chat/tool-output'
 import { READ_ATTACHMENT_TOOL_NAME } from '@cv/core/const'
@@ -14,6 +11,7 @@ import type { ToolUIPart } from 'ai'
 import { CollapsibleBlock } from '../collapsible-block'
 import { LoadFullOutput } from './load-full-output'
 import { ToolIcon } from './tool-icon'
+import { ToolShell } from './tool-shell'
 
 /** Reveals the recorded text page or search hits when the row is expanded. */
 export function ReadAttachmentBlock({
@@ -54,32 +52,78 @@ function AttachmentReadRow({
   forceError,
 }: AttachmentReadRowProps) {
   const { label, output } = attachmentToolActivity(part)
-  const error = getToolErrorText(part) ?? (forceError ? 'Read failed' : '')
-  const running = !error && getToolStatus(part) === 'running'
+  const failed = hasToolFailed(part, forceError)
+  const running = !failed && getToolStatus(part) === 'running'
   const range = attachmentRangeLabel(output?.offset, output?.endOffset)
   const text = output?.kind === 'text' ? output.content : undefined
   const matches = output?.kind === 'search' ? output.matches : undefined
   const hasPreview = typeof text === 'string' || Array.isArray(matches)
+  const surface = hasPreview ? 'inset-row' : false
+
+  const heading = (
+    <span className="flex flex-wrap items-center gap-x-2">
+      <span className={running ? undefined : 'text-foreground font-medium'}>
+        {label[0].toUpperCase() + label.slice(1)}
+      </span>
+      {range && <span className="font-mono">{range}</span>}
+    </span>
+  )
+  const preview = hasPreview && (
+    <AttachmentPreview
+      part={part}
+      messageId={messageId}
+      text={text}
+      matches={matches}
+    />
+  )
+
+  if (failed) {
+    return (
+      <ToolShell
+        part={part}
+        messageId={messageId}
+        forceError={forceError}
+        fullWidth={hasPreview}
+        surface={surface}
+        label={heading}
+      >
+        {preview}
+      </ToolShell>
+    )
+  }
 
   return (
     <CollapsibleBlock
       data-tool-call-id={part.toolCallId}
       collapsible={hasPreview}
       fullWidth={hasPreview}
-      surface={hasPreview ? 'inset-row' : false}
+      surface={surface}
       dense
       shimmer={running}
       leadingIcon={<ToolIcon name={READ_ATTACHMENT_TOOL_NAME} />}
-      label={
-        <span className="flex flex-wrap items-center gap-x-2">
-          <span className={running ? undefined : 'text-foreground font-medium'}>
-            {label[0].toUpperCase() + label.slice(1)}
-          </span>
-          {range && <span className="font-mono">{range}</span>}
-          {error && <span className="text-destructive">{error}</span>}
-        </span>
-      }
+      label={heading}
     >
+      {preview}
+    </CollapsibleBlock>
+  )
+}
+
+type AttachmentPreviewProps = Pick<
+  AttachmentReadRowProps,
+  'part' | 'messageId'
+> & {
+  text?: string
+  matches?: AttachmentSearchHit[]
+}
+
+function AttachmentPreview({
+  part,
+  messageId,
+  text,
+  matches,
+}: AttachmentPreviewProps) {
+  return (
+    <>
       {typeof text === 'string' &&
         ((part as { outputRef?: string }).outputRef ? (
           <StoredAttachmentText part={part} messageId={messageId} />
@@ -87,7 +131,7 @@ function AttachmentReadRow({
           <AttachmentOutputCode text={text || 'No text in this page.'} />
         ))}
       {Array.isArray(matches) && <AttachmentSearchPreview matches={matches} />}
-    </CollapsibleBlock>
+    </>
   )
 }
 

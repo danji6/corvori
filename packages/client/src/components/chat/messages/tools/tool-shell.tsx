@@ -3,8 +3,12 @@ import {
   useStreamProcessingMessageId,
   useStreamStore,
 } from '@/hooks/chat'
-import { getToolErrorText, getToolStatus } from '@/lib/chat'
 import type { SourceMessagePart } from '@/lib/chat/combine'
+import {
+  getToolErrorText,
+  getToolStatus,
+  hasToolFailed,
+} from '@/lib/chat/parts'
 import type { ToolUIPart } from 'ai'
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react'
 
@@ -65,8 +69,10 @@ export function ToolShell({
   const note = (part as { approval?: { note?: string } }).approval?.note?.trim()
   const showErrorText = Boolean(errorText) && !noErrorText
   const hasBody = Boolean(children) || showErrorText || Boolean(note)
-  const open =
-    isAwaitingApproval || (userOpen ?? (autoExpand || Boolean(errorText)))
+  const failed = hasToolFailed(part, forceError)
+  const open = failed
+    ? userOpen === true
+    : isAwaitingApproval || (userOpen ?? autoExpand)
 
   return (
     <CollapsibleBlock
@@ -82,7 +88,17 @@ export function ToolShell({
       dense={dense}
       className={className}
       leadingIcon={leadingIcon}
-      label={label}
+      label={
+        failed ? (
+          <span className="flex flex-wrap items-baseline gap-x-1">
+            <span className="min-w-0">{label}</span>
+            <span className="min-w-0">•</span>
+            <span className="text-destructive">failed</span>
+          </span>
+        ) : (
+          label
+        )
+      }
       actions={actions}
       footer={footer}
       {...props}
@@ -165,7 +181,7 @@ export function useToolPart(
 
 /**
  * Keeps the block open when the user expands it.
- * null follows the block's own `autoExpand`.
+ * null follows the block's default expansion behavior.
  */
 function openStateKey(messageId: string, toolCallId: string): string {
   return `${messageId}\0${toolCallId}`

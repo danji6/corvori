@@ -5,6 +5,7 @@ import type { ToolUIPart } from 'ai'
 import type { LucideIcon } from 'lucide-react'
 import { CircleCheckIcon, CircleDotIcon, CircleIcon } from 'lucide-react'
 
+import { ToolBlock } from '../tool-block'
 import { ToolShell } from './tool-shell'
 
 const STATUS_ICONS: Record<TodoStatus, LucideIcon> = {
@@ -87,29 +88,51 @@ function TodoToolShell({
 }
 
 export function WriteTodoBlock(props: TodoBlockProps) {
-  const todos = (props.part.input as { todos?: string[] } | undefined)?.todos
-  const items = (todos ?? []).map((content) => ({
+  const input = props.part.input as { todos?: unknown } | null | undefined
+  const todos = input?.todos
+
+  const todosAreStrings =
+    Array.isArray(todos) && todos.every((todo) => typeof todo === 'string')
+  if (!todosAreStrings) return <ToolBlock {...props} />
+
+  const items = todos.map<TodoItem>((content) => ({
     content,
-    status: 'pending' as TodoStatus,
+    status: 'pending',
   }))
+  const clearing = todos.length === 0 && props.part.state !== 'input-streaming'
 
   return (
     <TodoToolShell
       {...props}
       items={items}
-      label={items.length === 0 ? 'Clear todos' : 'Write todos'}
+      label={clearing ? 'Clear todos' : 'Write todos'}
     />
   )
 }
 
-type TodoEditInput = { task?: string; status?: TodoEditStatus }
+type TodoEditInput = { task: string; status: TodoEditStatus }
+
+function isTodoEdit(input: unknown): input is TodoEditInput {
+  if (typeof input !== 'object' || input === null) return false
+
+  const { task, status } = input as { task?: unknown; status?: unknown }
+  return (
+    typeof task === 'string' &&
+    typeof status === 'string' &&
+    Object.hasOwn(TODO_EDIT_STATUSES, status)
+  )
+}
 
 export function EditTodoBlock(props: TodoBlockProps) {
-  const edits = (props.part.input as { edits?: TodoEditInput[] } | undefined)
-    ?.edits
-  const items = (edits ?? []).map((edit) => ({
-    content: edit.task ?? '',
-    status: TODO_EDIT_STATUSES[edit.status ?? 'todo'] ?? 'pending',
+  const input = props.part.input as { edits?: unknown } | null | undefined
+  const edits = input?.edits
+  if (!Array.isArray(edits) || !edits.every(isTodoEdit)) {
+    return <ToolBlock {...props} />
+  }
+
+  const items = edits.map(({ task, status }) => ({
+    content: task,
+    status: TODO_EDIT_STATUSES[status],
   }))
 
   return <TodoToolShell {...props} items={items} label="Update todos" />

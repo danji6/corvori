@@ -6,6 +6,7 @@ import {
 } from '@/hooks/chat'
 import { useScrollIntoView } from '@/hooks/chat/scroll-into-view'
 import type { SourceMessagePart } from '@/lib/chat/combine'
+import { hasToolFailed } from '@/lib/chat/parts'
 import { api } from '@cv/convex/_generated/api'
 import {
   EDIT_PLAN_TOOL_NAME,
@@ -55,7 +56,11 @@ export function PlanBlock({
   const edits = (part.input as { edits?: unknown[] } | undefined)?.edits
   const editCount = toolName === EDIT_PLAN_TOOL_NAME ? (edits?.length ?? 0) : 0
 
-  if (toolName === EXIT_PLAN_MODE_TOOL_NAME && plan) {
+  const showPlan =
+    toolName === EXIT_PLAN_MODE_TOOL_NAME &&
+    plan &&
+    !hasToolFailed(part, forceError)
+  if (showPlan) {
     const sourceMessageId =
       (part as SourceMessagePart).sourceMessageId ?? messageId
 

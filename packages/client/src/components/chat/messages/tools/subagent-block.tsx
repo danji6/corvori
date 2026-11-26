@@ -1,3 +1,4 @@
+import { hasToolFailed } from '@/lib/chat/parts'
 import { abbreviateNumber } from '@/lib/utils'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
@@ -28,7 +29,10 @@ export type SubagentInfo = {
  * sub-agent's identity, live status, and a navigation callback. Shared by the
  * single and grouped renderers.
  */
-export function useSubagentInfo(part: ToolUIPart): SubagentInfo {
+export function useSubagentInfo(
+  part: ToolUIPart,
+  forceError?: boolean,
+): SubagentInfo {
   const [, navigate] = useLocation()
   const input = part.input as TaskInput | undefined
   const childSessionId = (part as TaskPart).subagentSessionId as
@@ -40,7 +44,9 @@ export function useSubagentInfo(part: ToolUIPart): SubagentInfo {
     input,
     childSessionId,
     live,
-    status: subagentStatus(part.state, childSessionId, live),
+    status: hasToolFailed(part, forceError)
+      ? 'failed'
+      : subagentStatus(part.state, childSessionId, live),
     openSession: childSessionId
       ? () => navigate(`/?id=${childSessionId}`)
       : undefined,
@@ -64,8 +70,13 @@ export function SubagentBlock({
   messageId,
   forceError,
 }: ToolRendererProps) {
-  const { input, childSessionId, live, status, openSession } =
-    useSubagentInfo(part)
+  const {
+    input,
+    childSessionId,
+    live,
+    status,
+    openSession,
+  } = useSubagentInfo(part, forceError) // prettier-ignore
 
   return (
     <ToolShell
@@ -79,7 +90,7 @@ export function SubagentBlock({
           name={live?.agent?.name ?? input?.agent_name}
           avatarId={live?.agent?.avatarId}
           title={input?.title}
-          status={status}
+          status={status === 'failed' ? null : status}
           tokens={live?.tokens ?? null}
           linked={Boolean(childSessionId)}
         />
@@ -93,10 +104,18 @@ function subagentStatus(
   childSessionId: string | undefined,
   live: { status: string | null } | null | undefined,
 ): string | null {
-  if (state === 'output-error') return 'failed'
   if (!childSessionId) return state === 'input-available' ? 'starting' : null
   if (live === undefined) return null // subscription still loading
   return live?.status ? 'running' : 'done'
+}
+
+type SubagentLabelProps = {
+  name: string | undefined
+  avatarId?: Id<'avatars'>
+  title: string | undefined
+  status: string | null
+  tokens: number | null
+  linked: boolean
 }
 
 export function SubagentLabel({
@@ -106,14 +125,7 @@ export function SubagentLabel({
   status,
   tokens,
   linked,
-}: {
-  name: string | undefined
-  avatarId?: Id<'avatars'>
-  title: string | undefined
-  status: string | null
-  tokens: number | null
-  linked: boolean
-}) {
+}: SubagentLabelProps) {
   return (
     <span className="text-muted-foreground flex min-w-0 items-start gap-2">
       <SessionAvatar avatarId={avatarId} noHover size="xs" />

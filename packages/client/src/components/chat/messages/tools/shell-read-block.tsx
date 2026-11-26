@@ -1,5 +1,6 @@
 import { useActiveSessionId } from '@/hooks/chat/session'
 import { useToolOutput } from '@/hooks/chat/tool-output'
+import { hasToolFailed } from '@/lib/chat/parts'
 import { parseOutputValue } from '@/lib/chat/tool-output'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
@@ -42,7 +43,9 @@ export function ShellReadBlock(props: ShellReadProps) {
       </span>
     </>
   )
-  if (!ref) return <SavedShellRead {...props} label={label} />
+  if (!ref || hasToolFailed(part, props.forceError)) {
+    return <SavedShellRead {...props} label={label} />
+  }
 
   return (
     <ToolShell
@@ -51,9 +54,7 @@ export function ShellReadBlock(props: ShellReadProps) {
       className="overflow-visible"
       surface="inset-row"
       fullWidth
-      title={part.state === 'output-error' ? part.errorText : undefined}
       onLabelClick={() => jump(ref)}
-      noErrorText
       label={label}
     />
   )

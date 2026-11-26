@@ -276,6 +276,13 @@ export function isToolInFlight(part: ToolUIPart): boolean {
   return part.state === 'input-available' || part.state === 'approval-responded'
 }
 
+export function hasToolFailed(part: ToolUIPart, forceError = false): boolean {
+  return (
+    part.state !== 'output-denied' &&
+    (forceError || getToolStatus(part) === 'error')
+  )
+}
+
 export function getToolErrorText(part: ToolUIPart) {
   if (part.state !== 'output-error') return undefined
   return part.errorText === undefined

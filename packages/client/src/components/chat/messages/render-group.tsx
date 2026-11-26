@@ -101,7 +101,11 @@ export const RenderGroup = memo(function RenderGroup(props: RenderGroupProps) {
       )
     }
     return (
-      <ReadFileBlock parts={group.parts} toolErrors={partMeta?.toolErrors} />
+      <ReadFileBlock
+        parts={group.parts}
+        messageId={props.message.id}
+        toolErrors={partMeta?.toolErrors}
+      />
     )
   }
 

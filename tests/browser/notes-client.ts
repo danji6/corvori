@@ -224,7 +224,11 @@ function initialMessages() {
       message(`history${index}`, index),
     )
   }
-  if (params.has('todoWork')) return todoWorkMessages()
+  if (params.has('todoWork')) {
+    return params.get('todoWork') === 'malformed'
+      ? failedToolWorkMessages()
+      : todoWorkMessages()
+  }
   if (params.has('fileChanges')) return fileChangeMessages()
   if (params.has('shellReports')) return shellMessages()
   if (params.has('tailWork') || backgrounds) return tailWorkMessages()
@@ -408,6 +412,42 @@ function todoWorkMessages() {
       output: 'Updated todos.',
     },
     { type: 'text', text: 'Todos updated.' },
+  ]
+  return [work]
+}
+
+function failedToolWorkMessages() {
+  const work = message('work', 0)
+  work.segments[0].parts = [
+    {
+      type: 'tool-write_todo',
+      toolCallId: 'malformed-write',
+      state: 'output-error',
+      input: { todos: [{ status: 'todo', task: 'Review the changes' }] },
+      errorText: 'Todo entries must be strings.',
+    },
+    {
+      type: 'tool-edit_todo',
+      toolCallId: 'malformed-edit',
+      state: 'output-error',
+      input: { edits: [{ task: 'Review the changes', status: 'constructor' }] },
+      errorText: 'Unknown todo status.',
+    },
+    {
+      type: 'tool-read_file',
+      toolCallId: 'failed-file-read',
+      state: 'output-error',
+      input: { path: 'missing.txt' },
+      errorText: 'The file could not be read.',
+    },
+    {
+      type: 'tool-read_attachment',
+      toolCallId: 'failed-attachment-read',
+      state: 'output-error',
+      input: { attachmentId: 'missing-attachment' },
+      errorText: 'The attachment could not be read.',
+    },
+    { type: 'text', text: 'The todo update failed.' },
   ]
   return [work]
 }
