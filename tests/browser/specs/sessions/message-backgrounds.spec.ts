@@ -105,10 +105,10 @@ test('uses the sender palette in both modes and keeps highlights above the tint'
   expect(x + width).toBeLessThanOrEqual(461)
   await expectCentered(page, background)
 
-  const text = page
-    .getByText('Regression checks passed.', { exact: true })
-    .first()
-  await text.click({ button: 'right' })
+  const avatar = page
+    .locator(row('work', 'header'))
+    .locator('[data-slot="avatar"]')
+  await avatar.click({ button: 'right' })
   const highlight = page.locator('[data-slot="message-highlight"]')
   await expect(highlight).toBeVisible()
   await expect(highlight).toHaveCSS(
@@ -124,6 +124,58 @@ test('uses the sender palette in both modes and keeps highlights above the tint'
       ),
     ),
   ).toBe(true)
+
+  await page.keyboard.press('Escape')
+  await expect(highlight).toHaveCount(0)
+  await page
+    .getByText('Regression checks passed.', { exact: true })
+    .first()
+    .click({ button: 'right' })
+  await expect(highlight).toHaveCSS('border-radius', '0px')
+})
+
+test('right-clicking the only answer highlights the whole message with thinking', async ({
+  page,
+}) => {
+  await openTranscript(page, '&thinkingWork=single')
+  const background = page.locator(surface('work'))
+  await page
+    .getByText('Finished thinking.', { exact: true })
+    .click({ button: 'right' })
+
+  await expect(
+    page.getByRole('menuitem', { name: 'Delete Message', exact: true }),
+  ).toBeVisible()
+  const highlight = page.locator('[data-slot="message-highlight"]')
+  await expect
+    .poll(() => highlight.boundingBox())
+    .toEqual(await background.boundingBox())
+})
+
+test('a selected agent step follows its own corners inside a rounded background', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1200, height: 1000 })
+  await page.goto('/?fixture=notes&id=notes&shellReports&backgrounds')
+  const firstMessage = page
+    .locator('[data-slot="message-background-part"]')
+    .first()
+  await expect(firstMessage).toHaveAttribute('data-flat-end')
+  const step = page.getByText('Agent progress', { exact: true })
+  const stepSurface = page
+    .locator('[data-slot="message-highlight-target"]')
+    .filter({ has: step })
+  const stepRadius = await stepSurface.evaluate(
+    (element) => getComputedStyle(element).borderRadius,
+  )
+  await step.click({ button: 'right' })
+  const highlight = page.locator('[data-slot="message-highlight"]')
+  await expect(highlight).toHaveCSS('border-radius', stepRadius)
+  const selection = (await highlight.boundingBox())!
+  const message = (await firstMessage.boundingBox())!
+  expect(selection.x).toBeCloseTo(message.x, 0)
+  expect(selection.width).toBeCloseTo(message.width, 0)
+  expect(selection.height).toBeLessThan(message.height)
 })
 
 test('moves the avatar into the gutter only when the padded background fits', async ({
@@ -249,6 +301,9 @@ test('persists the Appearance switch and removes the background layer', async ({
   page,
 }) => {
   await openTranscript(page)
+  const roundedRadius = await page
+    .locator(surface('work'))
+    .evaluate((element) => getComputedStyle(element).borderRadius)
   await page.getByText('Appearance', { exact: true }).click()
   const toggle = page.getByRole('switch', { name: 'Message backgrounds' })
   await expect(toggle).toBeChecked()
@@ -261,6 +316,15 @@ test('persists the Appearance switch and removes the background layer', async ({
   await expect(page.locator(bounds)).toHaveCount(0)
   const text = page.locator(row('work', 'group')).first()
   await expectCentered(page, text.locator('[data-slot="message-row"]'))
+
+  await page
+    .getByText('Regression checks passed.', { exact: true })
+    .first()
+    .click({ button: 'right' })
+  const highlight = page.locator('[data-slot="message-highlight"]')
+  await expect(highlight).toHaveCSS('border-radius', roundedRadius)
+  await page.keyboard.press('Escape')
+
   await page.getByText('Appearance', { exact: true }).click()
   await expect(toggle).not.toBeChecked()
 })

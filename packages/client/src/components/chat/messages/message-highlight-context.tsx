@@ -111,7 +111,10 @@ type HighlightRect = {
   width: number
   height: number
   borderRadius?: string
+  ringInset?: true
 }
+
+type HighlightEdges = Pick<DOMRectReadOnly, 'top' | 'bottom' | 'left' | 'right'>
 
 export const MESSAGE_HIGHLIGHT_PADDING = 12
 
@@ -269,7 +272,8 @@ function sameRect(a: HighlightRect | null, b: HighlightRect | null) {
     a.left === b.left &&
     a.width === b.width &&
     a.height === b.height &&
-    a.borderRadius === b.borderRadius
+    a.borderRadius === b.borderRadius &&
+    a.ringInset === b.ringInset
   )
 }
 
@@ -314,9 +318,53 @@ function measureTarget(
       width,
       height,
       borderRadius: getComputedStyle(surface).borderRadius,
+      ringInset: true,
     }
   }
 
+  const bounds = measureContentBounds(matching)
+  if (!bounds) return null
+
+  const rect = padHighlightBounds(bounds)
+  if (target.groupIndex === null || !surface?.isConnected) return rect
+
+  const centerY = (bounds.top + bounds.bottom) / 2
+  const background = measureMessageBackground(
+    elements,
+    target.messageId,
+    centerY,
+  )
+  if (!background) return rect
+
+  return {
+    ...rect,
+    left: background.left,
+    width: background.width,
+    borderRadius: getComputedStyle(surface).borderRadius,
+    ringInset: true,
+  }
+}
+
+/** Finds the background slice containing the selected block. */
+function measureMessageBackground(
+  elements: HighlightElements,
+  messageId: string,
+  centerY: number,
+) {
+  for (const [element, target] of elements) {
+    if (!element.isConnected) continue
+    if (target.messageId !== messageId || target.surface !== 'background') {
+      continue
+    }
+
+    const bounds = element.getBoundingClientRect()
+    if (bounds.width && bounds.top <= centerY && centerY < bounds.bottom) {
+      return bounds
+    }
+  }
+}
+
+function measureContentBounds(matching: HTMLElement[]): HighlightEdges | null {
   const rects = matching
     .filter((element) => element.isConnected)
     .map((element) => element.getBoundingClientRect())
@@ -325,7 +373,7 @@ function measureTarget(
   if (!rects.length) return null
 
   const first = rects[0]
-  const union = rects.slice(1).reduce(
+  return rects.slice(1).reduce(
     (acc, rect) => ({
       top: Math.min(acc.top, rect.top),
       left: Math.min(acc.left, rect.left),
@@ -339,8 +387,6 @@ function measureTarget(
       bottom: first.bottom,
     },
   )
-
-  return padHighlightBounds(union)
 }
 
 function measureAttachment(attachment: HTMLElement): HighlightRect | null {
@@ -367,7 +413,7 @@ function padHighlightBounds({
   bottom,
   left,
   right,
-}: Pick<DOMRectReadOnly, 'top' | 'bottom' | 'left' | 'right'>): HighlightRect {
+}: HighlightEdges): HighlightRect {
   return {
     top: top - MESSAGE_HIGHLIGHT_PADDING,
     left: left - MESSAGE_HIGHLIGHT_PADDING,
@@ -412,7 +458,7 @@ function MessageHighlightOverlay({ rect }: { rect: HighlightRect | null }) {
           transition={{ duration: 0.12, ease: 'easeOut' }}
           className={cn(
             'chat-message-highlight bg-m3-surface-container/70 ring-m3-outline-variant/40 pointer-events-none absolute z-0 ring-1',
-            rect.borderRadius && 'ring-inset',
+            rect.ringInset && 'ring-inset',
           )}
         />
       )}

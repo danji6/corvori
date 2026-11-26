@@ -4,6 +4,7 @@ import {
   type PartAddress,
   fromAddressForGroup,
   groupPartAddresses,
+  isRenderablePartGroup,
 } from '@/lib/chat/parts'
 import type { MessageRow, SegmentGroups } from '@/lib/chat/rows'
 import {
@@ -52,8 +53,37 @@ export function resolveHeaderScope(
   return { segmentIndex, groupIndex }
 }
 
-export function countGroups(slices: SegmentGroups[]): number {
-  return slices.reduce((sum, slice) => sum + slice.groups.length, 0)
+/** Resolves the selected group and whether the menu can target a block. */
+export function resolveMessageMenuScope(
+  parts: UIMessage['parts'],
+  slices: SegmentGroups[],
+  scope: GroupScope | null,
+) {
+  const slice = scope
+    ? slices.find((candidate) => candidate.segmentIndex === scope.segmentIndex)
+    : undefined
+  const group = scope && slice ? slice.groups[scope.groupIndex] : undefined
+  const blockPart = group?.type === 'single' ? group.part : undefined
+  const isReasoningBlock = Boolean(blockPart && isReasoningUIPart(blockPart))
+  const hasBlockLevelStructure = hasBlockLevelParts(parts)
+  const renderableGroupCount = slices.reduce(
+    (sum, slice) => sum + slice.groups.filter(isRenderablePartGroup).length,
+    0,
+  )
+  const multiGroup = renderableGroupCount > 1
+  const hasDistinctBlock =
+    multiGroup &&
+    group !== undefined &&
+    (hasBlockLevelStructure || isReasoningBlock)
+
+  return {
+    slice,
+    group,
+    blockPart,
+    multiGroup,
+    hasBlockLevelStructure,
+    hasDistinctBlock,
+  }
 }
 
 function isLastGroup(slices: SegmentGroups[], scope: GroupScope): boolean {
@@ -77,15 +107,16 @@ export function getMessageContextMenuState(
       ? '/new'
       : extractTextFromMessage(message) || undefined
 
-  const slice = scope
-    ? slices.find((candidate) => candidate.segmentIndex === scope.segmentIndex)
-    : undefined
+  const {
+    slice,
+    group,
+    blockPart,
+    multiGroup,
+    hasBlockLevelStructure,
+    hasDistinctBlock,
+  } = resolveMessageMenuScope(message.parts, slices, scope)
 
-  const group = scope && slice ? slice.groups[scope.groupIndex] : undefined
-  const blockPart = group?.type === 'single' ? group.part : undefined
   const blockText = getCopyableBlockText(blockPart)
-  const hasBlockLevelStructure = hasBlockLevelParts(message.parts)
-  const multiGroup = countGroups(slices) > 1
   // Skip "Copy Block" when it would copy exactly the same text as "Copy Message"
   const canCopyBlock =
     multiGroup && blockText !== undefined && blockText !== messageText
@@ -116,8 +147,6 @@ export function getMessageContextMenuState(
   const editMessageText = messageText && isEditableMessage(message) ? messageText : undefined // prettier-ignore
   const availableEditMessageText = canMutate ? editMessageText : undefined
 
-  const isReasoningBlock = Boolean(blockPart && isReasoningUIPart(blockPart))
-
   return {
     edit: {
       block: availableEditBlock,
@@ -138,8 +167,7 @@ export function getMessageContextMenuState(
       submenu:
         canMutate &&
         group?.type !== 'files' &&
-        multiGroup &&
-        (hasBlockLevelStructure || isReasoningBlock) &&
+        hasDistinctBlock &&
         blockAddresses.length > 0,
     },
     retry: canMutate && message.role === 'assistant',

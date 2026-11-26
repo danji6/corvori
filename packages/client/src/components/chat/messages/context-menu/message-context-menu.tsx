@@ -31,9 +31,9 @@ import { MESSAGE_MENU_TRIGGER_CLASS } from './forward-message-menu'
 import { CopyMenu, DeleteMenu, EditMenu } from './message-menu-items'
 import {
   type GroupScope,
-  countGroups,
   getMessageContextMenuState,
   resolveHeaderScope,
+  resolveMessageMenuScope,
 } from './message-menu-state'
 import {
   type MessageTarget,
@@ -157,7 +157,12 @@ export function MessageContextMenu({
       highlight.setTarget({ attachment: target.attachment })
       return
     }
-    if (scope && countGroups(slices) > 1) {
+    const { hasDistinctBlock } = resolveMessageMenuScope(
+      message.parts,
+      slices,
+      scope,
+    )
+    if (scope && hasDistinctBlock) {
       highlight.setTarget({
         messageId: message.id,
         ...scope,
