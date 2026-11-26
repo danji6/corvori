@@ -10,14 +10,18 @@ import { AttachmentAnchor } from '@/components/markdown/attachment-anchor'
 import { LightboxProvider } from '@/components/ui/lightbox'
 import { AttachmentUrlProvider } from '@/hooks/chat/attachment-urls'
 import { ChatMessagesProvider } from '@/hooks/chat/messages'
+import { getConvexClientUrl } from '@/lib/auth/site-url'
 import type { PendingMessage } from '@/lib/chat/types'
 import { previewShares } from '@cv/convex/model/chat/sharedAttachments'
-import { attachmentShareUrl } from '@cv/core/attachments'
+import { CONVEX_STORAGE_PATH } from '@cv/core/attachment-download'
+import { attachmentRef, attachmentShareUrl } from '@cv/core/attachments'
 import type { FileUIPart, UIMessage } from 'ai'
 import { ConvexQueryCacheProvider } from 'convex-helpers/react/cache'
 import { ConvexProvider, type ConvexReactClient } from 'convex/react'
 import { type FunctionReference, getFunctionName } from 'convex/server'
 import { useRef, useState } from 'react'
+
+import { nativeImage, nativePdf } from './attachment-download-assets'
 
 const originalUrl = 'https://storage.example.test/api/storage/image'
 const shareUrl = attachmentShareUrl(originalUrl, 'image')
@@ -49,6 +53,8 @@ const attachmentUrls = {
     mediaType: 'application/pdf',
     filename: 'processed.pdf',
   },
+  nativeimage: nativeAttachmentUrls(nativeImage),
+  nativepdf: nativeAttachmentUrls(nativePdf),
   ...Object.fromEntries(
     Object.entries(images).map(([id, imageDimensions]) => [
       id,
@@ -59,6 +65,20 @@ const attachmentUrls = {
       },
     ]),
   ),
+}
+
+function nativeAttachmentUrls({ id, name, mediaType }: typeof nativeImage) {
+  const origin = getConvexClientUrl({
+    CURRENT_ORIGIN: location.origin,
+    VITE_CONVEX_URL: import.meta.env.VITE_CONVEX_URL,
+  })
+  const url = new URL(CONVEX_STORAGE_PATH + id, origin).href
+  return {
+    url,
+    shareUrl: attachmentShareUrl(url, id),
+    filename: name,
+    mediaType,
+  }
 }
 const shareResults = new Map<
   string,
@@ -183,7 +203,8 @@ function AttachmentGalleryMessage() {
 }
 
 export function AttachmentDownloadFixture() {
-  if (new URLSearchParams(location.search).has('gallery')) {
+  const params = new URLSearchParams(location.search)
+  if (params.has('gallery')) {
     return <AttachmentGalleryFixture />
   }
 
@@ -192,30 +213,57 @@ export function AttachmentDownloadFixture() {
       <ConvexQueryCacheProvider>
         <ChatMessagesProvider>
           <AttachmentUrlProvider />
-          <AttachmentMessage
-            id="source-image"
-            part={imagePart}
-            attachmentId="image"
-          />
-          <AttachmentMessage
-            id="published"
-            part={publishedPart}
-            attachmentId="published"
-          />
-          <AttachmentShareFixture />
+          {params.has('native') ? (
+            <NativeAttachmentMessages />
+          ) : (
+            <>
+              <AttachmentMessage
+                id="source-image"
+                part={imagePart}
+                attachmentId="image"
+              />
+              <AttachmentMessage
+                id="published"
+                part={publishedPart}
+                attachmentId="published"
+              />
+              <AttachmentShareFixture />
+            </>
+          )}
         </ChatMessagesProvider>
       </ConvexQueryCacheProvider>
     </ConvexProvider>
   )
 }
 
+function NativeAttachmentMessages() {
+  return (['nativeimage', 'nativepdf'] as const).map((id) => {
+    const { filename, mediaType } = attachmentUrls[id]
+    return (
+      <AttachmentMessage
+        key={id}
+        id={id}
+        attachmentId={id}
+        part={{ type: 'file', url: `attachment:${id}`, filename, mediaType }}
+        inline={id === 'nativepdf'}
+      />
+    )
+  })
+}
+
 type AttachmentMessageProps = {
   id: string
   part: FileUIPart
   attachmentId: string
+  inline?: boolean
 }
 
-function AttachmentMessage({ id, part, attachmentId }: AttachmentMessageProps) {
+function AttachmentMessage({
+  id,
+  part,
+  attachmentId,
+  inline,
+}: AttachmentMessageProps) {
   const message: UIMessage = { id, role: 'user', parts: [part] }
 
   return (
@@ -225,6 +273,11 @@ function AttachmentMessage({ id, part, attachmentId }: AttachmentMessageProps) {
       canMutate={false}
     >
       <div data-message-id={id}>
+        {inline && part.filename && (
+          <AttachmentAnchor href={attachmentRef(attachmentId, part.filename)}>
+            Inline attachment
+          </AttachmentAnchor>
+        )}
         <FileBlock
           parts={[part]}
           attachmentIds={{ [part.url]: attachmentId }}

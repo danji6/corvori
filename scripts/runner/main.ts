@@ -205,6 +205,7 @@ function startFrontend(config: RunnerConfig, manager: ProcessManager) {
   ]
   return manager.spawn(preview ? 'vite-preview' : 'vite-dev', args, {
     cwd: config.clientRoot,
+    env: { CORVORI_CONVEX_INTERNAL_URL: config.convexInternalUrl },
   })
 }
 

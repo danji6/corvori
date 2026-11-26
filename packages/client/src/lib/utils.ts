@@ -104,12 +104,15 @@ export function downloadJson(obj: unknown, filename: string) {
 
 export function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
+  downloadFromUrl(url, filename)
+  URL.revokeObjectURL(url)
+}
+
+export function downloadFromUrl(url: string, filename: string) {
   const a = document.createElement('a')
   a.href = url
   a.download = filename
   a.click()
-  URL.revokeObjectURL(url)
-  a.remove()
 }
 
 export function formatDuration(ms: number): string {

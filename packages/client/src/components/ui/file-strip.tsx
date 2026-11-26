@@ -31,7 +31,6 @@ import {
   useReducedMotion,
 } from 'motion/react'
 import type { ReactNode } from 'react'
-import { useState } from 'react'
 
 import { FilterableList, RippleButton, Skeleton } from '../ui'
 import type { FilterableListProps } from '../ui'
@@ -280,7 +279,6 @@ function FileActions({
   onInsertInline?: (id: string) => void
   className?: string
 }) {
-  const [downloading, setDownloading] = useState(false)
   const downloadUrl = item.originalUrl
   const copyText = item.shareUrl
   if (!downloadUrl && !item.canInsertInline) return null
@@ -321,16 +319,7 @@ function FileActions({
           variant="surface"
           className="size-7 rounded-full"
           aria-label={`Download ${item.file.name}`}
-          disabled={downloading}
-          aria-busy={downloading}
-          onClick={async () => {
-            setDownloading(true)
-            try {
-              await downloadAttachment(downloadUrl, item.file.name)
-            } finally {
-              setDownloading(false)
-            }
-          }}
+          onClick={() => void downloadAttachment(downloadUrl, item.file.name)}
         >
           <DownloadIcon className="size-3" />
         </RippleButton>

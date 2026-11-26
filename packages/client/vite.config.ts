@@ -5,6 +5,8 @@ import path from 'path'
 import { glob } from 'tinyglobby'
 import { type Plugin, defineConfig } from 'vite'
 
+import { attachmentDownloads } from './server/attachment-downloads.ts'
+
 // `__dirname` is unavailable under Vite's native config loader
 const root = import.meta.dirname
 
@@ -53,7 +55,14 @@ export default defineConfig({
   },
   // Prevents cold starts / page reloads when the first xterm is mounted
   optimizeDeps: { include: ['@xterm/xterm', '@xterm/addon-fit'] },
-  plugins: [tailwindcss(), react(), fontLicenses()],
+  plugins: [
+    tailwindcss(),
+    react(),
+    fontLicenses(),
+    attachmentDownloads(
+      process.env.CORVORI_CONVEX_INTERNAL_URL ?? 'http://127.0.0.1:3210',
+    ),
+  ],
   preview: { allowedHosts: allowedHosts() },
   server: { allowedHosts: allowedHosts() },
   resolve: {
