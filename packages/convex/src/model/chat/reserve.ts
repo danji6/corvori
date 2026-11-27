@@ -10,6 +10,7 @@ import { assertAgentAvailable } from '../skills/access'
 import { scheduleStream } from '../stream/execution'
 import { latestHistoryAnchor } from '../stream/historyBoundary'
 import { STREAM_LEASE_MS } from '../stream/lifecycle'
+import { interruptRun } from '../tasks/outcomes'
 
 type ReserveStreamArgs = {
   taskRunId?: Id<'scheduledTaskRuns'>
@@ -101,6 +102,7 @@ export async function reserveOrDebounceTurn(
     taskRunId,
   }: TurnReservation,
 ) {
+  if (activeStream?.taskRunId) await interruptRun(ctx, activeStream)
   const debounceMs = session.settings?.agentDebounceMs ?? 0
   const willStream =
     Boolean(activeStream) || (!silent && Boolean(session.activeAgentId))
@@ -144,7 +146,6 @@ function canDebounceInvoke(
 ): stream is Doc<'streams'> {
   if (!stream) return false
   return (
-    !stream.taskRunId &&
     (stream.state.phase === 'pending' ||
       stream.state.phase === 'awaiting_attachments') &&
     stream.command.kind === 'invoke' &&

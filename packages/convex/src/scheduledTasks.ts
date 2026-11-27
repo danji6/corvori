@@ -20,6 +20,10 @@ export const get = authQuery({
   args: { taskId: v.string() },
   handler: Tasks.findById,
 })
+export const runDestination = authQuery({
+  args: { runId: v.string() },
+  handler: Tasks.runDestination,
+})
 export const history = authQuery({
   args: { taskId, paginationOpts: paginationOptsValidator },
   handler: Tasks.history,

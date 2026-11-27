@@ -40,7 +40,11 @@ import {
   releaseEvaluation,
 } from '../promptEvaluation/records'
 import { reserveSegmentEvaluation } from '../promptEvaluation/reserve'
-import { settleRun, settleStoppedRun } from '../tasks/outcomes'
+import {
+  recordTranscriptError,
+  settleRun,
+  settleStoppedRun,
+} from '../tasks/outcomes'
 import { ownsExecution } from './execution'
 import { cleanUpOffloadedOutputs } from './lifecycleCleanup'
 import { killSessionJobs } from './lifecycleControl'
@@ -97,12 +101,13 @@ export async function completeStream(
   }
 
   if (row && message) {
-    await finalizeTurn(ctx, {
+    const segments = await finalizeTurn(ctx, {
       message,
       row,
       parts,
       metadata: row.metadata,
     })
+    await recordTranscriptError(ctx, stream.taskRunId, segments)
   } else {
     await ctx.db.patch(processingMessageId, { status: 'done' })
   }

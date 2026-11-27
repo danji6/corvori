@@ -1,4 +1,6 @@
-import { Input, RippleButton, Textarea } from '@/components/ui'
+import { Input } from '@/components/ui/input'
+import { RippleButton } from '@/components/ui/ripple-button'
+import { Textarea } from '@/components/ui/textarea'
 import { extractErrorMessage } from '@/lib/errors'
 import { api } from '@cv/convex/_generated/api'
 import type { Doc, Id } from '@cv/convex/_generated/dataModel'
@@ -18,6 +20,9 @@ export function TaskEditor({ task }: { task?: Doc<'scheduledTasks'> }) {
   const agents = useQuery(api.agents.list, {})
   const save = useMutation(api.scheduledTasks.save)
   const [rule, setRule] = useState(() => task?.schedule ?? defaultSchedule())
+  const [selectedAgent, setSelectedAgent] = useState<string>(
+    task?.agentId ?? '',
+  )
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState('')
   const back = task ? '/tasks/' + task._id : '/tasks'
@@ -63,7 +68,8 @@ export function TaskEditor({ task }: { task?: Doc<'scheduledTasks'> }) {
           aria-label="Agent"
           name="agent"
           required
-          defaultValue={task?.agentId ?? ''}
+          value={selectedAgent}
+          onChange={(event) => setSelectedAgent(event.target.value)}
           className={selectStyle}
         >
           <option value="">Select an agent</option>

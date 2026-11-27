@@ -5,7 +5,10 @@ import type { Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error } from '../../errors'
 import type { AuthMutationCtx, AuthQueryCtx } from '../../functions'
-import type { ScheduledTaskDefinition, TaskListArgs } from '../../validators/scheduledTasks'
+import type {
+  ScheduledTaskDefinition,
+  TaskListArgs,
+} from '../../validators/scheduledTasks'
 import { requireOwnedAgent } from '../session/sessionAccess'
 import { armTask, futureOccurrence, reschedule } from './timing'
 
@@ -36,6 +39,16 @@ export async function list(ctx: AuthQueryCtx, args: TaskListArgs) {
         : q.neq(q.field('state'), 'archived'),
     )
     .paginate(args.paginationOpts)
+}
+
+export async function runDestination(
+  ctx: AuthQueryCtx,
+  { runId }: { runId: string },
+) {
+  const id = ctx.db.normalizeId('scheduledTaskRuns', runId)
+  const run = id && (await ctx.db.get(id))
+  if (!run || !(await get(ctx, { taskId: run.taskId }))) return null
+  return { taskId: run.taskId, sessionId: run.sessionId }
 }
 
 export async function history(

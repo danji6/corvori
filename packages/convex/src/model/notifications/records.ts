@@ -380,7 +380,7 @@ export async function clearRead(ctx: AuthMutationCtx) {
   await removeNotificationDocs(ctx, rows)
 }
 
-/** Removes all notifications belonging to a deleted session. */
+/** Removes session activity while keeping task outcomes accessible from run history. */
 export async function removeForSession(
   ctx: MutationCtx,
   sessionId: Id<'sessions'>,
@@ -389,7 +389,10 @@ export async function removeForSession(
     .query('notifications')
     .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
     .collect()
-  await deleteNotifications(ctx, rows)
+  await deleteNotifications(
+    ctx,
+    rows.filter((row) => !row.taskRunId),
+  )
 }
 
 /** Removes a former member's notifications for one session. */

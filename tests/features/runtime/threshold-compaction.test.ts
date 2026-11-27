@@ -359,6 +359,68 @@ test('preempts normal dispatch, consumes the one-shot, and resumes with unread m
   expect(transition).toHaveBeenCalledTimes(1)
 })
 
+test.each([false, true])(
+  'keeps task attribution through compaction unless interrupted by a new prompt (manual input: %s)',
+  async (interrupted) => {
+    const f = await fixture()
+    const runId = 'run' as Id<'scheduledTaskRuns'>
+    f.rows('scheduledTasks').push({
+      _id: 'task',
+      ownerId: userId,
+      state: 'active',
+      activeRunId: runId,
+    })
+    f.rows('scheduledTaskRuns').push({
+      _id: runId,
+      taskId: 'task',
+      sessionId,
+      status: 'running',
+      title: 'Mailbox',
+      agentName: 'Agent',
+    })
+    await f.ctx.db.patch(f.execution.streamId, { taskRunId: runId })
+    const manual = interrupted
+      ? await sendMessage(f.ctx, { sessionId, content: 'Manual request' })
+      : undefined
+    const pending = await current(f)
+    const claimed = (await _claim(f.ctx, pending.execution))!
+    if (manual) {
+      expect(claimed.taskRunId).toBeUndefined()
+      expect(f.rows('scheduledTaskRuns')[0].status).toBe('failed')
+      await f.ctx.db.patch(claimed.state.processingContentId!, {
+        parts: [{ type: 'text', text: 'Partial response' }],
+      })
+    }
+    expect(
+      await _compactAtThreshold(f.ctx, {
+        ...f.threshold,
+        ...pending.execution,
+      }),
+    ).toBe(true)
+    const compact = await current(f)
+    await _claim(f.ctx, compact.execution)
+    const summaryInput = await _getProviderHistory(f.ctx, compact.execution)
+    if (manual) expect(summaryInput.map((row) => row._id)).toContain(manual)
+    else expect(summaryInput.map((row) => row._id)).toEqual([f.prior!])
+    const summary = await completeSummary(f, compact.execution)
+    const resumed = await current(f)
+    const active = (await _claim(f.ctx, resumed.execution))!
+    const input = await _getProviderHistory(f.ctx, resumed.execution)
+    expect(input.map((row) => row._id)).toEqual(
+      manual ? [summary] : [summary, f.input],
+    )
+    expect(active.taskRunId).toEqual(manual ? undefined : runId)
+    await _complete(f.ctx, resumed.execution)
+    expect(
+      f
+        .rows('notifications')
+        .filter((row) => row.taskRunId)
+        .map((row) => row.kind),
+    ).toEqual([manual ? 'task_failed' : 'task_succeeded'])
+    expect(f.rows('streams')).toHaveLength(0)
+  },
+)
+
 test('seals settled tool output into the summary and resumes without requiring new input', async () => {
   const f = await fixture({ withHistory: false })
   const parentId = await f.ctx.db.insert('sessions', { ownerId: userId })

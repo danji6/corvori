@@ -4,7 +4,7 @@ import { api } from '@cv/convex/_generated/api'
 import type { Doc } from '@cv/convex/_generated/dataModel'
 import { scheduleLabel } from '@cv/core/task-schedule'
 import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
-import { Link, Route, Switch, useLocation } from 'wouter'
+import { Link, Redirect, Route, Switch, useLocation } from 'wouter'
 
 import { TaskEditor } from './task-editor'
 import { TaskGrid, taskTitle } from './task-grid'
@@ -117,6 +117,21 @@ function History({ task }: { task: Doc<'scheduledTasks'> }) {
   )
 }
 
+function RunLink({ runId }: { runId: string }) {
+  const target = useQuery(api.scheduledTasks.runDestination, { runId })
+  if (target === undefined) return <p>Opening run…</p>
+  if (!target)
+    return (
+      <p>
+        Run not found. <Link href="/tasks">All tasks</Link>
+      </p>
+    )
+  const path = target.sessionId
+    ? '/?id=' + target.sessionId
+    : '/tasks/' + target.taskId
+  return <Redirect to={path} replace />
+}
+
 function TaskDetail({ id, edit }: { id: string; edit?: boolean }) {
   const task = useQuery(api.scheduledTasks.get, {
     taskId: id,
@@ -139,6 +154,9 @@ export default function TasksPage() {
   return (
     <section className="h-dvh overflow-y-auto px-5 pt-16 pb-12 sm:px-10">
       <Switch>
+        <Route path="/tasks/runs/:runId">
+          {(params) => <RunLink runId={params.runId} />}
+        </Route>
         <Route path="/tasks/new">
           <TaskEditor />
         </Route>

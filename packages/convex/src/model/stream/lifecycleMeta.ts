@@ -10,10 +10,10 @@ import type {
 } from '../../validators/streams'
 import { getProcessingSegmentRow, saveSegmentMeta } from '../messageContents'
 import { scheduleTitle } from '../messages'
-import { notificationPreview } from '../notifications/records'
 import { _save, findCache } from '../session/cache'
 import { _patchSessionLog } from '../session/sessionWorkspace'
 import { getState, patchState } from '../session/state'
+import { recordRunError } from '../tasks/outcomes'
 import { ownsExecution } from './execution'
 
 export async function _saveMeta(
@@ -33,12 +33,7 @@ export async function _saveMeta(
   if (!ownsExecution(stream, { streamId, generation })) return
 
   if (stream.taskRunId && toolErrors.length) {
-    const run = await ctx.db.get(stream.taskRunId)
-    if (run?.status === 'running' && !run.detail) {
-      await ctx.db.patch(run._id, {
-        detail: notificationPreview(toolErrors[0], 'Tool failed'),
-      })
-    }
+    await recordRunError(ctx, stream.taskRunId, toolErrors[0])
   }
   const row = await getProcessingSegmentRow(ctx, stream)
   if (row && stream.state.processingMessageId) {
