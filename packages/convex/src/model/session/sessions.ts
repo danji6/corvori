@@ -33,6 +33,8 @@ export async function create(
   args: {
     folderId?: Id<'sessionFolders'>
     title?: string
+    scheduledTaskId?: Id<'scheduledTasks'>
+    taskRunId?: Id<'scheduledTaskRuns'>
     activeAgentId?: Id<'agents'>
     mode?: SessionMode
     approvalMode?: ApprovalMode
@@ -50,6 +52,8 @@ export async function create(
   const now = Date.now()
   const sessionId = await ctx.db.insert('sessions', {
     ownerId: ctx.userId,
+    scheduledTaskId: args.scheduledTaskId,
+    taskRunId: args.taskRunId,
     folderId: args.folderId,
     title: args.title,
     activeAgentId: args.activeAgentId,
@@ -67,6 +71,7 @@ export async function create(
     sessionId,
     userId: ctx.userId,
     role: 'owner',
+    hidden: args.taskRunId ? true : undefined,
     groupKey: sessionGroup(args.folderId),
     lastMessageAt: now,
     title: args.title,

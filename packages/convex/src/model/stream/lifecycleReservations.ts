@@ -15,8 +15,12 @@ export async function reserveFollowUp(
   const boundaryMessage = await earliestUnconsumedMessage(ctx, stream)
   if (!boundaryMessage) return false
 
+  const continuesTask =
+    boundaryMessage.sender.type === 'agent' &&
+    session.activeAgentId === stream.agentId
   return Boolean(
     await reserveInvokeTurn(ctx, {
+      taskRunId: continuesTask ? stream.taskRunId : undefined,
       sessionId: stream.sessionId,
       boundaryMessage,
       invokedBy: stream.invokedBy,
@@ -84,6 +88,7 @@ export async function earliestUnconsumedMessage(
 }
 
 export type ReserveInvokeTurnArgs = {
+  taskRunId?: Id<'scheduledTaskRuns'>
   sessionId: Id<'sessions'>
   boundaryMessage: Doc<'messages'>
   invokedBy: Id<'users'>
@@ -96,7 +101,7 @@ export type ReserveInvokeTurnArgs = {
  */
 export async function reserveInvokeTurn(
   ctx: MutationCtx,
-  { sessionId, boundaryMessage, invokedBy }: ReserveInvokeTurnArgs,
+  { sessionId, boundaryMessage, invokedBy, taskRunId }: ReserveInvokeTurnArgs,
 ) {
   const session = await getSessionWithWorkspace(ctx, sessionId)
   if (!session) return
@@ -118,6 +123,7 @@ export async function reserveInvokeTurn(
 
   const nextStreamId = await ctx.db.insert('streams', {
     generation: 0,
+    taskRunId,
     sessionId: session._id,
     agentId: agent._id,
     invokedBy,

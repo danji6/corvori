@@ -249,6 +249,18 @@ async function fanOut(
   }
 }
 
+type TaskNotice = Pick<
+  Doc<'notifications'>,
+  'recipientId' | 'sessionId' | 'sessionTitle' | 'actorName' | 'preview'
+> & {
+  kind: 'task_failed' | 'task_succeeded'
+  taskRunId: Id<'scheduledTaskRuns'>
+}
+
+export async function notifyTaskOutcome(ctx: MutationCtx, event: TaskNotice) {
+  await insertUnreadNotification(ctx, event)
+}
+
 /** Lists the current user's newest notifications for one inbox status. */
 export async function list(
   ctx: AuthQueryCtx,
@@ -344,7 +356,10 @@ export async function discardSession(
   { sessionId }: { sessionId: Id<'sessions'> },
 ) {
   const rows = await forRecipientSession(ctx, ctx.userId, sessionId)
-  await deleteNotifications(ctx, rows.filter(isOrdinaryUnread))
+  await deleteNotifications(
+    ctx,
+    rows.filter((row) => isOrdinaryUnread(row) && !row.taskRunId),
+  )
 }
 
 async function markNotificationsRead(

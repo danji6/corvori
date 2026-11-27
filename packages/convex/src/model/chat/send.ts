@@ -42,7 +42,11 @@ import { resolveAttachmentShares, resolveShare } from './sharedAttachments'
 import { runShellCommand } from './shell'
 import { maybeInsertStarters } from './starters'
 
-export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
+export async function sendMessage(
+  ctx: AuthMutationCtx,
+  args: SendMessageArgs,
+  taskRunId?: Id<'scheduledTaskRuns'>,
+) {
   const { session, membership } = await Memberships.requireMember(
     ctx,
     args.sessionId,
@@ -74,7 +78,8 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
   if (!pendingSend) await assertClientSendIdAvailable(ctx, args)
 
   const activeStream = await Memberships.getActiveStream(ctx, args.sessionId)
-  const command = role === 'user' ? parseShellCommand(args.content) : null
+  const command =
+    role === 'user' && !taskRunId ? parseShellCommand(args.content) : null
   const { attachments, content: messageText } = await loadAttachments(
     ctx,
     args,
@@ -101,7 +106,7 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
     })
   }
 
-  const content = unescapeShellPrefix(messageText)
+  const content = taskRunId ? messageText : unescapeShellPrefix(messageText)
 
   const fileLinkParts = session.workspace
     ? snapshotFileLinkParts(parseFileMentions(content), args.fileLinks)
@@ -187,6 +192,7 @@ export async function sendMessage(ctx: AuthMutationCtx, args: SendMessageArgs) {
     silent,
     activeStream,
     deferTitle: role === 'user' && partsHaveScript(parts),
+    taskRunId,
   })
   if (pendingSend) await wakeAttachmentTurn(ctx, args.sessionId)
 

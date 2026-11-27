@@ -4,7 +4,8 @@ import { useResolvedSettings } from '@/hooks/chat/resolved-settings'
 import { useChatShellState } from '@/hooks/chat/shell-state'
 import type { PendingMessage } from '@/lib/chat'
 import { cn } from '@/lib/utils'
-import { useMemo, useState } from 'react'
+import { Suspense, lazy, useMemo, useState } from 'react'
+import { useLocation } from 'wouter'
 
 import { ChatSession } from './chat-session'
 import { ChatSidebars } from './chat-sidebars'
@@ -16,11 +17,15 @@ import { UserSettings } from './entities/user/user-settings'
 import { ScriptManager } from './messages/editor/menu/script-manager'
 import { ChatSearchProvider } from './search'
 
+const TasksPage = lazy(() => import('./tasks/tasks-page'))
+
 export type { ChatProps } from './chat-types'
 
 type FirstMessage = { sessionId: string; message: PendingMessage }
 
 export function Chat(props: ChatProps) {
+  const [path] = useLocation()
+  const tasksOpen = path === '/tasks' || path.startsWith('/tasks/')
   const [firstMessage, setFirstMessage] = useState<FirstMessage | null>(null)
 
   const {
@@ -49,7 +54,11 @@ export function Chat(props: ChatProps) {
           className={cn('relative flex min-h-dvh flex-row', props.className)}
           style={style}
         >
-          {activeSessionId ? (
+          {tasksOpen ? (
+            <Suspense fallback={<p>Loading tasks…</p>}>
+              <TasksPage />
+            </Suspense>
+          ) : activeSessionId ? (
             <ChatSession
               sessionId={activeSessionId}
               pendingMessage={

@@ -230,6 +230,7 @@ export type ScheduleStreamRetryArgs = Infer<
 /** A leased background turn, including retries and deferred work. */
 export const streamSchema = v.object({
   promptEvaluationId: v.optional(v.id('promptEvaluations')),
+  taskRunId: v.optional(v.id('scheduledTaskRuns')),
   generation: v.number(),
   providerContinuity: v.optional(providerContinuityValidator),
   changeGroupId: v.optional(v.string()),

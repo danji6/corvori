@@ -165,7 +165,7 @@ export function useNotificationDelivery(options: DeliveryOptions) {
           if (!mounted.current) return
           const surface = surfaceFor(item.sessionId)
 
-          if (surface === 'discard' && !important) {
+          if (surface === 'discard' && !important && !item.taskRunId) {
             current.discardSession(item.sessionId)
           }
           if (surface === 'toast' && !important) {

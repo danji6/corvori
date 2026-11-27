@@ -455,6 +455,7 @@ import type * as reminders from "../reminders.js";
 import type * as sessionAgents from "../sessionAgents.js";
 import type * as sessionFolders from "../sessionFolders.js";
 import type * as sessionShares from "../sessionShares.js";
+import type * as scheduledTasks from "../scheduledTasks.js";
 import type * as sessions from "../sessions.js";
 import type * as settings from "../settings.js";
 import type * as shellJobs from "../shellJobs.js";
@@ -968,6 +969,7 @@ declare const fullApi: ApiFromModules<{
   sessionAgents: typeof sessionAgents;
   sessionFolders: typeof sessionFolders;
   sessionShares: typeof sessionShares;
+  scheduledTasks: typeof scheduledTasks;
   sessions: typeof sessions;
   settings: typeof settings;
   shellJobs: typeof shellJobs;

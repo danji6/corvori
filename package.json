@@ -91,6 +91,7 @@
     "lucide-react": "^1.78.0",
     "mime-types": "^3.0.2",
     "modern-gif": "^2.1.0",
+    "moment-timezone": "^0.6.6",
     "motion": "^14.14.0",
     "ollama": "^0.6.4",
     "png-chunks-encode": "^1.0.0",

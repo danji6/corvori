@@ -33,6 +33,7 @@ import {
   recordToolDeliveries,
 } from '../shell/outputDeliveries'
 import { hasPendingShellWait } from '../shell/waits'
+import { settleRun } from '../tasks/outcomes'
 import { ownsExecution } from './execution'
 import { isHistoricalTurn } from './historyBoundary'
 import { STREAM_LEASE_MS, renewStreamLease } from './lease'
@@ -105,6 +106,15 @@ export async function consumeInterjections(
 
   if (!newer) return false
   if (await latestAttachmentSend(ctx, stream.sessionId)) return false
+  if (stream.taskRunId && newer.sender.type === 'user') {
+    await settleRun(
+      ctx,
+      stream.taskRunId,
+      'failed',
+      'Turn interrupted by a new message.',
+    )
+    await ctx.db.patch(stream._id, { taskRunId: undefined })
+  }
 
   if (row) {
     await finalizeTurn(ctx, {
