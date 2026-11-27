@@ -3,6 +3,7 @@ import {
   MCP_PROTOCOL_TOOL_NAME,
   SHELL_TOOL_NAME,
 } from '@cv/core/const'
+import { shellRetry } from '@cv/core/shell/retry'
 import { mcpApprovalKey } from '@cv/core/types/mcp-catalog'
 import { mcpProtocolApprovalKey } from '@cv/core/types/mcp-protocol'
 import type { RememberScope } from '@cv/core/types/tools'
@@ -32,6 +33,7 @@ export async function rememberApproval(
   matched: ApprovedTool,
   scope: RememberScope,
 ) {
+  if (matched.toolName === SHELL_TOOL_NAME && shellRetry(matched.input)) return
   if (scope === 'paths') {
     await rememberPaths(ctx, session, matched)
     return

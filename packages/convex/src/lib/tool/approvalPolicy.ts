@@ -1,6 +1,7 @@
 import { formatAlwaysAllowLabel } from '@cv/core/approval-label'
 import { type ApprovalHold, getCommand } from '@cv/core/approval-presentation'
 import { CALL_MCP_TOOL_NAME, SHELL_TOOL_NAME } from '@cv/core/const'
+import { shellRetry } from '@cv/core/shell/retry'
 import type { ToolApprovals } from '@cv/core/types/tools'
 import type { PathApprovalStatus } from '@cv/core/workspace/path-policy'
 
@@ -25,6 +26,7 @@ export function alwaysLabel(
       : 'Always allow for this session'
   }
 
+  if (shellRetry(input)) return null
   const command = getCommand(input)
   if (command === null) return null
 
@@ -36,6 +38,7 @@ export function alwaysLabel(
 
 // prettier-ignore
 export const HOLD_HINTS: Record<NonNullable<ApprovalHold>, string> = {
+  retry: 'Approval restarts the original command. Work it already performed can happen again.',
   forbidden: 'This accesses a forbidden path and always requires approval.',
   plan: 'This command is not recognized as read-only. Plan mode requires approval each time, even if it is allowed for this session.',
   paths: 'This accesses git-ignored files or paths outside the workspace.',
@@ -58,6 +61,7 @@ export function approvalHold(
 
   const command = getCommand(input)
   if (command === null) return null
+  if (shellRetry(input)) return 'retry'
   if (pathStatus === 'forbidden') return 'forbidden'
   if (mode === 'plan' && !isReadOnlyShellCommand(command)) return 'plan'
   return pathStatus ?? null

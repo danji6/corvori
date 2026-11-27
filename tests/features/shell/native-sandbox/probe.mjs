@@ -61,21 +61,24 @@ function fileEvent(id, file) {
     )
 }
 
-async function waitForEvidence() {
+async function waitForEvidence(required) {
   const store = SandboxManager.getSandboxViolationStore()
   const observed = () =>
     samples.every((name, index) => fileEvent(ids[index], name + '.private'))
   let unsubscribe
   let timer
   try {
-    await new Promise((resolve, reject) => {
+    return await new Promise((resolve, reject) => {
       timer = setTimeout(
-        () => reject(new Error('Missing job-attributed read denial')),
+        () =>
+          required
+            ? reject(new Error('Missing job-attributed read denial'))
+            : resolve(false),
         5000,
       )
-      if (observed()) return resolve()
+      if (observed()) return resolve(true)
       unsubscribe = store.subscribe(() => {
-        if (observed()) resolve()
+        if (observed()) resolve(true)
       })
     })
   } finally {
@@ -95,10 +98,30 @@ async function checkChildren() {
     assert.equal(result.status, 42)
   }
   console.log('Protected reads denied in both child processes')
-  await waitForEvidence()
+  const attributed = await waitForEvidence(process.platform === 'darwin')
   assert.equal(fileEvent(ids[0], 'second.private'), false)
   assert.equal(fileEvent(ids[1], 'first.private'), false)
-  console.log('Both read denials attributed to the correct job')
+  console.log(
+    attributed
+      ? 'Both read denials attributed to the correct job'
+      : 'Native backend did not identify both denied operations',
+  )
+  // A process can also handle an optional denial and exit successfully.
+  const tolerated = await run(
+    'node workload.mjs optional first.private',
+    randomUUID(),
+  )
+  assert.equal(tolerated.status, 0)
+  assert.equal(tolerated.output, 'handled')
+  const failed = await run(
+    'node workload.mjs unexplained first.private',
+    randomUUID(),
+  )
+  assert.equal(failed.status, 42)
+  assert.equal(failed.output, '')
+  assert.equal(failed.diagnostic, '')
+  assert.equal(await readFile('starts', 'utf8'), 'x')
+  console.log('Unexplained failure returned once, optional denial succeeded')
 }
 
 try {

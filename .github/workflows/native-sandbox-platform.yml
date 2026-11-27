@@ -70,6 +70,13 @@ jobs:
       - name: Verify packaged sandbox startup
         working-directory: .
         run: node .data/build/sidecar/sandbox-check.js packages/sidecar/vendor
+      - name: Verify the agent-requested retry through the shell tool and sidecar
+        if: runner.os != 'Windows'
+        working-directory: .
+        env:
+          CORVORI_NATIVE_TEST: '1'
+        shell: bash
+        run: NODE_BINARY="$(command -v node)" bun --no-env-file test --path-ignore-patterns '**/browser/**' ./tests/features/shell/sandbox-retry.test.ts
       - name: Measure native launch overhead
         run: node ../../../../.data/native/benchmark.js
       - name: Verify workspace execution and denial attribution

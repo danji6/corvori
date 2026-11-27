@@ -1,6 +1,11 @@
 import { spawnSync } from 'node:child_process'
 import console from 'node:console'
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import {
+  appendFileSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 
@@ -23,6 +28,17 @@ if (action === 'write') {
     },
   )
   process.exitCode = child.status ?? 1
+} else if (action === 'unexplained' || action === 'optional') {
+  if (action === 'unexplained') appendFileSync('starts', 'x')
+  let visible
+  try {
+    visible = readFileSync(file, 'utf8') === 'fixture value'
+  } catch (error) {
+    if (!['EPERM', 'EACCES', 'ENOENT'].includes(error.code)) throw error
+  }
+  if (visible) throw new Error('Protected fixture was readable')
+  if (action === 'optional') console.log('handled')
+  else process.exitCode = 42
 } else if (action === 'read') {
   // The entire workspace is a disposable fixture. Never print file contents.
   try {

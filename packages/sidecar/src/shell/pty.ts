@@ -5,6 +5,7 @@ import { accessSync, constants } from 'node:fs'
 import { delimiter, join } from 'node:path'
 
 import {
+  type PreparedShell,
   type ShellEnvironment,
   prepareShellLaunch,
   spawnShellPipes,
@@ -24,6 +25,7 @@ export type ShellJobProcess = {
 }
 
 export type SpawnShellJobInput = {
+  prepared?: PreparedShell
   command: string
   cwd: string
   environment?: ShellEnvironment
@@ -134,11 +136,14 @@ async function spawnForMode(
   input: SpawnShellJobInput,
 ): Promise<ShellJobProcess> {
   if (mode === 'pipe') return spawnPipe(input)
-  if (mode === 'script') return spawnScriptPty(input)
+  if (mode === 'script')
+    return input.prepared ? spawnPipe(input) : spawnScriptPty(input)
 
   const nodePty = await probeNodePty()
   if (nodePty) return spawnNodePty(nodePty, input)
-  return hasScript() ? spawnScriptPty(input) : spawnPipe(input)
+  return !input.prepared && hasScript()
+    ? spawnScriptPty(input)
+    : spawnPipe(input)
 }
 
 function spawnNodePty(

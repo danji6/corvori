@@ -1,3 +1,5 @@
+import type { ShellRetry } from './retry'
+
 export type PtyMode = 'pty' | 'script' | 'pipe'
 
 export type ShellJobStatus = 'running' | 'done' | 'killed'
@@ -13,6 +15,10 @@ export type StartShellJobInput = {
   messageCreatedAt?: number
   toolCallId?: string
   workspaceId: string
+  revision?: number
+  authority?: string
+  sandbox?: true
+  retry?: ShellRetry
   command: string
   cwd: string
   environment?: {

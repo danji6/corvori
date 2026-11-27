@@ -10,6 +10,8 @@ import { type ShellStreamEvent } from './job-protocol'
 import { type ShellJob } from './job-state'
 import { OutputRing } from './output-ring'
 import { type PtyMode, spawnJob } from './pty'
+import { preparePreview } from './sandbox/preview'
+import { ShellRetryAuthorization, attemptIdentity } from './sandbox/retry'
 import { ShellJobSubscriber } from './subscriber'
 import { withBoundSessionDir } from './system-shell'
 
@@ -68,7 +70,14 @@ export async function startShellJob(
     )
   }
 
+  const original = input.retry && checkShellRetry(input)
+  const access =
+    original && input.retry && original.consume(input, input.retry.access)
+  const preview = input.sandbox
+    ? await preparePreview(input, [...new Set(roots)], access)
+    : undefined
   const proc = await spawnJob({
+    prepared: preview?.prepared,
     command: input.boundSessionDir
       ? withBoundSessionDir(input.command, input.boundSessionDir)
       : input.command,
@@ -77,10 +86,18 @@ export async function startShellJob(
     cols: input.cols ?? 80,
     rows: input.rows ?? 24,
     shell: input.shell,
+  }).catch(async (error) => {
+    await preview?.cleanup()
+    throw error
   })
 
   const job: ShellJob = {
     jobId: nextJobId(),
+    retryAuthorization:
+      preview && !input.retry
+        ? new ShellRetryAuthorization(attemptIdentity(input))
+        : undefined,
+    retryOf: input.retry?.jobId,
     agentId: input.agentId,
     homeId: input.homeId,
     sessionId: input.sessionId,
@@ -113,6 +130,11 @@ export async function startShellJob(
   startWaitProbe(job)
 
   proc.onExit((exitCode) => {
+    void preview
+      ?.cleanup()
+      .catch(() =>
+        console.error('Failed to remove shell job temporary directory'),
+      )
     // Grace period after exit for the final output
     setTimeout(() => {
       clearInterval(job.waitProbe)
@@ -139,6 +161,20 @@ function requireJob(jobId: string, sessionId: string): ShellJob {
     throw new Error('Job not found for this session')
   }
   return job
+}
+
+export function checkShellRetry(input: StartShellJobInput) {
+  if (!input.sandbox || !input.retry)
+    throw new Error('Sandbox retry unavailable')
+  const job = requireJob(input.retry.jobId, input.sessionId)
+  if (job.status !== 'done' || job.exitCode === null || job.exitCode === 0)
+    throw new Error(
+      'Only a failed shell job can be retried with additional access',
+    )
+  if (!job.retryAuthorization)
+    throw new Error('This job has no sandbox retry available')
+  job.retryAuthorization.check(attemptIdentity(input))
+  return job.retryAuthorization
 }
 
 export function pollShellJob(
@@ -256,6 +292,7 @@ export function listShellJobs(sessionId: string): ShellJobSummary[] {
     .filter((job) => job.sessionId === sessionId)
     .map((job) => ({
       jobId: job.jobId,
+      ...(job.retryOf && { retryOf: job.retryOf }),
       messageId: job.messageId,
       messageCreatedAt: job.messageCreatedAt,
       toolCallId: job.toolCallId,

@@ -3,6 +3,7 @@ import {
   SHELL_PAGE_CHARS,
   SHELL_TERM_TAIL_CHARS,
 } from '@cv/core/shell/output-page'
+import { shellRetryAccess } from '@cv/core/shell/retry'
 import type { Context, Handler } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { ZodError, z } from 'zod'
@@ -18,6 +19,7 @@ import { resolveShellDirectory } from './directory'
 import {
   type ShellJobStream,
   backgroundShellJob,
+  checkShellRetry,
   killSessionShellJobs,
   killShellJob,
   listShellJobs,
@@ -28,6 +30,7 @@ import {
   subscribeShellJob,
   writeStdin,
 } from './registry'
+import { previewAvailable } from './sandbox/preview-platform'
 import { pumpShellJobStream } from './stream'
 import { canBindSessionDir, shellPath } from './system-shell'
 
@@ -45,6 +48,13 @@ const startSchema = z.strictObject({
   workspaceId: z.string(),
   workspace: workspaceContextSchema,
   command: z.string().min(1),
+  sandbox: z.literal(true).optional(),
+  retry: z
+    .strictObject({
+      jobId: z.string().min(1),
+      access: z.enum(shellRetryAccess),
+    })
+    .optional(),
   bindSessionDir: z.literal(true).optional(),
   cwd: z.string().optional(),
   allowedPaths: z.array(z.string()).optional(),
@@ -99,47 +109,85 @@ const killSessionSchema = z.object({
 export const shellInfo: Handler = (c) => {
   try {
     const shell = shellPath()
-    return c.json({ shell, label: shellLabel(shell) })
+    return c.json({
+      shell,
+      label: shellLabel(shell),
+      sandbox: {
+        version: 1,
+        retryPreview: previewAvailable(),
+        automaticShellExecution: false,
+      },
+    })
   } catch (err: unknown) {
     return jobError(c, err)
   }
 }
 
-export const startShell: Handler = async (c) => {
+type StartRequest = z.infer<typeof startSchema>
+
+async function resolveLaunch(input: StartRequest) {
+  const directory = await resolveShellDirectory(input)
+  const roots = [
+    ...new Set([
+      ...(await workspaceRoots(input.sessionId, input.workspace)),
+      ...directory.roots,
+      directory.cwd,
+    ]),
+  ]
+  const launch = {
+    ...input,
+    agentId: input.workspace.agentHome?.agentId,
+    homeId: input.workspace.agentHome?.homeId,
+    revision: input.workspace.revision,
+    authority: JSON.stringify([
+      input.workspace.folderId,
+      input.workspace.agentHome?.revision,
+      [...roots].sort(),
+      [...(input.allowedPaths ?? [])]
+        .filter((path) => path !== directory.cwd)
+        .sort(),
+      input.allowInteractiveShells ?? false,
+      directory.environment,
+    ]),
+    cwd: directory.cwd,
+    environment: directory.environment,
+    boundSessionDir:
+      input.bindSessionDir && canBindSessionDir(input.shell)
+        ? directory.environment.SESSION_DIR
+        : undefined,
+  }
+  return { launch, roots }
+}
+
+async function shellLaunch(c: Context, inspect: boolean) {
   try {
     const input = startSchema.parse(await c.req.json())
     const result = await withAgentFiles(
       input.workspace.agentHome?.homeId ?? input.workspace.agentHome?.agentId,
       () =>
         withWorkspaceOperation(input.sessionId, async () => {
-          const directory = await resolveShellDirectory(input)
-          const roots = [
-            ...(await workspaceRoots(input.sessionId, input.workspace)),
-            ...directory.roots,
-            directory.cwd,
-          ]
+          const { launch, roots } = await resolveLaunch(input)
+          if (inspect) {
+            if (!previewAvailable())
+              throw new Error('Shell sandbox preview is unavailable')
+            if (input.cwd !== launch.cwd)
+              throw new Error(
+                'Use the absolute working directory of the failed job',
+              )
+            checkShellRetry(launch).request(launch)
+            return { cwd: launch.cwd }
+          }
           return checkpoints().write(input.sessionId, roots, async (writer) => {
-            const started = await startShellJob(
-              {
-                ...input,
-                agentId: input.workspace.agentHome?.agentId,
-                homeId: input.workspace.agentHome?.homeId,
-                cwd: directory.cwd,
-                environment: directory.environment,
-                boundSessionDir:
-                  input.bindSessionDir && canBindSessionDir(input.shell)
-                    ? directory.environment.SESSION_DIR
-                    : undefined,
-              },
-              roots,
-            )
+            const started = await startShellJob(launch, roots)
             try {
               await writer.trackJob(shellJobPid(started.jobId, input.sessionId))
             } catch (error) {
               killShellJob(started.jobId, input.sessionId)
               throw error
             }
-            return started
+            return input.sandbox
+              ? { ...started, sandboxCwd: launch.cwd }
+              : started
           })
         }),
     )
@@ -148,6 +196,9 @@ export const startShell: Handler = async (c) => {
     return jobError(c, err)
   }
 }
+
+export const startShell: Handler = (c) => shellLaunch(c, false)
+export const inspectShellRetry: Handler = (c) => shellLaunch(c, true)
 
 export const pollShell: Handler = async (c) => {
   try {

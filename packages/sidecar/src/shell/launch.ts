@@ -13,7 +13,10 @@ export type ShellEnvironment = {
   SESSION_DIR?: string
 }
 
+export type PreparedShell = ShellInvocation & { env: NodeJS.ProcessEnv }
+
 type LaunchInput = {
+  prepared?: PreparedShell
   command: string | ShellInvocation
   cwd: string
   environment?: ShellEnvironment
@@ -24,6 +27,7 @@ type Terminal = 'pty' | { cols: number; rows: number }
 
 /** Prepare every agent-controlled shell or direct argv launch before selecting its transport. */
 export function prepareShellLaunch(input: LaunchInput, terminal?: Terminal) {
+  if (input.prepared) return { ...input.prepared, cwd: input.cwd }
   const { command, cwd, environment, shell } = input
   const extra: Record<string, string> = terminal
     ? { TERM: 'xterm-256color' }

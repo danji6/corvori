@@ -79,6 +79,7 @@ import {
 import { sessionFileRoutes } from './session-files/routes'
 import {
   backgroundShell,
+  inspectShellRetry,
   killSessionShell,
   killShell,
   listShell,
@@ -118,6 +119,7 @@ export function createApp(authenticate: MiddlewareHandler) {
 
   app.get('/shell/info', shellInfo)
   app.post('/shell/start', startShell)
+  app.post('/shell/retry/check', inspectShellRetry)
   app.post('/shell/poll', pollShell)
   app.get('/shell/stream', streamShell)
   app.post('/shell/stdin', shellStdin)

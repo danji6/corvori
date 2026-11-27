@@ -38,6 +38,7 @@ export function ToolApprovalPicker({
 
   const {
     planApproval,
+    retry,
     toolName,
     description,
     hold,
@@ -108,8 +109,14 @@ export function ToolApprovalPicker({
               noLoadingIndicator
               wordWrap
             />
+            {retry && (
+              <div className="text-muted-foreground ml-6 text-xs break-all">
+                Job {retry.jobId} · {(part.input as { cwd: string }).cwd}
+              </div>
+            )}
             {description && (
               <div className="text-muted-foreground -mt-2 ml-6 text-xs">
+                {retry && 'Agent’s reason: '}
                 {description}
               </div>
             )}

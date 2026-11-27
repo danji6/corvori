@@ -7,11 +7,23 @@ const execute = promisify(execFile)
 const dependencies = new Set(['node_modules', '.venv'])
 
 /** Resolve Git's effective exclusions immediately before preparing a job. */
-export async function snapshotGitPaths(directory: string) {
+export async function snapshotGitPaths(directory: string, emptyRepo?: string) {
   const root = await realpath(directory)
   const hidden = new Set<string>()
   const readOnly = new Set<string>()
-  await addIgnoredPaths(root, hidden, readOnly)
+  let gitArgs: string[] = []
+  if (emptyRepo) {
+    try {
+      await execute('/usr/bin/git', ['rev-parse', '--git-dir'], { cwd: root })
+    } catch (error) {
+      if (
+        !(error as { stderr?: string }).stderr?.includes('not a git repository')
+      )
+        throw error
+      gitArgs = ['--git-dir', emptyRepo, '--work-tree', root]
+    }
+  }
+  await addIgnoredPaths(root, hidden, readOnly, gitArgs)
   await collectProtectedEntries(root, hidden, readOnly)
   return { hidden: [...hidden], readOnly: [...readOnly] }
 }
@@ -20,10 +32,12 @@ async function addIgnoredPaths(
   root: string,
   hidden: Set<string>,
   readOnly: Set<string>,
+  gitArgs: string[] = [],
 ) {
   const { stdout } = await execute(
-    'git',
+    process.platform === 'darwin' ? '/usr/bin/git' : 'git',
     [
+      ...gitArgs,
       '-c',
       'core.fsmonitor=false',
       '-c',

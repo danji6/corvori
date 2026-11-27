@@ -24,6 +24,10 @@ export async function buildSidecar(): Promise<string> {
         projectRoot,
         'packages/sidecar/src/shell/sandbox/sandbox-check.ts',
       ),
+      resolve(
+        projectRoot,
+        'packages/sidecar/src/shell/sandbox/linux-preview.ts',
+      ),
       resolve(projectRoot, 'packages/sidecar/src/eval/worker.ts'),
       resolve(projectRoot, 'packages/sidecar/src/mcp/external/stdio-supervisor.ts'), // prettier-ignore
     ],
@@ -31,6 +35,7 @@ export async function buildSidecar(): Promise<string> {
     external: [
       '@hono/node-server',
       '@anthropic-ai/sandbox-runtime',
+      '@anthropic-ai/sandbox-runtime/*',
       '@modelcontextprotocol/sdk',
       '@mozilla/readability',
       'hono',
