@@ -4,15 +4,17 @@ import {
 } from '@anthropic-ai/sandbox-runtime'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { delimiter, dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 
 import { initializeBackend, workspaceProbePolicy } from './backend'
 import { prepareProbeCommand } from './diagnostic-command'
 
 const vendor = resolve(process.argv[2])
+process.env.PATH =
+  dirname(process.execPath) + delimiter + (process.env.PATH ?? '')
 const mxcOnly = process.argv.includes('--mxc-only')
 const cwd = await realpath(
   await mkdtemp(
@@ -25,18 +27,30 @@ try {
   await promisify(execFile)('git', ['init', '--quiet'], { cwd })
   await writeFile('.gitignore', '*.private\n')
   await writeFile('test.private', 'disposable')
+  await writeFile(
+    'check.cjs',
+    [
+      "const fs = require('node:fs')",
+      "fs.writeFileSync('output', 'ready')",
+      "try { if (fs.readFileSync('test.private', 'utf8') === 'disposable') process.exitCode = 1 }",
+      "catch (error) { if (!['EACCES', 'EPERM', 'ENOENT'].includes(error.code)) throw error }",
+    ].join('\n'),
+  )
   const policy = await workspaceProbePolicy(cwd, vendor)
   const backend = await initializeBackend(policy, mxcOnly)
   const launch = await prepareProbeCommand({
-    command: 'echo ready',
+    command: 'node check.cjs',
     commandId: randomUUID(),
     cwd,
     shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/sh',
     filesystem: policy.filesystem,
   })
   const result = await launch()
-  if (result.status || result.stdout.trim() !== 'ready')
-    throw new Error('Native command did not complete')
+  if (result.status || (await readFile('output', 'utf8')) !== 'ready') {
+    throw new Error(
+      'The native workspace write and protected read check failed',
+    )
+  }
   console.log(
     JSON.stringify({
       version: 1,

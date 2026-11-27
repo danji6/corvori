@@ -110,7 +110,6 @@ async function report(mode, name, command) {
 }
 
 try {
-  // The benchmark is built into this package's node_modules for Node execution.
   await copyFile(
     join(originalCwd, 'workload.mjs'),
     join(fixture, 'workload.mjs'),

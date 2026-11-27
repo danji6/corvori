@@ -39,7 +39,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-latest, windows-latest]
+        os:
+          [
+            ubuntu-22.04,
+            ubuntu-22.04-arm,
+            macos-latest,
+            windows-latest,
+            windows-11-arm,
+          ]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     defaults:
@@ -81,7 +88,7 @@ jobs:
         working-directory: .
         run: |
           node .data/build/sidecar/sandbox-check.js packages/sidecar/vendor --mxc-only
-          if ($LASTEXITCODE -eq 78) {
+          if ($LASTEXITCODE -eq 78 -and '${{ matrix.os }}' -ne 'windows-11-arm') {
             "setup=true" >> $env:GITHUB_OUTPUT
             exit 0
           }

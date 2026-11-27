@@ -1,5 +1,5 @@
 import { releaseName } from '@cv/core/update/source'
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { projectRoot } from './runner/config'
@@ -36,6 +36,9 @@ async function includeSandboxHelpers(staging: string) {
     const destination = join(staging, 'packages/sidecar/vendor', name)
     await mkdir(destination, { recursive: true })
     await output(['tar', '-xzf', archive, '-C', destination], { cwd: staging })
+    // Nix store directories ship read-only. Let the owner replace them on update.
+    await chmod(destination, 0o755)
+    await chmod(join(destination, 'sources'), 0o755)
     const manifest = await readFile(join(destination, 'SHA256SUMS'), 'utf8')
     for (const file of ['bwrap', 'socat', 'rg']) {
       const hash = new Bun.CryptoHasher('sha256')
