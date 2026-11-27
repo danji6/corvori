@@ -7,10 +7,10 @@ import { checkScopedPaths } from '@cv/sidecar/mcp/workspace/scoped-checks'
 import type { UIMessage } from 'ai'
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Hono } from 'hono'
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { REPORTED_APPROVAL_COMMANDS } from '~/tests/helpers/approval-commands'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 let base: string
 let root: string
@@ -22,7 +22,7 @@ const previousDataEnvironment: Record<string, string | undefined> = {}
 let available = true
 
 async function createFixture() {
-  base = await mkdtemp(path.join(tmpdir(), 'shell-path-approval-'))
+  base = await createTempDirectory('shell-path-approval-')
   root = path.join(base, 'workspace')
   external = path.join(base, 'external')
   for (const directory of [

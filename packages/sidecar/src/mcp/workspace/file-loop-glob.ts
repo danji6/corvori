@@ -25,9 +25,10 @@ async function readNames(directory: string) {
   }
 }
 
-function decodeName(entry: Buffer): string {
-  const name = entry.toString()
-  if (!Buffer.from(name).equals(entry))
+function decodeName(entry: Uint8Array): string {
+  const bytes = Buffer.from(entry)
+  const name = bytes.toString()
+  if (!Buffer.from(name).equals(bytes))
     throw new Error('Cannot represent a filename in this directory')
   return name
 }

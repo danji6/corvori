@@ -18,18 +18,10 @@ import { homeInfo, runFileOperation } from '@cv/sidecar/agent-files/operations'
 import { libraryRoot, managedHome } from '@cv/sidecar/agent-files/storage'
 import { expect, test } from 'bun:test'
 import { getFunctionName } from 'convex/server'
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  rename,
-  rm,
-  stat,
-  writeFile,
-} from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { skillsDatabase } from '~/tests/helpers/skills-db'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 const agentId = 'agent' as Id<'agents'>
 const skillId = 'review' as Id<'skills'>
@@ -37,7 +29,7 @@ const skillId = 'review' as Id<'skills'>
 async function fixture(
   check: (fixture: ReturnType<typeof skillsDatabase>) => Promise<void>,
 ) {
-  const root = await mkdtemp(path.join(tmpdir(), 'home-lifecycle-'))
+  const root = await createTempDirectory('home-lifecycle-')
   const previousData = process.env.CHAT_SIDECAR_DATA_DIR
   const previousSecret = process.env.SIDECAR_SECRET
   const previousFetch = globalThis.fetch
@@ -163,7 +155,7 @@ test('durable initialization recreates a missing shared managed home with all pr
 test('durable folder changes recover a missing custom source and carry its assignment records forward', async () => {
   await fixture(async (f) => {
     const home = await assign(f)
-    const custom = await mkdtemp(path.join(tmpdir(), 'custom-home-recovery-'))
+    const custom = await createTempDirectory('custom-home-recovery-')
     try {
       await f.ctx.db.patch(home._id, {
         managed: false,
@@ -272,7 +264,7 @@ test('durable keep-copies deletion preserves edited skills through a fresh folde
     expect((await f.ctx.db.get(deletion))?.state.phase).toBe('done')
     expect(await f.ctx.db.get(skillId)).toBeNull()
     expect(f.rows('agentSkills')).toHaveLength(1)
-    const custom = await mkdtemp(path.join(tmpdir(), 'retained-home-'))
+    const custom = await createTempDirectory('retained-home-')
     try {
       const transition = await start(f.ctx, {
         kind: 'home',

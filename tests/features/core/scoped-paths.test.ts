@@ -7,16 +7,9 @@ import {
 import type { createApp } from '@cv/sidecar/main'
 import type * as WorkspaceFiles from '@cv/sidecar/mcp/workspace/workspace'
 import { afterAll, beforeAll, expect, test } from 'bun:test'
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 import { workspaceCheckpoint } from '~/tests/helpers/workspace-checkpoints'
 
 let root: string
@@ -31,7 +24,7 @@ const previous = {
 }
 
 beforeAll(async () => {
-  root = await mkdtemp(path.join(tmpdir(), 'scoped-paths-'))
+  root = await createTempDirectory('scoped-paths-')
   project = path.join(root, 'project')
   home = path.join(root, 'home')
   outside = path.join(root, 'outside')
@@ -329,7 +322,9 @@ test('every shell mode receives resolved cwd and authoritative root variables', 
   process.env.AGENT_DIR = 'stale-agent'
   process.env.WORKSPACE_DIR = 'stale-workspace'
   try {
-    for (const mode of ['pipe', 'script', 'pty']) {
+    const modes =
+      process.platform === 'linux' ? ['pipe', 'script', 'pty'] : ['pipe', 'pty']
+    for (const mode of modes) {
       process.env.CHAT_JOB_MODE = mode
       const output = await shellOutput({
         cwd: 'agent://skills/review',

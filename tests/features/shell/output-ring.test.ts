@@ -1,10 +1,6 @@
 import { OutputRing } from '@cv/sidecar/shell/registry'
 import { describe, expect, test } from 'bun:test'
 
-process.env.CHAT_JOB_MODE = 'script'
-
-process.env.CHAT_SIDECAR_DATA_DIR ??= process.cwd()
-
 describe('output ring', () => {
   test('keeps absolute offsets across head drops', () => {
     const ring = new OutputRing()

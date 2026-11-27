@@ -2,16 +2,9 @@ import { withAgentHome } from '@cv/core/workspace/personal'
 import type * as Workspace from '@cv/sidecar/mcp/workspace/workspace'
 /// <reference types="bun-types" />
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 import { workspaceCheckpoint } from '~/tests/helpers/workspace-checkpoints'
 
 type WorkspaceModule = typeof Workspace
@@ -21,7 +14,7 @@ let dataDir: string
 const previousDataDir = process.env.CHAT_SIDECAR_DATA_DIR
 
 async function boundWorkspace(sessionId: string) {
-  const root = await mkdtemp(path.join(tmpdir(), 'chat-workspace-'))
+  const root = await createTempDirectory('chat-workspace-')
   const workspace = {
     workspaceId: sessionId,
     path: root,
@@ -33,7 +26,7 @@ async function boundWorkspace(sessionId: string) {
 
 describe('previewWorkspaceDiff', () => {
   beforeAll(async () => {
-    dataDir = await mkdtemp(path.join(tmpdir(), 'chat-sidecar-'))
+    dataDir = await createTempDirectory('chat-sidecar-')
     process.env.CHAT_SIDECAR_DATA_DIR = dataDir
     workspaceModule = await import('@cv/sidecar/mcp/workspace/workspace')
   })
@@ -195,7 +188,7 @@ describe('previewWorkspaceDiff', () => {
               revision: 0,
             })
           : project
-      const external = await mkdtemp(path.join(tmpdir(), 'external-files-'))
+      const external = await createTempDirectory('external-files-')
       const filePath = path.join(external, 'file.txt')
       const args = {
         sessionId,
@@ -278,7 +271,7 @@ describe('previewWorkspaceDiff', () => {
   test('checkpoint restore rejects a replaced external target symlink', async () => {
     const { root, workspaceId, workspace } =
       await boundWorkspace('external-symlink')
-    const external = await mkdtemp(path.join(tmpdir(), 'external-checkpoint-'))
+    const external = await createTempDirectory('external-checkpoint-')
     const filePath = path.join(external, 'file.txt')
     const untouched = path.join(external, 'untouched.txt')
     const capture = await workspaceCheckpoint({
@@ -313,7 +306,7 @@ describe('previewWorkspaceDiff', () => {
   test('workspace writes cannot follow a symlink past a directory grant', async () => {
     const { root, workspaceId, workspace } =
       await boundWorkspace('write-symlink')
-    const external = await mkdtemp(path.join(tmpdir(), 'write-symlink-'))
+    const external = await createTempDirectory('write-symlink-')
     try {
       await mkdir(path.join(root, 'src'))
       await symlink(external, path.join(root, 'src', 'escape'))
@@ -340,7 +333,7 @@ describe('previewWorkspaceDiff', () => {
     const { handleMcpRequest } = await import('@cv/sidecar/mcp/mcp')
     const { callMcpTool } = await import('@cv/convex/model/tool/mcp')
     const { root, workspaceId, workspace } = await boundWorkspace('mcp-grants')
-    const external = await mkdtemp(path.join(tmpdir(), 'mcp-external-'))
+    const external = await createTempDirectory('mcp-external-')
     const app = new Hono().all('/mcp', handleMcpRequest)
     const server = Bun.serve({ port: 0, fetch: app.fetch })
     const previous = process.env.SIDECAR_URL
@@ -396,7 +389,7 @@ describe('previewWorkspaceDiff', () => {
   test('multiple sources keep relative paths primary and allow absolute secondary paths', async () => {
     const { root, workspaceId, workspace } =
       await boundWorkspace('multi-source')
-    const secondary = await mkdtemp(path.join(tmpdir(), 'chat-secondary-'))
+    const secondary = await createTempDirectory('chat-secondary-')
     let capture: Awaited<ReturnType<typeof workspaceCheckpoint>> | undefined
     try {
       workspace.sources.push({
@@ -463,7 +456,7 @@ describe('previewWorkspaceDiff', () => {
   test('source roots do not grant access to escaping symlinks or git internals', async () => {
     const { root, workspaceId, workspace } =
       await boundWorkspace('source-boundaries')
-    const outside = await mkdtemp(path.join(tmpdir(), 'chat-outside-'))
+    const outside = await createTempDirectory('chat-outside-')
     try {
       await writeFile(path.join(outside, 'secret.txt'), 'outside')
       await symlink(outside, path.join(root, 'escape'))

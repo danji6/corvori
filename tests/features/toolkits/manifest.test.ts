@@ -16,13 +16,14 @@ import { createHash } from 'node:crypto'
 import {
   mkdir,
   mkdtemp,
+  realpath,
   rename,
   rm,
   symlink,
   writeFile,
 } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 const roots: string[] = []
 afterEach(async () => {
@@ -30,7 +31,7 @@ afterEach(async () => {
     await rm(root, { recursive: true, force: true })
 })
 async function toolkit(manifest: unknown = {}) {
-  const root = await mkdtemp(path.join(tmpdir(), 'cv-toolkit-'))
+  const root = await createTempDirectory('cv-toolkit-')
   roots.push(root)
   await mkdir(path.join(root, '.agents'))
   await writeFile(
@@ -199,6 +200,28 @@ test('unsupported versions, ambiguous transports and executable settings fail ex
     }),
   ).toBeDefined()
 })
+
+test.skipIf(process.platform !== 'darwin')(
+  'accepts macOS system aliases while rejecting symlinks below them',
+  async () => {
+    const base = await mkdtemp('/tmp/cv-toolkit-alias-')
+    roots.push(base)
+    const toolkitRoot = path.join(base, 'kit')
+    await mkdir(path.join(toolkitRoot, '.agents'), { recursive: true })
+    await writeFile(path.join(toolkitRoot, '.agents/toolkit.json'), '{}')
+
+    const canonical = await realpath(toolkitRoot)
+    expect(await inspectToolkit(toolkitRoot)).toEqual(
+      await inspectToolkit(canonical),
+    )
+
+    const alias = path.join(base, 'toolkit-link')
+    await symlink(canonical, alias)
+    await expect(inspectToolkit(alias)).rejects.toThrow(
+      'Symlink is not supported',
+    )
+  },
+)
 
 test('only the exact root manifest is discovered; symlinks and oversized files are rejected', async () => {
   const root = await toolkit()

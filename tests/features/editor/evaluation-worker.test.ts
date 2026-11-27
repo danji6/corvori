@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { buildSidecar, resolveNodeBinary } from '~/scripts/sidecar'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 let child: ReturnType<typeof Bun.spawn>
 let root: string
@@ -12,7 +12,7 @@ let entry: string
 const secret = 'isolated-sidecar-fixture'
 
 beforeAll(async () => {
-  root = await mkdtemp(join(tmpdir(), 'corvori-eval-'))
+  root = await createTempDirectory('corvori-eval-')
   await writeFile(join(root, 'fixture.txt'), 'workspace fixture')
   const probe = Bun.serve({ port: 0, fetch: () => new Response() })
   port = probe.port!

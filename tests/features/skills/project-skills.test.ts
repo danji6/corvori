@@ -1,8 +1,8 @@
 import { projectSkillCatalog } from '@cv/sidecar/agent-files/project-catalog'
 import { expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 async function skill(
   root: string,
@@ -19,7 +19,7 @@ async function skill(
 }
 
 test('project discovery stays at its selected root and returns bounded, deterministic pages', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'project-skills-'))
+  const root = await createTempDirectory('project-skills-')
   try {
     for (let i = 0; i < 43; i++)
       await skill(root, `skill-${String(i).padStart(3, '0')}`)
@@ -78,7 +78,7 @@ test('project discovery stays at its selected root and returns bounded, determin
 })
 
 test('invalid manifests and symlinks are diagnosed without granting access to their targets', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'project-skills-'))
+  const root = await createTempDirectory('project-skills-')
   try {
     await skill(root, 'good')
     await skill(root, 'bad')

@@ -6,24 +6,16 @@ import {
   createFileHelper,
 } from '@cv/sidecar/eval/file-helper'
 import { afterAll, beforeAll, expect, test } from 'bun:test'
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  stat,
-  symlink,
-  writeFile,
-} from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 let root: string
 let project: string
 let personal: string
 const oldData = process.env.CHAT_SIDECAR_DATA_DIR
 beforeAll(async () => {
-  root = await mkdtemp(path.join(tmpdir(), 'explicit-personal-'))
+  root = await createTempDirectory('explicit-personal-')
   project = path.join(root, 'project')
   personal = path.join(root, 'home')
   await mkdir(project)

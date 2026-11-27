@@ -4,9 +4,9 @@ import {
 } from '@cv/sidecar/mcp/workspace/access'
 import { checkPaths } from '@cv/sidecar/mcp/workspace/check-paths'
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 let base: string
 let root: string
@@ -14,7 +14,7 @@ let external: string
 
 describe('sidecar path resolution', () => {
   beforeAll(async () => {
-    base = await mkdtemp(path.join(tmpdir(), 'path-policy-'))
+    base = await createTempDirectory('path-policy-')
     root = path.join(base, 'workspace')
     external = path.join(base, 'external')
     await mkdir(path.join(root, 'src'), { recursive: true })
@@ -222,6 +222,10 @@ describe('sidecar path resolution', () => {
   })
 
   test('validates ignored globs against grants and rejects dynamic operands', async () => {
+    const literal = await checkPaths(root, {
+      paths: ['ignored/file.txt'],
+      allowedPaths: [path.join(root, 'ignored')],
+    })
     const result = await checkPaths(root, {
       paths: ['ignored/*.txt'],
       allowedPaths: [path.join(root, 'ignored')],
@@ -231,6 +235,12 @@ describe('sidecar path resolution', () => {
       { path: 'ignored/file.txt', allowed: true },
     ])
     expect(result.uncovered).toEqual([])
+    expect(result.uncovered).toEqual(literal.uncovered)
+    expect(result.resolved[0]).toMatchObject({
+      absolutePath: literal.resolved[0]!.absolutePath,
+      allowed: literal.resolved[0]!.allowed,
+      outside: literal.resolved[0]!.outside,
+    })
     const alias = await checkPaths(root, { paths: ['alias.txt'] })
     expect(alias.uncovered).toEqual(['src/file.txt'])
     const dynamic = await checkPaths(root, {

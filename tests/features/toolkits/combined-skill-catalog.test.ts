@@ -11,10 +11,10 @@ import {
   toolkitSkillCatalog,
 } from '@cv/sidecar/toolkits/catalog'
 import { expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { skillsDatabase } from '~/tests/helpers/skills-db'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 async function writeSkill(
   root: string,
@@ -29,7 +29,7 @@ async function writeSkill(
 }
 
 test('combined catalogs preserve origins, page across sources, and reject stale continuations', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'combined-skills-'))
+  const root = await createTempDirectory('combined-skills-')
   const original = globalThis.fetch
   const secret = process.env.SIDECAR_SECRET
   const fixture = skillsDatabase()

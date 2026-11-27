@@ -16,18 +16,11 @@ import type { ToolApprovals } from '@cv/core/types'
 import { withAgentHome } from '@cv/core/workspace/personal'
 import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { Hono } from 'hono'
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { ZodType } from 'zod'
 import { skillsDatabase } from '~/tests/helpers/skills-db'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 let root: string
 let project: string
@@ -40,7 +33,7 @@ const previousData = process.env.CHAT_SIDECAR_DATA_DIR
 const options = { toolCallId: 'approved-file', messages: [], context: undefined as never } // prettier-ignore
 
 beforeAll(async () => {
-  root = await mkdtemp(path.join(tmpdir(), 'file-path-approval-'))
+  root = await createTempDirectory('file-path-approval-')
   project = path.join(root, 'project')
   outside = path.join(root, 'outside')
   await mkdir(project)

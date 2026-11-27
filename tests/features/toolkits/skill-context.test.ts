@@ -12,11 +12,11 @@ import {
 import { inspectToolkit } from '@cv/sidecar/toolkits/manifest'
 import { type ToolSet, asSchema } from 'ai'
 import { expect, spyOn, test } from 'bun:test'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { skillRequests } from '~/tests/helpers/skill-requests'
 import { skillsDatabase } from '~/tests/helpers/skills-db'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 async function toolDefinitions(tools: ToolSet) {
   return Promise.all(
@@ -204,7 +204,7 @@ test('context preparation persists the exact catalog configuration and survives 
 })
 
 test('provider preparation refreshes toolkit notes within a turn and preserves stored context', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'toolkit-context-'))
+  const root = await createTempDirectory('toolkit-context-')
   const f = skillRequests(root)
   try {
     await mkdir(path.join(root, '.agents/skills/review'), { recursive: true })

@@ -4,17 +4,15 @@ import type * as ShellToolModule from '@cv/convex/model/tool/shell'
 import type { ShellToolOutput } from '@cv/core/types/tools'
 import type * as RegistryModule from '@cv/sidecar/shell/registry'
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { mkdtemp, realpath, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { rm } from 'node:fs/promises'
 import { waitForExit } from '~/tests/helpers/shell-registry'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
-process.env.CHAT_JOB_MODE = 'script'
-process.env.CHAT_SIDECAR_DATA_DIR ??= process.cwd()
-
-const PORT = 39_312
-// Read at import time by the sidecar client, so it must be set before it loads
-process.env.SIDECAR_URL = `http://127.0.0.1:${PORT}`
+const previousEnvironment = {
+  CHAT_SIDECAR_DATA_DIR: process.env.CHAT_SIDECAR_DATA_DIR,
+  SIDECAR_URL: process.env.SIDECAR_URL,
+}
+let dataDirectory: string | undefined
 
 let registry: typeof RegistryModule
 let shellTool: typeof ShellToolModule
@@ -23,25 +21,35 @@ let server: ReturnType<typeof Bun.serve>
 const context = { sessionId: 'session-1', workspaceId: 'ws-1' }
 
 beforeAll(async () => {
+  dataDirectory = await createTempDirectory('shell-stream-')
+  process.env.CHAT_SIDECAR_DATA_DIR = dataDirectory
   registry = await import('@cv/sidecar/shell/registry')
   shellTool = await import('@cv/convex/model/tool/shell')
 
   const { createApp } = await import('@cv/sidecar/main')
   const app = createApp(async (_c, next) => next())
-  server = Bun.serve({ port: PORT, fetch: (req) => app.fetch(req) })
+  server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: app.fetch })
+  process.env.SIDECAR_URL = server.url.origin
 })
 
-afterAll(() => server?.stop(true))
+afterAll(async () => {
+  server?.stop(true)
+  for (const [name, value] of Object.entries(previousEnvironment)) {
+    if (value === undefined) delete process.env[name]
+    else process.env[name] = value
+  }
+  if (dataDirectory) await rm(dataDirectory, { recursive: true, force: true })
+})
 
 /** Starts the job here, so the tool only has to watch it over real HTTP. */
 async function startedJob(command: string, allowInteractiveShells = false) {
-  const { jobId } = await registry.startShellJob({
+  const job = await registry.startShellJob({
     ...context,
     command,
     allowInteractiveShells,
     cwd: process.cwd(),
   })
-  return { jobId, post: async () => ({ jobId, mode: 'script' }) }
+  return { jobId: job.jobId, post: async () => job }
 }
 
 /** Collects parts until `done` says stop, or the deadline passes. */
@@ -105,7 +113,7 @@ describe('shell job streaming over http', () => {
   })
 
   test('reads and kills an unfinished job by its chat number', async () => {
-    const path = await realpath(await mkdtemp(join(tmpdir(), 'shell-wait-')))
+    const path = await createTempDirectory('shell-wait-')
     const workspace = {
       workspaceId: context.workspaceId,
       path,
@@ -185,41 +193,47 @@ describe('shell job streaming over http', () => {
     }
   })
 
-  test('reports a job waiting on terminal input', async () => {
-    const { jobId, post } = await startedJob(
-      'read -r line; echo "got:$line"',
-      true,
-    )
+  test.skipIf(process.platform !== 'linux')(
+    'reports a job waiting on terminal input',
+    async () => {
+      const { jobId, post } = await startedJob(
+        'read -r line; echo "got:$line"',
+        true,
+      )
 
-    const seen = await collect(
-      shellTool.executeShellJob(context, { command: 'ignored' }, {
-        post,
-      } as Parameters<typeof shellTool.executeShellJob>[2]),
-      (part) => part.waiting === true,
-    )
+      const seen = await collect(
+        shellTool.executeShellJob(context, { command: 'ignored' }, {
+          post,
+        } as Parameters<typeof shellTool.executeShellJob>[2]),
+        (part) => part.waiting === true,
+      )
 
-    expect(seen.at(-1)?.waiting).toBe(true)
+      expect(seen.at(-1)?.waiting).toBe(true)
 
-    registry.killShellJob(jobId, context.sessionId)
-  })
+      registry.killShellJob(jobId, context.sessionId)
+    },
+  )
 
-  test('returns a non-interactive retry error to the agent without requesting input', async () => {
-    const { post } = await startedJob('read -r line; echo "got:$line"')
-    const seen = await collect(
-      shellTool.executeShellJob(context, { command: 'ignored' }, {
-        post,
-      } as Parameters<typeof shellTool.executeShellJob>[2]),
-      (part) => part.status !== 'running',
-    )
+  test.skipIf(process.platform !== 'linux')(
+    'returns a non-interactive retry error to the agent without requesting input',
+    async () => {
+      const { post } = await startedJob('read -r line; echo "got:$line"')
+      const seen = await collect(
+        shellTool.executeShellJob(context, { command: 'ignored' }, {
+          post,
+        } as Parameters<typeof shellTool.executeShellJob>[2]),
+        (part) => part.status !== 'running',
+      )
 
-    expect(seen.some((part) => part.waiting)).toBe(false)
-    const final = seen.at(-1)!
-    expect(final.status).toBe('killed')
-    expect(shellTool.shellToModelOutput({ output: final })).toMatchObject({
-      type: 'text',
-      value: expect.stringContaining('Try a non-interactive command instead'),
-    })
-  })
+      expect(seen.some((part) => part.waiting)).toBe(false)
+      const final = seen.at(-1)!
+      expect(final.status).toBe('killed')
+      expect(shellTool.shellToModelOutput({ output: final })).toMatchObject({
+        type: 'text',
+        value: expect.stringContaining('Try a non-interactive command instead'),
+      })
+    },
+  )
 })
 
 describe('watching a job that outlived its tool call', () => {
