@@ -153,11 +153,13 @@ export async function buildProviderHistory(
     { shellHistoryTools },
     { attachmentHistoryTools },
     { mcpHistoryTools },
+    { readFileHistoryTools },
   ] = await Promise.all([
     import('ai'),
     import('../tool/shell'),
     import('../tool/attachments'),
     import('../tool/mcpOutput'),
+    import('../tool/readFileOutput'),
   ])
 
   let modelMessages = await convertToModelMessages(attributed, {
@@ -166,6 +168,7 @@ export async function buildProviderHistory(
     tools: {
       ...shellHistoryTools(),
       ...attachmentHistoryTools(),
+      ...readFileHistoryTools(),
       ...mcpHistoryTools(
         attributed,
         data.stream.omitActiveMedia,
@@ -180,7 +183,7 @@ export async function buildProviderHistory(
         role: 'system',
         content: block(
           'attachment-error',
-          'The provider rejected the media payload as too large. Continue without media; stored attachment links and MCP results remain available.' +
+          'The provider rejected the media in this response. Continue with the available text and metadata.' +
             (names.includes(READ_MCP_OUTPUT_TOOL_NAME)
               ? ' Use read_mcp_output to retrieve full MCP output.'
               : ''),

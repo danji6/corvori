@@ -32,6 +32,7 @@ import { toolkitSkillFingerprint } from '../toolkits/skillContext'
 import { ownsExecution } from './execution'
 import { resolveHistoryBoundary } from './historyBoundary'
 import { listDoneHistory } from './providerHistory'
+import { hasOutputRef, isFileImagePart } from './toolOutput'
 
 export { _getProviderHistory } from './providerHistory'
 
@@ -177,6 +178,10 @@ async function getActiveMediaState(ctx: QueryCtx, stream: Doc<'streams'>) {
   if (processing) {
     const joined = await withParts(ctx, processing)
     if (hasLoadedAttachmentMedia(joined.parts)) return true
+    if (
+      joined.parts.some((part) => isFileImagePart(part) && hasOutputRef(part))
+    )
+      return true
   }
 
   if (!stream.contextBoundaryMessageId) return false

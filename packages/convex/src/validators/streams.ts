@@ -247,7 +247,7 @@ export const streamSchema = v.object({
   leaseExpiresAt: v.number(),
   /** A stop to honor after the current provider step. */
   stopAt: v.optional(v.number()),
-  /** Retry this logical turn without automatically materializing media. */
+  /** Skip this turn’s media payloads in model requests after a provider rejection. */
   omitActiveMedia: v.optional(v.boolean()),
   skillCatalogSource: v.optional(v.string()),
   skillAvailability: v.optional(skillAvailabilityValidator),

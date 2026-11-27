@@ -15,10 +15,14 @@ import { ToolError } from '../../errors'
 import { type WorkspaceToolContext, fileWorkspaceArgs } from './context'
 import type { FilesystemCall } from './executionApprovals'
 import { approvalsForFilesystemCall } from './filesystemApprovals'
-import { callMcpTool } from './mcp'
+import { callMcpTool, callSidecarMcpTool, sidecarMcpText } from './mcp'
 import { fileNeedsApproval } from './paths'
+import { readFileOutput, readFileToModelOutput } from './readFileOutput'
 
-export async function createReadFileTool(context: WorkspaceToolContext) {
+export async function createReadFileTool(
+  context: WorkspaceToolContext,
+  omitMedia?: boolean,
+) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
   return tool({
     description: fileToolDescription(
@@ -29,18 +33,26 @@ export async function createReadFileTool(context: WorkspaceToolContext) {
     inputSchema: z.strictObject(readFileFields),
     needsApproval: ({ path }) =>
       fileNeedsApproval(READ_FILE_TOOL_NAME, path, context),
-    execute: async (input, { toolCallId }) =>
-      callMcpTool(READ_FILE_TOOL_NAME, {
-        ...(await approvedFileArgs(context, {
-          id: toolCallId,
-          name: READ_FILE_TOOL_NAME,
-          input,
-        })),
-        path: input.path,
-        offset: input.offset,
-        limit: input.limit,
-        byteOffset: input.byteOffset,
-      }),
+    execute: async (input, { toolCallId, abortSignal }) => {
+      const args = await approvedFileArgs(context, {
+        id: toolCallId,
+        name: READ_FILE_TOOL_NAME,
+        input,
+      })
+      const content = await callSidecarMcpTool(
+        READ_FILE_TOOL_NAME,
+        {
+          ...args,
+          path: input.path,
+          offset: input.offset,
+          limit: input.limit,
+          byteOffset: input.byteOffset,
+        },
+        abortSignal,
+      )
+      return readFileOutput(sidecarMcpText(content), content)
+    },
+    toModelOutput: ({ output }) => readFileToModelOutput(output, omitMedia),
   })
 }
 

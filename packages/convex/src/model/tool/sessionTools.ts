@@ -136,7 +136,7 @@ async function currentTools({
       wireCalls,
       autoApprove: data.agent.autoApprove,
       shellWindowDeadline,
-      omitMcpMedia: data.stream.omitActiveMedia,
+      omitActiveMedia: data.stream.omitActiveMedia,
       messageId: data.output._id,
       messageCreatedAt: data.output._creationTime,
       agentId: data.agent._id,
