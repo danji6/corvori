@@ -9,6 +9,8 @@ const schedule = v.object({
   zone: v.string(),
   repeat: v.union(
     v.object({ kind: v.literal('once') }),
+    v.object({ kind: v.literal('minutes'), every: v.number() }),
+    v.object({ kind: v.literal('hours'), every: v.number() }),
     v.object({ kind: v.literal('daily'), every: v.number() }),
     v.object({
       kind: v.literal('weekly'),

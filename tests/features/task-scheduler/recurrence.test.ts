@@ -2,6 +2,7 @@ import {
   type TaskSchedule,
   occurrence,
   scheduleError,
+  scheduleLabel,
 } from '@cv/core/task-schedule'
 import { expect, test } from 'bun:test'
 
@@ -18,6 +19,40 @@ function adjacent(
 ) {
   return occurrence(rule, Date.parse(at + 'Z'), dir)
 }
+
+test('minute intervals begin at the start time and find the latest slot directly', () => {
+  const rule: TaskSchedule = {
+    ...daily,
+    repeat: { kind: 'minutes', every: 15 },
+  }
+  expect(adjacent(rule, '2020-01-01T07:59', 'latest')).toBeUndefined()
+  expect(adjacent(rule, '2020-01-01T07:59')).toBe(
+    Date.parse('2020-01-01T08:00Z'),
+  )
+  expect(adjacent(rule, '2026-03-29T07:17', 'latest')).toBe(
+    Date.parse('2026-03-29T07:15Z'),
+  )
+  expect(adjacent(rule, '2026-03-29T07:15')).toBe(
+    Date.parse('2026-03-29T07:30Z'),
+  )
+  expect(scheduleLabel(rule)).toBe('Every 15 minutes')
+})
+
+test('hour intervals keep their elapsed cadence across a time change', () => {
+  const rule: TaskSchedule = {
+    ...daily,
+    startDate: '2026-03-29',
+    time: '00:30',
+    repeat: { kind: 'hours', every: 2 },
+  }
+  expect(adjacent(rule, '2026-03-28T23:30', 'latest')).toBe(
+    Date.parse('2026-03-28T23:30Z'),
+  )
+  expect(adjacent(rule, '2026-03-28T23:30')).toBe(
+    Date.parse('2026-03-29T01:30Z'),
+  )
+  expect(scheduleLabel(rule)).toBe('Every 2 hours')
+})
 
 test('daily catch-up selects the latest due instant even after years, then returns to local 9 AM', () => {
   const at = '2026-03-29T07:17'
@@ -101,5 +136,11 @@ test('rejects malformed dates, zones and rules without a reachable next occurren
   ).toBeTruthy()
   expect(
     scheduleError({ ...daily, repeat: { kind: 'daily', every: 0 } }),
+  ).toBeTruthy()
+  expect(
+    scheduleError({ ...daily, repeat: { kind: 'minutes', every: 1.5 } }),
+  ).toBeTruthy()
+  expect(
+    scheduleError({ ...daily, repeat: { kind: 'hours', every: 9000 } }),
   ).toBeTruthy()
 })

@@ -82,8 +82,9 @@ function editorFixture() {
 
 test('editing restores the late-loaded agent and saves the edited time at minute precision', async () => {
   const { container, render, update, mutation, close } = editorFixture()
+  const repeat = { kind: 'hours', every: 2 } as const
   try {
-    await render(task)
+    await render({ ...task, schedule: { ...task.schedule, repeat } })
     const form = container.querySelector('form')!
     const picker = form.querySelector<HTMLButtonElement>('[role="combobox"]')!
     const save = form.querySelector<HTMLButtonElement>('button[type="submit"]')!
@@ -103,6 +104,9 @@ test('editing restores the late-loaded agent and saves the edited time at minute
     expect(
       form.querySelector('[aria-label="Reasoning effort"]')?.textContent,
     ).toContain('High')
+    const interval = form.querySelector<HTMLInputElement>('input[type=number]')!
+    expect(interval.closest('label')?.textContent).toContain('Interval (hours)')
+    expect(interval.value).toBe('2')
 
     const minute = form.querySelector<HTMLElement>('[data-type="minute"]')!
     await act(async () => {
@@ -122,7 +126,12 @@ test('editing restores the late-loaded agent and saves the edited time at minute
         agentId: 'mailbox',
         modelId: 'model',
         reasoningEffort: 'high',
-        schedule: { startDate: '2026-01-01', time: '09:01', zone: 'UTC' },
+        schedule: {
+          startDate: '2026-01-01',
+          time: '09:01',
+          zone: 'UTC',
+          repeat,
+        },
       },
     })
   } finally {

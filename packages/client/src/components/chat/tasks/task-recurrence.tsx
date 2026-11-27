@@ -7,6 +7,8 @@ import {
   occurrence,
   scheduleError,
   scheduleLabel,
+  taskIntervalLimit,
+  taskIntervalUnits,
   weekdayNames,
 } from '@cv/core/task-schedule'
 import moment from 'moment-timezone'
@@ -20,6 +22,8 @@ import {
 
 const repeatItems = [
   { value: 'once', label: 'Once' },
+  { value: 'minutes', label: 'Minute interval' },
+  { value: 'hours', label: 'Hour interval' },
   { value: 'daily', label: 'Daily' },
   { value: 'weekdays', label: 'Weekdays' },
   { value: 'weekly', label: 'Selected weekdays' },
@@ -66,10 +70,13 @@ export function RecurrenceEditor({ rule, onChange }: Props) {
   const change = (patch: Partial<TaskSchedule>) =>
     onChange({ ...rule, ...patch })
   const repeat = rule.repeat
+  const elapsedInterval = repeat.kind === 'minutes' || repeat.kind === 'hours'
   function select(kind: RepeatPreset) {
     setPreset(kind)
     if (kind === 'once') change({ repeat: { kind } })
-    if (kind === 'daily') change({ repeat: { kind, every: 1 } })
+    if (kind === 'daily' || kind === 'minutes' || kind === 'hours') {
+      change({ repeat: { kind, every: 1 } })
+    }
     if (kind === 'monthly')
       change({ repeat: { kind, every: 1, pattern: 'date' } })
     if (kind === 'weekly' || kind === 'weekdays')
@@ -116,7 +123,7 @@ export function RecurrenceEditor({ rule, onChange }: Props) {
           onChange={(startDate) => change({ startDate })}
         />
         <TimeField
-          label="Time"
+          label={elapsedInterval ? 'Start time' : 'Time'}
           name="time"
           required
           value={rule.time}
@@ -128,17 +135,11 @@ export function RecurrenceEditor({ rule, onChange }: Props) {
         />
         {repeat.kind !== 'once' && preset !== 'weekdays' && (
           <label className={fieldStyle}>
-            Interval (
-            {repeat.kind === 'daily'
-              ? 'days'
-              : repeat.kind === 'weekly'
-                ? 'weeks'
-                : 'months'}
-            )
+            Interval ({taskIntervalUnits[repeat.kind]}s)
             <Input
               type="number"
               min={1}
-              max={365}
+              max={taskIntervalLimit(repeat.kind)}
               required
               value={repeat.every || ''}
               onChange={(e) =>

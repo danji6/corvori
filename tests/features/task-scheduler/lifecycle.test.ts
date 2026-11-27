@@ -12,7 +12,7 @@ import {
 } from '@cv/convex/model/tool/executionApprovals'
 import { approvalsForFilesystemCall } from '@cv/convex/model/tool/filesystemApprovals'
 import { modelReference } from '@cv/core/model-reference'
-import { expect, test } from 'bun:test'
+import { expect, spyOn, test } from 'bun:test'
 import { lifecycleDatabase } from '~/tests/helpers/lifecycle-db'
 
 const day = 86400000
@@ -95,6 +95,54 @@ test('a wake-up claims the latest occurrence once, creates a hidden session, and
   expect(scheduled.at(-1)?.at).toBe(today + day)
   await discardSession(ctx, { sessionId: run.sessionId as Id<'sessions'> })
   expect(rows('notifications')).toHaveLength(1)
+})
+
+test('a saved interval skips missed slots and waits for the active run to settle', async () => {
+  const minute = 60_000
+  const { ctx, rows, scheduled } = fixture()
+  const clock = spyOn(Date, 'now').mockReturnValue(today)
+  try {
+    await save(ctx, {
+      taskId,
+      definition: {
+        agentId: 'agent' as Id<'agents'>,
+        modelId,
+        reasoningEffort: 'high',
+        prompt: task.prompt,
+        schedule: {
+          startDate: new Date(today).toISOString().slice(0, 10),
+          time: '00:00',
+          zone: 'UTC',
+          repeat: { kind: 'minutes', every: 5 },
+        },
+      },
+    })
+    const first = scheduled.at(-1)!
+    expect(first.at).toBe(today + 5 * minute)
+    clock.mockReturnValue(today + 17 * minute)
+    await dispatch(ctx, first.args as Parameters<typeof dispatch>[1])
+    const [run] = rows('scheduledTaskRuns')
+    expect(run).toMatchObject({
+      scheduledFor: today + 15 * minute,
+      skippedFrom: first.at,
+    })
+    expect(scheduled.at(-1)).toBe(first)
+
+    clock.mockReturnValue(today + 26 * minute)
+    await settleRun(
+      ctx,
+      run._id as Id<'scheduledTaskRuns'>,
+      'succeeded',
+      'Done',
+    )
+    const next = scheduled.at(-1)!
+    expect(next.at).toBe(today + 20 * minute)
+    await dispatch(ctx, next.args as Parameters<typeof dispatch>[1])
+    expect(rows('scheduledTaskRuns')).toHaveLength(2)
+    expect(rows('scheduledTaskRuns')[1].scheduledFor).toBe(today + 25 * minute)
+  } finally {
+    clock.mockRestore()
+  }
 })
 
 test('a one-time task finishes only after its agent turn ends', async () => {

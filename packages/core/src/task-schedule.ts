@@ -6,6 +6,8 @@ export type TaskSchedule = {
   zone: string
   repeat:
     | { kind: 'once' }
+    | { kind: 'minutes'; every: number }
+    | { kind: 'hours'; every: number }
     | { kind: 'daily'; every: number }
     | { kind: 'weekly'; every: number; weekdays: number[] }
     | { kind: 'monthly'; every: number; pattern: 'date' | 'weekday' }
@@ -13,9 +15,26 @@ export type TaskSchedule = {
 
 const dateFormat = 'YYYY-MM-DD'
 const localFormat = 'YYYY-MM-DD HH:mm'
+const minuteMs = 60_000
+type RepeatKind = Exclude<TaskSchedule['repeat']['kind'], 'once'>
+
+export const taskIntervalUnits = {
+  minutes: 'minute',
+  hours: 'hour',
+  daily: 'day',
+  weekly: 'week',
+  monthly: 'month',
+} satisfies Record<RepeatKind, string>
+
+export function taskIntervalLimit(kind: RepeatKind) {
+  if (kind === 'minutes') return 365 * 24 * 60
+  if (kind === 'hours') return 365 * 24
+  return 365
+}
+
 export const weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-/** Checks a calendar rule before it is saved or previewed. */
+/** Checks a schedule before it is saved or previewed. */
 export function scheduleError(rule: TaskSchedule): string | undefined {
   if (!moment.utc(rule.startDate, dateFormat, true).isValid())
     return 'Choose a valid start date.'
@@ -24,12 +43,13 @@ export function scheduleError(rule: TaskSchedule): string | undefined {
   if (!moment.tz.zone(rule.zone)) return 'Choose a valid time zone.'
   const repeat = rule.repeat
   if (repeat.kind === 'once') return
+  const limit = taskIntervalLimit(repeat.kind)
   if (
     !Number.isInteger(repeat.every) ||
     repeat.every < 1 ||
-    repeat.every > 365
+    repeat.every > limit
   ) {
-    return 'Choose an interval between 1 and 365.'
+    return `Choose a whole-number interval between 1 and ${limit}.`
   }
   if (repeat.kind === 'weekly') {
     const days = new Set(repeat.weekdays)
@@ -81,12 +101,15 @@ function monthlyDay(
   return month.add(ordinal * 7 + offset, 'days')
 }
 
-type Repeat = Exclude<TaskSchedule['repeat'], { kind: 'once' }>
+type CalendarRepeat = Exclude<
+  TaskSchedule['repeat'],
+  { kind: 'once' | 'minutes' | 'hours' }
+>
 
 function periodDays(
   base: moment.Moment,
   anchor: moment.Moment,
-  rule: Repeat,
+  rule: CalendarRepeat,
   index: number,
 ) {
   const offset = index * rule.every
@@ -105,26 +128,33 @@ function periodDays(
     .map((day) => monday.clone().add(day - 1, 'days'))
 }
 
-/** Finds the adjacent occurrence directly from the reference calendar period, even after a long outage. */
-export function occurrence(
-  rule: TaskSchedule,
+function calendarUnit(kind: CalendarRepeat['kind']) {
+  if (kind === 'daily') return 'day'
+  if (kind === 'weekly') return 'isoWeek'
+  return 'month'
+}
+
+type Direction = 'next' | 'latest'
+
+function intervalOccurrence(
+  start: number,
+  duration: number,
   reference: number,
-  direction: 'next' | 'latest',
-): number | undefined {
-  const anchor = moment.utc(rule.startDate, dateFormat, true)
-  const matches = (at: number) =>
-    direction === 'next' ? at > reference : at <= reference
-  const repeat = rule.repeat
-  if (repeat.kind === 'once') {
-    const at = atLocalTime(anchor, rule)
-    return matches(at) ? at : undefined
-  }
-  const unit =
-    repeat.kind === 'daily'
-      ? 'day'
-      : repeat.kind === 'weekly'
-        ? 'isoWeek'
-        : 'month'
+  direction: Direction,
+) {
+  const index = Math.floor((reference - start) / duration)
+  if (direction === 'next') return start + Math.max(0, index + 1) * duration
+  if (index >= 0) return start + index * duration
+}
+
+function calendarOccurrence(
+  rule: TaskSchedule,
+  repeat: CalendarRepeat,
+  anchor: moment.Moment,
+  reference: number,
+  direction: Direction,
+) {
+  const unit = calendarUnit(repeat.kind)
   const base = anchor.clone().startOf(unit)
   const local = moment.tz(reference, rule.zone)
   const today = moment.utc([local.year(), local.month(), local.date()])
@@ -139,25 +169,48 @@ export function occurrence(
     for (const day of days) {
       if (day.isBefore(anchor)) continue
       const at = atLocalTime(day, rule)
-      if (matches(at)) return at
+      const matches = direction === 'next' ? at > reference : at <= reference
+      if (matches) return at
     }
     index += step
+  }
+}
+
+/** Finds the adjacent occurrence without replaying earlier periods. */
+export function occurrence(
+  rule: TaskSchedule,
+  reference: number,
+  direction: Direction,
+): number | undefined {
+  const anchor = moment.utc(rule.startDate, dateFormat, true)
+  const repeat = rule.repeat
+  switch (repeat.kind) {
+    case 'once': {
+      const at = atLocalTime(anchor, rule)
+      const matches = direction === 'next' ? at > reference : at <= reference
+      return matches ? at : undefined
+    }
+    case 'minutes':
+    case 'hours': {
+      const start = atLocalTime(anchor, rule)
+      const duration =
+        repeat.every * minuteMs * (repeat.kind === 'hours' ? 60 : 1)
+      return intervalOccurrence(start, duration, reference, direction)
+    }
+    default:
+      return calendarOccurrence(rule, repeat, anchor, reference, direction)
   }
 }
 
 export function scheduleLabel(rule: TaskSchedule) {
   const { repeat, time } = rule
   if (repeat.kind === 'once') return rule.startDate + ' at ' + time
-  const unit =
-    repeat.kind === 'daily'
-      ? 'day'
-      : repeat.kind === 'weekly'
-        ? 'week'
-        : 'month'
+  const unit = taskIntervalUnits[repeat.kind]
   const interval =
     repeat.every === 1
       ? 'Every ' + unit
       : 'Every ' + repeat.every + ' ' + unit + 's'
+  if (repeat.kind === 'minutes' || repeat.kind === 'hours') return interval
   let days = ''
   if (repeat.kind === 'weekly')
     days =
