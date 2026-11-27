@@ -74,6 +74,7 @@ export const shellOutputRangeValidator = v.object({
 
 /** Mirrors `ShellToolOutput` from `@cv/core/types/tools`. */
 export const shellToolOutputValidator = v.object({
+  retryCwd: v.optional(v.string()),
   jobId: v.string(),
   jobNumber: v.optional(v.number()),
   waitUntil: v.optional(v.number()),

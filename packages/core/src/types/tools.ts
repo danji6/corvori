@@ -23,6 +23,8 @@ export type ShellJobStatus =
   'running' | 'done' | 'killed' | 'timeout' | 'background' | 'lost'
 
 export type ShellToolOutput = {
+  /** Original directory for an agent-requested, one-time sandbox retry. */
+  retryCwd?: string
   jobId: string
   /** Public handle within the shared chat. */
   jobNumber?: number

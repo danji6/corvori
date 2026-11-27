@@ -88,10 +88,10 @@ export async function createShellTool(context: WorkspaceToolContext) {
     inputSchema: z.strictObject(
       preview ? { ...shellFields, retry: shellRetryField } : shellFields,
     ),
-    needsApproval: async (input, { toolCallId }) => {
+    needsApproval: async (input, execution) => {
       if (!input.retry)
         return shellNeedsApproval(input.command, context, input.cwd)
-      const { job, options } = await launch(input, toolCallId)
+      const { job, options } = await launch(input, execution.toolCallId)
       if (!input.cwd || !input.description?.trim())
         throw new ToolError(
           'A sandbox retry requires the original working directory and a reason for the requested access',

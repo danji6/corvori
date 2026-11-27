@@ -5,6 +5,7 @@ import {
   SHELL_TOOL_PART_TYPE,
   WRITE_FILE_TOOL_PART_TYPE,
 } from '@cv/core/const'
+import { shellRetry } from '@cv/core/shell/retry'
 import type { FolderWorkspace } from '@cv/core/types/workspace'
 import {
   type PathCheckResult,
@@ -141,6 +142,7 @@ export async function withApprovalPaths(
   part: UIMessage['parts'][number],
 ) {
   const input = (part as { input?: { command?: string; cwd?: string } }).input
+  if (shellRetry(input)) return part
   const command = input?.command
   if (typeof command !== 'string') return part
 

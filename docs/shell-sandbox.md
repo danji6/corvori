@@ -12,7 +12,7 @@ The native suite snapshots the workspace’s existing Git exclusions at each com
 
 ## One-time retry preview
 
-On a Linux installation with the packaged helpers, or on macOS, set `CORVORI_SHELL_SANDBOX_PREVIEW=1` in the sidecar launch environment and restart it. Start a new chat for the updated shell tool definition. The preview applies to the agent’s normal-mode shell tool after its existing launch approval checks. Windows currently runs the packaged diagnostic and keeps the existing launch approvals.
+On a Linux installation with the packaged helpers, or on macOS, set `CORVORI_SHELL_SANDBOX_PREVIEW=1` in the sidecar launch environment and restart it. Start a new chat for the updated shell tool definition. The preview applies to the agent’s normal-mode shell tool after its existing launch approval checks. Windows currently runs the packaged diagnostic and keeps the existing launch approvals. The pinned MXC backend rejects a request to disable filesystem restrictions while keeping the network fence. A Windows retry needs a backend that can honor the access shown in the approval.
 
 A failed command returns to the agent. If it needs more access, it can request a retry by referencing the job number, repeating the original command and absolute working directory, selecting filesystem, network, or both, and explaining its reason. The approval shows what the agent requested. Approving starts the command over once. The original output stays in the chat. A sidecar restart, a change to the workspace revision, or a retry already spent invalidates the request. Successful commands finish normally, including those that handled a denied operation.
 

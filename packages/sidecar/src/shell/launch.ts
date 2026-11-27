@@ -27,7 +27,22 @@ type Terminal = 'pty' | { cols: number; rows: number }
 
 /** Prepare every agent-controlled shell or direct argv launch before selecting its transport. */
 export function prepareShellLaunch(input: LaunchInput, terminal?: Terminal) {
-  if (input.prepared) return { ...input.prepared, cwd: input.cwd }
+  if (input.prepared) {
+    const { file, args, env } = input.prepared
+    if (!terminal || terminal === 'pty')
+      return { file, args, env, cwd: input.cwd }
+    // util-linux script takes a shell string. Quote each word of the already prepared native invocation.
+    const words = [file, ...args].map(
+      (word) => "'" + word.replaceAll("'", "'\\''") + "'",
+    )
+    const sized = `stty cols ${terminal.cols} rows ${terminal.rows} 2>/dev/null; exec ${words.join(' ')}`
+    return {
+      file: '/usr/bin/script',
+      args: ['-qefc', sized, '/dev/null'],
+      env: { ...env, SHELL: '/bin/sh' },
+      cwd: input.cwd,
+    }
+  }
   const { command, cwd, environment, shell } = input
   const extra: Record<string, string> = terminal
     ? { TERM: 'xterm-256color' }

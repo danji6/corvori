@@ -101,7 +101,9 @@ function probeNodePty(): Promise<NodePtyModule | null> {
   return nodePtyProbe
 }
 
-function hasScript(): boolean {
+function hasScript(input: SpawnShellJobInput): boolean {
+  if (input.prepared)
+    return process.platform === 'linux' && isExecutable('/usr/bin/script')
   if (process.platform !== 'linux') return false
   return (process.env.PATH ?? '')
     .split(delimiter)
@@ -137,13 +139,11 @@ async function spawnForMode(
 ): Promise<ShellJobProcess> {
   if (mode === 'pipe') return spawnPipe(input)
   if (mode === 'script')
-    return input.prepared ? spawnPipe(input) : spawnScriptPty(input)
+    return hasScript(input) ? spawnScriptPty(input) : spawnPipe(input)
 
   const nodePty = await probeNodePty()
   if (nodePty) return spawnNodePty(nodePty, input)
-  return !input.prepared && hasScript()
-    ? spawnScriptPty(input)
-    : spawnPipe(input)
+  return hasScript(input) ? spawnScriptPty(input) : spawnPipe(input)
 }
 
 function spawnNodePty(

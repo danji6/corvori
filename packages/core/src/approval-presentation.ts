@@ -79,8 +79,7 @@ export function approvalSummary(toolName: string, input: unknown): string {
   if (plan) return plan.heading
   const retry = toolName === SHELL_TOOL_NAME ? shellRetry(input) : undefined
   if (retry) {
-    const { cwd, command } = input as { cwd: string; command: string }
-    return `${retryLabels[retry.access]} · Job ${retry.jobId} in ${cwd} · ${command} · Agent’s reason: ${getDescription(input) ?? ''}`
+    return `${retryLabels[retry.access]} · Job ${retry.jobId} · Agent’s reason: ${getDescription(input) ?? ''}`
   }
   if (toolName === SHELL_TOOL_NAME)
     return getDescription(input) ?? 'Run a shell command'

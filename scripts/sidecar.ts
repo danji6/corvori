@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { chmodSync, existsSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 import {
@@ -15,8 +15,31 @@ export function sidecarBuildEntry(root: string = dataDir): string {
   return join(root, 'build/sidecar/main.js')
 }
 
+/** Restore the executable bit missing from node-pty's packaged macOS helper. */
+function prepareMacPtyHelper() {
+  if (process.platform !== 'darwin') return
+  const helper = join(
+    projectRoot,
+    'node_modules/node-pty/prebuilds',
+    'darwin-' + process.arch,
+    'spawn-helper',
+  )
+  if (!existsSync(helper)) return
+  const mode = statSync(helper).mode
+  if (mode & 0o100) return
+  try {
+    chmodSync(helper, mode | 0o100)
+  } catch (error) {
+    console.warn(
+      'Could not enable the macOS PTY helper. Shell commands may use pipes.',
+      error,
+    )
+  }
+}
+
 /** Bundles the sidecar to plain JS so it can run under Node. */
 export async function buildSidecar(): Promise<string> {
+  prepareMacPtyHelper()
   const result = await Bun.build({
     entrypoints: [
       SIDECAR_ENTRY,

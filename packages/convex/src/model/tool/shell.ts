@@ -22,7 +22,7 @@ export type { ShellJobResume } from './shellContracts'
 export { shellToModelOutput } from './shellOutput'
 export { shellHistoryTools } from './shellOutput'
 
-type StartResponse = { jobId: string; mode: string; sandboxCwd?: string }
+type StartResponse = { jobId: string; mode: string }
 
 export function shellLaunchRequest(
   context: ShellJobContext,
@@ -41,7 +41,7 @@ export function shellLaunchRequest(
     ...(options.bindSessionDir && { bindSessionDir: true }),
     cwd: input.cwd,
     allowedPaths: context.allowedPaths,
-    background: input.wait_seconds === 0,
+    background: shellWaitSeconds(input.wait_seconds) === 0,
     ...(options.sandbox && { sandbox: true }),
     ...(options.retry && { retry: options.retry }),
     shell: context.shell,
@@ -65,7 +65,7 @@ export async function* executeShellJob(
       : shellWaitSeconds(input.wait_seconds)
   const background = wait === 0
 
-  const { jobId, sandboxCwd } = await post<StartResponse>(
+  const { jobId } = await post<StartResponse>(
     '/shell/start',
     shellLaunchRequest(context, input, options),
   )
@@ -91,24 +91,7 @@ export async function* executeShellJob(
       : watchJob(context, jobId, { ...options, post, detachOnBackground: true })
 
   for await (const output of outputs) {
-    const result = jobNumber == null ? output : { ...output, jobNumber }
-    if (
-      sandboxCwd &&
-      !options.retry &&
-      output.status === 'done' &&
-      output.exitCode
-    ) {
-      yield {
-        ...result,
-        text:
-          output.text +
-          '\nSandbox job ' +
-          (jobNumber ?? jobId) +
-          ' ran in ' +
-          sandboxCwd +
-          '. If additional access is needed, request a one-time retry with this cwd and explain why.',
-      }
-    } else yield result
+    yield jobNumber == null ? output : { ...output, jobNumber }
   }
 }
 

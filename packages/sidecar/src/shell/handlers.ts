@@ -185,9 +185,7 @@ async function shellLaunch(c: Context, inspect: boolean) {
               killShellJob(started.jobId, input.sessionId)
               throw error
             }
-            return input.sandbox
-              ? { ...started, sandboxCwd: launch.cwd }
-              : started
+            return started
           })
         }),
     )

@@ -35,6 +35,7 @@ export type StartShellJobInput = {
 }
 
 export type ShellJobSummary = {
+  retryOf?: string
   agentId?: string
   homeId?: string
   jobId: string
@@ -53,6 +54,7 @@ export type ShellJobSummary = {
 }
 
 export type PollResult = {
+  retryCwd?: string
   chunk: string
   nextOffset: number
   bufferStart: number

@@ -14,7 +14,11 @@ export async function snapshotGitPaths(directory: string, emptyRepo?: string) {
   let gitArgs: string[] = []
   if (emptyRepo) {
     try {
-      await execute('/usr/bin/git', ['rev-parse', '--git-dir'], { cwd: root })
+      await execute('/usr/bin/git', ['rev-parse', '--git-dir'], {
+        cwd: root,
+        env: { ...process.env, LC_ALL: 'C' },
+        timeout: 10000,
+      })
     } catch (error) {
       if (
         !(error as { stderr?: string }).stderr?.includes('not a git repository')

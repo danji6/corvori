@@ -25,8 +25,9 @@ async function readNames(directory: string) {
   }
 }
 
-function decodeName(entry: Buffer): string {
-  const name = entry.toString()
+function decodeName(entry: Uint8Array): string {
+  // Bun can return plain Uint8Array entries for the buffer encoding.
+  const name = Buffer.from(entry).toString('utf8')
   if (!Buffer.from(name).equals(entry))
     throw new Error('Cannot represent a filename in this directory')
   return name

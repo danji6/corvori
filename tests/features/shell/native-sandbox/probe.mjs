@@ -1,4 +1,7 @@
-import { SandboxManager } from '@anthropic-ai/sandbox-runtime'
+import {
+  SandboxManager,
+  WindowsSandboxError,
+} from '@anthropic-ai/sandbox-runtime'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import console from 'node:console'
@@ -139,6 +142,26 @@ try {
   assert.equal(await readFile('output.txt', 'utf8'), 'workspace output')
   console.log('Ordinary workspace I/O succeeded')
   await checkChildren()
+  if (backend === 'mxc') {
+    await SandboxManager.reset()
+    const policy = await offlinePolicy(workspace)
+    await assert.rejects(
+      initializeBackend(
+        {
+          ...policy,
+          filesystem: { ...policy.filesystem, disabled: true },
+        },
+        true,
+      ),
+      (error) =>
+        error instanceof WindowsSandboxError &&
+        error.code === 'backend_unsupported' &&
+        error.message.includes('filesystem.disabled'),
+    )
+    console.log(
+      'MXC declined an outside-filesystem retry with network still restricted before launch',
+    )
+  }
 } finally {
   try {
     await SandboxManager.reset()

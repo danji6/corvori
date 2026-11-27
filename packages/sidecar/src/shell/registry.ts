@@ -11,7 +11,7 @@ import { type ShellJob } from './job-state'
 import { OutputRing } from './output-ring'
 import { type PtyMode, spawnJob } from './pty'
 import { preparePreview } from './sandbox/preview'
-import { ShellRetryAuthorization, attemptIdentity } from './sandbox/retry'
+import { ShellRetryAuthorization } from './sandbox/retry'
 import { ShellJobSubscriber } from './subscriber'
 import { withBoundSessionDir } from './system-shell'
 
@@ -70,9 +70,7 @@ export async function startShellJob(
     )
   }
 
-  const original = input.retry && checkShellRetry(input)
-  const access =
-    original && input.retry && original.consume(input, input.retry.access)
+  const access = input.retry && checkShellRetry(input).consume(input)
   const preview = input.sandbox
     ? await preparePreview(input, [...new Set(roots)], access)
     : undefined
@@ -94,9 +92,7 @@ export async function startShellJob(
   const job: ShellJob = {
     jobId: nextJobId(),
     retryAuthorization:
-      preview && !input.retry
-        ? new ShellRetryAuthorization(attemptIdentity(input))
-        : undefined,
+      preview && !input.retry ? new ShellRetryAuthorization(input) : undefined,
     retryOf: input.retry?.jobId,
     agentId: input.agentId,
     homeId: input.homeId,
@@ -173,7 +169,6 @@ export function checkShellRetry(input: StartShellJobInput) {
     )
   if (!job.retryAuthorization)
     throw new Error('This job has no sandbox retry available')
-  job.retryAuthorization.check(attemptIdentity(input))
   return job.retryAuthorization
 }
 
@@ -199,6 +194,11 @@ export function pollShellJob(
     background: job.background,
     waiting: job.waiting,
     bufferEnd,
+    ...(job.status === 'done' &&
+    job.exitCode &&
+    job.retryAuthorization?.available
+      ? { retryCwd: job.retryAuthorization.cwd }
+      : {}),
     ...(tail && { term: tail.text, termOffset: tail.start }),
   }
 }

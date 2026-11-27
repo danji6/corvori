@@ -48,7 +48,10 @@ export function plainOutputPage(
 export function formatOutputPage(output: ShellToolOutput): string {
   const range = output.range
   const jobId = String(output.jobNumber ?? output.jobId)
-  if (!range) return output.text
+  const retry =
+    output.retryCwd &&
+    `Job ${jobId} ran in ${output.retryCwd}. If additional access is needed, request a one-time retry with this cwd and explain why.`
+  if (!range) return retry ? output.text + '\n' + retry : output.text
 
   const status = output.status === 'background' ? 'running' : output.status
   const exit = output.exitCode === null ? '' : `; exit code ${output.exitCode}`
@@ -66,6 +69,7 @@ export function formatOutputPage(output: ShellToolOutput): string {
     )
   }
   lines.push(output.text || '(No new output.)')
+  if (retry) lines.push(retry)
 
   if (range.hasMore) {
     const offset = range.replay ? `, offset: ${range.nextOffset}` : ''

@@ -260,6 +260,7 @@ function finishPage(
     jobId: input.jobId,
     status,
     exitCode: current.exitCode,
+    ...(current.retryCwd && { retryCwd: current.retryCwd }),
     text,
     term: current.term,
     termOffset: current.termOffset,

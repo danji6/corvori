@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 
 import { isOutside } from '../../mcp/workspace/access'
@@ -22,8 +22,11 @@ const execute = promisify(execFile)
 async function writableRoots(roots: string[], runtime: string) {
   const installation = await realpath(process.cwd())
   const trusted = [installation, runtime, await realpath(tmpdir())]
-  const helpers = ['node_modules', 'packages/sidecar', 'bin'].map((name) =>
+  const helpers = ['node_modules', 'packages', 'scripts', 'bin'].map((name) =>
     join(installation, name),
+  )
+  helpers.push(
+    resolve(installation, process.env.CHAT_DATA_DIR || '.data', 'build'),
   )
   if (process.platform === 'linux') helpers.push(...Object.values(linuxPaths()))
   for (const root of roots) {
@@ -52,6 +55,17 @@ async function filesystemPolicy(
     roots.map((root) => snapshotGitPaths(root, emptyRepo)),
   )
   const hidden = snapshots.flatMap((snapshot) => snapshot.hidden)
+  // Pin rules in ancestors of protected entries, even where no nested rule exists at launch.
+  const rules = new Set<string>()
+  for (const entry of hidden) {
+    for (
+      let parent = dirname(entry);
+      roots.some((root) => !isOutside(root, parent));
+      parent = dirname(parent)
+    ) {
+      rules.add(join(parent, '.gitignore'))
+    }
+  }
   return {
     readConfig: {
       denyOnly: [],
@@ -67,6 +81,7 @@ async function filesystemPolicy(
           : [],
       literalDenyWithinAllow: [
         ...hidden,
+        ...rules,
         ...snapshots.flatMap((snapshot) => snapshot.readOnly),
       ],
     },
