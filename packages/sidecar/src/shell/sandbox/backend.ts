@@ -12,6 +12,17 @@ function literal(path: string) {
   return { path, literal: true as const }
 }
 
+/** Check the Windows stdio requirement of the pinned MXC SDK before starting a process. */
+function requireMxcStdio() {
+  const [major, minor] = process.versions.node.split('.').map(Number)
+  if (major === 24 && minor >= 21) return
+  if (major > 26 || (major === 26 && minor >= 8)) return
+  throw new WindowsSandboxError(
+    'backend_unsupported',
+    'MXC requires Node 24.21+ on the 24.x line or Node 26.8+. Use the embedded Node runtime.',
+  )
+}
+
 /** Prepare the offline native proof policy from the workspace at launch. */
 export async function workspaceProbePolicy(
   root: string,
@@ -45,6 +56,7 @@ export async function initializeBackend(
     return process.platform === 'darwin' ? 'seatbelt' : 'bubblewrap'
   }
   try {
+    requireMxcStdio()
     await SandboxManager.initialize(
       { ...policy, windows: { backend: 'mxc' } },
       undefined,
