@@ -17,7 +17,11 @@ import { performance } from 'node:perf_hooks'
 import process from 'node:process'
 import { promisify } from 'node:util'
 
-import { offlinePolicy } from './policy.mjs'
+import {
+  initializeBackend,
+  offlinePolicy,
+  prepareProbeCommand,
+} from './policy.mjs'
 
 const exec = promisify(execFile)
 const fixture = await realpath(
@@ -27,7 +31,7 @@ const fixture = await realpath(
 )
 const originalCwd = process.cwd()
 const shell = process.platform === 'win32' ? 'cmd.exe' : '/bin/bash'
-const policy = offlinePolicy(fixture)
+let policy
 const scenarios = [
   ['builtin', 'echo ok'],
   ['node', 'node workload.mjs write output.txt'],
@@ -36,40 +40,44 @@ const scenarios = [
 const samples = 20
 
 async function prepare(mode, command) {
-  if (mode === 'host')
-    return prepareShellLaunch({ command, cwd: fixture, shell })
-  const {
-    argv: [file, ...args],
-    env,
-  } = await SandboxManager.wrapWithSandboxArgv(
-    shell === '/bin/bash' ? 'exec /bin/bash -lc "' + command + '"' : command,
+  if (mode === 'host') {
+    const { file, args, env } = prepareShellLaunch({
+      command,
+      cwd: fixture,
+      shell,
+    })
+    return () =>
+      exec(file, args, {
+        cwd: fixture,
+        env,
+        timeout: 30_000,
+        windowsHide: true,
+      })
+  }
+  const { filesystem } = await offlinePolicy(fixture)
+  const launch = await prepareProbeCommand({
+    command:
+      shell === '/bin/bash' ? 'exec /bin/bash -lc "' + command + '"' : command,
+    commandId: randomUUID(),
+    cwd: fixture,
     shell,
-    undefined,
-    undefined,
-    fixture,
-    { commandId: randomUUID() },
-  )
-  return { file, args, env }
+    filesystem,
+  })
+  return async () => {
+    const result = await launch()
+    if (result.status)
+      throw new Error('Benchmark command failed: ' + result.stderr)
+  }
 }
 
 async function measure(mode, command) {
   const start = performance.now()
-  if (mode === 'cold') await SandboxManager.initialize(policy, undefined, true)
+  if (mode === 'cold') await initializeBackend(policy)
   try {
     const wrapStart = performance.now()
-    const { file, args, env } = await prepare(mode, command)
+    const launch = await prepare(mode, command)
     const prepared = performance.now()
-    await exec(file, args, {
-      cwd: fixture,
-      env,
-      timeout: 30_000,
-      windowsHide: true,
-    }).catch((error) => {
-      // Wrapper argv can carry proxy authentication. Only report child diagnostics.
-      throw new Error(
-        'Benchmark command failed (' + error.code + '): ' + error.stderr,
-      )
-    })
+    await launch()
     return {
       total: performance.now() - start,
       preparation: prepared - wrapStart,
@@ -118,10 +126,10 @@ try {
       ),
     )
   }
+  policy = await offlinePolicy(fixture)
   console.log('workload\tmode\tmedian ms\tp95 ms\twrap median ms\twrap p95 ms')
   for (const mode of ['host', 'cold', 'warm']) {
-    if (mode === 'warm')
-      await SandboxManager.initialize(policy, undefined, true)
+    if (mode === 'warm') await initializeBackend(policy)
     for (const [name, command] of scenarios) await report(mode, name, command)
   }
 } finally {

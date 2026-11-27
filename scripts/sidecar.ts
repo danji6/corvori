@@ -20,12 +20,17 @@ export async function buildSidecar(): Promise<string> {
   const result = await Bun.build({
     entrypoints: [
       SIDECAR_ENTRY,
+      resolve(
+        projectRoot,
+        'packages/sidecar/src/shell/sandbox/sandbox-check.ts',
+      ),
       resolve(projectRoot, 'packages/sidecar/src/eval/worker.ts'),
       resolve(projectRoot, 'packages/sidecar/src/mcp/external/stdio-supervisor.ts'), // prettier-ignore
     ],
     naming: '[name].[ext]',
     external: [
       '@hono/node-server',
+      '@anthropic-ai/sandbox-runtime',
       '@modelcontextprotocol/sdk',
       '@mozilla/readability',
       'hono',
@@ -80,7 +85,19 @@ async function runSidecar() {
 }
 
 if (import.meta.main) {
-  if (process.argv.includes('--build-only')) {
+  if (process.argv.includes('--check-sandbox')) {
+    await buildSidecar()
+    const vendor = join(projectRoot, 'packages/sidecar/vendor')
+    const child = Bun.spawn(
+      [resolveNodeBinary(), join(OUT_DIR, 'sandbox-check.js'), vendor],
+      {
+        stdin: 'ignore',
+        stdout: 'inherit',
+        stderr: 'inherit',
+      },
+    )
+    process.exit(await child.exited)
+  } else if (process.argv.includes('--build-only')) {
     await buildSidecar()
   } else {
     await runSidecar()

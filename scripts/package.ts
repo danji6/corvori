@@ -36,7 +36,15 @@ async function includeSandboxHelpers(staging: string) {
     const destination = join(staging, 'packages/sidecar/vendor', name)
     await mkdir(destination, { recursive: true })
     await output(['tar', '-xzf', archive, '-C', destination], { cwd: staging })
-    await output(['sha256sum', '--check', 'SHA256SUMS'], { cwd: destination })
+    const manifest = await readFile(join(destination, 'SHA256SUMS'), 'utf8')
+    for (const file of ['bwrap', 'socat', 'rg']) {
+      const hash = new Bun.CryptoHasher('sha256')
+        .update(await readFile(join(destination, file)))
+        .digest('hex')
+      if (!manifest.split('\n').includes(`${hash}  ${file}`)) {
+        throw new Error(`Invalid sandbox helper checksum for ${name}/${file}`)
+      }
+    }
   }
 }
 

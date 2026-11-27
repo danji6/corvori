@@ -12,13 +12,16 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import process from 'node:process'
 import { clearTimeout, setTimeout } from 'node:timers'
-import { URL } from 'node:url'
 import { promisify } from 'node:util'
 
-import { offlinePolicy } from './policy.mjs'
+import {
+  initializeBackend,
+  offlinePolicy,
+  prepareProbeCommand,
+} from './policy.mjs'
 
 const execute = promisify(execFile)
 const workspace = await realpath(
@@ -32,33 +35,19 @@ const ids = samples.map(() => randomUUID())
 // Use fixed commands and fixture-only operands. Resolve node through a known PATH.
 async function run(command, commandId) {
   const shell = windows ? 'cmd.exe' : '/bin/bash'
-  const { argv, env } = await SandboxManager.wrapWithSandboxArgv(
+  const { filesystem } = await offlinePolicy(workspace)
+  const launch = await prepareProbeCommand({
     command,
+    commandId,
+    cwd: workspace,
     shell,
-    undefined,
-    undefined,
-    workspace,
-    { commandId },
-  )
-  const childEnv = {
-    ...env,
-    PATH: dirname(process.execPath) + (windows ? ';' : ':') + process.env.PATH,
-  }
-  try {
-    const { stdout } = await execute(argv[0], argv.slice(1), {
-      cwd: workspace,
-      env: childEnv,
-      timeout: 30_000,
-      windowsHide: true,
-    })
-    return { status: 0, output: stdout.trim() }
-  } catch (error) {
-    if (typeof error.code !== 'number') throw error
-    return {
-      status: error.code,
-      output: error.stdout.trim(),
-      diagnostic: error.stderr.trim(),
-    }
+    filesystem,
+  })
+  const result = await launch()
+  return {
+    status: result.status,
+    output: result.stdout.trim(),
+    diagnostic: result.stderr.trim(),
   }
 }
 
@@ -84,6 +73,7 @@ async function waitForEvidence() {
         () => reject(new Error('Missing job-attributed read denial')),
         5000,
       )
+      if (observed()) return resolve()
       unsubscribe = store.subscribe(() => {
         if (observed()) resolve()
       })
@@ -113,18 +103,14 @@ async function checkChildren() {
 
 try {
   process.chdir(workspace)
-  await copyFile(new URL('./workload.mjs', import.meta.url), 'workload.mjs')
-  const protectedFiles = samples.map((name) =>
-    join(workspace, name + '.private'),
-  )
-  for (const file of protectedFiles) await writeFile(file, 'fixture value')
-
-  // initialize checks native dependencies using the selected helper.
-  await SandboxManager.initialize(
-    offlinePolicy(workspace, protectedFiles),
-    undefined,
-    true,
-  )
+  await execute('git', ['init', '--quiet'], { cwd: workspace })
+  await copyFile(join(originalCwd, 'workload.mjs'), 'workload.mjs')
+  await writeFile('.gitignore', '*.private\n')
+  const backend = await initializeBackend(await offlinePolicy(workspace))
+  console.log('Selected native backend:', backend)
+  // Created AFTER manager initialization. The next invocation must snapshot both files.
+  for (const name of samples)
+    await writeFile(name + '.private', 'fixture value')
   const result = await run('node workload.mjs write output.txt', randomUUID())
   assert.equal(result.status, 0, JSON.stringify(result))
   assert.equal(await readFile('output.txt', 'utf8'), 'workspace output')
