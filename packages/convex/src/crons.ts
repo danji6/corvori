@@ -42,6 +42,13 @@ crons.interval(
   internal.streams.prune,
 )
 
+crons.interval(
+  'recover unfinished checkpoints for ended turns',
+  { minutes: 1 },
+  internal.chat._reconcileFinishedChanges,
+  {},
+)
+
 crons.daily(
   'prune orphaned tool outputs',
   { hourUTC: 3, minuteUTC: 30 },

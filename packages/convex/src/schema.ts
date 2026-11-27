@@ -189,6 +189,7 @@ export default defineSchema({
     .index('by_streamId', ['streamId'])
     .index('by_groupId', ['groupId'])
     .index('by_sessionId', ['sessionId'])
+    .index('by_finished_writersSettled', ['finished', 'writersSettled'])
     .index('by_messageId_version', ['messageId', 'version']),
 
   changeFiles: defineTable(V.changeFileSchema)

@@ -6,7 +6,7 @@ import type {
 } from '@cv/core/types/changes'
 
 import { internal } from '../../_generated/api'
-import type { Id } from '../../_generated/dataModel'
+import type { Doc, Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
 import { extractErrorMessage } from '../../errors'
 import { getSubject } from '../../functions'
@@ -75,29 +75,21 @@ export async function finishChanges(
     if (result.publication && !published) {
       await publish(ctx, row._id, result.publication, !row.root)
     }
-    if (result.released) {
-      await ctx.runMutation(internal.chat._releaseChangeGroup, {
-        groupId: row.groupId,
-      })
-    }
     if (!row.root || (!result.publication && result.released)) {
       await ctx.runMutation(internal.chat._settleChangesCapture, {
         changeSetId: row._id,
       })
     }
-    if (!result.released && row.root) {
-      await ctx.runMutation(internal.chat._scheduleSettleChanges, {
-        changeSetId: row._id,
+    if (result.released) {
+      await ctx.runMutation(internal.chat._releaseChangeGroup, {
+        groupId: row.groupId,
       })
+    } else if (row.root) {
+      await continueFinalization(ctx, row, 0)
     }
   } catch (error) {
     await recordIssue(ctx, row._id, error)
-    // Retain a durable retry: sidecar unavailability must not strand its writer reservation.
-    await ctx.scheduler.runAfter(
-      10_000,
-      internal.actions.workspaces._finishChanges,
-      args,
-    )
+    await continueFinalization(ctx, row)
   }
 }
 
@@ -132,11 +124,19 @@ export async function settleChanges(
   } catch (error) {
     await recordIssue(ctx, row._id, error)
   }
-  await ctx.scheduler.runAfter(
-    2000,
-    internal.actions.workspaces._settleChanges,
-    args,
-  )
+  await continueFinalization(ctx, row, args.sequence)
+}
+
+function continueFinalization(
+  ctx: ActionCtx,
+  row: Doc<'changeSets'>,
+  settlementSequence?: number,
+) {
+  return ctx.runMutation(internal.chat._continueChangesFinalization, {
+    changeSetId: row._id,
+    expectedJobId: row.finalizationJobId,
+    settlementSequence,
+  })
 }
 
 async function publish(

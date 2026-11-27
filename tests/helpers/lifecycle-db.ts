@@ -1,3 +1,5 @@
+import { type Value, compareValues } from 'convex/values'
+
 type Row = Record<string, unknown> & { _id: string }
 
 /** Models indexed lifecycle records, scheduling, and storage cleanup. */
@@ -16,6 +18,10 @@ export function lifecycleDatabase(seed: Record<string, Row[]> = {}) {
   const ctx = {
     db: {
       get,
+      system: {
+        get: async (table: string, id: string) =>
+          rows(table).find((row) => row._id === id) ?? null,
+      },
       patch: async (id: string, patch: Record<string, unknown>) => {
         const row = await get(id)
         if (!row) throw new Error('Missing fixture row')
@@ -43,8 +49,10 @@ export function lifecycleDatabase(seed: Record<string, Row[]> = {}) {
             predicates.push((row) => field(row, key) === value)
             return range
           },
-          lt: (key: string, value: number) => {
-            predicates.push((row) => Number(field(row, key)) < value)
+          lt: (key: string, value: Value) => {
+            predicates.push(
+              (row) => compareValues(field(row, key) as Value, value) < 0,
+            )
             return range
           },
           gt: (key: string, value: number) => {
@@ -69,6 +77,22 @@ export function lifecycleDatabase(seed: Record<string, Row[]> = {}) {
           unique: async () => selected()[0] ?? null,
           order: () => query,
           take: async (count: number) => selected().slice(0, count),
+          paginate: async ({
+            cursor,
+            numItems,
+          }: {
+            cursor: string | null
+            numItems: number
+          }) => {
+            const entries = selected()
+            const offset = Number(cursor ?? 0)
+            const end = offset + numItems
+            return {
+              page: entries.slice(offset, end),
+              isDone: end >= entries.length,
+              continueCursor: String(end),
+            }
+          },
           async *[Symbol.asyncIterator]() {
             yield* selected()
           },
@@ -83,7 +107,12 @@ export function lifecycleDatabase(seed: Record<string, Row[]> = {}) {
         args: Record<string, unknown>,
       ) => {
         scheduled.push({ args, at: Date.now() + delay })
-        return `job_${scheduled.length}`
+        const id = `job_${scheduled.length}`
+        rows('_scheduled_functions').push({
+          _id: id,
+          state: { kind: 'pending' },
+        })
+        return id
       },
       runAt: async (
         at: number,

@@ -95,6 +95,7 @@ import type * as model_avatars_http from "../model/avatars/http.js";
 import type * as model_avatars_joinStorage from "../model/avatars/joinStorage.js";
 import type * as model_caps from "../model/caps.js";
 import type * as model_changes_actions from "../model/changes/actions.js";
+import type * as model_changes_finalization from "../model/changes/finalization.js";
 import type * as model_changes_locations from "../model/changes/locations.js";
 import type * as model_changes_sets from "../model/changes/sets.js";
 import type * as model_chat_approvalMemory from "../model/chat/approvalMemory.js";
@@ -619,6 +620,7 @@ declare const fullApi: ApiFromModules<{
   "model/avatars/joinStorage": typeof model_avatars_joinStorage;
   "model/caps": typeof model_caps;
   "model/changes/actions": typeof model_changes_actions;
+  "model/changes/finalization": typeof model_changes_finalization;
   "model/changes/locations": typeof model_changes_locations;
   "model/changes/sets": typeof model_changes_sets;
   "model/chat/approvalMemory": typeof model_chat_approvalMemory;
