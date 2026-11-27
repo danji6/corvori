@@ -18,6 +18,8 @@ import { clearTimeout, setTimeout } from 'node:timers'
 import { URL } from 'node:url'
 import { promisify } from 'node:util'
 
+import { offlinePolicy } from './policy.mjs'
+
 const execute = promisify(execFile)
 const workspace = await realpath(
   await mkdtemp(join(tmpdir(), 'corvori-sandbox-')),
@@ -117,22 +119,9 @@ try {
   )
   for (const file of protectedFiles) await writeFile(file, 'fixture value')
 
-  const dependencies = await SandboxManager.checkDependenciesAsync()
-  assert.deepEqual(
-    dependencies.errors,
-    [],
-    'Missing native sandbox prerequisites: ' + dependencies.errors.join(', '),
-  )
+  // initialize checks native dependencies using the selected helper.
   await SandboxManager.initialize(
-    {
-      network: { allowedDomains: [], deniedDomains: [] },
-      filesystem: {
-        allowWrite: [workspace],
-        allowRead: [workspace],
-        denyRead: protectedFiles,
-        denyWrite: protectedFiles,
-      },
-    },
+    offlinePolicy(workspace, protectedFiles),
     undefined,
     true,
   )

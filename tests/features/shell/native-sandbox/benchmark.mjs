@@ -1,6 +1,5 @@
 import { SandboxManager } from '@anthropic-ai/sandbox-runtime'
 import { prepareShellLaunch } from '@cv/sidecar/shell/launch'
-import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import console from 'node:console'
 import { randomUUID } from 'node:crypto'
@@ -18,21 +17,15 @@ import { performance } from 'node:perf_hooks'
 import process from 'node:process'
 import { promisify } from 'node:util'
 
+import { offlinePolicy } from './policy.mjs'
+
 const exec = promisify(execFile)
 const fixture = await realpath(
   await mkdtemp(join(tmpdir(), 'corvori-shell-perf-')),
 )
 const originalCwd = process.cwd()
 const shell = process.platform === 'win32' ? 'cmd.exe' : '/bin/bash'
-const policy = {
-  network: { allowedDomains: [], deniedDomains: [] },
-  filesystem: {
-    allowWrite: [fixture],
-    allowRead: [fixture],
-    denyWrite: [],
-    denyRead: [],
-  },
-}
+const policy = offlinePolicy(fixture)
 const scenarios = [
   ['builtin', 'echo ok'],
   ['node', 'node workload.mjs write output.txt'],
@@ -47,7 +40,7 @@ async function prepare(mode, command) {
     argv: [file, ...args],
     env,
   } = await SandboxManager.wrapWithSandboxArgv(
-    command,
+    shell === '/bin/bash' ? 'exec /bin/bash -lc "' + command + '"' : command,
     shell,
     undefined,
     undefined,
@@ -119,8 +112,6 @@ try {
       ),
     )
   }
-  const { errors } = await SandboxManager.checkDependenciesAsync()
-  assert.deepEqual(errors, [])
   console.log('workload\tmode\tmedian ms\tp95 ms\twrap median ms\twrap p95 ms')
   for (const mode of ['host', 'cold', 'warm']) {
     if (mode === 'warm')
