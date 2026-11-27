@@ -20,6 +20,7 @@
     "\\/inline-editor\\.tsx$",
     "\\/plan-editor\\.tsx$",
     "\\/code-block-shiki\\.ts$",
+    "\\/ui\\/(date-picker|segmented-input|time-field)\\.tsx$",
     "\\/composer-editor\\.tsx$",
     "\\/prompt-content-editor\\.tsx$",
     "\\/title-prompt-editor\\.tsx$",

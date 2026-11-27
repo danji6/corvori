@@ -1,4 +1,7 @@
+import { normalizeReasoningEffort } from '@cv/core/model-reasoning'
+import { stableStringify } from '@cv/core/stable-json'
 import { scheduleError } from '@cv/core/task-schedule'
+import type { AgentModelOverride } from '@cv/core/types'
 import type { PaginationOptions } from 'convex/server'
 
 import type { Id } from '../../_generated/dataModel'
@@ -9,7 +12,11 @@ import type {
   ScheduledTaskDefinition,
   TaskListArgs,
 } from '../../validators/scheduledTasks'
+import { unavailableModelOverride } from '../agent/modelOverride'
+import { resolveModelReasoning } from '../provider/known'
+import { getSavedModel } from '../provider/providers'
 import { requireOwnedAgent } from '../session/sessionAccess'
+import { saveApprovalPolicy } from './approvalPolicy'
 import { armTask, futureOccurrence, reschedule } from './timing'
 
 type TaskKey = { taskId: Id<'scheduledTasks'> }
@@ -88,13 +95,59 @@ export async function refreshAgentName(
   }
 }
 
+type TaskModelSelection = Pick<
+  ScheduledTaskDefinition,
+  'modelId' | 'reasoningEffort'
+>
+
+export async function validateTaskModel(
+  ctx: MutationCtx,
+  ownerId: Id<'users'>,
+  selection: TaskModelSelection,
+  override?: AgentModelOverride,
+): Promise<TaskModelSelection> {
+  const modelId = override?.modelId ?? selection.modelId
+  if (!modelId) error('Choose a model in the task editor.')
+
+  const saved = await getSavedModel(ctx, ownerId, modelId)
+  if (!saved || saved.model.available === false) {
+    if (override) error(unavailableModelOverride(override.modelId), 409)
+    error('The task model is unavailable. Choose an available model.')
+  }
+
+  const capability = resolveModelReasoning(
+    saved.providerId,
+    saved.model.reasoning,
+  )
+  const taskEffortRequired =
+    capability.type !== 'none' && override?.reasoningEffort === undefined
+  const reasoningEffort = taskEffortRequired
+    ? selection.reasoningEffort
+    : undefined
+  if (
+    taskEffortRequired &&
+    normalizeReasoningEffort(reasoningEffort, capability) !== reasoningEffort
+  ) {
+    error('Choose a supported reasoning effort in the task editor.')
+  }
+  return { modelId: override ? undefined : saved.id, reasoningEffort }
+}
+
 export async function save(
   ctx: AuthMutationCtx,
   {
     taskId,
     definition,
-  }: { taskId?: Id<'scheduledTasks'>; definition: ScheduledTaskDefinition },
+    reviewedWorkspaceKey,
+  }: {
+    taskId?: Id<'scheduledTasks'>
+    definition: ScheduledTaskDefinition
+    reviewedWorkspaceKey?: string
+  },
 ) {
+  const task = taskId ? await get(ctx, { taskId }) : null
+  if (taskId && !task) error('Task not found', 404)
+  if (task?.state === 'archived') error('This task is archived.')
   const agent = await requireOwnedAgent(ctx, definition.agentId)
   const title = definition.title?.trim() || undefined
   const prompt = definition.prompt.trim()
@@ -103,19 +156,34 @@ export async function save(
   if (title && title.length > 200) error('Keep the title under 201 characters.')
   const issue = scheduleError(definition.schedule)
   if (issue) error(issue)
+  const model = await validateTaskModel(
+    ctx,
+    ctx.userId,
+    definition,
+    agent.modelOverride,
+  )
+  const policy = await saveApprovalPolicy(
+    ctx,
+    definition,
+    task,
+    reviewedWorkspaceKey,
+  )
   const fields = {
     ...definition,
+    ...model,
+    ...policy,
+    folderId: definition.folderId,
     title,
     prompt,
     agentName: agent.name,
     searchText: taskSearchText(agent.name, prompt, title),
   }
-  const next = futureOccurrence(fields.schedule)
-  if (taskId) {
-    const task = await get(ctx, { taskId })
-    if (!task) error('Task not found', 404)
-    if (task.state === 'archived') error('This task is archived.')
-    await ctx.db.patch(taskId, fields)
+  if (task) {
+    const scheduleChanged =
+      stableStringify(task.schedule) !== stableStringify(fields.schedule)
+    const next = scheduleChanged ? futureOccurrence(fields.schedule) : undefined
+    await ctx.db.patch(task._id, fields)
+    if (!scheduleChanged) return task._id
     const paused = task.state === 'paused'
     await reschedule(
       ctx,
@@ -123,8 +191,9 @@ export async function save(
       paused ? 'paused' : 'active',
       paused ? undefined : next,
     )
-    return taskId
+    return task._id
   }
+  const next = futureOccurrence(fields.schedule)
   const id = await ctx.db.insert('scheduledTasks', {
     ...fields,
     ownerId: ctx.userId,

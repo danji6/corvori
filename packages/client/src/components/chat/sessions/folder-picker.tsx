@@ -25,6 +25,7 @@ type FolderPickerProps = {
   onChange: (value: string | null) => void
   disabled?: boolean
   organizationOnly?: boolean
+  workspaceOnly?: boolean
   rootLabel?: string
   label?: string
   excludeBranchId?: string
@@ -36,6 +37,7 @@ export function FolderPicker({
   onChange,
   disabled,
   organizationOnly = false,
+  workspaceOnly,
   rootLabel = 'No folder',
   label = 'Session folder',
   excludeBranchId,
@@ -54,6 +56,7 @@ export function FolderPicker({
 
   const pickerArgs = {
     organizationOnly,
+    workspaceOnly,
     excludeBranchId: excludeBranchId as Id<'sessionFolders'> | undefined,
   }
 

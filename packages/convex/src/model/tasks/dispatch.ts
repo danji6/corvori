@@ -4,9 +4,13 @@ import { internal } from '../../_generated/api'
 import type { Doc, Id } from '../../_generated/dataModel'
 import type { MutationCtx } from '../../_generated/server'
 import { error, sanitizeChatError } from '../../errors'
+import type { AuthMutationCtx } from '../../functions'
 import type { TaskDispatchArgs } from '../../validators/scheduledTasks'
 import { sendMessage } from '../chat/send'
+import { workspaceKey } from '../session/folderContext'
 import { create as createSession } from '../session/sessions'
+import { requireTaskWorkspace } from './approvalPolicy'
+import { get, validateTaskModel } from './definitions'
 import { settleRun } from './outcomes'
 import { armTask } from './timing'
 
@@ -16,19 +20,24 @@ async function ownerContext(ctx: MutationCtx, ownerId: Id<'users'>) {
   return { ...ctx, userId: ownerId, subject: owner.subject, role: owner.role }
 }
 
+type RunTiming = Pick<
+  Doc<'scheduledTaskRuns'>,
+  'scheduledFor' | 'startedAt' | 'trigger'
+>
+
 async function createRun(
   ctx: MutationCtx,
   task: Doc<'scheduledTasks'>,
-  scheduledFor: number,
-  now: number,
+  timing: RunTiming,
   title: string,
   agentName: string,
 ) {
+  const caughtUp = !timing.trigger && task.nextRunAt !== timing.scheduledFor
   return ctx.db.insert('scheduledTaskRuns', {
     taskId: task._id,
-    scheduledFor,
-    skippedFrom: task.nextRunAt === scheduledFor ? undefined : task.nextRunAt,
-    startedAt: now,
+    ...timing,
+    approvalRevision: task.approvals ? task.approvalRevision : undefined,
+    skippedFrom: caughtUp ? task.nextRunAt : undefined,
     status: 'running',
     title,
     prompt: task.prompt,
@@ -38,38 +47,96 @@ async function createRun(
   })
 }
 
+async function workspaceFailure(ctx: MutationCtx, task: Doc<'scheduledTasks'>) {
+  try {
+    const workspace = await requireTaskWorkspace(
+      ctx,
+      task.ownerId,
+      task.folderId,
+    )
+    if (
+      task.approvals &&
+      task.approvalWorkspaceKey !== workspaceKey(workspace)
+    ) {
+      return 'Workspace sources changed. Review automatic approvals in the task editor.'
+    }
+  } catch {
+    return 'Task workspace is unavailable. Choose a workspace in the task editor.'
+  }
+}
+
 async function claim(
   ctx: MutationCtx,
   task: Doc<'scheduledTasks'>,
-  scheduledFor: number,
-  now: number,
+  timing: RunTiming,
 ) {
   const agent = await ctx.db.get(task.agentId)
   const title = task.title || task.prompt.split('\n', 1)[0].slice(0, 120)
   const runId = await createRun(
     ctx,
     task,
-    scheduledFor,
-    now,
+    timing,
     title,
     agent?.name ?? task.agentName,
   )
   const owner = await ownerContext(ctx, task.ownerId)
+  const failure = await workspaceFailure(ctx, task)
   const { sessionId } = await createSession(owner, {
     title,
+    folderId: failure ? undefined : task.folderId,
     activeAgentId: agent?.ownerId === owner.userId ? agent._id : undefined,
     scheduledTaskId: task._id,
     taskRunId: runId,
+    modelId: task.modelId,
+    reasoningEffort: task.reasoningEffort,
   })
   await ctx.db.patch(runId, { sessionId })
-  const nextRunAt = occurrence(task.schedule, now, 'next')
+  return { runId, agent, failure }
+}
+
+async function startRun(
+  ctx: MutationCtx,
+  task: Doc<'scheduledTasks'>,
+  timing: RunTiming,
+): Promise<Id<'scheduledTaskRuns'>> {
+  const { runId, agent, failure } = await claim(ctx, task, timing)
+  const nextRunAt =
+    timing.trigger === 'manual'
+      ? task.nextRunAt
+      : occurrence(task.schedule, timing.startedAt, 'next')
   await ctx.db.patch(task._id, {
     activeRunId: runId,
     latestStatus: 'running',
     nextRunAt,
     jobId: undefined,
   })
+  try {
+    if (failure) error(failure)
+    if (agent)
+      await validateTaskModel(ctx, task.ownerId, task, agent.modelOverride)
+    // A failed launch rolls back its partial transcript and reservation independently.
+    await ctx.runMutation(internal.scheduledTasks._launch, { runId })
+  } catch (cause) {
+    await settleRun(ctx, runId, 'failed', sanitizeChatError(cause))
+  }
   return runId
+}
+
+export async function runNow(
+  ctx: AuthMutationCtx,
+  { taskId }: { taskId: Id<'scheduledTasks'> },
+): Promise<Id<'scheduledTaskRuns'>> {
+  const task = await get(ctx, { taskId })
+  if (!task) error('Task not found', 404)
+  if (task.state === 'archived') error('This task is archived.')
+  if (task.activeRunId) error('This task already has a running session.', 409)
+  if (task.jobId) await ctx.scheduler.cancel(task.jobId)
+  const now = Date.now()
+  return startRun(ctx, task, {
+    scheduledFor: now,
+    startedAt: now,
+    trigger: 'manual',
+  })
 }
 
 export async function dispatch(
@@ -82,13 +149,13 @@ export async function dispatch(
   const now = Date.now()
   if (due > now) return
   const scheduledFor = occurrence(task.schedule, now, 'latest') ?? due
-  const existing = await ctx.db
+  const matchingRuns = await ctx.db
     .query('scheduledTaskRuns')
     .withIndex('by_task_due', (q) =>
       q.eq('taskId', taskId).eq('scheduledFor', scheduledFor),
     )
-    .unique()
-  if (existing) {
+    .collect()
+  if (matchingRuns.some((run) => run.trigger !== 'manual')) {
     const nextRunAt = occurrence(task.schedule, now, 'next')
     await ctx.db.patch(taskId, {
       nextRunAt,
@@ -98,13 +165,7 @@ export async function dispatch(
     if (nextRunAt !== undefined) await armTask(ctx, taskId, revision, nextRunAt)
     return
   }
-  const runId = await claim(ctx, task, scheduledFor, now)
-  try {
-    // A failed launch rolls back its partial transcript and reservation independently.
-    await ctx.runMutation(internal.scheduledTasks._launch, { runId })
-  } catch (cause) {
-    await settleRun(ctx, runId, 'failed', sanitizeChatError(cause))
-  }
+  await startRun(ctx, task, { scheduledFor, startedAt: now })
 }
 
 export async function launch(

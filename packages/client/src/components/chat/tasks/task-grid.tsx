@@ -1,4 +1,4 @@
-import { Input, RippleButton } from '@/components/ui'
+import { Input, LabeledCheckbox, RippleButton } from '@/components/ui'
 import { api } from '@cv/convex/_generated/api'
 import type { Doc } from '@cv/convex/_generated/dataModel'
 import { scheduleLabel } from '@cv/core/task-schedule'
@@ -72,14 +72,9 @@ export function TaskGrid() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={archived}
-            onChange={(e) => setArchived(e.target.checked)}
-          />
+        <LabeledCheckbox checked={archived} onCheckedChange={setArchived}>
           Archived tasks
-        </label>
+        </LabeledCheckbox>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {page.results.map((task) => (

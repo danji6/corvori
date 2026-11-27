@@ -15,6 +15,7 @@ import * as ProviderRequests from './model/stream/providerRequests'
 import * as StreamReads from './model/stream/reads'
 import * as StreamSubagents from './model/stream/subagents'
 import { _compactAtThreshold as compactAtThreshold } from './model/stream/thresholdCompaction'
+import { executionApprovals } from './model/tool/executionApprovals'
 import { filesystemToolContext } from './model/tool/filesystemContext'
 import { assertToolAccess } from './model/tool/liveAccess'
 import * as V from './validators/streams'
@@ -186,6 +187,16 @@ export const _prepareMcpContext = internalMutation({
 export const _getFilesystemContext = internalQuery({
   args: V.streamExecutionArgsValidator.fields,
   handler: filesystemToolContext,
+})
+
+export const _getExecutionApprovals = internalQuery({
+  args: {
+    ...V.streamExecutionArgsValidator.fields,
+    call: v.optional(
+      v.object({ id: v.string(), name: v.string(), input: v.any() }),
+    ),
+  },
+  handler: executionApprovals,
 })
 
 export const _resolveProviderCacheId = internalMutation({

@@ -29,8 +29,16 @@ export const history = authQuery({
   handler: Tasks.history,
 })
 export const save = authMutation({
-  args: { taskId: v.optional(taskId), definition: taskDefinition },
+  args: {
+    taskId: v.optional(taskId),
+    definition: taskDefinition,
+    reviewedWorkspaceKey: v.optional(v.string()),
+  },
   handler: Tasks.save,
+})
+export const runNow = authMutation({
+  args: { taskId },
+  handler: Dispatch.runNow,
 })
 export const setState = authMutation({
   args: {

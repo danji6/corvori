@@ -36,6 +36,8 @@ export async function create(
     scheduledTaskId?: Id<'scheduledTasks'>
     taskRunId?: Id<'scheduledTaskRuns'>
     activeAgentId?: Id<'agents'>
+    modelId?: string
+    reasoningEffort?: string
     mode?: SessionMode
     approvalMode?: ApprovalMode
   },
@@ -44,7 +46,7 @@ export async function create(
   const activeAgent = args.activeAgentId
     ? await requireOwnedAgent(ctx, args.activeAgentId)
     : null
-  const settings = await getSettings(ctx, ctx.userId)
+  const settings = args.taskRunId ? null : await getSettings(ctx, ctx.userId)
 
   const folder = args.folderId
     ? await requireFolder(ctx, args.folderId, ctx.userId)
@@ -60,9 +62,9 @@ export async function create(
     model: await resolveSessionModel(
       ctx,
       activeAgent?.ownerId ?? ctx.userId,
-      settings?.recentModel,
+      args.modelId ?? settings?.recentModel,
     ),
-    reasoningEffort: settings?.recentReasoning,
+    reasoningEffort: args.reasoningEffort ?? settings?.recentReasoning,
     lastMessageAt: now,
     mode: folder?.workspace && args.mode === 'plan' ? args.mode : undefined,
   })

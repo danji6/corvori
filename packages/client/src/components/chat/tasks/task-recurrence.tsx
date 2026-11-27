@@ -1,4 +1,7 @@
+import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
+import { LabeledCheckbox } from '@/components/ui/labeled-checkbox'
+import { TimeField } from '@/components/ui/time-field'
 import {
   type TaskSchedule,
   occurrence,
@@ -9,9 +12,26 @@ import {
 import moment from 'moment-timezone'
 import { useEffect, useState } from 'react'
 
-export const selectStyle =
-  'border-input bg-m3-surface-container-low h-11 w-full rounded-full border px-4 text-sm'
-export const fieldStyle = 'grid gap-1.5 text-sm font-medium'
+import {
+  ScheduleSelect,
+  TimeZoneField,
+  fieldStyle,
+} from './task-schedule-fields'
+
+const repeatItems = [
+  { value: 'once', label: 'Once' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekdays', label: 'Weekdays' },
+  { value: 'weekly', label: 'Selected weekdays' },
+  { value: 'monthly', label: 'Monthly' },
+] as const
+
+const monthlyItems = [
+  { value: 'date', label: 'Day of month from start date' },
+  { value: 'weekday', label: 'Weekday position from start date' },
+] as const
+
+type RepeatPreset = (typeof repeatItems)[number]['value']
 
 export function defaultSchedule(): TaskSchedule {
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -29,7 +49,7 @@ export function localDate(at: number, zone: string) {
 
 type Props = { rule: TaskSchedule; onChange: (rule: TaskSchedule) => void }
 
-function initialPreset(repeat: TaskSchedule['repeat']) {
+function initialPreset(repeat: TaskSchedule['repeat']): RepeatPreset {
   if (repeat.kind === 'once') return 'once'
   if (repeat.kind === 'daily' && repeat.every === 1) return 'daily'
   if (
@@ -46,7 +66,7 @@ export function RecurrenceEditor({ rule, onChange }: Props) {
   const change = (patch: Partial<TaskSchedule>) =>
     onChange({ ...rule, ...patch })
   const repeat = rule.repeat
-  function select(kind: string) {
+  function select(kind: RepeatPreset) {
     setPreset(kind)
     if (kind === 'once') change({ repeat: { kind } })
     if (kind === 'daily') change({ repeat: { kind, every: 1 } })
@@ -82,54 +102,30 @@ export function RecurrenceEditor({ rule, onChange }: Props) {
     <fieldset className="grid gap-4">
       <legend className="mb-3 text-lg font-semibold">Schedule</legend>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className={fieldStyle}>
-          Repeat
-          <select
-            className={selectStyle}
-            aria-label="Repeat"
-            value={preset}
-            onChange={(e) => select(e.target.value)}
-          >
-            <option value="once">Once</option>
-            <option value="daily">Daily</option>
-            <option value="weekdays">Weekdays</option>
-            <option value="weekly">Selected weekdays</option>
-            <option value="monthly">Monthly</option>
-          </select>
-        </label>
-        <label className={fieldStyle}>
-          {preset === 'once' ? 'Date' : 'Starting on'}
-          <Input
-            type="date"
-            required
-            value={rule.startDate}
-            onChange={(e) => change({ startDate: e.target.value })}
-          />
-        </label>
-        <label className={fieldStyle}>
-          Time
-          <Input
-            type="time"
-            required
-            value={rule.time}
-            onChange={(e) => change({ time: e.target.value })}
-          />
-        </label>
-        <label className={fieldStyle}>
-          Time zone
-          <Input
-            required
-            aria-label="Time zone"
-            list="task-zones"
-            value={rule.zone}
-            onChange={(e) => change({ zone: e.target.value })}
-          />
-          <datalist id="task-zones">
-            {moment.tz.names().map((zone) => (
-              <option key={zone} value={zone} />
-            ))}
-          </datalist>
-        </label>
+        <ScheduleSelect
+          label="Repeat"
+          items={repeatItems}
+          value={preset}
+          onChange={select}
+        />
+        <DatePicker
+          label={preset === 'once' ? 'Date' : 'Starting on'}
+          name="startDate"
+          required
+          value={rule.startDate}
+          onChange={(startDate) => change({ startDate })}
+        />
+        <TimeField
+          label="Time"
+          name="time"
+          required
+          value={rule.time}
+          onChange={(time) => change({ time })}
+        />
+        <TimeZoneField
+          value={rule.zone}
+          onChange={(zone) => change({ zone })}
+        />
         {repeat.kind !== 'once' && preset !== 'weekdays' && (
           <label className={fieldStyle}>
             Interval (
@@ -152,46 +148,33 @@ export function RecurrenceEditor({ rule, onChange }: Props) {
           </label>
         )}
         {repeat.kind === 'monthly' && (
-          <label className={fieldStyle}>
-            Monthly pattern
-            <select
-              className={selectStyle}
-              value={repeat.pattern}
-              onChange={(e) =>
-                change({
-                  repeat: {
-                    ...repeat,
-                    pattern: e.target.value === 'date' ? 'date' : 'weekday',
-                  },
-                })
-              }
-            >
-              <option value="date">Day of month from start date</option>
-              <option value="weekday">Weekday position from start date</option>
-            </select>
-          </label>
+          <ScheduleSelect
+            label="Monthly pattern"
+            items={monthlyItems}
+            value={repeat.pattern}
+            onChange={(pattern) => change({ repeat: { ...repeat, pattern } })}
+          />
         )}
       </div>
       {preset === 'weekly' && repeat.kind === 'weekly' && (
         <div className="flex flex-wrap gap-3">
           {weekdayNames.map((name, i) => (
-            <label key={name} className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={repeat.weekdays.includes(i + 1)}
-                onChange={(e) =>
-                  change({
-                    repeat: {
-                      ...repeat,
-                      weekdays: e.target.checked
-                        ? [...repeat.weekdays, i + 1].sort((a, b) => a - b)
-                        : repeat.weekdays.filter((d) => d !== i + 1),
-                    },
-                  })
-                }
-              />
+            <LabeledCheckbox
+              key={name}
+              checked={repeat.weekdays.includes(i + 1)}
+              onCheckedChange={(checked) =>
+                change({
+                  repeat: {
+                    ...repeat,
+                    weekdays: checked
+                      ? [...repeat.weekdays, i + 1].sort((a, b) => a - b)
+                      : repeat.weekdays.filter((d) => d !== i + 1),
+                  },
+                })
+              }
+            >
               {name}
-            </label>
+            </LabeledCheckbox>
           ))}
         </div>
       )}

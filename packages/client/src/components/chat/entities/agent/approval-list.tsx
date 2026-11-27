@@ -1,4 +1,5 @@
-import { Input, RippleButton } from '@/components/ui'
+import { Input } from '@/components/ui/input'
+import { RippleButton } from '@/components/ui/ripple-button'
 import { PlusIcon, XIcon } from 'lucide-react'
 import { useState } from 'react'
 

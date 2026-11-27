@@ -19,6 +19,7 @@ import {
   type WorkspaceToolContext,
   workspaceArgs,
 } from './context'
+import { approvalsForFilesystemCall } from './filesystemApprovals'
 import { checkShellToolPaths } from './paths'
 import {
   type ShellJobInput,
@@ -43,7 +44,11 @@ export async function createShellTool(context: WorkspaceToolContext) {
       shellNeedsApproval(input.command, context, input.cwd),
     toModelOutput: shellToModelOutput,
     execute: async function* (input, { abortSignal, toolCallId }) {
-      const approvals = await context.approvals?.()
+      const approvals = await approvalsForFilesystemCall(
+        context,
+        { id: toolCallId, name: SHELL_TOOL_NAME, input },
+        (current) => shellNeedsApproval(input.command, current, input.cwd),
+      )
       // Reaching execute means this invocation passed its approval gate
       const cwdGrant =
         input.cwd && !parseScopedPath(input.cwd).explicit ? [input.cwd] : []

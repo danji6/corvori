@@ -1,6 +1,8 @@
 import { paginationOptsValidator } from 'convex/server'
 import { type Infer, v } from 'convex/values'
 
+import { reasoningEffortValidator } from './providers'
+
 const schedule = v.object({
   startDate: v.string(),
   time: v.string(),
@@ -21,9 +23,18 @@ const schedule = v.object({
   ),
 })
 
+const taskApprovals = v.object({
+  shell: v.array(v.string()),
+  paths: v.array(v.string()),
+})
+
 export const taskDefinition = v.object({
   title: v.optional(v.string()),
   agentId: v.id('agents'),
+  folderId: v.optional(v.id('sessionFolders')),
+  approvals: v.optional(taskApprovals),
+  modelId: v.optional(v.string()),
+  reasoningEffort: v.optional(reasoningEffortValidator),
   prompt: v.string(),
   schedule,
 })
@@ -41,6 +52,8 @@ export const runStatus = v.union(
 )
 export const taskSchema = v.object({
   ...taskDefinition.fields,
+  approvalRevision: v.optional(v.number()),
+  approvalWorkspaceKey: v.optional(v.string()),
   ownerId: v.id('users'),
   agentName: v.string(),
   searchText: v.string(),
@@ -55,7 +68,9 @@ export const taskSchema = v.object({
 export const runSchema = v.object({
   taskId: v.id('scheduledTasks'),
   sessionId: v.optional(v.id('sessions')),
+  approvalRevision: v.optional(v.number()),
   scheduledFor: v.number(),
+  trigger: v.optional(v.literal('manual')),
   skippedFrom: v.optional(v.number()),
   startedAt: v.number(),
   promptMessageId: v.optional(v.id('messages')),
@@ -82,5 +97,6 @@ export const listArgs = v.object({
 })
 
 export type ScheduledTaskDefinition = Infer<typeof taskDefinition>
+export type TaskApprovals = Infer<typeof taskApprovals>
 export type TaskDispatchArgs = Infer<typeof dispatchArgs>
 export type TaskListArgs = Infer<typeof listArgs>
