@@ -3,7 +3,7 @@ import {
   MAX_MESSAGE_PART_BYTES,
   MAX_PROMPT_CONTENT_CHARS,
 } from '@cv/core/limits'
-import { spawn } from 'node:child_process'
+import type { ChildProcess } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
 import type { z } from 'zod'
 
@@ -12,7 +12,8 @@ import { workspaceRoots } from '../checkpoints/group'
 import { checkpoints, finishCheckpointJob } from '../checkpoints/manager'
 import { withWorkspaceOperation } from '../mcp/workspace/context'
 import { resolveShellDirectory } from '../shell/directory'
-import { jobEnv, killProcessTree, shellInvocation } from '../shell/system-shell'
+import { spawnShellPipes } from '../shell/launch'
+import { killProcessTree } from '../shell/system-shell'
 import type { evaluationShellSchema } from './schemas'
 
 export type EvaluationShell = z.infer<typeof evaluationShellSchema>
@@ -71,17 +72,17 @@ function launch(
 ) {
   signal.throwIfAborted()
 
-  const invocation =
-    args.length === 1
-      ? shellInvocation(args[0], input.shell)
-      : { file: args[0], args: args.slice(1) }
-  const child = spawn(invocation.file, invocation.args, {
-    cwd: directory.cwd,
-    env: jobEnv({}, directory.environment),
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: process.platform !== 'win32',
-    windowsHide: true,
-  })
+  const command =
+    args.length === 1 ? args[0] : { file: args[0], args: args.slice(1) }
+  const child = spawnShellPipes(
+    {
+      command,
+      cwd: directory.cwd,
+      environment: directory.environment,
+      shell: input.shell,
+    },
+    'ignore',
+  )
 
   const kill = () => killProcessTree(child.pid, () => child.kill())
 
@@ -94,7 +95,7 @@ function launch(
 }
 
 function collectOutput(
-  child: ReturnType<typeof spawn>,
+  child: ChildProcess,
   kill: () => void,
   kind: EvaluationRequest['kind'],
 ) {

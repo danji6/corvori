@@ -1,15 +1,15 @@
 import type { PtyMode } from '@cv/core/shell/job-protocol'
 import type { IPty } from 'node-pty'
-import { type ChildProcess, spawn } from 'node:child_process'
+import type { ChildProcess } from 'node:child_process'
 import { accessSync, constants } from 'node:fs'
 import { delimiter, join } from 'node:path'
 
 import {
-  jobEnv,
-  killProcessTree,
-  shellInvocation,
-  shellPath,
-} from './system-shell'
+  type ShellEnvironment,
+  prepareShellLaunch,
+  spawnShellPipes,
+} from './launch'
+import { killProcessTree, shellInvocation } from './system-shell'
 
 export type { PtyMode } from '@cv/core/shell/job-protocol'
 
@@ -23,16 +23,10 @@ export type ShellJobProcess = {
   onExit(cb: (exitCode: number | null) => void): void
 }
 
-export type Environment = {
-  AGENT_DIR?: string
-  WORKSPACE_DIR?: string
-  SESSION_DIR?: string
-}
-
 export type SpawnShellJobInput = {
   command: string
   cwd: string
-  environment?: Environment
+  environment?: ShellEnvironment
   cols: number
   rows: number
   shell?: string
@@ -151,16 +145,13 @@ function spawnNodePty(
   nodePty: NodePtyModule,
   input: SpawnShellJobInput,
 ): ShellJobProcess {
-  const { file, args } = shellInvocation(input.command, input.shell)
+  const { file, args, cwd, env } = prepareShellLaunch(input, 'pty')
   const pty: IPty = nodePty.spawn(file, args, {
     name: 'xterm-256color',
     cols: input.cols,
     rows: input.rows,
-    cwd: input.cwd,
-    env: jobEnv({ TERM: 'xterm-256color' }, input.environment) as Record<
-      string,
-      string
-    >,
+    cwd,
+    env: env as Record<string, string>,
   })
 
   return {
@@ -194,28 +185,15 @@ function safeKill(pty: IPty) {
  * The pty size is fixed at spawn time, so resize is a no-op.
  */
 function spawnScriptPty(input: SpawnShellJobInput): ShellJobProcess {
-  const sized = `stty cols ${input.cols} rows ${input.rows} 2>/dev/null; ${input.command}`
-  const child = spawn('script', ['-qefc', sized, '/dev/null'], {
-    cwd: input.cwd,
-    detached: true,
-    env: jobEnv(
-      { SHELL: shellPath(input.shell), TERM: 'xterm-256color' },
-      input.environment,
-    ),
-    stdio: ['pipe', 'pipe', 'pipe'],
+  const child = spawnShellPipes(input, 'pipe', {
+    cols: input.cols,
+    rows: input.rows,
   })
   return wrapChildProcess(child, 'script')
 }
 
 function spawnPipe(input: SpawnShellJobInput): ShellJobProcess {
-  const { file, args } = shellInvocation(input.command, input.shell)
-  const child = spawn(file, args, {
-    cwd: input.cwd,
-    detached: process.platform !== 'win32',
-    env: jobEnv({}, input.environment),
-    stdio: ['pipe', 'pipe', 'pipe'],
-    windowsHide: true,
-  })
+  const child = spawnShellPipes(input, 'pipe')
   return wrapChildProcess(child, 'pipe')
 }
 

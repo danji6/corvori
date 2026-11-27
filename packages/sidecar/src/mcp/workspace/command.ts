@@ -1,11 +1,5 @@
-import { spawn } from 'node:child_process'
-
-import type { Environment } from '../../shell/pty'
-import {
-  jobEnv,
-  killProcessTree,
-  shellInvocation,
-} from '../../shell/system-shell'
+import { type ShellEnvironment, spawnShellPipes } from '../../shell/launch'
+import { killProcessTree } from '../../shell/system-shell'
 
 const MAX_COMMAND_BYTES = 100_000
 const TRUNCATED_MARKER = '\n[truncated]\n'
@@ -15,18 +9,11 @@ export async function runCommand(
   cwd: string,
   timeoutSeconds: number,
   signal?: AbortSignal,
-  environment?: Environment,
+  environment?: ShellEnvironment,
 ) {
   return new Promise<{ exitCode: number | null; output: string }>(
     (resolve, reject) => {
-      const { file, args } = shellInvocation(command)
-      const child = spawn(file, args, {
-        cwd,
-        detached: process.platform !== 'win32',
-        env: jobEnv({}, environment),
-        stdio: ['ignore', 'pipe', 'pipe'],
-        windowsHide: true,
-      })
+      const child = spawnShellPipes({ command, cwd, environment }, 'ignore')
 
       let output = ''
       let killed = false
