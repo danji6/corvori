@@ -16,6 +16,7 @@ async function main() {
   await mkdir(staging, { recursive: true })
 
   await exportTree(staging)
+  await includeSandboxHelpers(staging)
   await assertNoSymlinks(staging)
   await writeReleaseFile(staging, version)
 
@@ -25,6 +26,18 @@ async function main() {
 
   await writeChecksums(outDir, [`${name}.tar.gz`, `${name}.zip`])
   console.log(`Packaged ${name} into ${outDir}`)
+}
+
+/** Add the native helper sets built by the release workflow. */
+async function includeSandboxHelpers(staging: string) {
+  for (const arch of ['x64', 'arm64']) {
+    const name = `linux-${arch}`
+    const archive = join(projectRoot, '.data/sandbox-helpers', name + '.tar.gz')
+    const destination = join(staging, 'packages/sidecar/vendor', name)
+    await mkdir(destination, { recursive: true })
+    await output(['tar', '-xzf', archive, '-C', destination], { cwd: staging })
+    await output(['sha256sum', '--check', 'SHA256SUMS'], { cwd: destination })
+  }
 }
 
 async function readVersion() {

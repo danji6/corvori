@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'tests/features/shell/native-sandbox/**'
+      - 'scripts/sandbox/**'
+      - 'packages/sidecar/src/shell/sandbox/**'
+      - '.github/workflows/linux-sandbox-helpers.yml'
       - '.github/workflows/native-sandbox.yml'
   push:
     branches: [codex/sidecar-shell-sandbox]
@@ -12,6 +15,9 @@ permissions:
   contents: read
 
 jobs:
+  helpers:
+    uses: ./.github/workflows/linux-sandbox-helpers.yml
+
   shell-regression:
     runs-on: ubuntu-latest
     steps:
@@ -29,6 +35,7 @@ jobs:
       - run: bun --no-env-file test --path-ignore-patterns '**/browser/**' ./tests/features/editor/evaluation-worker.test.ts
 
   native:
+    needs: helpers
     strategy:
       fail-fast: false
       matrix:
@@ -49,9 +56,18 @@ jobs:
         with:
           bun-version: 1.3.14
       - run: bun install --frozen-lockfile --ignore-scripts
-      - name: Install Linux sandbox dependencies
+      - uses: actions/download-artifact@v4
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
+        with:
+          name: sandbox-helpers-x64
+          path: ${{ runner.temp }}/helpers
+      - name: Use release-packaged helpers on Linux
+        if: runner.os == 'Linux'
+        run: |
+          directory="$GITHUB_WORKSPACE/packages/sidecar/vendor/linux-x64"
+          mkdir -p "$directory"
+          tar -xzf "$RUNNER_TEMP/helpers/linux-x64.tar.gz" -C "$directory"
+          cd "$directory" && sha256sum --check SHA256SUMS
       - name: Install the sandbox helper on the disposable Windows runner
         if: runner.os == 'Windows'
         run: node node_modules/@anthropic-ai/sandbox-runtime/dist/cli.js windows-install --skip-profile-grant
