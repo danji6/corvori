@@ -22,7 +22,7 @@ import { offlinePolicy } from './policy.mjs'
 
 const execute = promisify(execFile)
 const workspace = await realpath(
-  await mkdtemp(join(tmpdir(), 'corvori-sandbox-')),
+  await mkdtemp(join(process.env.RUNNER_TEMP || tmpdir(), 'corvori-sandbox-')),
 )
 const originalCwd = process.cwd()
 const windows = process.platform === 'win32'

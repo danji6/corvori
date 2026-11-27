@@ -21,7 +21,9 @@ import { offlinePolicy } from './policy.mjs'
 
 const exec = promisify(execFile)
 const fixture = await realpath(
-  await mkdtemp(join(tmpdir(), 'corvori-shell-perf-')),
+  await mkdtemp(
+    join(process.env.RUNNER_TEMP || tmpdir(), 'corvori-shell-perf-'),
+  ),
 )
 const originalCwd = process.cwd()
 const shell = process.platform === 'win32' ? 'cmd.exe' : '/bin/bash'
@@ -62,6 +64,11 @@ async function measure(mode, command) {
       env,
       timeout: 30_000,
       windowsHide: true,
+    }).catch((error) => {
+      // Wrapper argv can carry proxy authentication. Only report child diagnostics.
+      throw new Error(
+        'Benchmark command failed (' + error.code + '): ' + error.stderr,
+      )
     })
     return {
       total: performance.now() - start,
@@ -73,9 +80,8 @@ async function measure(mode, command) {
 }
 
 function percentile(values, fraction) {
-  return values
-    .toSorted((a, b) => a - b)
-    [Math.ceil(values.length * fraction) - 1].toFixed(1)
+  const sorted = values.toSorted((a, b) => a - b)
+  return sorted[Math.ceil(values.length * fraction) - 1].toFixed(1)
 }
 
 async function report(mode, name, command) {
