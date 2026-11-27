@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { readdir, realpath } from 'node:fs/promises'
-import { basename, join, resolve, sep } from 'node:path'
+import { basename, isAbsolute, join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 
 const execute = promisify(execFile)
@@ -9,6 +9,18 @@ const dependencies = new Set(['node_modules', '.venv'])
 /** Resolve Git's effective exclusions immediately before preparing a job. */
 export async function snapshotGitPaths(directory: string) {
   const root = await realpath(directory)
+  const hidden = new Set<string>()
+  const readOnly = new Set<string>()
+  await addIgnoredPaths(root, hidden, readOnly)
+  await collectProtectedEntries(root, hidden, readOnly)
+  return { hidden: [...hidden], readOnly: [...readOnly] }
+}
+
+async function addIgnoredPaths(
+  root: string,
+  hidden: Set<string>,
+  readOnly: Set<string>,
+) {
   const { stdout } = await execute(
     'git',
     [
@@ -34,8 +46,6 @@ export async function snapshotGitPaths(directory: string) {
     fatal: true,
     ignoreBOM: true,
   }).decode(stdout)
-  const hidden = new Set<string>()
-  const readOnly = new Set<string>()
   for (const name of names.split('\0').filter(Boolean)) {
     const entry = resolve(root, name)
     if (!entry.startsWith(root.endsWith(sep) ? root : root + sep)) {
@@ -47,9 +57,19 @@ export async function snapshotGitPaths(directory: string) {
       hidden.add(entry)
     }
   }
+}
 
-  await collectProtectedEntries(root, hidden, readOnly)
-  return { hidden: [...hidden], readOnly: [...readOnly] }
+/** Hide both the worktree index and the shared repository behind a .git file. */
+async function addLinkedMetadata(directory: string, hidden: Set<string>) {
+  const { stdout } = await execute(
+    'git',
+    ['rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir'],
+    { cwd: directory, timeout: 10_000 },
+  )
+  const paths = stdout.replace(/\r?\n$/, '').split(/\r?\n/)
+  if (paths.length !== 2 || !paths.every(isAbsolute))
+    throw new Error('Could not identify linked Git metadata')
+  for (const path of paths) hidden.add(await realpath(path))
 }
 
 /** Skip ignored trees, dependency contents, and directory links during discovery. */
@@ -62,6 +82,11 @@ async function collectProtectedEntries(
   while (pending.length) {
     const directory = pending.pop()!
     const entries = await readdir(directory, { withFileTypes: true })
+    const metadata = entries.find((entry) => entry.name === '.git')
+    if (metadata && directory !== root)
+      await addIgnoredPaths(directory, hidden, readOnly)
+    if (metadata && !metadata.isDirectory())
+      await addLinkedMetadata(directory, hidden)
     for (const entry of entries) {
       const path = join(directory, entry.name)
       if (entry.name === '.git') hidden.add(path)

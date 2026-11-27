@@ -37,3 +37,31 @@ test('each launch snapshots Git exclusions and preserves dependency reads', asyn
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test('snapshots nested repositories and denies their linked metadata', async () => {
+  const base = await realpath(
+    await mkdtemp(join(tmpdir(), 'corvori-linked-git-')),
+  )
+  const root = join(base, 'workspace')
+  const nested = join(root, 'child')
+  const metadata = join(base, 'child-metadata')
+  try {
+    execFileSync('git', ['init', '--quiet', root])
+    execFileSync('git', [
+      'init',
+      '--quiet',
+      '--separate-git-dir',
+      metadata,
+      nested,
+    ])
+    await writeFile(join(nested, '.gitignore'), '*.private\n')
+    const privateFile = join(nested, 'implicit.private')
+    await writeFile(privateFile, 'test fixture')
+    const { hidden } = await snapshotGitPaths(root)
+    expect(hidden).toContain(privateFile)
+    expect(hidden).toContain(metadata)
+    expect(hidden).toContain(join(nested, '.git'))
+  } finally {
+    await rm(base, { recursive: true, force: true })
+  }
+})
