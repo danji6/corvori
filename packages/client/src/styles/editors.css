@@ -1,3 +1,11 @@
+@utility markdown-heading {
+  @apply mb-1.5;
+}
+
+@utility markdown-heading-divider {
+  @apply border-b pb-1.5;
+}
+
 /* --- TipTap / ProseMirror editor typography --- */
 .ProseMirror {
   outline: none;
@@ -17,11 +25,11 @@
 }
 
 .ProseMirror h1 {
-  @apply scroll-m-20 text-4xl font-bold tracking-tight not-first:mt-6;
+  @apply markdown-heading markdown-heading-divider scroll-m-20 text-4xl font-bold tracking-tight not-first:mt-6;
 }
 
 .ProseMirror h2 {
-  @apply scroll-m-20 text-3xl font-semibold tracking-tight not-first:mt-4;
+  @apply markdown-heading markdown-heading-divider scroll-m-20 text-3xl font-semibold tracking-tight not-first:mt-4;
 }
 
 .ProseMirror h2:first-child {
@@ -29,11 +37,11 @@
 }
 
 .ProseMirror h3 {
-  @apply scroll-m-20 text-2xl font-semibold tracking-tight not-first:mt-4;
+  @apply markdown-heading scroll-m-20 text-2xl font-semibold tracking-tight not-first:mt-4;
 }
 
 .ProseMirror h4 {
-  @apply scroll-m-20 text-xl font-semibold tracking-tight not-first:mt-4;
+  @apply markdown-heading scroll-m-20 text-xl font-semibold tracking-tight not-first:mt-4;
 }
 
 .ProseMirror p {

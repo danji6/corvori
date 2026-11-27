@@ -9,7 +9,7 @@ function h1({
   return (
     <h1
       className={cn(
-        'mb-1 scroll-m-20 text-4xl font-bold tracking-tight not-first:mt-4',
+        'markdown-heading markdown-heading-divider scroll-m-20 text-4xl font-bold tracking-tight not-first:mt-6',
         className,
       )}
       {...props}
@@ -26,7 +26,7 @@ function h2({
   return (
     <h2
       className={cn(
-        'scroll-m-20 text-3xl font-semibold tracking-tight not-first:mt-4 first:mt-0',
+        'markdown-heading markdown-heading-divider scroll-m-20 text-3xl font-semibold tracking-tight not-first:mt-4 first:mt-0',
         className,
       )}
       {...props}
@@ -43,7 +43,7 @@ function h3({
   return (
     <h3
       className={cn(
-        'scroll-m-20 text-2xl font-semibold tracking-tight not-first:mt-4',
+        'markdown-heading scroll-m-20 text-2xl font-semibold tracking-tight not-first:mt-4',
         className,
       )}
       {...props}
@@ -60,7 +60,7 @@ function h4({
   return (
     <h4
       className={cn(
-        'scroll-m-20 text-xl font-semibold tracking-tight not-first:mt-4',
+        'markdown-heading scroll-m-20 text-xl font-semibold tracking-tight not-first:mt-4',
         className,
       )}
       {...props}
