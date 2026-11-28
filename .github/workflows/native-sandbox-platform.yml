@@ -89,6 +89,9 @@ jobs:
           CORVORI_NATIVE_TEST: '1'
         shell: bash
         run: NODE_BINARY="$(node -p 'process.execPath')" bun --no-env-file test --timeout 30000 --path-ignore-patterns '**/browser/**' ./tests/features/shell/sandbox-retry.test.ts
+      - name: Diagnose read-only Git worktree access
+        if: failure() && runner.os == 'Windows' && steps.mxc.outputs.setup != 'true'
+        run: node windows-readonly-git.mjs
       - name: Report Windows loader failures
         if: failure() && runner.os == 'Windows' && steps.mxc.outputs.setup != 'true'
         run: |

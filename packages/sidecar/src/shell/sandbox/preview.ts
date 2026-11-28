@@ -190,7 +190,7 @@ export async function preparePreview(
     const permissions = await filesystemPolicy(
       writable,
       scratch,
-      !!input.readOnlyWorkspace || !!git,
+      !!input.readOnlyWorkspace || (!windows && !!git),
       await privateShellPaths(writable, input.environment),
       grants,
     )
@@ -198,14 +198,13 @@ export async function preparePreview(
       const prepared = await windowsRequest({
         roots: writable,
         runtime,
-        env: git ? { ...env, CORVORI_GIT: git.argv[0] } : env,
+        env,
         temporary,
         cwd: input.cwd,
-        shell: git ? 'cmd.exe' : input.shell,
-        command: git
-          ? '"%CORVORI_GIT%" ' + git.argv.slice(1).join(' ')
-          : original,
-        argv: (github && [github.file, ...github.args]) ?? directArgv,
+        shell: input.shell,
+        command: original,
+        argv:
+          git?.argv ?? (github && [github.file, ...github.args]) ?? directArgv,
         hidden: permissions.readConfig.literalDenyOnly,
         exceptions: permissions.readConfig.literalAllowWithinDeny,
         readonly: [

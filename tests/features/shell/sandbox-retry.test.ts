@@ -226,34 +226,16 @@ nativeSuite('native shell retry approval', () => {
       { command: 'git status --short' },
       'git-status',
     )
-    if (windows && status.exitCode !== 0) {
-      const commands = [
-        'git rev-parse --is-bare-repository --is-inside-work-tree --absolute-git-dir --show-toplevel',
-        'git -c core.fsmonitor=false status --short',
-        'git --no-pager --no-optional-locks -c core.hooksPath=/dev/null -c core.fsmonitor=false status --short',
-      ]
-      const diagnostics = []
-      for (const [index, command] of commands.entries()) {
-        const ordinary = await execute({ command }, 'git-diagnostic-' + index)
-        context.isPlanMode = async () => true
-        try {
-          const plan = await execute(
-            { command },
-            'git-plan-diagnostic-' + index,
-          )
-          diagnostics.push({
-            command,
-            ordinary: ordinary.text,
-            plan: plan.text,
-          })
-        } finally {
-          delete context.isPlanMode
-        }
-      }
-      throw new Error(status.text + JSON.stringify(diagnostics))
-    }
     expect(status.text).toContain('?? status-marker')
     expect(status.exitCode).toBe(0)
+    context.isPlanMode = async () => true
+    try {
+      const plan = await execute({ command: 'git status --short' }, 'plan-git')
+      expect(plan.text).toContain('?? status-marker')
+      expect(plan.exitCode).toBe(0)
+    } finally {
+      delete context.isPlanMode
+    }
     const script = await execute(
       { command: windows ? 'type .git\\HEAD' : '/bin/cat .git/HEAD' },
       'ordinary-git-read',

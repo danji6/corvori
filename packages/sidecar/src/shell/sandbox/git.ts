@@ -11,7 +11,7 @@ const flags: Record<string, RegExp> = {
   'rev-parse': /^(?:HEAD|--show-toplevel|--abbrev-ref|--short)$/,
 }
 
-/** Run recognized inspections directly with an entirely read-only workspace. */
+/** Build a direct Git inspection without optional locks or repository hooks. */
 export function prepareGitQuery(command: string, git: string) {
   const words = directShellWords(command)
   if (words?.[0] !== 'git') return

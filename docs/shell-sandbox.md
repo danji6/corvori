@@ -16,7 +16,7 @@ Restart the sidecar after installing the update and start a new chat. In normal 
 
 Commands may read ordinary files outside the workspace, including files in other checkouts. Private Corvori storage, the GitHub CLI configuration, and existing Git-ignored workspace entries are hidden. An authorized session or agent can access its own files. Git metadata is readable. Writes stay within the authorized workspace, path grants, and private scratch directory.
 
-Plan mode keeps its launch checks and a read-only workspace. Recognized direct Git inspections run with a read-only workspace. Evaluator and workspace MCP commands use the same filesystem and network policy. Explicit unrestricted shell mode retains host execution.
+Plan mode keeps its launch checks and a read-only workspace. Recognized Git inspections use the system Git executable with optional locks, hooks, and filesystem monitors disabled. Evaluator and workspace MCP commands use the same filesystem and network policy. Explicit unrestricted shell mode retains host execution.
 
 On compatible Windows 11 hosts, the packaged sidecar uses MXC after the same startup check. Other Windows hosts use the existing approval flow. The administrator-installed helper is available for diagnostics.
 
