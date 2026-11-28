@@ -102,7 +102,6 @@ function ApprovalList({
           aria-label={label}
           aria-describedby={descriptionId}
           aria-invalid={Boolean(error)}
-          variant="outline"
           size="sm"
           className="max-w-70 font-mono"
         />
