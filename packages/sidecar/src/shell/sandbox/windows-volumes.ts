@@ -8,22 +8,8 @@ export async function mountedDrives() {
   )
   const drives = await Promise.all(
     letters.map(async (root) => {
-      try {
-        return (await stat(root)).isDirectory() ? root : undefined
-      } catch (error) {
-        if (
-          ![
-            'ENOENT',
-            'ENODEV',
-            'EACCES',
-            'EPERM',
-            'EBUSY',
-            'EIO',
-            'UNKNOWN',
-          ].includes((error as NodeJS.ErrnoException).code ?? '')
-        )
-          throw error
-      }
+      const info = await stat(root).catch(() => undefined)
+      return info?.isDirectory() ? root : undefined
     }),
   )
   return drives.filter((drive): drive is string => !!drive)

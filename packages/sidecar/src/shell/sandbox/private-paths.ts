@@ -33,7 +33,8 @@ export async function privateShellPaths(
       join(homedir(), name),
     ),
   ]
-  const hidden = []
+  const personal = [env?.SESSION_DIR, env?.AGENT_DIR]
+  const hidden = new Set<string>()
   for (const path of [...storage, ...credentials]) {
     const canonical = await realpath(path).catch(
       (error: NodeJS.ErrnoException) => {
@@ -43,15 +44,13 @@ export async function privateShellPaths(
     if (!canonical) continue
     for (const root of roots) {
       if (isOutside(canonical, root)) continue
-      const personal = [env?.SESSION_DIR, env?.AGENT_DIR].some(
-        (dir) => dir && !isOutside(dir, root),
+      const ownDirectory = personal.some((dir) => dir && !isOutside(dir, root))
+      if (storage.includes(path) && ownDirectory && root !== canonical) continue
+      throw new Error(
+        'A sandbox workspace overlaps private Corvori storage or credentials',
       )
-      if (!storage.includes(path) || !personal || !isOutside(root, canonical))
-        throw new Error(
-          'A sandbox workspace overlaps private Corvori storage or credentials',
-        )
     }
-    hidden.push(canonical)
+    hidden.add(canonical)
   }
-  return [...new Set(hidden)]
+  return [...hidden]
 }

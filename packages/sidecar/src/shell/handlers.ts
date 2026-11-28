@@ -33,6 +33,7 @@ import {
   writeStdin,
 } from './registry'
 import { previewAvailable } from './sandbox/preview-platform'
+import { privateShellPaths } from './sandbox/private-paths'
 import { sandboxReady, sandboxSetupDetail } from './sandbox/readiness'
 import { sandboxRoots } from './sandbox/roots'
 import { pumpShellJobStream } from './stream'
@@ -224,7 +225,8 @@ export const checkSandboxLaunch: Handler = async (c) => {
     const input = startSchema.parse(await c.req.json())
     if (!(await sandboxReady())) return c.json({ ready: false })
     const { launch, roots } = await resolveLaunch(input, true)
-    await sandboxRoots([...roots, ...launch.grantedPaths])
+    const writable = await sandboxRoots([...roots, ...launch.grantedPaths])
+    await privateShellPaths(writable, launch.environment)
     return c.json({ ready: true })
   } catch {
     return c.json({ ready: false })

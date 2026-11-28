@@ -81,10 +81,10 @@ async function filesystemPolicy(
         ),
         ...snapshots
           .flatMap((snapshot) => snapshot.readOnly)
-          .filter((path) =>
-            ['node_modules', '.venv'].includes(basename(path))
-              ? !granted(path)
-              : true,
+          .filter(
+            (path) =>
+              !['node_modules', '.venv'].includes(basename(path)) ||
+              !granted(path),
           ),
       ],
     },
@@ -186,7 +186,7 @@ export async function preparePreview(
           : { file: binShell, args: ['-c', original] }
       return { prepared: { ...invocation, env }, cleanup }
     }
-    const git = prepareGitQuery(input.command, tools.git)
+    const git = await prepareGitQuery(input.command, tools.git, input.cwd)
     const permissions = await filesystemPolicy(
       writable,
       scratch,
@@ -206,6 +206,7 @@ export async function preparePreview(
         argv:
           git?.argv ?? (github && [github.file, ...github.args]) ?? directArgv,
         hidden: permissions.readConfig.literalDenyOnly,
+        exceptions: permissions.readConfig.literalAllowWithinDeny,
         readonly: [
           ...permissions.readConfig.literalAllowWithinDeny,
           ...permissions.writeConfig.literalDenyWithinAllow,

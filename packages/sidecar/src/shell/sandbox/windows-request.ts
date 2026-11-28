@@ -4,6 +4,7 @@ import {
 } from '@anthropic-ai/sandbox-runtime/dist/sandbox/mxc-sandbox-utils.js'
 import type { ContainerRequest } from '@microsoft/mxc-sdk/v1'
 import { realpath, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { basename, dirname, join, parse, resolve } from 'node:path'
 
 import { isOutside } from '../../mcp/workspace/access'
@@ -19,10 +20,18 @@ export function windowsWorker() {
   )
 }
 
+function windowsExecutor() {
+  const sdk = createRequire(import.meta.url).resolve(
+    '@microsoft/mxc-sdk/package.json',
+  )
+  return join(dirname(sdk), 'bin', process.arch, 'wxc-exec.exe')
+}
+
 type WindowsLaunch = {
   roots: string[]
   hidden: string[]
   readonly: string[]
+  exceptions: string[]
   writable: string[]
   cwd: string
   command: string
@@ -32,6 +41,17 @@ type WindowsLaunch = {
   env: NodeJS.ProcessEnv
   runtime: string
   temporary: string
+}
+
+/** A narrower read-only rule must not reopen a hidden subtree. */
+function readable(path: string, input: WindowsLaunch) {
+  return input.hidden.every((deny) => {
+    if (isOutside(deny, path)) return true
+    return input.exceptions.some(
+      (root) =>
+        root !== deny && !isOutside(deny, root) && !isOutside(root, path),
+    )
+  })
 }
 
 /** Compile a per-command BaseContainer request with explicit filesystem grants. */
@@ -59,7 +79,6 @@ export async function windowsRequest(
       )
     )
       throw new Error('The Windows shell installation overlaps the workspace')
-    reads.push(shellHome)
   }
   const command =
     shell && name === 'cmd.exe'
@@ -77,8 +96,7 @@ export async function windowsRequest(
     containment: { type: 'processcontainer' },
     filesystem: {
       readonlyPaths: [...new Set(reads)].filter(
-        (path) =>
-          !input.writable.includes(path) && !input.hidden.includes(path),
+        (path) => !input.writable.includes(path) && readable(path, input),
       ),
       readwritePaths: input.writable,
       deniedPaths: input.hidden,
@@ -94,12 +112,25 @@ export async function windowsRequest(
     inheritDefaultEnvironment: false,
     ui: { disable: false, clipboard: 'none', allowInputInjection: false },
   }
+  const { probe } = await import('@microsoft/mxc-sdk/v1')
+  const facts = probe(request)
+  if (
+    facts.error ||
+    facts.tier !== 'base-container' ||
+    facts.needsDaclAugmentation ||
+    !facts.probes.baseContainerSupportsDenyPaths
+  )
+    throw new Error(
+      'Windows BaseContainer cannot enforce this workspace policy. Request the command again for approval.',
+    )
+
   const policy = join(input.temporary, 'policy.json')
   await writeFile(policy, JSON.stringify(request), { flag: 'wx', mode: 0o600 })
   const worker = windowsWorker()
   return {
     file: input.runtime,
     args: [worker, policy],
+    terminal: { file: windowsExecutor(), args: [policy] },
     cwd: dirname(worker),
     env: {
       SystemRoot: process.env.SystemRoot,

@@ -31,11 +31,10 @@ export async function snapshotGitPaths(directory: string, emptyRepo?: string) {
     }
   }
   await addIgnoredPaths(root, hidden, readOnly, gitArgs)
-  const metadata = new Set<string>()
-  await collectProtectedEntries(root, hidden, readOnly, metadata)
+  await collectProtectedEntries(root, hidden, readOnly)
   return {
     hidden: [...hidden],
-    readOnly: [...readOnly, ...metadata],
+    readOnly: [...readOnly],
   }
 }
 
@@ -86,7 +85,7 @@ async function addIgnoredPaths(
 }
 
 /** Locate both the worktree index and the shared repository behind a .git file. */
-async function addLinkedMetadata(directory: string, hidden: Set<string>) {
+async function addLinkedMetadata(directory: string, readOnly: Set<string>) {
   const { git } = await systemTools()
   const { stdout } = await execute(
     git,
@@ -96,7 +95,7 @@ async function addLinkedMetadata(directory: string, hidden: Set<string>) {
   const paths = stdout.replace(/\r?\n$/, '').split(/\r?\n/)
   if (paths.length !== 2 || !paths.every(isAbsolute))
     throw new Error('Could not identify linked Git metadata')
-  for (const path of paths) hidden.add(await realpath(path))
+  for (const path of paths) readOnly.add(await realpath(path))
 }
 
 /** Skip ignored trees, dependency contents, and directory links during discovery. */
@@ -104,7 +103,6 @@ async function collectProtectedEntries(
   root: string,
   hidden: Set<string>,
   readOnly: Set<string>,
-  protectedMetadata: Set<string>,
 ) {
   const pending = [root]
   while (pending.length) {
@@ -114,11 +112,11 @@ async function collectProtectedEntries(
     if (metadata && directory !== root)
       await addIgnoredPaths(directory, hidden, readOnly)
     if (metadata && !metadata.isDirectory())
-      await addLinkedMetadata(directory, protectedMetadata)
+      await addLinkedMetadata(directory, readOnly)
     for (const entry of entries) {
       const path = join(directory, entry.name)
       if (entry.name === '.git') {
-        protectedMetadata.add(path)
+        readOnly.add(path)
         continue
       }
       if (entry.name === '.gitignore') readOnly.add(path)

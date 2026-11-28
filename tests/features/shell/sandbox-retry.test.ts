@@ -226,6 +226,33 @@ nativeSuite('native shell retry approval', () => {
       { command: 'git status --short' },
       'git-status',
     )
+    if (windows && status.exitCode !== 0) {
+      const host = execFileSync(
+        'git',
+        [
+          'rev-parse',
+          '--is-bare-repository',
+          '--absolute-git-dir',
+          '--show-toplevel',
+        ],
+        { cwd: sandbox, encoding: 'utf8' },
+      )
+      const probe = await execute(
+        {
+          command:
+            'git rev-parse --is-bare-repository --absolute-git-dir --show-toplevel',
+        },
+        'git-location',
+      )
+      throw new Error(
+        'Git status: ' +
+          status.text +
+          ' Host: ' +
+          host +
+          ' Sandboxed: ' +
+          probe.text,
+      )
+    }
     expect(status.text).toContain('?? status-marker')
     expect(status.exitCode).toBe(0)
     const script = await execute(
