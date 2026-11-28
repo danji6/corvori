@@ -186,7 +186,7 @@ export async function preparePreview(
           : { file: binShell, args: ['-c', original] }
       return { prepared: { ...invocation, env }, cleanup }
     }
-    const git = await prepareGitQuery(input.command, tools.git, input.cwd)
+    const git = prepareGitQuery(input.command, tools.git)
     const permissions = await filesystemPolicy(
       writable,
       scratch,
@@ -198,13 +198,14 @@ export async function preparePreview(
       const prepared = await windowsRequest({
         roots: writable,
         runtime,
-        env,
+        env: git ? { ...env, CORVORI_GIT: git.argv[0] } : env,
         temporary,
         cwd: input.cwd,
-        shell: input.shell,
-        command: original,
-        argv:
-          git?.argv ?? (github && [github.file, ...github.args]) ?? directArgv,
+        shell: git ? 'cmd.exe' : input.shell,
+        command: git
+          ? '"%CORVORI_GIT%" ' + git.argv.slice(1).join(' ')
+          : original,
+        argv: (github && [github.file, ...github.args]) ?? directArgv,
         hidden: permissions.readConfig.literalDenyOnly,
         exceptions: permissions.readConfig.literalAllowWithinDeny,
         readonly: [

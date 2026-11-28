@@ -146,6 +146,8 @@ async function spawnForMode(
   if (mode === 'script')
     return hasScript(input) ? spawnScriptPty(input) : spawnPipe(input)
 
+  if (input.prepared?.terminal)
+    return input.prepared.terminal(input.cols, input.rows)
   const nodePty = await probeNodePty()
   if (nodePty) return spawnNodePty(nodePty, input)
   return hasScript(input) ? spawnScriptPty(input) : spawnPipe(input)

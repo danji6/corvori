@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { basename } from 'node:path'
 
+import type { ShellJobProcess } from './pty'
 import {
   type ShellInvocation,
   jobEnv,
@@ -15,8 +16,8 @@ export type ShellEnvironment = {
 }
 
 export type PreparedShell = ShellInvocation & {
-  /** A native executor that attaches directly to the existing PTY. */
-  terminal?: ShellInvocation
+  /** A backend that owns the job's terminal directly. */
+  terminal?: (columns: number, rows: number) => Promise<ShellJobProcess>
   env: NodeJS.ProcessEnv
   cwd?: string
 }
@@ -38,9 +39,7 @@ export function shellWord(word: string) {
 /** Prepare every agent-controlled shell or direct argv launch before selecting its transport. */
 export function prepareShellLaunch(input: LaunchInput, terminal?: Terminal) {
   if (input.prepared) {
-    const { env } = input.prepared
-    const { file, args } =
-      (terminal === 'pty' && input.prepared.terminal) || input.prepared
+    const { file, args, env } = input.prepared
     if (!terminal || terminal === 'pty')
       return { file, args, env, cwd: input.prepared.cwd ?? input.cwd }
     // util-linux script takes a shell string. Quote each word of the already prepared native invocation.

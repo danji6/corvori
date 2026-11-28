@@ -4,12 +4,12 @@ import {
 } from '@anthropic-ai/sandbox-runtime/dist/sandbox/mxc-sandbox-utils.js'
 import type { ContainerRequest } from '@microsoft/mxc-sdk/v1'
 import { realpath, writeFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { basename, dirname, join, parse, resolve } from 'node:path'
 
 import { isOutside } from '../../mcp/workspace/access'
 import type { PreparedShell } from '../launch'
 import { shellInvocation } from '../system-shell'
+import { windowsTerminal } from './windows-terminal'
 import { mountedDrives } from './windows-volumes'
 
 export function windowsWorker() {
@@ -18,13 +18,6 @@ export function windowsWorker() {
     process.env.CHAT_DATA_DIR || '.data',
     'build/sidecar/windows-preview.js',
   )
-}
-
-function windowsExecutor() {
-  const sdk = createRequire(import.meta.url).resolve(
-    '@microsoft/mxc-sdk/package.json',
-  )
-  return join(dirname(sdk), 'bin', process.arch, 'wxc-exec.exe')
 }
 
 type WindowsLaunch = {
@@ -130,7 +123,7 @@ export async function windowsRequest(
   return {
     file: input.runtime,
     args: [worker, policy],
-    terminal: { file: windowsExecutor(), args: [policy] },
+    terminal: (columns, rows) => windowsTerminal(request, columns, rows),
     cwd: dirname(worker),
     env: {
       SystemRoot: process.env.SystemRoot,
