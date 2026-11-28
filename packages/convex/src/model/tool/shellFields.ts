@@ -1,3 +1,4 @@
+import { shellRetryAccess } from '@cv/core/shell/retry'
 import { z } from 'zod'
 
 const JOB_NUMBER = /^[1-9][0-9]*$/
@@ -26,6 +27,20 @@ export const shellFields = {
       'Maximum seconds to wait for exit (default 60, maximum 600). Set to 0 to start in the background and return the job ID immediately.',
     ),
 } as const
+
+export const shellRetryField = z
+  .strictObject({
+    jobId: shellJobIdField,
+    access: z
+      .enum(shellRetryAccess)
+      .describe(
+        'Use network for network access inside the filesystem sandbox. Use both to run once outside the sandbox with filesystem and network access.',
+      ),
+  })
+  .describe(
+    'Request one retry of a failed sandboxed job. Repeat its exact command and cwd. Explain why this access is needed in description. The user must approve before the command starts again.',
+  )
+  .optional()
 
 export const shellOutputFields = {
   jobId: shellJobIdField,

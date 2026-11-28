@@ -19,6 +19,7 @@ export function buildApprovalActions(
   rememberLabel: string | null,
   hold: ApprovalHold,
   planApproval?: PlanApprovalMeta,
+  onceLabel?: string,
 ): ApprovalAction[] {
   if (!enabled) return []
 
@@ -28,7 +29,7 @@ export function buildApprovalActions(
   const items: ApprovalAction[] = [
     {
       id: 'approve',
-      label: planApproval?.approveLabel ?? 'Allow',
+      label: onceLabel ?? planApproval?.approveLabel ?? 'Allow',
       shortcut: getKey(),
       approved: true,
     },

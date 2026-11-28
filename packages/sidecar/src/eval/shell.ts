@@ -3,7 +3,7 @@ import {
   MAX_MESSAGE_PART_BYTES,
   MAX_PROMPT_CONTENT_CHARS,
 } from '@cv/core/limits'
-import { spawn } from 'node:child_process'
+import type { ChildProcess } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
 import type { z } from 'zod'
 
@@ -12,7 +12,9 @@ import { workspaceRoots } from '../checkpoints/group'
 import { checkpoints, finishCheckpointJob } from '../checkpoints/manager'
 import { withWorkspaceOperation } from '../mcp/workspace/context'
 import { resolveShellDirectory } from '../shell/directory'
-import { jobEnv, killProcessTree, shellInvocation } from '../shell/system-shell'
+import { shellWord, spawnShellPipes } from '../shell/launch'
+import { prepareAuxiliaryShell } from '../shell/sandbox/auxiliary'
+import { killProcessTree } from '../shell/system-shell'
 import type { evaluationShellSchema } from './schemas'
 
 export type EvaluationShell = z.infer<typeof evaluationShellSchema>
@@ -37,7 +39,14 @@ export async function runEvaluationShell(
           input.sessionId,
           roots,
           async (writer) => {
-            const command = launch(input, directory, args, kind, signal)
+            const command = await launch(
+              input,
+              directory,
+              roots,
+              args,
+              kind,
+              signal,
+            )
             try {
               await writer.trackJob(command.pid)
               return command
@@ -62,39 +71,66 @@ export async function runEvaluationShell(
 
 type ShellDirectory = Awaited<ReturnType<typeof resolveShellDirectory>>
 
-function launch(
+async function launch(
   input: EvaluationShell,
   directory: ShellDirectory,
+  roots: string[],
   args: string[],
   kind: EvaluationRequest['kind'],
   signal: AbortSignal,
 ) {
   signal.throwIfAborted()
 
-  const invocation =
-    args.length === 1
-      ? shellInvocation(args[0], input.shell)
-      : { file: args[0], args: args.slice(1) }
-  const child = spawn(invocation.file, invocation.args, {
-    cwd: directory.cwd,
-    env: jobEnv({}, directory.environment),
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: process.platform !== 'win32',
-    windowsHide: true,
-  })
+  const command =
+    args.length === 1 ? args[0] : { file: args[0], args: args.slice(1) }
+  const job = input.unrestricted
+    ? undefined
+    : await prepareAuxiliaryShell(
+        {
+          ...input,
+          cwd: directory.cwd,
+          environment: directory.environment,
+          command:
+            typeof command === 'string'
+              ? command
+              : 'exec ' + args.map(shellWord).join(' '),
+        },
+        roots,
+        typeof command === 'string' ? undefined : args,
+      )
+  const start = () =>
+    spawnShellPipes(
+      {
+        prepared: job?.prepared,
+        command,
+        cwd: directory.cwd,
+        environment: directory.environment,
+        shell: input.shell,
+      },
+      'ignore',
+    )
 
+  let child: ChildProcess
+  try {
+    signal.throwIfAborted()
+    child = start()
+  } catch (error) {
+    await job?.cleanup()
+    throw error
+  }
   const kill = () => killProcessTree(child.pid, () => child.kill())
 
   signal.addEventListener('abort', kill, { once: true })
-  const output = collectOutput(child, kill, kind).finally(() =>
-    signal.removeEventListener('abort', kill),
-  )
+  const output = collectOutput(child, kill, kind).finally(async () => {
+    signal.removeEventListener('abort', kill)
+    await job?.cleanup()
+  })
 
   return { pid: child.pid, kill, output }
 }
 
 function collectOutput(
-  child: ReturnType<typeof spawn>,
+  child: ChildProcess,
   kill: () => void,
   kind: EvaluationRequest['kind'],
 ) {

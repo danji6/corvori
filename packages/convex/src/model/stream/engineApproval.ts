@@ -5,6 +5,8 @@ import {
   SHELL_TOOL_PART_TYPE,
   WRITE_FILE_TOOL_PART_TYPE,
 } from '@cv/core/const'
+import type { PollResult } from '@cv/core/shell/job-protocol'
+import { shellRetry } from '@cv/core/shell/retry'
 import type { FolderWorkspace } from '@cv/core/types/workspace'
 import {
   type PathCheckResult,
@@ -61,7 +63,7 @@ export async function attachApprovalPreviews(
     allowedPaths: await previewPaths(ctx, setup),
   }
   const result = await Promise.all(
-    parts.map((part) => withApprovalPreview(context, part)),
+    parts.map((part) => withApprovalPreview(ctx, context, part)),
   )
 
   return result as UIMessage['parts']
@@ -88,11 +90,31 @@ async function previewPaths(
 }
 
 async function withApprovalPreview(
+  ctx: ActionCtx,
   context: ApprovalContext,
   part: UIMessage['parts'][number],
 ) {
   if ((part as { state?: string }).state !== 'approval-requested') {
     return part
+  }
+  const retry =
+    part.type === SHELL_TOOL_PART_TYPE &&
+    shellRetry((part as { input?: unknown }).input)
+  if (retry) {
+    const ref = await ctx.runQuery(internal.shellJobs._findReference, {
+      sessionId: context.sessionId,
+      jobId: retry.jobId,
+    })
+    if (!ref) return part
+    const status = await postSidecar<PollResult>('/shell/poll', {
+      sessionId: context.sessionId,
+      jobId: ref.jobId,
+      offset: 0,
+      limit: 0,
+    }).catch(() => undefined)
+    return status?.sandboxDenials?.length
+      ? { ...part, sandboxDenials: status.sandboxDenials }
+      : part
   }
   if (isFileTool(part.type.replace(/^tool-/, ''))) {
     const checked = await withFileApprovalPaths(context, part)
@@ -155,6 +177,7 @@ export async function withApprovalPaths(
   part: UIMessage['parts'][number],
 ) {
   const input = (part as { input?: { command?: string; cwd?: string } }).input
+  if (shellRetry(input)) return part
   const command = input?.command
   if (typeof command !== 'string') return part
 

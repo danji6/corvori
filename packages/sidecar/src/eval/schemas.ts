@@ -37,6 +37,8 @@ export const promptsSchema = requestSchema.extend({ items: records })
 export const messageSchema = requestSchema.extend({ parts: records })
 
 export const evaluationShellSchema = z.object({
+  unrestricted: z.literal(true).optional(),
+  readOnlyWorkspace: z.literal(true).optional(),
   sessionId: z.string(),
   workspaceId: z.string(),
   workspace: workspaceContextSchema,

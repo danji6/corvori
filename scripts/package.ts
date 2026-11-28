@@ -1,5 +1,5 @@
 import { releaseName } from '@cv/core/update/source'
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { projectRoot } from './runner/config'
@@ -16,6 +16,7 @@ async function main() {
   await mkdir(staging, { recursive: true })
 
   await exportTree(staging)
+  await includeSandboxHelpers(staging)
   await assertNoSymlinks(staging)
   await writeReleaseFile(staging, version)
 
@@ -25,6 +26,29 @@ async function main() {
 
   await writeChecksums(outDir, [`${name}.tar.gz`, `${name}.zip`])
   console.log(`Packaged ${name} into ${outDir}`)
+}
+
+/** Add the native helper sets built by the release workflow. */
+async function includeSandboxHelpers(staging: string) {
+  for (const arch of ['x64', 'arm64']) {
+    const name = `linux-${arch}`
+    const archive = join(projectRoot, '.data/sandbox-helpers', name + '.tar.gz')
+    const destination = join(staging, 'packages/sidecar/vendor', name)
+    await mkdir(destination, { recursive: true })
+    await output(['tar', '-xzf', archive, '-C', destination], { cwd: staging })
+    // Nix store directories ship read-only. Let the owner replace them on update.
+    await chmod(destination, 0o755)
+    await chmod(join(destination, 'sources'), 0o755)
+    const manifest = await readFile(join(destination, 'SHA256SUMS'), 'utf8')
+    for (const file of ['bwrap', 'socat', 'rg']) {
+      const hash = new Bun.CryptoHasher('sha256')
+        .update(await readFile(join(destination, file)))
+        .digest('hex')
+      if (!manifest.split('\n').includes(`${hash}  ${file}`)) {
+        throw new Error(`Invalid sandbox helper checksum for ${name}/${file}`)
+      }
+    }
+  }
 }
 
 async function readVersion() {

@@ -1,3 +1,4 @@
+import type { ShellRetry } from '@cv/core/shell/retry'
 import type { ShellAnsiState, ShellOutputSpan } from '@cv/core/types/tools'
 import type { FolderWorkspace } from '@cv/core/types/workspace'
 
@@ -19,6 +20,7 @@ export type ShellJobContext = {
 }
 
 export type ShellJobInput = {
+  retry?: ShellRetry
   cwd?: string
   command: string
   /** Display-only summary of what the command does. */
@@ -47,6 +49,11 @@ export type OpenStream = (
 ) => AsyncGenerator<ShellStreamEvent>
 
 export type ShellJobOptions = {
+  requireSandbox?: true
+  githubQuery?: true
+  readOnlyWorkspace?: true
+  sandbox?: true
+  retry?: ShellRetry
   abortSignal?: AbortSignal
   bindSessionDir?: true
   /**

@@ -2,7 +2,9 @@ import {
   PLAN_APPROVALS,
   approvalRememberOption,
 } from '@cv/core/approval-presentation'
+import { SHELL_TOOL_NAME } from '@cv/core/const'
 import type { NotificationApprovalOption } from '@cv/core/notification-actions'
+import { retryLabels, shellRetry } from '@cv/core/shell/retry'
 import { isPendingToolApproval } from '@cv/core/utils/tool-parts'
 import type { PathApprovalStatus } from '@cv/core/workspace/path-policy'
 
@@ -79,8 +81,15 @@ async function requestOptions(
 ) {
   const toolName = part.type.slice(5)
   const plan = PLAN_APPROVALS[toolName]
+  const retry =
+    toolName === SHELL_TOOL_NAME ? shellRetry(part.input) : undefined
   const options: NotificationApprovalOption[] = [
-    { action: 'allow', label: plan?.approveLabel ?? 'Allow' },
+    {
+      action: 'allow',
+      label: retry
+        ? retryLabels[retry.access]
+        : (plan?.approveLabel ?? 'Allow'),
+    },
   ]
   let remember: 'paths' | 'patterns' | undefined
 

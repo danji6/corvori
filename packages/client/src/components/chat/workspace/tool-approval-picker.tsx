@@ -8,6 +8,7 @@ import { type api } from '@cv/convex/_generated/api'
 import { HOLD_HINTS } from '@cv/convex/lib/tool/approvalPolicy'
 import { summarizeInput, toolDisplayName } from '@cv/core/approval-presentation'
 import { SHELL_TOOL_NAME } from '@cv/core/const'
+import { describeShellDenial, retryScope } from '@cv/core/shell/retry'
 import type { FunctionReturnType } from 'convex/server'
 import { type RefObject, Suspense, lazy, useRef } from 'react'
 
@@ -38,6 +39,7 @@ export function ToolApprovalPicker({
 
   const {
     planApproval,
+    retry,
     toolName,
     description,
     hold,
@@ -108,8 +110,23 @@ export function ToolApprovalPicker({
               noLoadingIndicator
               wordWrap
             />
+            {retry && (
+              <div className="text-muted-foreground ml-6 text-xs break-all">
+                Job {retry.jobId} · {(part.input as { cwd: string }).cwd}
+              </div>
+            )}
+            {retry &&
+              part.sandboxDenials?.map((denial) => (
+                <div
+                  key={describeShellDenial(denial)}
+                  className="text-muted-foreground ml-6 text-xs break-all"
+                >
+                  Sandbox blocked {describeShellDenial(denial)}
+                </div>
+              ))}
             {description && (
               <div className="text-muted-foreground -mt-2 ml-6 text-xs">
+                {retry && 'Agent’s reason: '}
                 {description}
               </div>
             )}
@@ -118,6 +135,7 @@ export function ToolApprovalPicker({
         <T.hr className="mx-auto w-[calc(100%-(var(--spacing)*2.5))]" />
         {hold && (
           <div className="text-muted-foreground ml-2 text-xs">
+            {retry && retryScope[retry.access] + ' '}
             {HOLD_HINTS[hold]}
           </div>
         )}

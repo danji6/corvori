@@ -3,8 +3,10 @@ import {
   SHELL_OUTPUT_TOOL_NAME,
   SHELL_TOOL_NAME,
 } from '@cv/core/const'
+import { hasGitHubQueryGrant } from '@cv/core/shell/direct-command'
+import { stableStringify } from '@cv/core/stable-json'
 import { TOOL_DESCRIPTIONS, shellToolDescription } from '@cv/core/types'
-import type { ShellToolOutput } from '@cv/core/types/tools'
+import type { ShellToolOutput, ToolApprovals } from '@cv/core/types/tools'
 import { parseScopedPath } from '@cv/core/workspace/scoped-path'
 
 import { ToolError } from '../../errors'
@@ -14,59 +16,184 @@ import {
   isToolAutoApproved,
   isUnrestrictedAccess,
 } from '../../lib/tool/approval'
+import { getSidecar, postSidecar } from '../sidecar'
 import {
   type WatchedJobRef,
   type WorkspaceToolContext,
   workspaceArgs,
 } from './context'
 import { approvalsForFilesystemCall } from './filesystemApprovals'
-import { checkShellToolPaths } from './paths'
+import { checkShellToolPaths, checkToolPaths } from './paths'
 import {
   type ShellJobInput,
   type ShellOutputInput,
   executeShellJob,
   executeShellOutput,
   killShell,
+  shellLaunchRequest,
   shellToModelOutput,
 } from './shell'
-import { killShellFields, shellFields, shellOutputFields } from './shellFields'
+import {
+  killShellFields,
+  shellFields,
+  shellOutputFields,
+  shellRetryField,
+} from './shellFields'
 import { shellWaitSeconds, waitForShell } from './shellTimedWait'
 
 export async function createShellTool(context: WorkspaceToolContext) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
+  const capability =
+    context.workspace && context.findShell ? await shellCapability() : undefined
+  const automatic =
+    capability?.version === 2 && capability.automaticShellExecution === true
+  const preview =
+    automatic || (capability?.version === 1 && capability.retryPreview)
+  const fallbackRequests = new Map<string, string>()
+
+  async function needsLaunchApproval(
+    input: ShellJobInput,
+    current: WorkspaceToolContext,
+    toolCallId: string,
+  ) {
+    fallbackRequests.delete(toolCallId)
+    if (input.retry) return true
+    const approvals = await current.approvals?.()
+    if (isUnrestrictedAccess(approvals)) return false
+    if (
+      !automatic ||
+      !supportsSandboxShell(current.shell, capability?.platform) ||
+      (await current.isPlanMode?.())
+    )
+      return shellNeedsApproval(input.command, current, input.cwd)
+    const probe = await postSidecar<{ ready: boolean }>(
+      '/shell/sandbox/check',
+      {
+        ...workspaceArgs(current),
+        command: input.command,
+        allowedPaths: approvals?.paths,
+      },
+    ).catch(() => undefined)
+    if (!probe?.ready) {
+      fallbackRequests.set(toolCallId, stableStringify(input))
+      return true
+    }
+    if (!input.cwd) return false
+    const result = await checkToolPaths([], current, approvals?.paths, {
+      cwd: input.cwd,
+    })
+    return !result?.complete || result.uncovered.length > 0
+  }
+
+  async function launch(
+    input: ShellJobInput,
+    toolCallId: string,
+    approvals: ToolApprovals | undefined,
+  ) {
+    const planMode = await context.isPlanMode?.()
+    const requestedFallback = fallbackRequests.get(toolCallId)
+    fallbackRequests.delete(toolCallId)
+    if (requestedFallback !== undefined) {
+      const approved =
+        requestedFallback === stableStringify(input) &&
+        (await context.manuallyApproved?.({
+          id: toolCallId,
+          name: SHELL_TOOL_NAME,
+          input,
+        }))
+      if (!approved)
+        throw new ToolError(
+          'Running the command without the sandbox requires a fresh approval.',
+        )
+    }
+    const enforced =
+      automatic &&
+      supportsSandboxShell(context.shell, capability?.platform) &&
+      requestedFallback === undefined
+    const sandbox =
+      !isUnrestrictedAccess(approvals) &&
+      (enforced || (preview && !automatic && !planMode))
+    if (input.retry && (!sandbox || planMode))
+      throw new ToolError('Sandbox retry is unavailable in this mode')
+    const cwdGrant =
+      input.cwd &&
+      (!enforced || isUnrestrictedAccess(approvals)) &&
+      !parseScopedPath(input.cwd).explicit
+        ? [input.cwd]
+        : []
+    const job = {
+      ...workspaceArgs(context),
+      ...jobRef(context, toolCallId),
+      allowedPaths: [...(approvals?.paths ?? []), ...cwdGrant],
+    }
+    const ref =
+      input.retry && (await requireShellReference(context, input.retry.jobId))
+    const retry = input.retry && ref && { ...input.retry, jobId: ref.jobId }
+    return {
+      job,
+      options: {
+        sandbox: sandbox ? (true as const) : undefined,
+        requireSandbox: sandbox && enforced ? (true as const) : undefined,
+        readOnlyWorkspace: sandbox && planMode ? (true as const) : undefined,
+        githubQuery:
+          sandbox &&
+          enforced &&
+          !planMode &&
+          hasGitHubQueryGrant(input.command, approvals?.shell)
+            ? (true as const)
+            : undefined,
+        retry,
+        bindSessionDir: shouldBindSessionDir(input.command, context),
+      },
+    }
+  }
+
   return tool<ShellJobInput, ShellToolOutput, never>({
     description: shellToolDescription(
       context.shell,
       context.hasAgentHome ?? !!context.workspace?.agentHome,
     ),
-    inputSchema: z.strictObject(shellFields),
-    needsApproval: (input) =>
-      shellNeedsApproval(input.command, context, input.cwd),
+    inputSchema: z.strictObject(
+      preview ? { ...shellFields, retry: shellRetryField } : shellFields,
+    ),
+    needsApproval: async (input, execution) => {
+      if (!input.retry)
+        return automatic
+          ? needsLaunchApproval(input, context, execution.toolCallId)
+          : shellNeedsApproval(input.command, context, input.cwd)
+      const { job, options } = await launch(
+        input,
+        execution.toolCallId,
+        await context.approvals?.(),
+      )
+      if (!input.cwd || !input.description?.trim())
+        throw new ToolError(
+          'A sandbox retry requires the original working directory and a reason for the requested access',
+        )
+      await postSidecar(
+        '/shell/retry/check',
+        shellLaunchRequest(job, input, options),
+      )
+      return true
+    },
     toModelOutput: shellToModelOutput,
     execute: async function* (input, { abortSignal, toolCallId }) {
       const approvals = await approvalsForFilesystemCall(
         context,
         { id: toolCallId, name: SHELL_TOOL_NAME, input },
-        (current) => shellNeedsApproval(input.command, current, input.cwd),
+        (current) => needsLaunchApproval(input, current, toolCallId),
       )
-      // Reaching execute means this invocation passed its approval gate
-      const cwdGrant =
-        input.cwd && !parseScopedPath(input.cwd).explicit ? [input.cwd] : []
-      const allowedPaths = [...(approvals?.paths ?? []), ...cwdGrant]
+      const { job, options } = await launch(input, toolCallId, approvals)
       yield* trackJob(
         executeShellJob(
-          {
-            ...workspaceArgs(context),
-            ...jobRef(context, toolCallId),
-            allowedPaths,
-          },
+          job,
           {
             ...input,
             wait_seconds: shellWaitSeconds(input.wait_seconds),
           },
           {
             abortSignal,
-            bindSessionDir: shouldBindSessionDir(input.command, context),
+            ...options,
             windowDeadline: context.shellWindowDeadline,
             onStarted:
               context.bindShell &&
@@ -80,7 +207,30 @@ export async function createShellTool(context: WorkspaceToolContext) {
   })
 }
 
-function shouldBindSessionDir(command: string, context: WorkspaceToolContext) {
+async function shellCapability() {
+  const info = await getSidecar<{
+    sandbox?: {
+      version: number
+      platform?: string
+      retryPreview?: boolean
+      automaticShellExecution?: boolean
+    }
+  }>('/shell/info').catch(() => undefined)
+  return info?.sandbox
+}
+
+function supportsSandboxShell(shell?: string, platform?: string) {
+  if (platform === 'win32')
+    return (
+      !shell || /^(?:.*[\\/])?(?:cmd|powershell|pwsh)(?:\.exe)?$/i.test(shell)
+    )
+  return !shell || /^(?:\/bin\/)?(?:sh|bash|zsh)$/.test(shell)
+}
+
+function shouldBindSessionDir(
+  command: string,
+  context: WorkspaceToolContext,
+): true | undefined {
   if (!context.workspace?.sessionFiles || !command.includes('SESSION_DIR'))
     return undefined
   const { complete, sessionPaths } = analyzeShellPathCandidates(command)

@@ -1,0 +1,36 @@
+name: Build Linux sandbox helpers
+
+on: workflow_call
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@v31
+      - run: nix-build scripts/sandbox/linux-helpers.nix -o "$RUNNER_TEMP/helpers"
+      - name: Verify and pack standalone helpers
+        run: |
+          cd "$RUNNER_TEMP/helpers"
+          sha256sum --check SHA256SUMS
+          ./bwrap --version
+          ./rg --version
+          ./socat -V
+          tar -czf "$RUNNER_TEMP/linux-${{ matrix.arch }}.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sandbox-helpers-${{ matrix.arch }}
+          path: ${{ runner.temp }}/linux-${{ matrix.arch }}.tar.gz

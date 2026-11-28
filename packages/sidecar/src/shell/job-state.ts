@@ -1,9 +1,16 @@
+import type { ShellDenial } from '@cv/core/shell/retry'
+
 import { type ShellJobStatus } from './job-protocol'
 import { type OutputRing } from './output-ring'
 import { type ShellJobProcess } from './pty'
+import type { ShellRetryAuthorization } from './sandbox/retry'
 import { type ShellJobSubscriber } from './subscriber'
 
 export type ShellJob = {
+  collectingDenials?: Promise<void>
+  sandboxDenials?: ShellDenial[]
+  retryAuthorization?: ShellRetryAuthorization
+  retryOf?: string
   agentId?: string
   homeId?: string
   jobId: string

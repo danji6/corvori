@@ -3,6 +3,7 @@ import {
   SHELL_PAGE_CHARS,
   SHELL_TERM_TAIL_CHARS,
 } from '@cv/core/shell/output-page'
+import { shellRetryAccess } from '@cv/core/shell/retry'
 import type { Context, Handler } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { ZodError, z } from 'zod'
@@ -10,6 +11,7 @@ import { ZodError, z } from 'zod'
 import { withAgentFiles } from '../agent-files/access'
 import { workspaceRoots } from '../checkpoints/group'
 import { checkpoints } from '../checkpoints/manager'
+import { resolvePathGrants } from '../mcp/workspace/access'
 import {
   withWorkspaceOperation,
   workspaceContextSchema,
@@ -18,6 +20,7 @@ import { resolveShellDirectory } from './directory'
 import {
   type ShellJobStream,
   backgroundShellJob,
+  checkShellRetry,
   killSessionShellJobs,
   killShellJob,
   listShellJobs,
@@ -26,8 +29,13 @@ import {
   shellJobPid,
   startShellJob,
   subscribeShellJob,
+  terminalShellEvidence,
   writeStdin,
 } from './registry'
+import { previewAvailable } from './sandbox/preview-platform'
+import { privateShellPaths } from './sandbox/private-paths'
+import { sandboxReady, sandboxSetupDetail } from './sandbox/readiness'
+import { sandboxRoots } from './sandbox/roots'
 import { pumpShellJobStream } from './stream'
 import { canBindSessionDir, shellPath } from './system-shell'
 
@@ -45,6 +53,16 @@ const startSchema = z.strictObject({
   workspaceId: z.string(),
   workspace: workspaceContextSchema,
   command: z.string().min(1),
+  sandbox: z.literal(true).optional(),
+  scopedGrants: z.literal(true).optional(),
+  githubQuery: z.literal(true).optional(),
+  readOnlyWorkspace: z.literal(true).optional(),
+  retry: z
+    .strictObject({
+      jobId: z.string().min(1),
+      access: z.enum(shellRetryAccess),
+    })
+    .optional(),
   bindSessionDir: z.literal(true).optional(),
   cwd: z.string().optional(),
   allowedPaths: z.array(z.string()).optional(),
@@ -96,43 +114,95 @@ const killSessionSchema = z.object({
 })
 
 /** What an unconfigured shell resolves to on this host. */
-export const shellInfo: Handler = (c) => {
+export const shellInfo: Handler = async (c) => {
   try {
     const shell = shellPath()
-    return c.json({ shell, label: shellLabel(shell) })
+    const ready = await sandboxReady()
+    return c.json({
+      shell,
+      label: shellLabel(shell),
+      sandbox: {
+        version: 2,
+        retryPreview: ready,
+        automaticShellExecution: ready,
+        platform: process.platform,
+        detail: ready ? undefined : sandboxSetupDetail(),
+      },
+    })
   } catch (err: unknown) {
     return jobError(c, err)
   }
 }
 
-export const startShell: Handler = async (c) => {
+type StartRequest = z.infer<typeof startSchema>
+
+async function resolveLaunch(input: StartRequest, scopedGrants: boolean) {
+  const directory = await resolveShellDirectory(input)
+  const roots = [
+    ...new Set([
+      ...(await workspaceRoots(input.sessionId, input.workspace)),
+      ...directory.roots,
+      directory.cwd,
+    ]),
+  ]
+  const grants = scopedGrants
+    ? await resolvePathGrants(directory.grantRoot, input.allowedPaths ?? [])
+    : []
+  const launch = {
+    grantedPaths: grants.map((grant) => grant.absolutePath),
+    ...input,
+    agentId: input.workspace.agentHome?.agentId,
+    homeId: input.workspace.agentHome?.homeId,
+    revision: input.workspace.revision,
+    authority: JSON.stringify([
+      input.workspace.folderId,
+      input.workspace.agentHome?.revision,
+      [...roots].sort(),
+      [...(input.allowedPaths ?? [])]
+        .filter((path) => path !== directory.cwd)
+        .sort(),
+      input.allowInteractiveShells ?? false,
+      directory.environment,
+    ]),
+    cwd: directory.cwd,
+    environment: directory.environment,
+    boundSessionDir:
+      input.bindSessionDir && canBindSessionDir(input.shell)
+        ? directory.environment.SESSION_DIR
+        : undefined,
+  }
+  return { launch, roots }
+}
+
+async function shellLaunch(
+  c: Context,
+  inspect: boolean,
+  requireSandbox = false,
+) {
   try {
     const input = startSchema.parse(await c.req.json())
+    if (requireSandbox && !input.sandbox)
+      throw new Error('A sandbox policy is required')
     const result = await withAgentFiles(
       input.workspace.agentHome?.homeId ?? input.workspace.agentHome?.agentId,
       () =>
         withWorkspaceOperation(input.sessionId, async () => {
-          const directory = await resolveShellDirectory(input)
-          const roots = [
-            ...(await workspaceRoots(input.sessionId, input.workspace)),
-            ...directory.roots,
-            directory.cwd,
-          ]
+          const { launch, roots } = await resolveLaunch(
+            input,
+            requireSandbox || (inspect && input.scopedGrants === true),
+          )
+          if (inspect) {
+            if (!previewAvailable())
+              throw new Error('Shell sandbox preview is unavailable')
+            if (input.cwd !== launch.cwd)
+              throw new Error(
+                'Use the absolute working directory of the failed job',
+              )
+            checkShellRetry(launch).request(launch)
+            return { cwd: launch.cwd }
+          }
           return checkpoints().write(input.sessionId, roots, async (writer) => {
-            const started = await startShellJob(
-              {
-                ...input,
-                agentId: input.workspace.agentHome?.agentId,
-                homeId: input.workspace.agentHome?.homeId,
-                cwd: directory.cwd,
-                environment: directory.environment,
-                boundSessionDir:
-                  input.bindSessionDir && canBindSessionDir(input.shell)
-                    ? directory.environment.SESSION_DIR
-                    : undefined,
-              },
-              roots,
-            )
+            const started = await startShellJob(launch, roots)
             try {
               await writer.trackJob(shellJobPid(started.jobId, input.sessionId))
             } catch (error) {
@@ -149,9 +219,37 @@ export const startShell: Handler = async (c) => {
   }
 }
 
+export const startShell: Handler = (c) => shellLaunch(c, false)
+export const checkSandboxLaunch: Handler = async (c) => {
+  try {
+    const input = startSchema.parse(await c.req.json())
+    if (!(await sandboxReady())) return c.json({ ready: false })
+    const { launch, roots } = await resolveLaunch(input, true)
+    const writable = await sandboxRoots([...roots, ...launch.grantedPaths])
+    await privateShellPaths(writable, launch.environment)
+    return c.json({ ready: true })
+  } catch {
+    return c.json({ ready: false })
+  }
+}
+
+export const startSandboxShell: Handler = async (c) => {
+  if (!(await sandboxReady()))
+    return c.json(
+      {
+        error:
+          'Shell sandbox unavailable. Request the command again for approval.',
+      },
+      409,
+    )
+  return shellLaunch(c, false, true)
+}
+export const inspectShellRetry: Handler = (c) => shellLaunch(c, true)
+
 export const pollShell: Handler = async (c) => {
   try {
     const input = pollSchema.parse(await c.req.json())
+    await terminalShellEvidence(input.jobId, input.sessionId)
     return c.json(
       pollShellJob(input.jobId, input.sessionId, input.offset, input),
     )

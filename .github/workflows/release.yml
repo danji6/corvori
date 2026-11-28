@@ -8,7 +8,13 @@ permissions:
   contents: write
 
 jobs:
+  helpers:
+    uses: ./.github/workflows/linux-sandbox-helpers.yml
+    permissions:
+      contents: read
+
   release:
+    needs: helpers
     runs-on: ubuntu-latest
 
     steps:
@@ -38,6 +44,11 @@ jobs:
       - run: bun run test:all
       - run: bun run build
 
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sandbox-helpers-*
+          merge-multiple: true
+          path: .data/sandbox-helpers
       - name: Build the release archives
         run: bun scripts/package.ts
 

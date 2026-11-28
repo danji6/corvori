@@ -1,3 +1,5 @@
+import type { ShellDenial, ShellRetry } from './retry'
+
 export type PtyMode = 'pty' | 'script' | 'pipe'
 
 export type ShellJobStatus = 'running' | 'done' | 'killed'
@@ -13,6 +15,13 @@ export type StartShellJobInput = {
   messageCreatedAt?: number
   toolCallId?: string
   workspaceId: string
+  revision?: number
+  authority?: string
+  grantedPaths?: string[]
+  githubQuery?: true
+  readOnlyWorkspace?: true
+  sandbox?: true
+  retry?: ShellRetry
   command: string
   cwd: string
   environment?: {
@@ -29,6 +38,7 @@ export type StartShellJobInput = {
 }
 
 export type ShellJobSummary = {
+  retryOf?: string
   agentId?: string
   homeId?: string
   jobId: string
@@ -47,6 +57,8 @@ export type ShellJobSummary = {
 }
 
 export type PollResult = {
+  sandboxDenials?: ShellDenial[]
+  retryCwd?: string
   chunk: string
   nextOffset: number
   bufferStart: number

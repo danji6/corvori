@@ -79,6 +79,8 @@ import {
 import { sessionFileRoutes } from './session-files/routes'
 import {
   backgroundShell,
+  checkSandboxLaunch,
+  inspectShellRetry,
   killSessionShell,
   killShell,
   listShell,
@@ -86,6 +88,7 @@ import {
   resizeShell,
   shellInfo,
   shellStdin,
+  startSandboxShell,
   startShell,
   streamShell,
 } from './shell/handlers'
@@ -118,6 +121,9 @@ export function createApp(authenticate: MiddlewareHandler) {
 
   app.get('/shell/info', shellInfo)
   app.post('/shell/start', startShell)
+  app.post('/shell/sandbox/check', checkSandboxLaunch)
+  app.post('/shell/sandbox/start', startSandboxShell)
+  app.post('/shell/retry/check', inspectShellRetry)
   app.post('/shell/poll', pollShell)
   app.get('/shell/stream', streamShell)
   app.post('/shell/stdin', shellStdin)

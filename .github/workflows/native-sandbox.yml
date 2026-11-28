@@ -1,0 +1,61 @@
+name: Native shell sandbox
+
+on:
+  pull_request:
+    paths:
+      - 'tests/features/shell/native-sandbox/**'
+      - 'scripts/sandbox/**'
+      - 'packages/sidecar/src/shell/sandbox/**'
+      - '.github/workflows/linux-sandbox-helpers.yml'
+      - '.github/workflows/native-sandbox.yml'
+      - '.github/workflows/native-sandbox-platform.yml'
+      - 'versions.json'
+  push:
+    branches: [codex/sidecar-shell-sandbox]
+
+permissions:
+  contents: read
+
+jobs:
+  helpers:
+    uses: ./.github/workflows/linux-sandbox-helpers.yml
+
+  shell-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Read the embedded Node version
+        id: pins
+        working-directory: .
+        shell: bash
+        run: echo "node=$(jq -r .node versions.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.pins.outputs.node }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - run: bun run tests shell
+      - run: bun --no-env-file test --path-ignore-patterns '**/browser/**' ./tests/features/editor/evaluation-worker.test.ts
+
+  linux:
+    needs: helpers
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-22.04-arm]
+    uses: ./.github/workflows/native-sandbox-platform.yml
+    with:
+      os: ${{ matrix.os }}
+
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, windows-11-arm]
+    uses: ./.github/workflows/native-sandbox-platform.yml
+    with:
+      os: ${{ matrix.os }}
