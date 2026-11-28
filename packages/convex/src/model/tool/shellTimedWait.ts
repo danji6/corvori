@@ -128,6 +128,7 @@ function timedResult(
     jobId,
     status: snapshot.status === 'running' ? 'background' : snapshot.status,
     exitCode: snapshot.exitCode,
+    ...(snapshot.sandboxDenials && { sandboxDenials: snapshot.sandboxDenials }),
     ...(snapshot.retryCwd && { retryCwd: snapshot.retryCwd }),
     text: page.text,
     term,

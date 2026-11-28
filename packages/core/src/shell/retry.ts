@@ -1,6 +1,16 @@
 export const shellRetryAccess = ['filesystem', 'network', 'both'] as const
 export type ShellRetryAccess = (typeof shellRetryAccess)[number]
 
+export type ShellDenial = {
+  access: 'filesystem' | 'network'
+  operation: string
+  target?: string
+}
+
+export function describeShellDenial(denial: ShellDenial) {
+  return [denial.operation, denial.target].filter(Boolean).join(' ')
+}
+
 export type ShellRetry = { jobId: string; access: ShellRetryAccess }
 
 export function shellRetry(input: unknown): ShellRetry | undefined {

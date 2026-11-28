@@ -260,6 +260,7 @@ function finishPage(
     jobId: input.jobId,
     status,
     exitCode: current.exitCode,
+    ...(current.sandboxDenials && { sandboxDenials: current.sandboxDenials }),
     ...(current.retryCwd && { retryCwd: current.retryCwd }),
     text,
     term: current.term,

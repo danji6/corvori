@@ -74,6 +74,15 @@ export const shellOutputRangeValidator = v.object({
 
 /** Mirrors `ShellToolOutput` from `@cv/core/types/tools`. */
 export const shellToolOutputValidator = v.object({
+  sandboxDenials: v.optional(
+    v.array(
+      v.object({
+        access: v.union(v.literal('filesystem'), v.literal('network')),
+        operation: v.string(),
+        target: v.optional(v.string()),
+      }),
+    ),
+  ),
   retryCwd: v.optional(v.string()),
   jobId: v.string(),
   jobNumber: v.optional(v.number()),

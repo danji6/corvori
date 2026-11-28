@@ -215,6 +215,48 @@ describe.skipIf(
     }
   })
 
+  test.skipIf(process.platform !== 'darwin')(
+    'Seatbelt identifies the child’s denied read in the failed job',
+    async () => {
+      const failed = await execute(
+        { command: '/bin/cat protected.private >/dev/null 2>&1 || exit 42' },
+        'native-denial',
+      )
+      expect(failed.sandboxDenials).toContainEqual({
+        access: 'filesystem',
+        operation: 'file-read-data',
+        target: join(sandbox, 'protected.private'),
+      })
+    },
+  )
+
+  test('a capability loss between approval and launch never starts a host process', async () => {
+    const input = {
+      command: 'echo host-start > capability-marker',
+      description: 'Create a marker',
+    }
+    expect(await approveRequest(input, 'capability')).toBe('not-applicable')
+    const calls: string[] = []
+    const older = Bun.serve({
+      port: 0,
+      hostname: '127.0.0.1',
+      fetch(req) {
+        const path = new URL(req.url).pathname
+        calls.push(path)
+        return new Response('Unsupported sandbox route', { status: 404 })
+      },
+    })
+    process.env.SIDECAR_URL = older.url.origin
+    try {
+      await expect(execute(input, 'capability')).rejects.toThrow()
+      expect(await approveRequest(input, 'fallback')).toBe('user-approval')
+      expect(calls).toEqual(['/shell/sandbox/start', '/shell/sandbox/check'])
+    } finally {
+      process.env.SIDECAR_URL = sidecar.url
+      older.stop(true)
+    }
+  })
+
   test.each(['filesystem', 'network', 'both'] as const)(
     'restarts once with only %s access',
     async (access) => {

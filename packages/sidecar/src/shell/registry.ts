@@ -10,6 +10,7 @@ import { type ShellStreamEvent } from './job-protocol'
 import { type ShellJob } from './job-state'
 import { OutputRing } from './output-ring'
 import { type PtyMode, spawnJob } from './pty'
+import { readSeatbeltDenials } from './sandbox/denials'
 import { preparePreview } from './sandbox/preview'
 import { ShellRetryAuthorization } from './sandbox/retry'
 import { ShellJobSubscriber } from './subscriber'
@@ -126,14 +127,22 @@ export async function startShellJob(
   startWaitProbe(job)
 
   proc.onExit((exitCode) => {
+    if (exitCode && !job.endReason && preview?.tag) {
+      job.collectingDenials = readSeatbeltDenials(
+        preview.tag,
+        job.startedAt,
+      ).then((events) => {
+        job.sandboxDenials = events
+      })
+    }
     void preview
       ?.cleanup()
       .catch(() =>
         console.error('Failed to remove shell job temporary directory'),
       )
     // Grace period after exit for the final output
+    clearInterval(job.waitProbe)
     setTimeout(() => {
-      clearInterval(job.waitProbe)
       job.exitCode = exitCode
       job.exitedAt = Date.now()
       job.waiting = false
@@ -172,6 +181,12 @@ export function checkShellRetry(input: StartShellJobInput) {
   return job.retryAuthorization
 }
 
+/** Wait for native evidence only when returning a completed failure over HTTP. */
+export function terminalShellEvidence(jobId: string, sessionId: string) {
+  const job = requireJob(jobId, sessionId)
+  if (job.status === 'done') return job.collectingDenials
+}
+
 export function pollShellJob(
   jobId: string,
   sessionId: string,
@@ -197,7 +212,12 @@ export function pollShellJob(
     ...(job.status === 'done' &&
     job.exitCode &&
     job.retryAuthorization?.available
-      ? { retryCwd: job.retryAuthorization.cwd }
+      ? {
+          retryCwd: job.retryAuthorization.cwd,
+          ...(job.sandboxDenials?.length && {
+            sandboxDenials: job.sandboxDenials,
+          }),
+        }
       : {}),
     ...(tail && { term: tail.text, termOffset: tail.start }),
   }

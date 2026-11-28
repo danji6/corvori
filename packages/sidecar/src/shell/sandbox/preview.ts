@@ -183,8 +183,21 @@ export async function preparePreview(
           git,
         ))),
     }
+    const prepared = await wrapPreview(policy, temporary, runtime, env)
+    const tag =
+      process.platform === 'darwin'
+        ? prepared.args
+            .at(-1)
+            ?.match(/; LogTag: (CMD64_[\w+/=]+_END_\w+_SBX)/)?.[1]
+        : undefined
+    const trustedTag = tag?.startsWith(
+      'CMD64_' + Buffer.from(policy.commandId).toString('base64') + '_END_',
+    )
+      ? tag
+      : undefined
     return {
-      prepared: await wrapPreview(policy, temporary, runtime, env),
+      tag: trustedTag,
+      prepared,
       cleanup,
     }
   } catch (error) {

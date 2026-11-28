@@ -1,4 +1,4 @@
-import type { ShellRetry } from './retry'
+import type { ShellDenial, ShellRetry } from './retry'
 
 export type PtyMode = 'pty' | 'script' | 'pipe'
 
@@ -57,6 +57,7 @@ export type ShellJobSummary = {
 }
 
 export type PollResult = {
+  sandboxDenials?: ShellDenial[]
   retryCwd?: string
   chunk: string
   nextOffset: number

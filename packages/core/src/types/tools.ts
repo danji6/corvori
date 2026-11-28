@@ -2,6 +2,7 @@ import type * as V from '@cv/convex/validators'
 import type { Infer } from 'convex/values'
 
 import type { ShellJobSummary as SidecarShellJobSummary } from '../shell/job-protocol'
+import type { ShellDenial } from '../shell/retry'
 
 export type RememberScope = Infer<typeof V.rememberScopeValidator>
 
@@ -23,6 +24,7 @@ export type ShellJobStatus =
   'running' | 'done' | 'killed' | 'timeout' | 'background' | 'lost'
 
 export type ShellToolOutput = {
+  sandboxDenials?: ShellDenial[]
   /** Original directory for an agent-requested, one-time sandbox retry. */
   retryCwd?: string
   jobId: string

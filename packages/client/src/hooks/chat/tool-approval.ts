@@ -16,7 +16,7 @@ import { api } from '@cv/convex/_generated/api'
 import { alwaysLabel, approvalHold } from '@cv/convex/lib/tool/approvalPolicy'
 import { PLAN_APPROVALS, getDescription } from '@cv/core/approval-presentation'
 import { APP_ID, SHELL_TOOL_NAME } from '@cv/core/const'
-import { retryLabels, shellRetry } from '@cv/core/shell/retry'
+import { type ShellDenial, retryLabels, shellRetry } from '@cv/core/shell/retry'
 import { isPendingToolApproval } from '@cv/core/utils/tool-parts'
 import type { PathApprovalStatus } from '@cv/core/workspace/path-policy'
 import type { Editor } from '@tiptap/react'
@@ -32,7 +32,10 @@ const accountNotes = createTextDraftStore(`${APP_ID}-approval-note-drafts`)
 
 export type PendingToolApproval = {
   key: string
-  part: ToolUIPart & { approvalPathStatus?: PathApprovalStatus }
+  part: ToolUIPart & {
+    approvalPathStatus?: PathApprovalStatus
+    sandboxDenials?: ShellDenial[]
+  }
 }
 
 type PendingApprovalOptions = {

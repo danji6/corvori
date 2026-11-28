@@ -29,6 +29,7 @@ import {
   shellJobPid,
   startShellJob,
   subscribeShellJob,
+  terminalShellEvidence,
   writeStdin,
 } from './registry'
 import { previewAvailable } from './sandbox/preview-platform'
@@ -244,6 +245,7 @@ export const inspectShellRetry: Handler = (c) => shellLaunch(c, true)
 export const pollShell: Handler = async (c) => {
   try {
     const input = pollSchema.parse(await c.req.json())
+    await terminalShellEvidence(input.jobId, input.sessionId)
     return c.json(
       pollShellJob(input.jobId, input.sessionId, input.offset, input),
     )

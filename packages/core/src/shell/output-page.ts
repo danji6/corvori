@@ -1,5 +1,6 @@
 import type { ShellAnsiState, ShellToolOutput } from '../types/tools'
 import { stripTerminalCodes } from './ansi'
+import { describeShellDenial } from './retry'
 
 export const SHELL_PAGE_CHARS = 24_000
 export const SHELL_TERM_TAIL_CHARS = 48_000
@@ -48,9 +49,10 @@ export function plainOutputPage(
 export function formatOutputPage(output: ShellToolOutput): string {
   const range = output.range
   const jobId = String(output.jobNumber ?? output.jobId)
+  const denials = output.sandboxDenials?.map(describeShellDenial).join(', ')
   const retry =
     output.retryCwd &&
-    `Job ${jobId} ran in ${output.retryCwd}. If additional access is needed, request a one-time retry with this cwd and explain why.`
+    `Job ${jobId} ran in ${output.retryCwd}. ${denials ? 'The sandbox recorded ' + denials + '. ' : ''}If additional access is needed, request a one-time retry with this cwd and explain why.`
   if (!range) return retry ? output.text + '\n' + retry : output.text
 
   const status = output.status === 'background' ? 'running' : output.status
