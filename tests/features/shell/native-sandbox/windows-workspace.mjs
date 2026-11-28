@@ -3,7 +3,7 @@ import { probe, spawn } from '@microsoft/mxc-sdk/v1'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import console from 'node:console'
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, join, parse } from 'node:path'
@@ -47,6 +47,17 @@ try {
     ].join('\n'),
   )
   const qualified = new Set()
+  const libraries = []
+  for (const name of ['System32', 'SysWOW64', 'WinSxS']) {
+    const path = join(process.env.SystemRoot, name)
+    if (
+      await stat(path).then(
+        (s) => s.isDirectory(),
+        () => false,
+      )
+    )
+      libraries.push(path)
+  }
   for (const denyVolume of [false, true]) {
     for (const online of [false, true]) {
       try {
@@ -69,7 +80,7 @@ try {
             },
           },
           filesystem: {
-            readonlyPaths: [runtime, dependency],
+            readonlyPaths: [runtime, dependency, ...libraries],
             readwritePaths: [workspace],
             deniedPaths: [
               ignored,
