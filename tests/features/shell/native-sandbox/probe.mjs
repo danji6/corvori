@@ -1,7 +1,6 @@
-import {
-  SandboxManager,
-  WindowsSandboxError,
-} from '@anthropic-ai/sandbox-runtime'
+import { SandboxManager } from '@anthropic-ai/sandbox-runtime'
+import { preparePreview } from '@cv/sidecar/shell/sandbox/preview'
+import { ShellRetryAuthorization } from '@cv/sidecar/shell/sandbox/retry'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import console from 'node:console'
@@ -14,6 +13,7 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -127,6 +127,56 @@ async function checkChildren() {
   console.log('Unexplained failure returned once, optional denial succeeded')
 }
 
+/** Exercise the approved host launch after the Windows backend denies the first run. */
+async function checkOutsideRetry() {
+  const server = createServer((_request, response) => response.end('fixture'))
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  try {
+    const jobId = randomUUID()
+    const command =
+      'node workload.mjs retry first.private ' + server.address().port
+    const job = {
+      cwd: workspace,
+      command,
+      shell: 'cmd.exe',
+      sessionId: jobId,
+      workspaceId: workspace,
+      revision: 1,
+    }
+    const failed = await run(command, jobId)
+    assert.equal(failed.status, 42, JSON.stringify(failed))
+    assert.equal(failed.output, 'file=false network=false')
+    const approval = new ShellRetryAuthorization(job)
+    const replay = {
+      ...job,
+      toolCallId: randomUUID(),
+      retry: { jobId, access: 'both' },
+    }
+    approval.request(replay)
+    assert.equal(await readFile('retry-starts', 'utf8'), 'x')
+    const launch = await preparePreview(
+      replay,
+      [workspace],
+      approval.consume(replay),
+    )
+    try {
+      const { file, args, env } = launch.prepared
+      const { stdout } = await execute(file, args, {
+        cwd: workspace,
+        env,
+        timeout: 10000,
+      })
+      assert.equal(stdout.trim(), 'file=true network=true')
+    } finally {
+      await launch.cleanup()
+    }
+    assert.throws(() => approval.consume(replay), /already used/)
+    assert.equal(await readFile('retry-starts', 'utf8'), 'xx')
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
+  }
+}
+
 try {
   process.chdir(workspace)
   await execute('git', ['init', '--quiet'], { cwd: workspace })
@@ -142,26 +192,7 @@ try {
   assert.equal(await readFile('output.txt', 'utf8'), 'workspace output')
   console.log('Ordinary workspace I/O succeeded')
   await checkChildren()
-  if (backend === 'mxc') {
-    await SandboxManager.reset()
-    const policy = await offlinePolicy(workspace)
-    await assert.rejects(
-      initializeBackend(
-        {
-          ...policy,
-          filesystem: { ...policy.filesystem, disabled: true },
-        },
-        true,
-      ),
-      (error) =>
-        error instanceof WindowsSandboxError &&
-        error.code === 'backend_unsupported' &&
-        error.message.includes('filesystem.disabled'),
-    )
-    console.log(
-      'MXC declined an outside-filesystem retry with network still restricted before launch',
-    )
-  }
+  if (windows) await checkOutsideRetry()
 } finally {
   try {
     await SandboxManager.reset()

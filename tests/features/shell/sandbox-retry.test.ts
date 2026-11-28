@@ -10,7 +10,7 @@ import {
   approvalRememberOption,
   approvalSummary,
 } from '@cv/core/approval-presentation'
-import type { ShellRetryAccess } from '@cv/core/shell/retry'
+import { retryLabels, shellRetryAccess } from '@cv/core/shell/retry'
 import type { ShellToolOutput } from '@cv/core/types/tools'
 import { type ToolSet, streamText } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
@@ -274,8 +274,8 @@ describe.skipIf(
     }
   })
 
-  test.each(['filesystem', 'network', 'both'] as const)(
-    'restarts once with only %s access',
+  test.each([...shellRetryAccess])(
+    'restarts once with the approved %s access',
     async (access) => {
       const count = join(sandbox, access + '-starts')
       const url = 'http://127.0.0.1:' + server.port + '/fixture'
@@ -307,7 +307,10 @@ describe.skipIf(
           'Remember',
         ),
       ).toBeUndefined()
-      expect(approvalSummary('shell', request)).toContain('Agent’s reason')
+      const summary = approvalSummary('shell', request)
+      expect(summary).toContain(retryLabels[access])
+      expect(summary).toContain(request.description)
+      if (access === 'both') expect(summary).toContain('filesystem and network')
       const runs = await Promise.allSettled([
         execute(request, call),
         execute(request, call),
@@ -315,15 +318,13 @@ describe.skipIf(
       const done = runs.filter((r) => r.status === 'fulfilled')
       expect(done).toHaveLength(1)
       const result = done[0]!.value
-      const expected: Record<ShellRetryAccess, string> = {
-        filesystem: 'yes no',
-        network: 'no yes',
-        both: 'yes yes',
-      }
-      expect(result.text).toContain(expected[access])
+      expect(result.text).toContain(access === 'both' ? 'yes yes' : 'no yes')
       expect(result.exitCode).toBe(0)
       expect(await readFile(count, 'utf8')).toBe('xx')
       expect(jobs.get(request.retry.jobId)?.jobId).toBe(first.jobId)
+      const next = await execute({ command: script }, access + '-next')
+      expect(next.exitCode).toBe(42)
+      expect(next.text).toContain('no no')
     },
   )
 
@@ -368,7 +369,7 @@ describe.skipIf(
       command,
       cwd: first.retryCwd,
       description: 'Read the disposable sibling file',
-      retry: { jobId: String(first.jobNumber), access: 'filesystem' },
+      retry: { jobId: String(first.jobNumber), access: 'both' },
     }
     const tools = { shell } as unknown as ToolSet
     let emitRequest = true
@@ -454,7 +455,7 @@ describe.skipIf(
       command,
       cwd: sandbox,
       description: 'Read the fixture',
-      retry: { jobId: String(ok.jobNumber), access: 'filesystem' as const },
+      retry: { jobId: String(ok.jobNumber), access: 'network' as const },
     }
     await expect(approveRequest(request, 'unused')).rejects.toThrow(
       'failed shell job',
@@ -465,6 +466,17 @@ describe.skipIf(
     expect(failed.retryCwd).toBe(sandbox)
     expect(failed.text.trim()).toBe('')
     request.retry.jobId = String(failed.jobNumber)
+    const legacyRequest = {
+      ...request,
+      retry: { ...request.retry, access: 'filesystem' as const },
+    }
+    expect(approvalSummary('shell', legacyRequest)).toContain(
+      'filesystem access only',
+    )
+    await expect(
+      // @ts-expect-error Replay an old client payload at the sidecar boundary.
+      approveRequest(legacyRequest, 'old-client'),
+    ).rejects.toThrow()
     expect(await approveRequest(request, 'stale-approval')).toBe(
       'user-approval',
     )

@@ -31,7 +31,11 @@ export const shellFields = {
 export const shellRetryField = z
   .strictObject({
     jobId: shellJobIdField,
-    access: z.enum(shellRetryAccess),
+    access: z
+      .enum(shellRetryAccess)
+      .describe(
+        'Use network for network access inside the filesystem sandbox. Use both to run once outside the sandbox with filesystem and network access.',
+      ),
   })
   .describe(
     'Request one retry of a failed sandboxed job. Repeat its exact command and cwd. Explain why this access is needed in description. The user must approve before the command starts again.',

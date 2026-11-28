@@ -8,7 +8,7 @@ import { type api } from '@cv/convex/_generated/api'
 import { HOLD_HINTS } from '@cv/convex/lib/tool/approvalPolicy'
 import { summarizeInput, toolDisplayName } from '@cv/core/approval-presentation'
 import { SHELL_TOOL_NAME } from '@cv/core/const'
-import { describeShellDenial } from '@cv/core/shell/retry'
+import { describeShellDenial, retryScope } from '@cv/core/shell/retry'
 import type { FunctionReturnType } from 'convex/server'
 import { type RefObject, Suspense, lazy, useRef } from 'react'
 
@@ -135,6 +135,7 @@ export function ToolApprovalPicker({
         <T.hr className="mx-auto w-[calc(100%-(var(--spacing)*2.5))]" />
         {hold && (
           <div className="text-muted-foreground ml-2 text-xs">
+            {retry && retryScope[retry.access] + ' '}
             {HOLD_HINTS[hold]}
           </div>
         )}

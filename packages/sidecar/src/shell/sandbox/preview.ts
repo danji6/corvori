@@ -3,13 +3,13 @@ import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, realpath, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, delimiter, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 
 import { isOutside } from '../../mcp/workspace/access'
 import type { StartShellJobInput } from '../job-protocol'
 import { shellWord } from '../launch'
-import { withBoundSessionDir } from '../system-shell'
+import { shellInvocation, withBoundSessionDir } from '../system-shell'
 import { prepareGitQuery } from './git'
 import { githubEnvironment, githubInvocation } from './github'
 import { snapshotGitPaths } from './ignore-snapshot'
@@ -96,13 +96,28 @@ async function filesystemPolicy(
   }
 }
 
-/** Prepare one invocation with independent filesystem and network policy. */
+function runtimeEnvironment(runtime: string, path: string, scratch: string) {
+  if (process.platform !== 'win32')
+    return { PATH: path + ':/usr/sbin:/sbin:' + dirname(runtime) }
+  const systemRoot = process.env.SystemRoot
+  if (!systemRoot) throw new Error('Missing Windows system directory')
+  return {
+    PATH: [dirname(runtime), join(systemRoot, 'System32')].join(delimiter),
+    SystemRoot: systemRoot,
+    USERPROFILE: scratch,
+    TEMP: scratch,
+    TMP: scratch,
+  }
+}
+
+/** Prepare a sandboxed job or a single authorized replay with its selected access. */
 export async function preparePreview(
   input: StartShellJobInput,
   roots: string[],
   access?: ShellRetryAccess,
 ) {
-  if (!previewAvailable())
+  const outside = access === 'both'
+  if (!outside && !previewAvailable())
     throw new Error('Shell sandbox preview is unavailable')
   const runtime = await realpath(
     (process.versions.bun && process.env.NODE_BINARY) || process.execPath,
@@ -116,9 +131,14 @@ export async function preparePreview(
       'The Linux sandbox worker requires the packaged Node runtime',
     )
   const grants = input.grantedPaths ?? []
-  const writable = await sandboxRoots([...new Set([...roots, ...grants])])
+  const authorizedRoots = [...new Set([...roots, ...grants])]
+  const writable = outside
+    ? authorizedRoots
+    : await sandboxRoots(authorizedRoots)
+  const windows = process.platform === 'win32'
   const shell = input.shell || '/bin/bash'
   if (
+    !windows &&
     !['/bin/sh', '/bin/bash', '/bin/zsh', 'bash', 'zsh', 'sh'].includes(shell)
   )
     throw new Error('The sandbox preview requires a system shell')
@@ -131,13 +151,6 @@ export async function preparePreview(
     const scratch = join(temporary, 'tmp')
     await mkdir(scratch)
     const tools = await systemTools()
-    const git = await prepareGitQuery(
-      input.command,
-      input.cwd,
-      writable,
-      temporary,
-      tools.git,
-    )
     const github = input.githubQuery
       ? await githubInvocation(input.command, writable)
       : undefined
@@ -147,41 +160,51 @@ export async function preparePreview(
       HOME: scratch,
       TMPDIR: scratch,
       TERM: 'xterm-256color',
-      PATH: tools.path + ':/usr/sbin:/sbin:' + dirname(runtime),
+      ...runtimeEnvironment(runtime, tools.path, scratch),
       GIT_TERMINAL_PROMPT: '0',
       GIT_CONFIG_NOSYSTEM: '1',
-      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_CONFIG_GLOBAL: windows ? 'NUL' : '/dev/null',
       GIT_PAGER: 'cat',
       PAGER: 'cat',
     }
+    const original = input.boundSessionDir
+      ? withBoundSessionDir(input.command, input.boundSessionDir)
+      : input.command
+    if (outside) {
+      const invocation = github
+        ? { file: github.file, args: github.args }
+        : windows
+          ? shellInvocation(original, input.shell)
+          : { file: binShell, args: ['-c', original] }
+      return { prepared: { ...invocation, env }, cleanup }
+    }
+    const git = await prepareGitQuery(
+      input.command,
+      input.cwd,
+      writable,
+      temporary,
+      tools.git,
+    )
     const command =
       git?.command ??
       (github
         ? 'exec ' + [github.file, ...github.args].map(shellWord).join(' ')
-        : input.boundSessionDir
-          ? withBoundSessionDir(input.command, input.boundSessionDir)
-          : input.command)
-    if (access === 'both' || (github && access === 'filesystem'))
-      return {
-        prepared: { file: binShell, args: ['-c', command], env },
-        cleanup,
-      }
+        : original)
     const policy = {
       // Override the library's default TMPDIR inside the sandbox.
       command: 'export TMPDIR="$HOME"\n' + command,
       commandId: randomUUID(),
       binShell,
       needsNetworkRestriction: !github && access !== 'network',
-      ...(access !== 'filesystem' &&
-        (await filesystemPolicy(
-          writable,
-          runtime,
-          scratch,
-          !!input.readOnlyWorkspace || !!git,
-          [...tools.reads, ...(github ? [github.file] : [])],
-          grants,
-          git,
-        ))),
+      ...(await filesystemPolicy(
+        writable,
+        runtime,
+        scratch,
+        !!input.readOnlyWorkspace || !!git,
+        [...tools.reads, ...(github ? [github.file] : [])],
+        grants,
+        git,
+      )),
     }
     const prepared = await wrapPreview(policy, temporary, runtime, env)
     const tag =

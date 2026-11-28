@@ -39,6 +39,21 @@ if (action === 'write') {
   if (visible) throw new Error('Protected fixture was readable')
   if (action === 'optional') console.log('handled')
   else process.exitCode = 42
+} else if (action === 'retry') {
+  appendFileSync('retry-starts', 'x')
+  let readable = false
+  try {
+    readable = readFileSync(file, 'utf8') === 'fixture value'
+  } catch (error) {
+    if (!['EPERM', 'EACCES', 'ENOENT'].includes(error.code)) throw error
+  }
+  const url = 'http://127.0.0.1:' + process.argv[4]
+  const online = await globalThis
+    .fetch(url, { signal: globalThis.AbortSignal.timeout(2000) })
+    .then(async (response) => (await response.text()) === 'fixture')
+    .catch(() => false)
+  console.log('file=' + readable + ' network=' + online)
+  if (!readable || !online) process.exitCode = 42
 } else if (action === 'read') {
   // The entire workspace is a disposable fixture. Never print file contents.
   try {

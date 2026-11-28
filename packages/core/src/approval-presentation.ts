@@ -4,7 +4,7 @@ import {
   EXIT_PLAN_MODE_TOOL_NAME,
   SHELL_TOOL_NAME,
 } from './const'
-import { retryLabels, shellRetry } from './shell/retry'
+import { retryLabels, retryScope, shellRetry } from './shell/retry'
 import type { RememberScope } from './types/tools'
 
 /** Explains why an otherwise remembered call still needs approval. */
@@ -79,7 +79,7 @@ export function approvalSummary(toolName: string, input: unknown): string {
   if (plan) return plan.heading
   const retry = toolName === SHELL_TOOL_NAME ? shellRetry(input) : undefined
   if (retry) {
-    return `${retryLabels[retry.access]} · Job ${retry.jobId} · Agent’s reason: ${getDescription(input) ?? ''}`
+    return `${retryLabels[retry.access]} · Job ${retry.jobId}. ${retryScope[retry.access]} Agent’s reason: ${getDescription(input) ?? ''}`
   }
   if (toolName === SHELL_TOOL_NAME)
     return getDescription(input) ?? 'Run a shell command'
