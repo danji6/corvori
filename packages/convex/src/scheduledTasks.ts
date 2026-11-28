@@ -9,25 +9,31 @@ import {
   dispatchArgs,
   listArgs,
   taskDefinition,
+  taskState,
 } from './validators/scheduledTasks'
 
 const taskId = v.id('scheduledTasks')
+
 export const list = authQuery({
   args: listArgs.fields,
   handler: Tasks.list,
 })
+
 export const get = authQuery({
   args: { taskId: v.string() },
   handler: Tasks.findById,
 })
+
 export const runDestination = authQuery({
   args: { runId: v.string() },
   handler: Tasks.runDestination,
 })
+
 export const history = authQuery({
   args: { taskId, paginationOpts: paginationOptsValidator },
   handler: Tasks.history,
 })
+
 export const save = authMutation({
   args: {
     taskId: v.optional(taskId),
@@ -36,29 +42,32 @@ export const save = authMutation({
   },
   handler: Tasks.save,
 })
+
 export const runNow = authMutation({
   args: { taskId },
   handler: Dispatch.runNow,
 })
+
+export const unarchive = authMutation({
+  args: { taskId },
+  handler: Tasks.unarchive,
+})
+
 export const setState = authMutation({
-  args: {
-    taskId,
-    state: v.union(
-      v.literal('active'),
-      v.literal('paused'),
-      v.literal('archived'),
-    ),
-  },
+  args: { taskId, state: taskState },
   handler: Tasks.setState,
 })
+
 export const _dispatch = internalMutation({
   args: dispatchArgs.fields,
   handler: Dispatch.dispatch,
 })
+
 export const _launch = internalMutation({
   args: { runId: v.id('scheduledTaskRuns') },
   handler: Dispatch.launch,
 })
+
 export const _recover = internalMutation({
   args: {},
   handler: Dispatch.recover,

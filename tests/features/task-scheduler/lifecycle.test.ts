@@ -3,7 +3,12 @@ import type { MutationCtx } from '@cv/convex/_generated/server'
 import { discardSession } from '@cv/convex/model/notifications/records'
 import { expireStream } from '@cv/convex/model/stream/expiry'
 import { requestImmediateStop } from '@cv/convex/model/stream/stop'
-import { get, save, setState } from '@cv/convex/model/tasks/definitions'
+import {
+  get,
+  save,
+  setState,
+  unarchive,
+} from '@cv/convex/model/tasks/definitions'
 import { dispatch, runNow } from '@cv/convex/model/tasks/dispatch'
 import { settleRun } from '@cv/convex/model/tasks/outcomes'
 import {
@@ -209,6 +214,7 @@ test('other owners cannot read or alter a task', async () => {
   await expect(setState(ctx, { taskId, state: 'archived' })).rejects.toThrow(
     'Task not found',
   )
+  await expect(unarchive(ctx, { taskId })).rejects.toThrow('Task not found')
 })
 
 test('lease expiry fails an unfinished run and does not replay the interrupted turn', async () => {
@@ -312,6 +318,38 @@ test('a paused task can run manually and stays paused after a failed launch', as
   expect(scheduled).toHaveLength(0)
   await setState(ctx, { taskId, state: 'archived' })
   await expect(runNow(ctx, { taskId })).rejects.toThrow('This task is archived')
+})
+
+test('unarchiving keeps a task paused until the owner resumes its schedule', async () => {
+  const { ctx, rows, scheduled, cancelled } = fixture()
+  const [definition] = rows('scheduledTasks')
+  definition.jobId = 'pending'
+  const clock = spyOn(Date, 'now').mockReturnValue(today)
+  try {
+    await setState(ctx, { taskId, state: 'archived' })
+    expect(cancelled).toEqual(['pending'])
+    await expect(setState(ctx, { taskId, state: 'paused' })).rejects.toThrow(
+      'This task is archived',
+    )
+
+    await unarchive(ctx, { taskId })
+    expect(definition).toMatchObject({
+      state: 'paused',
+      nextRunAt: undefined,
+      jobId: undefined,
+    })
+    expect(scheduled).toHaveLength(0)
+    await dispatch(ctx, { taskId, due, revision: 2 })
+    expect(rows('scheduledTaskRuns')).toHaveLength(0)
+
+    await setState(ctx, { taskId, state: 'active' })
+    await unarchive(ctx, { taskId })
+    expect(definition.state).toBe('active')
+    expect(scheduled).toHaveLength(1)
+    expect(scheduled[0]?.at).toBe(today + day)
+  } finally {
+    clock.mockRestore()
+  }
 })
 
 test('task choices bind to the run session independently of recent chat choices', async () => {
@@ -558,6 +596,8 @@ test('manual and scheduled runs get only their own grants, for their original st
   }
   Object.assign(stream, { sessionId: first.sessionId, taskRunId: first._id })
   await setState(ctx, { taskId, state: 'archived' })
+  expect((await read()).approvals?.shell).toEqual(['git status'])
+  await unarchive(ctx, { taskId })
   expect((await read()).approvals?.shell).toEqual(['git status'])
   await expect(
     executionApprovals(ctx, { ...execution, generation: 1 }),

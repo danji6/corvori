@@ -23,15 +23,20 @@ export async function recordRunError(
 function transcriptToolError(parts: readonly unknown[]) {
   for (const part of parts) {
     const tool = part as { type?: string; state?: string; errorText?: unknown }
-    if (tool?.state !== 'output-error' && tool?.state !== 'output-denied')
+
+    if (tool?.state !== 'output-error' && tool?.state !== 'output-denied') {
       continue
+    }
     if (
       typeof tool.type !== 'string' ||
       !(tool.type.startsWith('tool-') || tool.type === 'dynamic-tool')
-    )
+    ) {
       continue
-    if (typeof tool.errorText === 'string' && tool.errorText.trim())
+    }
+    if (typeof tool.errorText === 'string' && tool.errorText.trim()) {
       return tool.errorText
+    }
+
     return tool.state === 'output-denied'
       ? 'Tool execution denied'
       : 'Tool failed'
@@ -61,12 +66,14 @@ export async function settleRun(
   if (!run || run.status !== 'running') return
   const task = await ctx.db.get(run.taskId)
   if (!task || task.activeRunId !== runId) return
+
   const priorError = status === 'succeeded' ? run.detail : undefined
   if (priorError) status = 'failed'
   const preview = notificationPreview(
     priorError || detail,
     status === 'succeeded' ? 'Task completed' : 'Task failed',
   )
+
   await ctx.db.patch(runId, { status, detail: preview, finishedAt: Date.now() })
   const exhausted = task.state === 'active' && task.nextRunAt === undefined
   await ctx.db.patch(task._id, {

@@ -15,7 +15,6 @@ import {
   useWorkspaceFileIndex,
 } from '@/hooks/chat'
 import { useComposerSubmission } from '@/hooks/chat/composer-submission'
-import { useUserProfile } from '@/hooks/chat/profile'
 import { useNavPadding } from '@/hooks/nav-padding'
 import type { PendingMessage } from '@/lib/chat'
 import { ChatError, ChatWarning, RateLimitError } from '@/lib/chat/errors'
@@ -25,7 +24,6 @@ import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
 import { useMutation, useQuery } from 'convex/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'wouter'
 
 import { ChatSessionView } from './chat-session-view'
 import type { ChatProps } from './chat-types'
@@ -84,7 +82,6 @@ function ChatSessionContent({
   onError,
 }: ChatSessionContentProps) {
   const session = useActiveSession()
-  const userId = useUserProfile()?._id
   const isWorkspaceAdmin = useIsWorkspaceAdmin()
   const fileIndex = useWorkspaceFileIndex(
     session?._id,
@@ -294,14 +291,6 @@ function ChatSessionContent({
 
   return (
     <MessageEditProvider onEdit={handleEdit}>
-      {session?.scheduledTaskId && session.ownerId === userId && (
-        <Link
-          href={'/tasks/' + session.scheduledTaskId}
-          className="text-primary mx-auto mt-2 text-sm"
-        >
-          ← Back to task
-        </Link>
-      )}
       <ChatSessionView
         dockWidth={`min(95%, ${width ?? '800px'} - var(--spacing)*36)`}
         topPadding={useNavPadding()}

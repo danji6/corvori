@@ -5,11 +5,7 @@ import type { Doc } from '@cv/convex/_generated/dataModel'
 import { useId } from 'react'
 
 import { fieldStyle } from './task-schedule-fields'
-
-export type TaskModelSettings = Pick<
-  Doc<'scheduledTasks'>,
-  'modelId' | 'reasoningEffort'
->
+import type { TaskModelSettings } from '@/hooks/chat/tasks'
 
 type TaskModelFieldsProps = {
   override?: Doc<'agents'>['modelOverride']

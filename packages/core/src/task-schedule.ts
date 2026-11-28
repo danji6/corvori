@@ -36,13 +36,19 @@ export const weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 /** Checks a schedule before it is saved or previewed. */
 export function scheduleError(rule: TaskSchedule): string | undefined {
-  if (!moment.utc(rule.startDate, dateFormat, true).isValid())
+  if (!moment.utc(rule.startDate, dateFormat, true).isValid()) {
     return 'Choose a valid start date.'
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(rule.time))
+  }
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(rule.time)) {
     return 'Choose a valid time.'
-  if (!moment.tz.zone(rule.zone)) return 'Choose a valid time zone.'
+  }
+  if (!moment.tz.zone(rule.zone)) {
+    return 'Choose a valid time zone.'
+  }
+
   const repeat = rule.repeat
   if (repeat.kind === 'once') return
+
   const limit = taskIntervalLimit(repeat.kind)
   if (
     !Number.isInteger(repeat.every) ||
@@ -51,6 +57,7 @@ export function scheduleError(rule: TaskSchedule): string | undefined {
   ) {
     return `Choose a whole-number interval between 1 and ${limit}.`
   }
+
   if (repeat.kind === 'weekly') {
     const days = new Set(repeat.weekdays)
     if (
@@ -67,15 +74,20 @@ export function scheduleError(rule: TaskSchedule): string | undefined {
 function atLocalTime(day: moment.Moment, rule: TaskSchedule) {
   const local = day.format(dateFormat) + ' ' + rule.time
   const [hour, minute] = rule.time.split(':').map(Number)
+
   const resolved = moment.tz(
     [day.year(), day.month(), day.date(), hour, minute],
     rule.zone,
   )
-  if (resolved.format(localFormat) === local) return resolved.valueOf()
+  if (resolved.format(localFormat) === local) {
+    return resolved.valueOf()
+  }
+
   const zone = moment.tz.zone(rule.zone)!
   const transition = zone.untils
     .filter((until) => until <= resolved.valueOf())
     .at(-1)
+
   return transition ?? resolved.valueOf()
 }
 
@@ -89,6 +101,7 @@ function monthlyDay(
       ? month.date(anchor.date())
       : undefined
   }
+
   const ordinal = Math.floor((anchor.date() - 1) / 7)
   if (ordinal === 4) {
     const end = month.endOf('month').startOf('day')
@@ -97,6 +110,7 @@ function monthlyDay(
       'days',
     )
   }
+
   const offset = (anchor.isoWeekday() - month.isoWeekday() + 7) % 7
   return month.add(ordinal * 7 + offset, 'days')
 }
@@ -113,7 +127,10 @@ function periodDays(
   index: number,
 ) {
   const offset = index * rule.every
-  if (rule.kind === 'daily') return [base.clone().add(offset, 'days')]
+
+  if (rule.kind === 'daily') {
+    return [base.clone().add(offset, 'days')]
+  }
   if (rule.kind === 'monthly') {
     const day = monthlyDay(
       base.clone().add(offset, 'months'),
@@ -122,6 +139,7 @@ function periodDays(
     )
     return day ? [day] : []
   }
+
   const monday = base.clone().add(offset, 'weeks')
   return [...rule.weekdays]
     .sort((a, b) => a - b)
@@ -158,11 +176,10 @@ function calendarOccurrence(
   const base = anchor.clone().startOf(unit)
   const local = moment.tz(reference, rule.zone)
   const today = moment.utc([local.year(), local.month(), local.date()])
-  const distance = today
-    .startOf(unit)
-    .diff(base, unit === 'isoWeek' ? 'week' : unit)
-  let index = Math.max(0, Math.floor(distance / repeat.every))
+  const distance = today.startOf(unit).diff(base, unit === 'isoWeek' ? 'week' : unit) // prettier-ignore
   const step = direction === 'next' ? 1 : -1
+  let index = Math.max(0, Math.floor(distance / repeat.every))
+
   while (index >= 0) {
     const days = periodDays(base, anchor, repeat, index)
     if (step < 0) days.reverse()
@@ -184,6 +201,7 @@ export function occurrence(
 ): number | undefined {
   const anchor = moment.utc(rule.startDate, dateFormat, true)
   const repeat = rule.repeat
+
   switch (repeat.kind) {
     case 'once': {
       const at = atLocalTime(anchor, rule)
@@ -204,21 +222,30 @@ export function occurrence(
 
 export function scheduleLabel(rule: TaskSchedule) {
   const { repeat, time } = rule
-  if (repeat.kind === 'once') return rule.startDate + ' at ' + time
+
+  if (repeat.kind === 'once') {
+    return rule.startDate + ' at ' + time
+  }
+
   const unit = taskIntervalUnits[repeat.kind]
   const interval =
     repeat.every === 1
       ? 'Every ' + unit
       : 'Every ' + repeat.every + ' ' + unit + 's'
-  if (repeat.kind === 'minutes' || repeat.kind === 'hours') return interval
+
+  if (repeat.kind === 'minutes' || repeat.kind === 'hours') {
+    return interval
+  }
+
   let days = ''
-  if (repeat.kind === 'weekly')
+  if (repeat.kind === 'weekly') {
     days =
       ' · ' +
       [...repeat.weekdays]
         .sort((a, b) => a - b)
         .map((day) => weekdayNames[day - 1])
         .join(', ')
+  }
   if (repeat.kind === 'monthly') {
     const start = moment.utc(rule.startDate, dateFormat)
     const ordinal = ['first', 'second', 'third', 'fourth', 'last'][
@@ -229,5 +256,6 @@ export function scheduleLabel(rule: TaskSchedule) {
         ? ' · day ' + start.date()
         : ' · ' + ordinal + ' ' + weekdayNames[start.isoWeekday() - 1]
   }
+
   return interval + days + ' at ' + time
 }

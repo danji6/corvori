@@ -23,37 +23,50 @@ export type FilesystemCall = { id: string; name: string; input: unknown }
 async function activeTaskPolicy(ctx: QueryCtx, stream: Doc<'streams'>) {
   if (!stream.taskRunId) return
   const run = await ctx.db.get(stream.taskRunId)
-  if (run?.status !== 'running' || run.approvalRevision === undefined) return
-  if (run.sessionId !== stream.sessionId || run.agentId !== stream.agentId)
+  if (run?.status !== 'running' || run.approvalRevision === undefined) {
     return
+  }
+  if (run.sessionId !== stream.sessionId || run.agentId !== stream.agentId) {
+    return
+  }
 
   const task = await ctx.db.get(run.taskId)
-  if (!task?.approvals || task.state === 'archived') return
+  if (!task?.approvals || task.state === 'archived') {
+    return
+  }
   if (
     task.activeRunId !== run._id ||
     task.approvalRevision !== run.approvalRevision
-  )
+  ) {
     return
-  if (task.ownerId !== stream.invokedBy || task.agentId !== stream.agentId)
+  }
+  if (task.ownerId !== stream.invokedBy || task.agentId !== stream.agentId) {
     return
+  }
 
   const [session, invoker] = await Promise.all([
     getSessionWithWorkspace(ctx, stream.sessionId),
     ctx.db.get(stream.invokedBy),
   ])
-  if (!session || session.parent || !minRole(invoker?.role, 'admin')) return
+  if (!session || session.parent || !minRole(invoker?.role, 'admin')) {
+    return
+  }
   if (
     session.ownerId !== task.ownerId ||
     session.activeAgentId !== task.agentId
-  )
+  ) {
     return
-  if (session.scheduledTaskId !== task._id || session.taskRunId !== run._id)
+  }
+  if (session.scheduledTaskId !== task._id || session.taskRunId !== run._id) {
     return
+  }
   if (
     session.folderId !== task.folderId ||
     task.approvalWorkspaceKey !== workspaceKey(session.workspace)
-  )
+  ) {
     return
+  }
+
   return { grants: task.approvals, revision: run.approvalRevision }
 }
 
@@ -91,12 +104,14 @@ export async function executionApprovals(
   const stream = await ctx.db.get(args.streamId)
   if (!ownsExecution(stream, args))
     error('Tool invocation is no longer active', 409)
+
   const [session, agent, task] = await Promise.all([
     getApprovals(ctx, stream.sessionId),
     ctx.db.get(stream.agentId),
     activeTaskPolicy(ctx, stream),
   ])
   const policy = agent?.ownerId === stream.invokedBy ? task : undefined
+
   return {
     approvals: mergeToolApprovals(
       mergeToolApprovals(session, agent?.autoApprove),

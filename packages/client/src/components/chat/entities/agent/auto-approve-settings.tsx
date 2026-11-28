@@ -5,7 +5,7 @@ import type { Control } from 'react-hook-form'
 import { useController } from 'react-hook-form'
 
 import type { AgentFormValues } from './agent-form'
-import { ApprovalList } from './approval-list'
+import { PathApprovalList, ShellApprovalList } from './approval-list'
 
 /** Approval-gated tools an agent can be trusted to run unprompted. */
 const APPROVAL_GATED_TOOLS = [
@@ -59,37 +59,19 @@ export function AutoApproveSettings({
           onCheckedChange={() => toggleTool(meta.name)}
         />
       ))}
-      <SettingsList.Item
+      <ShellApprovalList
         className="pl-8"
-        label="Shell commands"
-        description="Command prefixes this agent may run without approval, e.g. `find` or `git checkout`."
-        orientation="vertical"
-        unclickable
-        unhoverable
-      >
-        <ApprovalList
-          values={shellField.value}
-          onChange={shellField.onChange}
-          placeholder="git checkout"
-          label="Command prefix"
-        />
-      </SettingsList.Item>
-      <SettingsList.Item
+        values={shellField.value}
+        onChange={shellField.onChange}
+        placeholder="git checkout"
+      />
+      <PathApprovalList
         className="pl-8"
-        label="Paths"
-        description="Files and directories this agent may read or edit without approval, relative to the workspace."
-        orientation="vertical"
-        unclickable
-        unhoverable
-      >
-        <ApprovalList
-          values={pathsField.value ?? []}
-          onChange={pathsField.onChange}
-          placeholder="path"
-          label="Path"
-          validate={approvalPathsError}
-        />
-      </SettingsList.Item>
+        values={pathsField.value ?? []}
+        onChange={pathsField.onChange}
+        placeholder="path"
+        validate={approvalPathsError}
+      />
     </SettingsList>
   )
 }

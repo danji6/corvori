@@ -22,11 +22,10 @@ import {
 
 const repeatItems = [
   { value: 'once', label: 'Once' },
-  { value: 'minutes', label: 'Minute interval' },
-  { value: 'hours', label: 'Hour interval' },
+  { value: 'minutes', label: 'Minutes' },
+  { value: 'hours', label: 'Hours' },
   { value: 'daily', label: 'Daily' },
-  { value: 'weekdays', label: 'Weekdays' },
-  { value: 'weekly', label: 'Selected weekdays' },
+  { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
 ] as const
 
@@ -53,51 +52,39 @@ export function localDate(at: number, zone: string) {
 
 type Props = { rule: TaskSchedule; onChange: (rule: TaskSchedule) => void }
 
-function initialPreset(repeat: TaskSchedule['repeat']): RepeatPreset {
-  if (repeat.kind === 'once') return 'once'
-  if (repeat.kind === 'daily' && repeat.every === 1) return 'daily'
-  if (
-    repeat.kind === 'weekly' &&
-    repeat.every === 1 &&
-    repeat.weekdays.join(',') === '1,2,3,4,5'
-  )
-    return 'weekdays'
-  return repeat.kind
-}
-
 export function RecurrenceEditor({ rule, onChange }: Props) {
-  const [preset, setPreset] = useState(() => initialPreset(rule.repeat))
-  const change = (patch: Partial<TaskSchedule>) =>
-    onChange({ ...rule, ...patch })
   const repeat = rule.repeat
   const elapsedInterval = repeat.kind === 'minutes' || repeat.kind === 'hours'
+
+  const change = (patch: Partial<TaskSchedule>) =>
+    onChange({ ...rule, ...patch })
+
   function select(kind: RepeatPreset) {
-    setPreset(kind)
     if (kind === 'once') change({ repeat: { kind } })
     if (kind === 'daily' || kind === 'minutes' || kind === 'hours') {
       change({ repeat: { kind, every: 1 } })
     }
     if (kind === 'monthly')
       change({ repeat: { kind, every: 1, pattern: 'date' } })
-    if (kind === 'weekly' || kind === 'weekdays')
+    if (kind === 'weekly')
       change({
         repeat: {
-          kind: 'weekly',
+          kind,
           every: 1,
-          weekdays:
-            kind === 'weekdays'
-              ? [1, 2, 3, 4, 5]
-              : [moment.utc(rule.startDate).isoWeekday()],
+          weekdays: weekdayNames.map((_, i) => i + 1),
         },
       })
   }
+
   const preview: number[] = []
   const invalid = scheduleError(rule)
+
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60_000)
     return () => clearInterval(timer)
   }, [])
+
   let reference = now
   while (!invalid && preview.length < 3) {
     const at = occurrence(rule, reference, 'next')
@@ -105,6 +92,7 @@ export function RecurrenceEditor({ rule, onChange }: Props) {
     preview.push(at)
     reference = at
   }
+
   return (
     <fieldset className="grid gap-4">
       <legend className="mb-3 text-lg font-semibold">Schedule</legend>
@@ -112,11 +100,11 @@ export function RecurrenceEditor({ rule, onChange }: Props) {
         <ScheduleSelect
           label="Repeat"
           items={repeatItems}
-          value={preset}
+          value={repeat.kind}
           onChange={select}
         />
         <DatePicker
-          label={preset === 'once' ? 'Date' : 'Starting on'}
+          label={repeat.kind === 'once' ? 'Date' : 'Starting on'}
           name="startDate"
           required
           value={rule.startDate}
@@ -133,7 +121,7 @@ export function RecurrenceEditor({ rule, onChange }: Props) {
           value={rule.zone}
           onChange={(zone) => change({ zone })}
         />
-        {repeat.kind !== 'once' && preset !== 'weekdays' && (
+        {repeat.kind !== 'once' && (
           <label className={fieldStyle}>
             Interval ({taskIntervalUnits[repeat.kind]}s)
             <Input
@@ -157,7 +145,7 @@ export function RecurrenceEditor({ rule, onChange }: Props) {
           />
         )}
       </div>
-      {preset === 'weekly' && repeat.kind === 'weekly' && (
+      {repeat.kind === 'weekly' && (
         <div className="flex flex-wrap gap-3">
           {weekdayNames.map((name, i) => (
             <LabeledCheckbox

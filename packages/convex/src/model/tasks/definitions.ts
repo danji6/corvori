@@ -1,3 +1,4 @@
+import { MAX_TASK_PROMPT_CHARS } from '@cv/core/limits'
 import { normalizeReasoningEffort } from '@cv/core/model-reasoning'
 import { stableStringify } from '@cv/core/stable-json'
 import { scheduleError } from '@cv/core/task-schedule'
@@ -130,6 +131,7 @@ export async function validateTaskModel(
   ) {
     error('Choose a supported reasoning effort in the task editor.')
   }
+
   return { modelId: override ? undefined : saved.id, reasoningEffort }
 }
 
@@ -148,14 +150,20 @@ export async function save(
   const task = taskId ? await get(ctx, { taskId }) : null
   if (taskId && !task) error('Task not found', 404)
   if (task?.state === 'archived') error('This task is archived.')
+
   const agent = await requireOwnedAgent(ctx, definition.agentId)
   const title = definition.title?.trim() || undefined
   const prompt = definition.prompt.trim()
-  if (!prompt || prompt.length > 16000)
+  if (!prompt || prompt.length > MAX_TASK_PROMPT_CHARS) {
     error('Enter a prompt of up to 16,000 characters.')
-  if (title && title.length > 200) error('Keep the title under 201 characters.')
+  }
+  if (title && title.length > 200) {
+    error('Keep the title under 201 characters.')
+  }
+
   const issue = scheduleError(definition.schedule)
   if (issue) error(issue)
+
   const model = await validateTaskModel(
     ctx,
     ctx.userId,
@@ -178,6 +186,7 @@ export async function save(
     agentName: agent.name,
     searchText: taskSearchText(agent.name, prompt, title),
   }
+
   if (task) {
     const scheduleChanged =
       stableStringify(task.schedule) !== stableStringify(fields.schedule)
@@ -193,6 +202,7 @@ export async function save(
     )
     return task._id
   }
+
   const next = futureOccurrence(fields.schedule)
   const id = await ctx.db.insert('scheduledTasks', {
     ...fields,
@@ -202,6 +212,7 @@ export async function save(
     nextRunAt: next,
   })
   await armTask(ctx, id, 1, next)
+
   return id
 }
 
@@ -218,9 +229,24 @@ export async function setState(
   if (
     args.state === 'paused' &&
     (task.state !== 'active' || task.nextRunAt === undefined)
-  )
+  ) {
     error('Only active tasks can pause.')
+  }
   const next =
     args.state === 'active' ? futureOccurrence(task.schedule) : undefined
   await reschedule(ctx, task, args.state, next)
+}
+
+export async function unarchive(ctx: AuthMutationCtx, args: TaskKey) {
+  const task = await get(ctx, args)
+  if (!task) error('Task not found', 404)
+  if (task.state !== 'archived') return
+
+  // Restoring a task must not reactivate grants for a run started before archiving.
+  if (task.approvals) {
+    await ctx.db.patch(task._id, {
+      approvalRevision: (task.approvalRevision ?? 0) + 1,
+    })
+  }
+  await reschedule(ctx, task, 'paused')
 }

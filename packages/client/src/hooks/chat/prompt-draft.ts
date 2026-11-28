@@ -43,6 +43,8 @@ export type PromptDraftOptions<T extends WithContent> = {
   open: boolean
   /** Stored values, returned to when the editor closes with nothing unsaved. */
   initial: () => T
+  /** Persist edits without waiting for the autosave debounce. */
+  saveImmediately?: boolean
 }
 
 export type PromptDraft = {
@@ -69,6 +71,7 @@ export function usePromptDraft<T extends WithContent>({
   stored,
   open,
   initial,
+  saveImmediately = false,
 }: PromptDraftOptions<T>): PromptDraft {
   const draft = useEditorDraft<StoredPromptDraft<T>>(key, label)
   const { control, getValues, reset } = form
@@ -94,14 +97,15 @@ export function usePromptDraft<T extends WithContent>({
 
   const watched = useWatch({ control })
   useEffect(() => {
-    if (isDirty)
-      draft.save({
-        values: watched as T,
-        doc: content.current?.read(),
-        baseline: baseline.current,
-      })
-    else draft.clearUnchanged()
-  }, [watched, isDirty, draft, content])
+    if (!isDirty) return draft.clearUnchanged()
+    const snapshot = {
+      values: watched as T,
+      doc: content.current?.read(),
+      baseline: baseline.current,
+    }
+    if (saveImmediately) draft.flush(snapshot)
+    else draft.save(snapshot)
+  }, [watched, isDirty, draft, content, saveImmediately])
 
   useEffect(() => {
     if (open || draft.read()) return
@@ -112,11 +116,14 @@ export function usePromptDraft<T extends WithContent>({
     doc,
     onBaseline: useCallback(
       (markdown: string) => {
-        if (getValues().content !== stored) return
+        const values = getValues()
+        if (values.content !== stored) return
         baseline.current = markdown
-        reset({ ...getValues(), content: markdown })
+        if (markdown === stored) return
+        reset({ ...initial(), content: markdown })
+        reset({ ...values, content: markdown }, { keepDefaultValues: true })
       },
-      [getValues, reset, stored],
+      [getValues, initial, reset, stored],
     ),
     clear: useCallback(() => {
       baseline.current = getValues().content

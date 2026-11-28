@@ -12,18 +12,21 @@ export async function approvalsForFilesystemCall(
 
   const before = await context.taskApprovals(call)
   if (before.manuallyApproved) return before.approvals
+
   const stillNeedsApproval = await needsApproval({
     ...context,
     approvals: async () => before.approvals,
   })
   const after = await context.taskApprovals()
+
   if (
     stillNeedsApproval ||
     before.taskApprovalRevision !== after.taskApprovalRevision
   ) {
     throw new ToolError(
-      'This tool call requires fresh approval. Review the task approvals and try again.',
+      'This tool still needs approval. Review the task approvals and try again.',
     )
   }
+
   return before.approvals
 }

@@ -72,6 +72,7 @@ async function claim(
 ) {
   const agent = await ctx.db.get(task.agentId)
   const title = task.title || task.prompt.split('\n', 1)[0].slice(0, 120)
+
   const runId = await createRun(
     ctx,
     task,
@@ -79,8 +80,10 @@ async function claim(
     title,
     agent?.name ?? task.agentName,
   )
+
   const owner = await ownerContext(ctx, task.ownerId)
   const failure = await workspaceFailure(ctx, task)
+
   const { sessionId } = await createSession(owner, {
     title,
     folderId: failure ? undefined : task.folderId,
@@ -90,7 +93,9 @@ async function claim(
     modelId: task.modelId,
     reasoningEffort: task.reasoningEffort,
   })
+
   await ctx.db.patch(runId, { sessionId })
+
   return { runId, agent, failure }
 }
 
@@ -104,12 +109,14 @@ async function startRun(
     timing.trigger === 'manual'
       ? task.nextRunAt
       : occurrence(task.schedule, timing.startedAt, 'next')
+
   await ctx.db.patch(task._id, {
     activeRunId: runId,
     latestStatus: 'running',
     nextRunAt,
     jobId: undefined,
   })
+
   try {
     if (failure) error(failure)
     if (agent)
@@ -119,6 +126,7 @@ async function startRun(
   } catch (cause) {
     await settleRun(ctx, runId, 'failed', sanitizeChatError(cause))
   }
+
   return runId
 }
 
@@ -131,6 +139,7 @@ export async function runNow(
   if (task.state === 'archived') error('This task is archived.')
   if (task.activeRunId) error('This task already has a running session.', 409)
   if (task.jobId) await ctx.scheduler.cancel(task.jobId)
+
   const now = Date.now()
   return startRun(ctx, task, {
     scheduledFor: now,
@@ -146,8 +155,10 @@ export async function dispatch(
   const task = await ctx.db.get(taskId)
   if (!task || task.state !== 'active' || task.activeRunId) return
   if (task.revision !== revision || task.nextRunAt !== due) return
+
   const now = Date.now()
   if (due > now) return
+
   const scheduledFor = occurrence(task.schedule, now, 'latest') ?? due
   const matchingRuns = await ctx.db
     .query('scheduledTaskRuns')
@@ -155,6 +166,7 @@ export async function dispatch(
       q.eq('taskId', taskId).eq('scheduledFor', scheduledFor),
     )
     .collect()
+
   if (matchingRuns.some((run) => run.trigger !== 'manual')) {
     const nextRunAt = occurrence(task.schedule, now, 'next')
     await ctx.db.patch(taskId, {
@@ -162,9 +174,12 @@ export async function dispatch(
       jobId: undefined,
       state: nextRunAt === undefined ? 'finished' : 'active',
     })
-    if (nextRunAt !== undefined) await armTask(ctx, taskId, revision, nextRunAt)
+    if (nextRunAt !== undefined) {
+      await armTask(ctx, taskId, revision, nextRunAt)
+    }
     return
   }
+
   await startRun(ctx, task, { scheduledFor, startedAt: now })
 }
 
@@ -173,15 +188,20 @@ export async function launch(
   { runId }: { runId: Id<'scheduledTaskRuns'> },
 ): Promise<void> {
   const run = await ctx.db.get(runId)
-  if (!run?.sessionId || run.status !== 'running' || run.promptMessageId) return
+  if (!run?.sessionId || run.status !== 'running' || run.promptMessageId) {
+    return
+  }
+
   const session = await ctx.db.get(run.sessionId)
   if (session?.activeAgentId !== run.agentId)
     error('Assigned agent is no longer available.')
+
   const promptMessageId = await sendMessage(
     await ownerContext(ctx, session.ownerId),
     { sessionId: session._id, content: run.prompt },
     runId,
   )
+
   await ctx.db.patch(runId, { promptMessageId })
 }
 

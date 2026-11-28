@@ -4,33 +4,45 @@ import { toastError } from '@/lib/notifications'
 import { api } from '@cv/convex/_generated/api'
 import type { Doc } from '@cv/convex/_generated/dataModel'
 import { scheduleLabel } from '@cv/core/task-schedule'
-import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
-import { ChevronLeftIcon, PlayIcon } from 'lucide-react'
-import { useState } from 'react'
+import { useMutation, useQuery } from 'convex/react'
+import {
+  ArchiveIcon,
+  ArchiveRestoreIcon,
+  ChevronLeftIcon,
+  PauseIcon,
+  PencilIcon,
+  PlayIcon,
+} from 'lucide-react'
+import { type RefObject, useRef, useState } from 'react'
 import { Link, Redirect, Route, Switch, useLocation } from 'wouter'
 
 import { TaskEditor } from './task-editor'
 import { TaskGrid, taskTitle } from './task-grid'
 import { localDate } from './task-recurrence'
+import { TaskRunHistory } from './task-run-history'
 
-function History({ task }: { task: Doc<'scheduledTasks'> }) {
+type TaskDetailsProps = {
+  task: Doc<'scheduledTasks'>
+  scrollRoot: RefObject<HTMLElement | null>
+}
+
+function TaskDetails({ task, scrollRoot }: TaskDetailsProps) {
   const setState = useMutation(api.scheduledTasks.setState)
+  const unarchive = useMutation(api.scheduledTasks.unarchive)
   const runNow = useMutation(api.scheduledTasks.runNow)
   const [starting, setStarting] = useState(false)
   const [, navigate] = useLocation()
-  const page = usePaginatedQuery(
-    api.scheduledTasks.history,
-    { taskId: task._id },
-    { initialNumItems: 20 },
-  )
+
   const change = (state: 'paused' | 'active' | 'archived') =>
     setState({ taskId: task._id, state }).catch(toastError)
+
   const start = () => {
     setStarting(true)
     void runNow({ taskId: task._id })
       .catch(toastError)
       .finally(() => setStarting(false))
   }
+
   return (
     <div className="mx-auto grid max-w-3xl gap-4">
       <RippleButton
@@ -55,7 +67,15 @@ function History({ task }: { task: Doc<'scheduledTasks'> }) {
             ? 'Next run · ' + localDate(task.nextRunAt, task.schedule.zone)
             : 'Schedule · ' + task.state}
         </p>
-        {task.state !== 'archived' && (
+        {task.state === 'archived' ? (
+          <RippleButton
+            variant="input"
+            className="justify-self-start"
+            onClick={() => unarchive({ taskId: task._id }).catch(toastError)}
+          >
+            <ArchiveRestoreIcon aria-hidden="true" /> Unarchive
+          </RippleButton>
+        ) : (
           <div className="flex flex-wrap gap-2">
             <RippleButton
               disabled={starting || !!task.activeRunId}
@@ -65,84 +85,27 @@ function History({ task }: { task: Doc<'scheduledTasks'> }) {
               {starting ? 'Starting…' : 'Run now'}
             </RippleButton>
             <RippleButton
-              variant="surface"
+              variant="input"
               onClick={() => navigate('/tasks/' + task._id + '/edit')}
             >
-              Edit task
+              <PencilIcon aria-hidden="true" /> Edit task
             </RippleButton>
             {task.state === 'active' && task.nextRunAt !== undefined && (
-              <RippleButton variant="surface" onClick={() => change('paused')}>
-                Pause
+              <RippleButton variant="input" onClick={() => change('paused')}>
+                <PauseIcon aria-hidden="true" /> Pause
               </RippleButton>
             )}
             {task.state === 'paused' && (
-              <RippleButton variant="surface" onClick={() => change('active')}>
-                Resume
+              <RippleButton variant="input" onClick={() => change('active')}>
+                <PlayIcon aria-hidden="true" /> Resume
               </RippleButton>
             )}
-            <RippleButton variant="stealth" onClick={() => change('archived')}>
-              Archive
+            <RippleButton variant="input" onClick={() => change('archived')}>
+              <ArchiveIcon aria-hidden="true" /> Archive
             </RippleButton>
           </div>
         )}
-        <h2 className="mt-3 text-xl font-semibold">Run history</h2>
-        {!page.results.length && (
-          <p>
-            {page.status === 'LoadingFirstPage'
-              ? 'Loading runs…'
-              : 'No runs yet.'}
-          </p>
-        )}
-        {page.results.map((run) => (
-          <article key={run._id} className="grid gap-1 border-t py-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <strong className="capitalize">{run.status}</strong>
-              {run.sessionId ? (
-                <Link
-                  href={'/?id=' + run.sessionId}
-                  className="text-primary underline"
-                >
-                  Open session
-                </Link>
-              ) : (
-                <span>Session deleted</span>
-              )}
-            </div>
-            <p className="text-sm">
-              {run.agentName} ·{' '}
-              {run.trigger === 'manual'
-                ? 'Manual run'
-                : 'Scheduled ' + localDate(run.scheduledFor, run.zone)}
-            </p>
-            <p className="text-muted-foreground text-xs">
-              Started {localDate(run.startedAt, run.zone)}
-              {run.finishedAt &&
-                ' · Finished ' + localDate(run.finishedAt, run.zone)}
-            </p>
-            {run.skippedFrom && (
-              <p className="text-muted-foreground text-xs">
-                Caught up with the latest occurrence. Earlier times skipped from{' '}
-                {localDate(run.skippedFrom, run.zone)}.
-              </p>
-            )}
-            {run.prompt !== task.prompt && (
-              <details className="text-sm">
-                <summary>Prompt used for this run</summary>
-                <p className="wrap-anywhere whitespace-pre-wrap">
-                  {run.prompt}
-                </p>
-              </details>
-            )}
-            {run.detail && (
-              <p className="mt-1 text-sm wrap-anywhere">{run.detail}</p>
-            )}
-          </article>
-        ))}
-        {page.status === 'CanLoadMore' && (
-          <RippleButton variant="surface" onClick={() => page.loadMore(20)}>
-            Older runs
-          </RippleButton>
-        )}
+        <TaskRunHistory task={task} scrollRoot={scrollRoot} />
       </Surface>
     </div>
   )
@@ -163,7 +126,12 @@ function RunLink({ runId }: { runId: string }) {
   return <Redirect to={path} replace />
 }
 
-function TaskDetail({ id, edit }: { id: string; edit?: boolean }) {
+type TaskDetailRouteProps = Pick<TaskDetailsProps, 'scrollRoot'> & {
+  id: string
+  edit?: boolean
+}
+
+function TaskDetailRoute({ id, edit, scrollRoot }: TaskDetailRouteProps) {
   const task = useQuery(api.scheduledTasks.get, {
     taskId: id,
   })
@@ -174,16 +142,21 @@ function TaskDetail({ id, edit }: { id: string; edit?: boolean }) {
         <Link href="/tasks">All tasks</Link>
       </p>
     )
-  return edit && task.state !== 'archived' ? (
-    <TaskEditor key={id} task={task} />
-  ) : (
-    <History task={task} />
-  )
+  if (edit) {
+    if (task.state === 'archived')
+      return <Redirect to={'/tasks/' + id} replace />
+    return <TaskEditor key={id} task={task} />
+  }
+  return <TaskDetails key={id} task={task} scrollRoot={scrollRoot} />
 }
 
 export default function TasksPage() {
+  const scrollRoot = useRef<HTMLElement>(null)
   return (
-    <section className="h-dvh overflow-y-auto px-5 pt-16 pb-12 sm:px-10">
+    <section
+      ref={scrollRoot}
+      className="h-dvh overflow-y-auto px-5 pt-16 pb-12 sm:px-10"
+    >
       <Switch>
         <Route path="/tasks/runs/:runId">
           {(params) => <RunLink runId={params.runId} />}
@@ -192,10 +165,14 @@ export default function TasksPage() {
           <TaskEditor />
         </Route>
         <Route path="/tasks/:id/edit">
-          {(params) => <TaskDetail id={params.id} edit />}
+          {(params) => (
+            <TaskDetailRoute id={params.id} edit scrollRoot={scrollRoot} />
+          )}
         </Route>
         <Route path="/tasks/:id">
-          {(params) => <TaskDetail id={params.id} />}
+          {(params) => (
+            <TaskDetailRoute id={params.id} scrollRoot={scrollRoot} />
+          )}
         </Route>
         <Route>
           <TaskGrid />

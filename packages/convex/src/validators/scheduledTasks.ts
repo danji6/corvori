@@ -44,14 +44,15 @@ export const taskDefinition = v.object({
 export const taskState = v.union(
   v.literal('active'),
   v.literal('paused'),
-  v.literal('finished'),
   v.literal('archived'),
 )
+
 export const runStatus = v.union(
   v.literal('running'),
   v.literal('succeeded'),
   v.literal('failed'),
 )
+
 export const taskSchema = v.object({
   ...taskDefinition.fields,
   approvalRevision: v.optional(v.number()),
@@ -59,7 +60,7 @@ export const taskSchema = v.object({
   ownerId: v.id('users'),
   agentName: v.string(),
   searchText: v.string(),
-  state: taskState,
+  state: v.union(...taskState.members, v.literal('finished')),
   nextRunAt: v.optional(v.number()),
   revision: v.number(),
   jobId: v.optional(v.id('_scheduled_functions')),
