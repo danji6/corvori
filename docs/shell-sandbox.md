@@ -1,6 +1,6 @@
-# Native shell sandbox preview
+# Native shell sandbox
 
-The draft sidecar ships a diagnostic for the native command runner. Ordinary installations use the existing approval flow. Run `bun scripts/sidecar.ts --check-sandbox` from the installation directory to build and exercise the diagnostic. It invokes the sidecar’s Node runtime against a disposable Git repository. A successful response names the selected backend. Restart the sidecar after an update.
+The packaged sidecar checks that a native child can write in its workspace and cannot read a private sibling file. On Linux and macOS a successful check enables automatic sandboxed shell commands. Unconfigured hosts use the existing approval flow. Run `bun scripts/sidecar.ts --check-sandbox` from the installation directory to build and exercise the diagnostic. It invokes the sidecar’s Node runtime against a disposable Git repository. A successful response names the selected backend. Restart the sidecar after an update.
 
 ## Release verification
 
@@ -10,10 +10,14 @@ On Windows the diagnostic checks MXC first. The launcher supplies Node 24.22.3, 
 
 The native suite snapshots the workspace’s existing Git exclusions at each command launch. A command that was already running when a matching file appeared can retain its original view. An ordinary failure preserves its exit status and output, including when the backend cannot identify a denied operation.
 
-## One-time retry preview
+## Shell execution and retries
 
-On a Linux installation with the packaged helpers, or on macOS, set `CORVORI_SHELL_SANDBOX_PREVIEW=1` in the sidecar launch environment and restart it. Start a new chat for the updated shell tool definition. The preview applies to the agent’s normal-mode shell tool after its existing launch approval checks. Windows currently runs the packaged diagnostic and keeps the existing launch approvals. The pinned MXC backend rejects a request to disable filesystem restrictions while keeping the network fence. A Windows retry needs a backend that can honor the access shown in the approval.
+Restart the sidecar after installing the update and start a new chat. In normal mode, ordinary workspace scripts run offline with a private temporary home. A saved command prefix can give a direct `gh pr list` or `gh issue list` invocation network access and the GitHub account credential. Literal arguments such as `--repo danji6/corvori` pass directly to the CLI. Pipelines, substitutions, and interpreter calls start offline. Set `CORVORI_GH_BINARY` in the sidecar launch environment for a trusted CLI outside the standard installation paths.
+
+Plan mode keeps its launch checks and a read-only workspace. Recognized direct Git inspections use a read-only metadata view. Evaluator and workspace MCP commands use the same filesystem and network policy. Explicit unrestricted shell mode retains host execution.
+
+Windows uses its existing shell approval flow. The MXC backend rejects disabling filesystem restrictions while keeping the network fence. The Windows diagnostics exercise both MXC and the provisioned helper.
 
 A failed command returns to the agent. If it needs more access, it can request a retry by referencing the job number, repeating the original command and absolute working directory, selecting filesystem, network, or both, and explaining its reason. The approval shows what the agent requested. Approving starts the command over once. The original output stays in the chat. A sidecar restart, a change to the workspace revision, or a retry already spent invalidates the request. Successful commands finish normally, including those that handled a denied operation.
 
-The preview runs ordinary shell commands offline with a fresh temporary home. A filesystem-only retry stays offline. A network-only retry keeps the filesystem policy. Direct CLI credential grants, automatic shell launches, and sandbox enforcement for the evaluator and workspace MCP are still pending.
+A filesystem-only retry preserves the original network policy. A network-only retry keeps filesystem restrictions.

@@ -17,7 +17,6 @@ import { MockLanguageModelV4 } from 'ai/test'
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { execFileSync } from 'node:child_process'
 import {
-  copyFile,
   mkdir,
   mkdtemp,
   readFile,
@@ -26,6 +25,7 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { join } from 'node:path'
+import { nativeGitHubFixture } from '~/tests/helpers/native-shell-github'
 import { nativeShellSidecar } from '~/tests/helpers/native-shell-sidecar'
 
 describe.skipIf(
@@ -58,54 +58,12 @@ describe.skipIf(
       port: 0,
       fetch: () => new Response('ok'),
     })
-    // Use the installed gh against a disposable GitHub API socket. The fixture
-    // configures only the test CLI's private HOME and uses a synthetic token.
-    const gh = Bun.which('gh')
-    if (!gh) throw new Error('The native CLI test requires gh')
-    const fixtureGh = join(sandbox, 'fixture-gh')
-    await copyFile(gh, fixtureGh)
-    const socket = join(sandbox, 'api.sock')
-    requests = []
-    api = Bun.serve({
-      unix: socket,
-      fetch: async (request) => {
-        if (
-          request.headers.get('authorization') !== 'Bearer fixture-token' &&
-          request.headers.get('authorization') !== 'token fixture-token'
-        )
-          return new Response('missing test credential', { status: 401 })
-        requests.push(await request.text())
-        return Response.json({
-          data: {
-            repository: {
-              pullRequests: {
-                nodes: [],
-                edges: [],
-                totalCount: 0,
-                pageInfo: { hasNextPage: false },
-              },
-              hasIssuesEnabled: true,
-            },
-          },
-        })
-      },
-    })
-    const launcher = join(root, 'fixture-launcher')
-    await writeFile(
-      launcher,
-      [
-        '#!/bin/sh',
-        'mkdir -p "$HOME/.config/gh" || exit 1',
-        'echo "http_unix_socket: ' +
-          socket +
-          '" > "$HOME/.config/gh/config.yml" || exit 1',
-        'exec "' + fixtureGh + '" "$@"',
-      ].join('\n'),
-      { mode: 0o700 },
-    )
+    const fixture = await nativeGitHubFixture(root, sandbox)
+    api = fixture.server
+    requests = fixture.requests
     originalUrl = process.env.SIDECAR_URL
     sidecar = await nativeShellSidecar(join(root, 'sidecar'), 'pipe', {
-      CORVORI_GH_BINARY: launcher,
+      CORVORI_GH_BINARY: fixture.launcher,
       GH_TOKEN: 'fixture-token',
     })
     process.env.SIDECAR_URL = sidecar.url

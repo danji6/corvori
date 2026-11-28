@@ -24,7 +24,6 @@ export async function nativeShellSidecar(
       MCP_PORT: String(port),
       CHAT_SIDECAR_DATA_DIR: directory,
       CHAT_JOB_MODE: mode,
-      CORVORI_SHELL_SANDBOX_PREVIEW: '1',
     },
     stdout: 'ignore',
     stderr: 'inherit',

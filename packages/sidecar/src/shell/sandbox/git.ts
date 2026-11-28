@@ -24,8 +24,11 @@ async function linkMetadata(source: string, destination: string, name: string) {
   })
   if (!entry || entry.isSymbolicLink()) return
   const target = join(destination, name)
-  if (name === 'HEAD') await copyFile(file, target)
-  else await symlink(file, target)
+  if (name === 'HEAD') {
+    if (!entry.isFile() || entry.size > 4096)
+      throw new Error('Invalid Git HEAD')
+    await copyFile(file, target)
+  } else await symlink(file, target)
 }
 
 /** Give a direct inspection command a read-only Git view with no repository-configured helpers. */

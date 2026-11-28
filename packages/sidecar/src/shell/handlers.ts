@@ -33,6 +33,7 @@ import {
 } from './registry'
 import { previewAvailable } from './sandbox/preview-platform'
 import { sandboxReady } from './sandbox/readiness'
+import { sandboxRoots } from './sandbox/roots'
 import { pumpShellJobStream } from './stream'
 import { canBindSessionDir, shellPath } from './system-shell'
 
@@ -114,13 +115,14 @@ const killSessionSchema = z.object({
 export const shellInfo: Handler = async (c) => {
   try {
     const shell = shellPath()
+    const ready = await sandboxReady()
     return c.json({
       shell,
       label: shellLabel(shell),
       sandbox: {
         version: 2,
-        retryPreview: await sandboxReady(),
-        automaticShellExecution: await sandboxReady(),
+        retryPreview: ready,
+        automaticShellExecution: ready,
       },
     })
   } catch (err: unknown) {
@@ -214,6 +216,18 @@ async function shellLaunch(
 }
 
 export const startShell: Handler = (c) => shellLaunch(c, false)
+export const checkSandboxLaunch: Handler = async (c) => {
+  try {
+    const input = startSchema.parse(await c.req.json())
+    if (!(await sandboxReady())) return c.json({ ready: false })
+    const { launch, roots } = await resolveLaunch(input, true)
+    await sandboxRoots([...roots, ...launch.grantedPaths])
+    return c.json({ ready: true })
+  } catch {
+    return c.json({ ready: false })
+  }
+}
+
 export const startSandboxShell: Handler = async (c) => {
   if (!(await sandboxReady()))
     return c.json(

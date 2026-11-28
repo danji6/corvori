@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, realpath, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 
 import { isOutside } from '../../mcp/workspace/access'
@@ -14,39 +14,14 @@ import { prepareGitQuery } from './git'
 import { githubEnvironment, githubInvocation } from './github'
 import { snapshotGitPaths } from './ignore-snapshot'
 import {
-  linuxPaths,
   previewAvailable,
   runtimeReadPaths,
   wrapPreview,
 } from './preview-platform'
+import { sandboxRoots } from './roots'
 import { systemTools } from './system-tools'
 
 const execute = promisify(execFile)
-
-async function writableRoots(roots: string[], runtime: string) {
-  const installation = await realpath(process.cwd())
-  const trusted = [installation, runtime, await realpath(tmpdir())]
-  const helpers = ['node_modules', 'packages', 'scripts', 'bin'].map((name) =>
-    join(installation, name),
-  )
-  helpers.push(
-    resolve(installation, process.env.CHAT_DATA_DIR || '.data', 'build'),
-  )
-  if (process.platform === 'linux') helpers.push(...Object.values(linuxPaths()))
-  for (const root of roots) {
-    if (
-      trusted.some((path) => !isOutside(root, path)) ||
-      helpers.some((path) => !isOutside(root, path) || !isOutside(path, root))
-    )
-      throw new Error(
-        'A sandbox workspace overlaps the installation or private temporary directory',
-      )
-  }
-  // A cwd below an existing grant must never reopen a protected child.
-  return roots.filter(
-    (root) => !roots.some((other) => other !== root && !isOutside(other, root)),
-  )
-}
 
 async function filesystemPolicy(
   roots: string[],
@@ -141,10 +116,7 @@ export async function preparePreview(
       'The Linux sandbox worker requires the packaged Node runtime',
     )
   const grants = input.grantedPaths ?? []
-  const writable = await writableRoots(
-    [...new Set([...roots, ...grants])],
-    runtime,
-  )
+  const writable = await sandboxRoots([...new Set([...roots, ...grants])])
   const shell = input.shell || '/bin/bash'
   if (
     !['/bin/sh', '/bin/bash', '/bin/zsh', 'bash', 'zsh', 'sh'].includes(shell)

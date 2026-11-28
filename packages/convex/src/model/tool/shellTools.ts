@@ -65,7 +65,15 @@ export async function createShellTool(context: WorkspaceToolContext) {
       (await current.isPlanMode?.())
     )
       return shellNeedsApproval(input.command, current, input.cwd)
-    if ((await shellCapability())?.automaticShellExecution !== true) {
+    const probe = await postSidecar<{ ready: boolean }>(
+      '/shell/sandbox/check',
+      {
+        ...workspaceArgs(current),
+        command: input.command,
+        allowedPaths: approvals?.paths,
+      },
+    ).catch(() => undefined)
+    if (!probe?.ready) {
       fallbackRequests.add(toolCallId)
       return true
     }

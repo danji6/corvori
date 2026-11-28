@@ -43,9 +43,11 @@ export function linuxPaths() {
   }
 }
 
-/** Advertise the preview separately from readiness for automatic execution. */
+/** Check the launch dependencies before running the packaged isolation probe. */
 export function previewAvailable() {
-  if (process.env.CORVORI_SHELL_SANDBOX_PREVIEW !== '1') return false
+  const override = process.env.CORVORI_SHELL_SANDBOX_PREVIEW
+  if (override === '0' || (process.versions.bun && override !== '1'))
+    return false
   if (process.platform === 'darwin') return existsSync('/usr/bin/sandbox-exec')
   return (
     process.platform === 'linux' &&

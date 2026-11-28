@@ -11,6 +11,7 @@ import { promisify } from 'node:util'
 
 import { initializeBackend, workspaceProbePolicy } from './backend'
 import { prepareProbeCommand } from './diagnostic-command'
+import { sandboxReady } from './readiness'
 
 const vendor = resolve(process.argv[2])
 process.env.PATH =
@@ -21,6 +22,7 @@ const cwd = await realpath(
     join(process.env.RUNNER_TEMP || tmpdir(), 'corvori-native-check-'),
   ),
 )
+const automaticShellExecution = await sandboxReady()
 const original = process.cwd()
 try {
   process.chdir(cwd)
@@ -56,7 +58,7 @@ try {
       version: 1,
       backend,
       probe: 'passed',
-      automaticShellExecution: false,
+      automaticShellExecution,
     }),
   )
 } catch (error) {
