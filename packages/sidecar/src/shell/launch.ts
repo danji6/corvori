@@ -25,6 +25,10 @@ type LaunchInput = {
 
 type Terminal = 'pty' | { cols: number; rows: number }
 
+export function shellWord(word: string) {
+  return "'" + word.replaceAll("'", "'\\''") + "'"
+}
+
 /** Prepare every agent-controlled shell or direct argv launch before selecting its transport. */
 export function prepareShellLaunch(input: LaunchInput, terminal?: Terminal) {
   if (input.prepared) {
@@ -32,9 +36,7 @@ export function prepareShellLaunch(input: LaunchInput, terminal?: Terminal) {
     if (!terminal || terminal === 'pty')
       return { file, args, env, cwd: input.cwd }
     // util-linux script takes a shell string. Quote each word of the already prepared native invocation.
-    const words = [file, ...args].map(
-      (word) => "'" + word.replaceAll("'", "'\\''") + "'",
-    )
+    const words = [file, ...args].map(shellWord)
     const sized = `stty cols ${terminal.cols} rows ${terminal.rows} 2>/dev/null; exec ${words.join(' ')}`
     return {
       file: '/usr/bin/script',

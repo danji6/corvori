@@ -136,6 +136,7 @@ export async function readInput(ctx: QueryCtx, { id }: { id: EvaluationId }) {
     mcpServers,
     model,
     ...counts,
+    unrestrictedShell: vars?.toolApprovals?.mode === 'unrestricted',
     environment: vars?.environment ?? {},
     items,
   }

@@ -3,6 +3,7 @@ import {
   SHELL_OUTPUT_TOOL_NAME,
   SHELL_TOOL_NAME,
 } from '@cv/core/const'
+import { hasGitHubQueryGrant } from '@cv/core/shell/direct-command'
 import { TOOL_DESCRIPTIONS, shellToolDescription } from '@cv/core/types'
 import type { ShellToolOutput, ToolApprovals } from '@cv/core/types/tools'
 import { parseScopedPath } from '@cv/core/workspace/scoped-path'
@@ -21,7 +22,7 @@ import {
   workspaceArgs,
 } from './context'
 import { approvalsForFilesystemCall } from './filesystemApprovals'
-import { checkShellToolPaths } from './paths'
+import { checkShellToolPaths, checkToolPaths } from './paths'
 import {
   type ShellJobInput,
   type ShellOutputInput,
@@ -41,31 +42,60 @@ import { shellWaitSeconds, waitForShell } from './shellTimedWait'
 
 export async function createShellTool(context: WorkspaceToolContext) {
   const [{ tool }, { z }] = await Promise.all([import('ai'), import('zod')])
+  const capability =
+    context.workspace && context.findShell ? await shellCapability() : undefined
+  const automatic =
+    capability?.version === 2 && capability.automaticShellExecution === true
   const preview =
-    context.workspace && context.findShell
-      ? await getSidecar<{
-          sandbox?: { version: number; retryPreview: boolean }
-        }>('/shell/info')
-          .then(
-            (info) =>
-              info.sandbox?.version === 1 && info.sandbox.retryPreview === true,
-          )
-          .catch(() => false)
-      : false
+    automatic || (capability?.version === 1 && capability.retryPreview)
+  const fallbackRequests = new Set<string>()
+
+  async function needsLaunchApproval(
+    input: ShellJobInput,
+    current: WorkspaceToolContext,
+    toolCallId: string,
+  ) {
+    fallbackRequests.delete(toolCallId)
+    if (input.retry) return true
+    const approvals = await current.approvals?.()
+    if (isUnrestrictedAccess(approvals)) return false
+    if (
+      !automatic ||
+      !supportsSandboxShell(current.shell) ||
+      (await current.isPlanMode?.())
+    )
+      return shellNeedsApproval(input.command, current, input.cwd)
+    if ((await shellCapability())?.automaticShellExecution !== true) {
+      fallbackRequests.add(toolCallId)
+      return true
+    }
+    if (!input.cwd) return false
+    const result = await checkToolPaths([], current, approvals?.paths, {
+      cwd: input.cwd,
+    })
+    return !result?.complete || result.uncovered.length > 0
+  }
 
   async function launch(
     input: ShellJobInput,
     toolCallId: string,
     approvals: ToolApprovals | undefined,
   ) {
+    const planMode = await context.isPlanMode?.()
+    const enforced =
+      automatic &&
+      supportsSandboxShell(context.shell) &&
+      !fallbackRequests.has(toolCallId)
     const sandbox =
-      preview &&
       !isUnrestrictedAccess(approvals) &&
-      !(await context.isPlanMode?.())
-    if (input.retry && !sandbox)
+      (enforced || (preview && !automatic && !planMode))
+    if (input.retry && (!sandbox || planMode))
       throw new ToolError('Sandbox retry is unavailable in this mode')
     const cwdGrant =
-      input.cwd && !parseScopedPath(input.cwd).explicit ? [input.cwd] : []
+      input.cwd && (!enforced || isUnrestrictedAccess(approvals)) && !parseScopedPath(input.cwd).explicit
+        ? [input.cwd]
+        : []
+    fallbackRequests.delete(toolCallId)
     const job = {
       ...workspaceArgs(context),
       ...jobRef(context, toolCallId),
@@ -78,6 +108,15 @@ export async function createShellTool(context: WorkspaceToolContext) {
       job,
       options: {
         sandbox: sandbox ? (true as const) : undefined,
+        requireSandbox: sandbox && enforced ? (true as const) : undefined,
+        readOnlyWorkspace: sandbox && planMode ? (true as const) : undefined,
+        githubQuery:
+          sandbox &&
+          enforced &&
+          !planMode &&
+          hasGitHubQueryGrant(input.command, approvals?.shell)
+            ? (true as const)
+            : undefined,
         retry,
         bindSessionDir: shouldBindSessionDir(input.command, context),
       },
@@ -94,7 +133,7 @@ export async function createShellTool(context: WorkspaceToolContext) {
     ),
     needsApproval: async (input, execution) => {
       if (!input.retry)
-        return shellNeedsApproval(input.command, context, input.cwd)
+        return needsLaunchApproval(input, context, execution.toolCallId)
       const { job, options } = await launch(
         input,
         execution.toolCallId,
@@ -115,10 +154,7 @@ export async function createShellTool(context: WorkspaceToolContext) {
       const approvals = await approvalsForFilesystemCall(
         context,
         { id: toolCallId, name: SHELL_TOOL_NAME, input },
-        (current) =>
-          input.retry
-            ? Promise.resolve(true)
-            : shellNeedsApproval(input.command, current, input.cwd),
+        (current) => needsLaunchApproval(input, current, toolCallId),
       )
       const { job, options } = await launch(input, toolCallId, approvals)
       yield* trackJob(
@@ -142,6 +178,21 @@ export async function createShellTool(context: WorkspaceToolContext) {
       )
     },
   })
+}
+
+async function shellCapability() {
+  const info = await getSidecar<{
+    sandbox?: {
+      version: number
+      retryPreview?: boolean
+      automaticShellExecution?: boolean
+    }
+  }>('/shell/info').catch(() => undefined)
+  return info?.sandbox
+}
+
+function supportsSandboxShell(shell?: string) {
+  return !shell || /^(?:\/bin\/)?(?:sh|bash|zsh)$/.test(shell)
 }
 
 function shouldBindSessionDir(

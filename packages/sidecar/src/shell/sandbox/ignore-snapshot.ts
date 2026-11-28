@@ -28,8 +28,9 @@ export async function snapshotGitPaths(directory: string, emptyRepo?: string) {
     }
   }
   await addIgnoredPaths(root, hidden, readOnly, gitArgs)
-  await collectProtectedEntries(root, hidden, readOnly)
-  return { hidden: [...hidden], readOnly: [...readOnly] }
+  const metadata = new Set<string>()
+  await collectProtectedEntries(root, hidden, readOnly, metadata)
+  return { hidden: [...hidden, ...metadata], readOnly: [...readOnly], metadata: [...metadata] }
 }
 
 async function addIgnoredPaths(
@@ -95,6 +96,7 @@ async function collectProtectedEntries(
   root: string,
   hidden: Set<string>,
   readOnly: Set<string>,
+  protectedMetadata: Set<string>,
 ) {
   const pending = [root]
   while (pending.length) {
@@ -104,10 +106,13 @@ async function collectProtectedEntries(
     if (metadata && directory !== root)
       await addIgnoredPaths(directory, hidden, readOnly)
     if (metadata && !metadata.isDirectory())
-      await addLinkedMetadata(directory, hidden)
+      await addLinkedMetadata(directory, protectedMetadata)
     for (const entry of entries) {
       const path = join(directory, entry.name)
-      if (entry.name === '.git') hidden.add(path)
+      if (entry.name === '.git') {
+        protectedMetadata.add(path)
+        continue
+      }
       if (entry.name === '.gitignore') readOnly.add(path)
       if (!entry.isDirectory() || hidden.has(path)) continue
       if (dependencies.has(entry.name)) readOnly.add(path)

@@ -15,6 +15,7 @@ const macSystemPaths = [
   '/private/etc/ssl/openssl.cnf',
   '/private/etc/ssl/cert.pem',
   '/private/etc/hosts',
+  '/private/var/select/sh',
   '/private/etc/resolv.conf',
   '/dev/null',
   '/dev/urandom',

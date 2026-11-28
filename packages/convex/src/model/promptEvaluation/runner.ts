@@ -237,6 +237,8 @@ function shellInput(
 
   return {
     shell: {
+      ...(session.mode === 'plan' && { readOnlyWorkspace: true as const }),
+      ...(data.unrestrictedShell && { unrestricted: true as const }),
       sessionId: session.parent?.sessionId ?? session._id,
       workspaceId: workspace.workspaceId,
       workspace,

@@ -17,6 +17,9 @@ export type StartShellJobInput = {
   workspaceId: string
   revision?: number
   authority?: string
+  grantedPaths?: string[]
+  githubQuery?: true
+  readOnlyWorkspace?: true
   sandbox?: true
   retry?: ShellRetry
   command: string

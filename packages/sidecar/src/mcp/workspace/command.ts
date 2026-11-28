@@ -1,4 +1,8 @@
-import { type ShellEnvironment, spawnShellPipes } from '../../shell/launch'
+import {
+  type PreparedShell,
+  type ShellEnvironment,
+  spawnShellPipes,
+} from '../../shell/launch'
 import { killProcessTree } from '../../shell/system-shell'
 
 const MAX_COMMAND_BYTES = 100_000
@@ -10,10 +14,15 @@ export async function runCommand(
   timeoutSeconds: number,
   signal?: AbortSignal,
   environment?: ShellEnvironment,
+  prepared?: PreparedShell,
 ) {
   return new Promise<{ exitCode: number | null; output: string }>(
     (resolve, reject) => {
-      const child = spawnShellPipes({ command, cwd, environment }, 'ignore')
+      signal?.throwIfAborted()
+      const child = spawnShellPipes(
+        { prepared, command, cwd, environment },
+        'ignore',
+      )
 
       let output = ''
       let killed = false

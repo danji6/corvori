@@ -20,6 +20,7 @@ import { readImagePreview } from '../../files/read-image'
 import { readOptionalEditSnapshot } from '../../files/read-snapshot'
 import { readTextPage } from '../../files/read-text'
 import { resolveShellDirectory } from '../../shell/directory'
+import { prepareAuxiliaryShell } from '../../shell/sandbox/auxiliary'
 import { assertCheckpointTarget, resolveToolPath } from './access'
 import { runCommand } from './command'
 import { withFilesystemOperation, workspaceContextSchema } from './context'
@@ -300,14 +301,27 @@ async function runWorkspaceCommandImpl(input: {
   const roots = input.workspace
     ? await workspaceRoots(input.sessionId, input.workspace)
     : directory.roots
-  return checkpoints().write(input.sessionId, [...roots, directory.cwd], () =>
-    runCommand(
-      input.command,
-      directory.cwd,
-      input.timeout ?? 30,
-      input.signal,
-      directory.environment,
-    ),
+  return checkpoints().write(
+    input.sessionId,
+    [...roots, directory.cwd],
+    async () => {
+      const job = await prepareAuxiliaryShell(
+        { ...input, cwd: directory.cwd, environment: directory.environment },
+        roots,
+      )
+      try {
+        return await runCommand(
+          input.command,
+          directory.cwd,
+          input.timeout ?? 30,
+          input.signal,
+          directory.environment,
+          job?.prepared,
+        )
+      } finally {
+        await job?.cleanup()
+      }
+    },
   )
 }
 

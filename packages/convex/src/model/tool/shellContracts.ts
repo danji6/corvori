@@ -49,6 +49,9 @@ export type OpenStream = (
 ) => AsyncGenerator<ShellStreamEvent>
 
 export type ShellJobOptions = {
+  requireSandbox?: true
+  githubQuery?: true
+  readOnlyWorkspace?: true
   sandbox?: true
   retry?: ShellRetry
   abortSignal?: AbortSignal

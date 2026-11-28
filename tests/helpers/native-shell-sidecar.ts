@@ -4,6 +4,7 @@ import { buildSidecar, resolveNodeBinary } from '~/scripts/sidecar'
 export async function nativeShellSidecar(
   directory: string,
   mode: 'pipe' | 'pty',
+  cli?: { CORVORI_GH_BINARY: string; GH_TOKEN: string },
 ) {
   const entry = await buildSidecar()
   const reservation = Bun.serve({
@@ -16,6 +17,7 @@ export async function nativeShellSidecar(
   const url = 'http://127.0.0.1:' + port
   const child = Bun.spawn([resolveNodeBinary(), entry], {
     env: {
+      ...cli,
       PATH: process.env.PATH,
       TMPDIR: process.env.TMPDIR,
       SIDECAR_SECRET: 'corvori-test-sidecar-credential',

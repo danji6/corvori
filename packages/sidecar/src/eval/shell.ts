@@ -12,7 +12,8 @@ import { workspaceRoots } from '../checkpoints/group'
 import { checkpoints, finishCheckpointJob } from '../checkpoints/manager'
 import { withWorkspaceOperation } from '../mcp/workspace/context'
 import { resolveShellDirectory } from '../shell/directory'
-import { spawnShellPipes } from '../shell/launch'
+import { shellWord, spawnShellPipes } from '../shell/launch'
+import { prepareAuxiliaryShell } from '../shell/sandbox/auxiliary'
 import { killProcessTree } from '../shell/system-shell'
 import type { evaluationShellSchema } from './schemas'
 
@@ -38,7 +39,14 @@ export async function runEvaluationShell(
           input.sessionId,
           roots,
           async (writer) => {
-            const command = launch(input, directory, args, kind, signal)
+            const command = await launch(
+              input,
+              directory,
+              roots,
+              args,
+              kind,
+              signal,
+            )
             try {
               await writer.trackJob(command.pid)
               return command
@@ -63,9 +71,10 @@ export async function runEvaluationShell(
 
 type ShellDirectory = Awaited<ReturnType<typeof resolveShellDirectory>>
 
-function launch(
+async function launch(
   input: EvaluationShell,
   directory: ShellDirectory,
+  roots: string[],
   args: string[],
   kind: EvaluationRequest['kind'],
   signal: AbortSignal,
@@ -74,22 +83,47 @@ function launch(
 
   const command =
     args.length === 1 ? args[0] : { file: args[0], args: args.slice(1) }
-  const child = spawnShellPipes(
-    {
-      command,
-      cwd: directory.cwd,
-      environment: directory.environment,
-      shell: input.shell,
-    },
-    'ignore',
-  )
+  const job = input.unrestricted
+    ? undefined
+    : await prepareAuxiliaryShell(
+        {
+          ...input,
+          cwd: directory.cwd,
+          environment: directory.environment,
+          command:
+            typeof command === 'string'
+              ? command
+              : 'exec ' + args.map(shellWord).join(' '),
+        },
+        roots,
+      )
+  const start = () =>
+    spawnShellPipes(
+      {
+        prepared: job?.prepared,
+        command,
+        cwd: directory.cwd,
+        environment: directory.environment,
+        shell: input.shell,
+      },
+      'ignore',
+    )
 
+  let child: ChildProcess
+  try {
+    signal.throwIfAborted()
+    child = start()
+  } catch (error) {
+    await job?.cleanup()
+    throw error
+  }
   const kill = () => killProcessTree(child.pid, () => child.kill())
 
   signal.addEventListener('abort', kill, { once: true })
-  const output = collectOutput(child, kill, kind).finally(() =>
-    signal.removeEventListener('abort', kill),
-  )
+  const output = collectOutput(child, kill, kind).finally(async () => {
+    signal.removeEventListener('abort', kill)
+    await job?.cleanup()
+  })
 
   return { pid: child.pid, kill, output }
 }

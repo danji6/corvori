@@ -15,6 +15,9 @@ function identity(job: StartShellJobInput) {
     job.shell,
     job.boundSessionDir,
     job.authority,
+    [...(job.grantedPaths ?? [])].filter((path) => path !== job.cwd).sort(),
+    job.githubQuery,
+    job.readOnlyWorkspace,
   ])
 }
 

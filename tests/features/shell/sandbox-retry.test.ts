@@ -16,6 +16,7 @@ import { type ToolSet, streamText } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import {
+  copyFile,
   mkdir,
   mkdtemp,
   readFile,
@@ -23,7 +24,6 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nativeShellSidecar } from '~/tests/helpers/native-shell-sidecar'
 
@@ -33,6 +33,8 @@ describe.skipIf(
   let root: string
   let sandbox: string
   let server: ReturnType<typeof Bun.serve>
+  let api: ReturnType<typeof Bun.serve>
+  let requests: string[]
   let originalUrl: string | undefined
   let sidecar: Awaited<ReturnType<typeof nativeShellSidecar>>
   let shell: Awaited<ReturnType<typeof createShellTool>>
@@ -44,7 +46,7 @@ describe.skipIf(
   let number = 0
 
   beforeAll(async () => {
-    root = await realpath(await mkdtemp(join(tmpdir(), 'corvori-retry-')))
+    root = await realpath(await mkdtemp('/tmp/cv-retry-'))
     sandbox = join(root, 'workspace')
     await mkdir(sandbox)
     await writeFile(join(sandbox, '.gitignore'), '*.private\n')
@@ -55,8 +57,56 @@ describe.skipIf(
       port: 0,
       fetch: () => new Response('ok'),
     })
+    // Use the installed gh against a disposable GitHub API socket. The fixture
+    // configures only the test CLI's private HOME and uses a synthetic token.
+    const gh = Bun.which('gh')
+    if (!gh) throw new Error('The native CLI test requires gh')
+    const fixtureGh = join(sandbox, 'fixture-gh')
+    await copyFile(gh, fixtureGh)
+    const socket = join(sandbox, 'api.sock')
+    requests = []
+    api = Bun.serve({
+      unix: socket,
+      fetch: async (request) => {
+        if (
+          request.headers.get('authorization') !== 'Bearer fixture-token' &&
+          request.headers.get('authorization') !== 'token fixture-token'
+        )
+          return new Response('missing test credential', { status: 401 })
+        requests.push(await request.text())
+        return Response.json({
+          data: {
+            repository: {
+              pullRequests: {
+                nodes: [],
+                edges: [],
+                totalCount: 0,
+                pageInfo: { hasNextPage: false },
+              },
+              hasIssuesEnabled: true,
+            },
+          },
+        })
+      },
+    })
+    const launcher = join(root, 'fixture-launcher')
+    await writeFile(
+      launcher,
+      [
+        '#!/bin/sh',
+        'mkdir -p "$HOME/.config/gh" || exit 1',
+        'echo "http_unix_socket: ' +
+          socket +
+          '" > "$HOME/.config/gh/config.yml" || exit 1',
+        'exec "' + fixtureGh + '" "$@"',
+      ].join('\n'),
+      { mode: 0o700 },
+    )
     originalUrl = process.env.SIDECAR_URL
-    sidecar = await nativeShellSidecar(join(root, 'sidecar'), 'pipe')
+    sidecar = await nativeShellSidecar(join(root, 'sidecar'), 'pipe', {
+      CORVORI_GH_BINARY: launcher,
+      GH_TOKEN: 'fixture-token',
+    })
     process.env.SIDECAR_URL = sidecar.url
     context = {
       sessionId: 'retry-session',
@@ -79,6 +129,7 @@ describe.skipIf(
     shell = await createShellTool(context)
   })
   afterAll(async () => {
+    api?.stop(true)
     server?.stop(true)
     await sidecar?.close()
     if (originalUrl === undefined) delete process.env.SIDECAR_URL
@@ -107,6 +158,51 @@ describe.skipIf(
       runtimeContext: undefined,
     })
   }
+
+  test('an explicitly granted GitHub query reaches the API without a path approval', async () => {
+    const command = 'gh pr list --repo danji6/corvori --state all --limit 30'
+    context.approvals = async () => ({ shell: ['gh'] })
+    try {
+      expect(await approveRequest({ command }, 'github')).toBe('not-applicable')
+      const result = await execute({ command }, 'github')
+      expect({ exitCode: result.exitCode, output: result.text.trim() }).toEqual(
+        { exitCode: 0, output: '' },
+      )
+      expect(
+        requests.some(
+          (body) => body.includes('danji6') && body.includes('corvori'),
+        ),
+      ).toBe(true)
+      const mixed = await execute(
+        { command: 'test -z "$GH_TOKEN" && echo offline' },
+        'mixed',
+      )
+      expect(mixed.text.trim()).toBe('offline')
+    } finally {
+      delete context.approvals
+    }
+  })
+
+  test('an ordinary script runs without launch approval and Plan mode fences writes', async () => {
+    const command = "node -e \"require('fs').writeFileSync('ordinary', 'ok')\""
+    expect(await approveRequest({ command }, 'script')).toBe('not-applicable')
+    expect((await execute({ command }, 'script')).exitCode).toBe(0)
+    expect(await readFile(join(sandbox, 'ordinary'), 'utf8')).toBe('ok')
+    context.isPlanMode = async () => true
+    try {
+      expect(
+        await approveRequest({ command, description: 'Edit ordinary' }, 'plan'),
+      ).toBe('user-approval')
+      const failed = await execute(
+        { command: 'echo changed > ordinary' },
+        'plan',
+      )
+      expect(failed.exitCode).not.toBe(0)
+      expect(await readFile(join(sandbox, 'ordinary'), 'utf8')).toBe('ok')
+    } finally {
+      delete context.isPlanMode
+    }
+  })
 
   test.each(['filesystem', 'network', 'both'] as const)(
     'restarts once with only %s access',

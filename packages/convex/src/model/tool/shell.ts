@@ -42,6 +42,9 @@ export function shellLaunchRequest(
     cwd: input.cwd,
     allowedPaths: context.allowedPaths,
     background: shellWaitSeconds(input.wait_seconds) === 0,
+    ...(options.requireSandbox && { scopedGrants: true }),
+    ...(options.githubQuery && { githubQuery: true }),
+    ...(options.readOnlyWorkspace && { readOnlyWorkspace: true }),
     ...(options.sandbox && { sandbox: true }),
     ...(options.retry && { retry: options.retry }),
     shell: context.shell,
@@ -66,7 +69,7 @@ export async function* executeShellJob(
   const background = wait === 0
 
   const { jobId } = await post<StartResponse>(
-    '/shell/start',
+    options.requireSandbox ? '/shell/sandbox/start' : '/shell/start',
     shellLaunchRequest(context, input, options),
   )
 
