@@ -3,12 +3,21 @@ import { probe, spawn } from '@microsoft/mxc-sdk/v1'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import console from 'node:console'
-import { mkdir, mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import {
+  copyFile,
+  mkdir,
+  mkdtemp,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, join, parse } from 'node:path'
 import process from 'node:process'
 import { text } from 'node:stream/consumers'
+import { URL } from 'node:url'
 
 // Qualify the exact workspace permissions before enabling automatic Windows jobs.
 const root = await mkdtemp(join(tmpdir(), 'corvori-mxc-'))
@@ -17,6 +26,7 @@ const runtime = process.execPath
 const dependency = join(workspace, 'node_modules')
 const outside = join(root, 'sibling')
 const ignored = join(workspace, 'ignored')
+const opensslConfig = join(root, 'openssl.cnf')
 const server = createServer((_request, response) => response.end('fixture'))
 try {
   await mkdir(dependency, { recursive: true })
@@ -29,22 +39,13 @@ try {
   })
   await writeFile(join(dependency, 'sample'), 'fixture')
   await writeFile(ignored, 'fixture')
+  await writeFile(opensslConfig, '')
   await symlink(outside, join(workspace, 'linked'), 'junction')
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
   const script = join(workspace, 'verify.cjs')
-  await writeFile(
+  await copyFile(
+    new URL('./windows-workspace-child.cjs', import.meta.url),
     script,
-    [
-      "const fs = require('node:fs')",
-      'const [outside, port] = process.argv.slice(2)',
-      "function accessible(fn) { try { fn(); return true } catch (e) { if (!['EACCES','EPERM','ENOENT'].includes(e.code)) throw e; return false } }",
-      'const read = (p) => accessible(() => fs.readFileSync(p))',
-      "const write = (p) => accessible(() => fs.writeFileSync(p, 'fixture'))",
-      "const sibling = require('node:path').dirname(outside)",
-      "let listSibling = false; accessible(() => { listSibling = fs.readdirSync(sibling).includes('sample') })",
-      "const results = { ordinary: write('result'), dependencyRead: read('node_modules/sample'), dependencyWrite: write('node_modules/sample'), ignored: read('ignored'), outside: read(outside), shared: read(require('node:path').join(sibling, 'shared')), listSibling, linked: read('linked/sample') }",
-      "fetch('http://127.0.0.1:' + port, {signal: AbortSignal.timeout(2500)}).then(r => r.text()).catch(() => '').then(body => console.log(JSON.stringify({...results, online: body === 'fixture'})))",
-    ].join('\n'),
   )
   const qualified = new Set()
   const libraries = []
@@ -80,7 +81,7 @@ try {
             },
           },
           filesystem: {
-            readonlyPaths: [runtime, dependency, ...libraries],
+            readonlyPaths: [runtime, dependency, opensslConfig, ...libraries],
             readwritePaths: [workspace],
             deniedPaths: [
               ignored,
@@ -99,6 +100,7 @@ try {
             SystemRoot: process.env.SystemRoot,
             LOCALAPPDATA: process.env.LOCALAPPDATA,
             PATH: dirname(runtime),
+            OPENSSL_CONF: opensslConfig,
             NODE_OPTIONS: '--preserve-symlinks-main --preserve-symlinks',
           },
           inheritDefaultEnvironment: false,
