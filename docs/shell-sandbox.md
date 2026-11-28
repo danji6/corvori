@@ -1,6 +1,6 @@
 # Native shell sandbox
 
-The packaged sidecar checks that a native child can write in its workspace and cannot read a private sibling file. On Linux and macOS a successful check enables automatic sandboxed shell commands. Unconfigured hosts use the existing approval flow. Run `bun scripts/sidecar.ts --check-sandbox` from the installation directory to build and exercise the diagnostic. It invokes the sidecar’s Node runtime against a disposable Git repository. A successful response names the selected backend. Restart the sidecar after an update.
+The packaged sidecar checks that a native child can read an ordinary sibling file, write inside its workspace, and protect an ignored workspace file and outside writes. A successful check enables automatic sandboxed shell commands. Unconfigured hosts use the existing approval flow. Run `bun scripts/sidecar.ts --check-sandbox` from the installation directory to build and exercise the diagnostic. It invokes the sidecar’s Node runtime against a disposable Git repository. A successful response names the selected backend. Restart the sidecar after an update.
 
 ## Release verification
 
@@ -14,9 +14,11 @@ The native suite snapshots the workspace’s existing Git exclusions at each com
 
 Restart the sidecar after installing the update and start a new chat. In normal mode, ordinary workspace scripts run offline with a private temporary home. A saved command prefix can give a direct `gh pr list` or `gh issue list` invocation network access and the GitHub account credential. Literal arguments such as `--repo danji6/corvori` pass directly to the CLI. Pipelines, substitutions, and interpreter calls start offline. Set `CORVORI_GH_BINARY` in the sidecar launch environment for a trusted CLI outside the standard installation paths.
 
-Plan mode keeps its launch checks and a read-only workspace. Recognized direct Git inspections use a read-only metadata view. Evaluator and workspace MCP commands use the same filesystem and network policy. Explicit unrestricted shell mode retains host execution.
+Commands may read ordinary files outside the workspace, including files in other checkouts. Private Corvori storage, the GitHub CLI configuration, and existing Git-ignored workspace entries are hidden. An authorized session or agent can access its own files. Git metadata is readable. Writes stay within the authorized workspace, path grants, and private scratch directory.
 
-Windows release builds use the existing approval flow. CI tests the packaged sidecar with MXC separately on Windows 11. MXC can inherit reads granted to all app packages by the host. Denying a specific volume can fence those reads on that volume. Automatic Windows execution requires a boundary that also covers files on other volumes and shares. [Microsoft’s filesystem policy](https://github.com/microsoft/mxc/blob/main/docs/backends/process-container/filesystem.md)
+Plan mode keeps its launch checks and a read-only workspace. Recognized direct Git inspections run with a read-only workspace. Evaluator and workspace MCP commands use the same filesystem and network policy. Explicit unrestricted shell mode retains host execution.
+
+On compatible Windows 11 hosts, the packaged sidecar uses MXC after the same startup check. Other Windows hosts use the existing approval flow. The administrator-installed helper is available for diagnostics.
 
 A failed command shows its output and exit status. If the agent needs more access, it requests a retry of that job and explains why. The approval card shows the command, working directory, reason, and requested access. On macOS it also shows the blocked operation and destination when Seatbelt identifies them. A successful command that handled a denied operation finishes normally.
 

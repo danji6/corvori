@@ -15,35 +15,35 @@ export function sandboxSetupDetail() {
   return detail
 }
 
-/** Verify a real child can write ordinary files while a sibling file stays private. */
+/** Check broad reads, confined writes and protected workspace contents with a real child. */
 async function probe() {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'corvori-probe-')))
   const cwd = join(root, 'workspace')
   try {
     await mkdir(cwd)
-    await writeFile(join(root, 'private'), 'private')
+    await writeFile(join(root, 'sibling'), 'readable')
+    await writeFile(join(cwd, '.gitignore'), 'protected\n')
+    await writeFile(join(cwd, 'protected'), 'hidden')
     const windows = process.platform === 'win32'
-    if (windows) {
-      await writeFile(
-        join(cwd, 'probe.cjs'),
-        [
-          "const fs = require('node:fs')",
-          "fs.writeFileSync('probe', 'ready')",
-          "try { fs.readFileSync('../private'); process.exitCode = 1 }",
-          "catch (error) { if (!['EPERM', 'EACCES', 'ENOENT'].includes(error.code)) throw error }",
-          "process.stdout.write(fs.readFileSync('probe'))",
-        ].join('\n'),
-      )
-    }
+    await writeFile(
+      join(cwd, 'probe.cjs'),
+      [
+        "const fs = require('node:fs')",
+        "fs.writeFileSync('probe', 'ready')",
+        "if (fs.readFileSync('../sibling', 'utf8') !== 'readable') process.exitCode = 1",
+        "const denied = fn => { try { return fn() } catch (e) { if (!['EPERM','EACCES','EROFS','ENOENT'].includes(e.code)) throw e } }",
+        "denied(() => { fs.writeFileSync('../sibling', 'changed'); process.exitCode = 1 })",
+        "if (denied(() => fs.readFileSync('protected','utf8')) === 'hidden') process.exitCode = 1",
+        "process.stdout.write(fs.readFileSync('probe'))",
+      ].join('\n'),
+    )
     const job = await preparePreview(
       {
         sessionId: 'probe',
         workspaceId: 'probe',
         cwd,
         shell: windows ? 'cmd.exe' : undefined,
-        command: windows
-          ? 'node probe.cjs'
-          : 'printf ready > probe && ! /bin/cat ../private && /bin/cat probe',
+        command: 'node probe.cjs',
       },
       [cwd],
     )

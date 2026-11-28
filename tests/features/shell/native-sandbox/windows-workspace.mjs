@@ -8,7 +8,6 @@ import {
   mkdir,
   mkdtemp,
   rm,
-  stat,
   symlink,
   writeFile,
 } from 'node:fs/promises'
@@ -47,17 +46,6 @@ try {
     new URL('./windows-workspace-child.cjs', import.meta.url),
     script,
   )
-  const libraries = []
-  for (const name of ['System32', 'SysWOW64', 'WinSxS']) {
-    const path = join(process.env.SystemRoot, name)
-    if (
-      await stat(path).then(
-        (s) => s.isDirectory(),
-        () => false,
-      )
-    )
-      libraries.push(path)
-  }
   for (const online of [false, true]) {
     const request = {
       command: joinWindowsCommandLine([
@@ -67,20 +55,14 @@ try {
         String(server.address().port),
       ]),
       workingDirectory: workspace,
-      containment: {
-        type: 'processcontainer',
-        config: {
-          filesystem: {
-            enumeratePaths: [
-              ...new Set([parse(workspace).root, parse(runtime).root]),
-            ],
-          },
-        },
-      },
+      containment: { type: 'processcontainer' },
       filesystem: {
-        readonlyPaths: [runtime, dependency, opensslConfig, ...libraries],
+        readonlyPaths: [
+          ...new Set([parse(workspace).root, parse(runtime).root]),
+          dependency,
+        ],
         readwritePaths: [workspace],
-        deniedPaths: [ignored, parse(workspace).root],
+        deniedPaths: [ignored],
       },
       network: {
         egress: { default: online ? 'allow' : 'deny' },
@@ -117,10 +99,12 @@ try {
         dependencyRead: true,
         dependencyWrite: false,
         ignored: false,
-        outside: false,
-        listSibling: false,
-        shared: false,
-        linked: false,
+        outside: true,
+        outsideWrite: false,
+        linkedWrite: false,
+        listSibling: true,
+        shared: true,
+        linked: true,
         online,
       })
     } finally {

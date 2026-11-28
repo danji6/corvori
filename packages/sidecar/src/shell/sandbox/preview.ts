@@ -2,7 +2,6 @@ import type { ShellRetryAccess } from '@cv/core/shell/retry'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, realpath, rm, stat } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { basename, delimiter, dirname, join, win32 } from 'node:path'
 import { promisify } from 'node:util'
 
@@ -13,11 +12,8 @@ import { shellInvocation, withBoundSessionDir } from '../system-shell'
 import { prepareGitQuery } from './git'
 import { githubEnvironment, githubInvocation } from './github'
 import { snapshotGitPaths } from './ignore-snapshot'
-import {
-  previewAvailable,
-  runtimeReadPaths,
-  wrapPreview,
-} from './preview-platform'
+import { previewAvailable, wrapPreview } from './preview-platform'
+import { privateShellPaths, shellJobDirectory } from './private-paths'
 import { sandboxRoots } from './roots'
 import { systemTools } from './system-tools'
 import { windowsRequest } from './windows-request'
@@ -26,12 +22,10 @@ const execute = promisify(execFile)
 
 async function filesystemPolicy(
   roots: string[],
-  runtime: string,
   scratch: string,
   readOnly: boolean,
-  binaries: string[],
+  privatePaths: string[],
   grants: string[],
-  git?: Awaited<ReturnType<typeof prepareGitQuery>>,
 ) {
   const emptyRepo = join(dirname(scratch), 'empty.git')
   const { git: executable } = await systemTools()
@@ -46,17 +40,11 @@ async function filesystemPolicy(
       .filter((root): root is string => !!root)
       .map((root) => snapshotGitPaths(root, emptyRepo)),
   )
-  const metadata = new Set(snapshots.flatMap((snapshot) => snapshot.metadata))
-  if (git && git.metadata.some((path) => !metadata.has(path)))
-    throw new Error('Git metadata is outside the selected workspace authority')
   const granted = (path: string) =>
     grants.some((grant) => !isOutside(grant, path))
   const hidden = snapshots
     .flatMap((snapshot) => snapshot.hidden)
-    .filter(
-      (path) =>
-        !git?.metadata.includes(path) && (metadata.has(path) || !granted(path)),
-    )
+    .filter((path) => !granted(path))
   // Pin rules in ancestors of protected entries, even where no nested rule exists at launch.
   const rules = new Set<string>()
   for (const entry of hidden) {
@@ -71,14 +59,8 @@ async function filesystemPolicy(
   return {
     readConfig: {
       denyOnly: [],
-      literalDenyOnly: process.platform === 'win32' ? hidden : ['/', ...hidden],
-      literalAllowWithinDeny: [
-        ...runtimeReadPaths(runtime),
-        ...binaries,
-        ...(git ? [git.view, ...git.metadata] : []),
-        scratch,
-        ...roots,
-      ],
+      literalDenyOnly: [...hidden, ...privatePaths],
+      literalAllowWithinDeny: [...roots, scratch],
     },
     writeConfig: {
       allowOnly: [],
@@ -94,9 +76,16 @@ async function filesystemPolicy(
       literalDenyWithinAllow: [
         ...hidden,
         ...rules,
+        ...privatePaths.filter((path) =>
+          roots.some((root) => !isOutside(root, path)),
+        ),
         ...snapshots
           .flatMap((snapshot) => snapshot.readOnly)
-          .filter((path) => basename(path) === '.gitignore' || !granted(path)),
+          .filter((path) =>
+            ['node_modules', '.venv'].includes(basename(path))
+              ? !granted(path)
+              : true,
+          ),
       ],
     },
   }
@@ -162,9 +151,9 @@ export async function preparePreview(
   )
     throw new Error('The sandbox preview requires a system shell')
   const binShell = shell.startsWith('/') ? shell : '/bin/' + shell
-  const temporary = await realpath(
-    await mkdtemp(join(tmpdir(), 'corvori-shell-')),
-  )
+  const jobs = shellJobDirectory()
+  await mkdir(jobs, { recursive: true, mode: 0o700 })
+  const temporary = await realpath(await mkdtemp(join(jobs, 'job-')))
   const cleanup = () => rm(temporary, { recursive: true, force: true })
   try {
     const scratch = join(temporary, 'tmp')
@@ -197,21 +186,13 @@ export async function preparePreview(
           : { file: binShell, args: ['-c', original] }
       return { prepared: { ...invocation, env }, cleanup }
     }
-    const git = await prepareGitQuery(
-      input.command,
-      input.cwd,
-      writable,
-      temporary,
-      tools.git,
-    )
+    const git = prepareGitQuery(input.command, tools.git)
     const permissions = await filesystemPolicy(
       writable,
-      runtime,
       scratch,
       !!input.readOnlyWorkspace || !!git,
-      [...tools.reads, ...(github ? [github.file] : [])],
+      await privateShellPaths(writable, input.environment),
       grants,
-      git,
     )
     if (windows) {
       const prepared = await windowsRequest({

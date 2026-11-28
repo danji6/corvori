@@ -34,9 +34,8 @@ export async function snapshotGitPaths(directory: string, emptyRepo?: string) {
   const metadata = new Set<string>()
   await collectProtectedEntries(root, hidden, readOnly, metadata)
   return {
-    hidden: [...hidden, ...metadata],
-    readOnly: [...readOnly],
-    metadata: [...metadata],
+    hidden: [...hidden],
+    readOnly: [...readOnly, ...metadata],
   }
 }
 
@@ -86,7 +85,7 @@ async function addIgnoredPaths(
   }
 }
 
-/** Hide both the worktree index and the shared repository behind a .git file. */
+/** Locate both the worktree index and the shared repository behind a .git file. */
 async function addLinkedMetadata(directory: string, hidden: Set<string>) {
   const { git } = await systemTools()
   const { stdout } = await execute(

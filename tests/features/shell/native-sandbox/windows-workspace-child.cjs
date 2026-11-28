@@ -40,6 +40,8 @@ async function main() {
     dependencyWrite: write('node_modules/sample'),
     ignored: read('ignored'),
     outside: read(outside),
+    outsideWrite: write(outside),
+    linkedWrite: write('linked/sample'),
     shared: read(join(sibling, 'shared')),
     listSibling: permitted(() => readdirSync(sibling).includes('sample')),
     linked: read('linked/sample'),

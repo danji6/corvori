@@ -219,7 +219,7 @@ nativeSuite('native shell retry approval', () => {
     expect(node.text.trim()).toBe('17')
   })
 
-  test('only direct Git queries can inspect metadata', async () => {
+  test('workspace Git metadata is readable and protected from writes', async () => {
     execFileSync('git', ['init', '-q'], { cwd: sandbox })
     await writeFile(join(sandbox, 'status-marker'), 'ok')
     const status = await execute(
@@ -232,26 +232,75 @@ nativeSuite('native shell retry approval', () => {
       { command: windows ? 'type .git\\HEAD' : '/bin/cat .git/HEAD' },
       'ordinary-git-read',
     )
-    expect(script.text).not.toContain('refs/heads/')
+    expect(script.text).toContain('refs/heads/')
+    const write = await execute(
+      { command: 'echo changed > .git/config' },
+      'git-write',
+    )
+    expect(write.exitCode).not.toBe(0)
   })
 
-  test('a saved file grant opens only its target for a workspace script', async () => {
+  test('scripts can read siblings and a saved file grant permits only that write', async () => {
     const target = join(root, 'outside')
-    await writeFile(join(root, 'sibling'), 'private fixture')
+    await writeFile(join(root, 'sibling'), 'public fixture')
+    const read = await execute(
+      { command: windows ? 'type ..\\sibling' : 'cat ../sibling' },
+      'broad-read',
+    )
+    expect(read.text.trim()).toBe('public fixture')
     context.approvals = async () => ({ paths: [target] })
     try {
-      const command = windows
-        ? "node -e \"const f=require('fs');console.log(f.readFileSync('../outside','utf8'));try{f.readFileSync('../sibling');process.exitCode=1}catch{}\""
-        : '/bin/cat ../outside && ! /bin/cat ../sibling'
+      const command = 'echo updated > ../outside'
       expect(await approveRequest({ command }, 'file-grant')).toBe(
         'not-applicable',
       )
-      const result = await execute({ command }, 'file-grant')
-      expect(result.text).toContain('fixture')
-      expect(result.text).not.toContain('private fixture')
-      expect(result.exitCode).toBe(0)
+      expect((await execute({ command }, 'file-grant')).exitCode).toBe(0)
+      expect((await readFile(target, 'utf8')).trim()).toBe('updated')
+      expect(
+        (
+          await execute(
+            { command: 'echo changed > ../sibling' },
+            'sibling-write',
+          )
+        ).exitCode,
+      ).not.toBe(0)
+      expect(await readFile(join(root, 'sibling'), 'utf8')).toBe(
+        'public fixture',
+      )
     } finally {
       delete context.approvals
+    }
+  })
+
+  test('only the authorized session is visible inside private sidecar storage', async () => {
+    const sessions = join(root, 'sidecar', 'sessions')
+    const other = join(sessions, 'other')
+    await mkdir(other, { recursive: true })
+    await writeFile(join(other, 'private'), 'other session fixture')
+    context.workspace!.sessionFiles = true
+    try {
+      await writeFile(
+        join(sandbox, 'session-check.cjs'),
+        [
+          "const fs = require('node:fs'), path = require('node:path')",
+          "fs.writeFileSync(path.join(process.env.SESSION_DIR, 'public'), 'current session')",
+          "let sibling; try { sibling = fs.readFileSync(path.resolve(process.env.SESSION_DIR, '../other/private'), 'utf8') } catch {}",
+          "if (sibling === 'other session fixture') process.exitCode = 1",
+        ].join('\n'),
+      )
+      const result = await execute(
+        { command: 'node session-check.cjs' },
+        'session-read',
+      )
+      expect({ code: result.exitCode, output: result.text.trim() }).toEqual({
+        code: 0,
+        output: '',
+      })
+      expect(
+        await readFile(join(sessions, 'retry-session/public'), 'utf8'),
+      ).toBe('current session')
+    } finally {
+      delete context.workspace!.sessionFiles
     }
   })
 
@@ -259,7 +308,10 @@ nativeSuite('native shell retry approval', () => {
     'Seatbelt identifies the child’s denied read in the failed job',
     async () => {
       const failed = await execute(
-        { command: '/bin/cat protected.private >/dev/null 2>&1 || exit 42' },
+        {
+          command:
+            'test "$(/bin/cat protected.private 2>/dev/null)" = fixture || exit 42',
+        },
         'native-denial',
       )
       expect(failed.sandboxDenials).toContainEqual({
@@ -446,14 +498,14 @@ nativeSuite('native shell retry approval', () => {
 
   test('approval history resumes a silent failure exactly once', async () => {
     const command = windows
-      ? "node -e \"const f=require('fs');f.appendFileSync('history-starts','x');try{f.readFileSync('../outside')}catch{process.exitCode=42}\""
-      : 'printf x >> history-starts; /bin/cat ../outside >/dev/null 2>&1 || exit 42'
+      ? "node -e \"const f=require('fs');f.appendFileSync('history-starts','x');try{if(f.readFileSync('protected.private','utf8')!=='fixture')process.exitCode=42}catch{process.exitCode=42}\""
+      : 'printf x >> history-starts; test "$(/bin/cat protected.private 2>/dev/null)" = fixture || exit 42'
     const first = await execute({ command }, 'first-history')
     expect(first.text.trim()).toBe('')
     const request = {
       command,
       cwd: first.retryCwd,
-      description: 'Read the disposable sibling file',
+      description: 'Read the protected workspace file',
       retry: { jobId: String(first.jobNumber), access: 'both' },
     }
     const tools = { shell } as unknown as ToolSet
@@ -533,8 +585,8 @@ nativeSuite('native shell retry approval', () => {
 
   test('a successful probe has no retry and a stale revision cannot spend an approval', async () => {
     const command = windows
-      ? "node -e \"try{require('fs').readFileSync('../outside')}catch{}\""
-      : '/bin/cat ../outside >/dev/null 2>&1 || true'
+      ? "node -e \"try{require('fs').readFileSync('protected.private')}catch{}\""
+      : '/bin/cat protected.private >/dev/null 2>&1 || true'
     const ok = await execute({ command }, 'tolerated')
     expect(ok.exitCode).toBe(0)
     expect(ok.retryCwd).toBeUndefined()
@@ -548,8 +600,8 @@ nativeSuite('native shell retry approval', () => {
       'failed shell job',
     )
     request.command = windows
-      ? "node -e \"try{require('fs').readFileSync('../outside')}catch{process.exitCode=42}\""
-      : '/bin/cat ../outside >/dev/null 2>&1 || exit 42'
+      ? "node -e \"try{if(require('fs').readFileSync('protected.private','utf8')!=='fixture')process.exitCode=42}catch{process.exitCode=42}\""
+      : 'test "$(/bin/cat protected.private 2>/dev/null)" = fixture || exit 42'
     const failed = await execute({ command: request.command }, 'stale')
     expect(failed.exitCode).toBe(42)
     expect(failed.retryCwd).toBe(sandbox)

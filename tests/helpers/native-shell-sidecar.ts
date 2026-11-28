@@ -1,8 +1,5 @@
 import { buildSidecar, resolveNodeBinary } from '~/scripts/sidecar'
 
-// Keep the qualification build below the installation so Node resolves the pinned native packages.
-const windowsBuild =
-  process.platform === 'win32' ? '.data/windows-qualification' : undefined
 let packaged: ReturnType<typeof buildSidecar> | undefined
 
 /** Start the packaged Node sidecar with a fresh authority and wait until its HTTP server answers. */
@@ -11,7 +8,7 @@ export async function nativeShellSidecar(
   mode: 'pipe' | 'pty',
   cli?: { CORVORI_GH_BINARY: string; GH_TOKEN: string },
 ) {
-  const entry = await (packaged ??= buildSidecar(windowsBuild))
+  const entry = await (packaged ??= buildSidecar())
   const reservation = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,
@@ -30,7 +27,6 @@ export async function nativeShellSidecar(
         USERPROFILE: process.env.USERPROFILE,
         TEMP: process.env.TEMP,
         TMP: process.env.TMP,
-        CHAT_DATA_DIR: windowsBuild,
       }),
       PATH: process.env.PATH,
       TMPDIR: process.env.TMPDIR,

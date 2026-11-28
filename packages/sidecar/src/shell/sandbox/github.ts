@@ -37,6 +37,19 @@ export async function githubInvocation(command: string, roots: string[]) {
   throw new Error('Install the GitHub CLI to use the saved gh grant')
 }
 
+export function githubConfigDirectory() {
+  return resolve(
+    process.env.GH_CONFIG_DIR ||
+      (process.platform === 'win32' &&
+        process.env.APPDATA &&
+        join(process.env.APPDATA, 'GitHub CLI')) ||
+      resolve(
+        process.env.XDG_CONFIG_HOME || resolve(homedir(), '.config'),
+        'gh',
+      ),
+  )
+}
+
 /** Resolve the github.com credential without exposing the personal config directory to the job. */
 export async function githubEnvironment(
   file: string,
@@ -45,16 +58,7 @@ export async function githubEnvironment(
 ) {
   let token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN
   if (!token) {
-    const config = resolve(
-      process.env.GH_CONFIG_DIR ||
-        (process.platform === 'win32' &&
-          process.env.APPDATA &&
-          join(process.env.APPDATA, 'GitHub CLI')) ||
-        resolve(
-          process.env.XDG_CONFIG_HOME || resolve(homedir(), '.config'),
-          'gh',
-        ),
-    )
+    const config = githubConfigDirectory()
     const trusted = await realpath(config).catch(() => undefined)
     if (trusted && roots.every((root) => isOutside(root, trusted))) {
       const result = await execute(

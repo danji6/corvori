@@ -7,6 +7,7 @@ import { delimiter, join } from 'node:path'
 import {
   type PreparedShell,
   type ShellEnvironment,
+  cmdArguments,
   prepareShellLaunch,
   spawnShellPipes,
 } from './launch'
@@ -43,7 +44,11 @@ type NodePtySpawnOptions = {
 }
 
 type NodePtyModule = {
-  spawn(file: string, args: string[], options: NodePtySpawnOptions): IPty
+  spawn(
+    file: string,
+    args: string[] | string,
+    options: NodePtySpawnOptions,
+  ): IPty
 }
 
 let nodePtyProbe: Promise<NodePtyModule | null> | undefined
@@ -151,13 +156,17 @@ function spawnNodePty(
   input: SpawnShellJobInput,
 ): ShellJobProcess {
   const { file, args, cwd, env } = prepareShellLaunch(input, 'pty')
-  const pty: IPty = nodePty.spawn(file, args, {
-    name: 'xterm-256color',
-    cols: input.cols,
-    rows: input.rows,
-    cwd,
-    env: env as Record<string, string>,
-  })
+  const pty: IPty = nodePty.spawn(
+    file,
+    cmdArguments(file, args)?.join(' ') ?? args,
+    {
+      name: 'xterm-256color',
+      cols: input.cols,
+      rows: input.rows,
+      cwd,
+      env: env as Record<string, string>,
+    },
+  )
 
   return {
     mode: 'pty',

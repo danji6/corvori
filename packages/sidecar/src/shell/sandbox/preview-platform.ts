@@ -7,25 +7,6 @@ import { dirname, join, resolve } from 'node:path'
 import type { PreparedShell } from '../launch'
 import { windowsWorker } from './windows-request'
 
-declare const CORVORI_WINDOWS_QUALIFICATION: boolean
-
-const macSystemPaths = [
-  '/bin',
-  '/usr/bin',
-  '/usr/lib',
-  '/usr/libexec',
-  '/System/Library',
-  '/private/etc/ssl/openssl.cnf',
-  '/private/etc/ssl/cert.pem',
-  '/private/etc/hosts',
-  '/private/var/select/sh',
-  '/private/etc/resolv.conf',
-  '/dev/null',
-  '/dev/urandom',
-  '/dev/random',
-  '/dev/tty',
-]
-
 export function linuxPaths() {
   const root = process.cwd()
   const bundled = join(root, 'packages/sidecar/vendor/linux-' + process.arch)
@@ -52,35 +33,11 @@ export function previewAvailable() {
   if (override === '0' || (process.versions.bun && override !== '1'))
     return false
   if (process.platform === 'darwin') return existsSync('/usr/bin/sandbox-exec')
-  if (process.platform === 'win32')
-    return (
-      typeof CORVORI_WINDOWS_QUALIFICATION !== 'undefined' &&
-      CORVORI_WINDOWS_QUALIFICATION &&
-      existsSync(windowsWorker())
-    )
+  if (process.platform === 'win32') return existsSync(windowsWorker())
   return (
     process.platform === 'linux' &&
     Object.values(linuxPaths()).every((path) => existsSync(path))
   )
-}
-
-export function runtimeReadPaths(runtime: string) {
-  if (process.platform === 'win32') return [runtime]
-  if (process.platform === 'darwin') return [...macSystemPaths, runtime]
-  return [
-    '/usr/bin',
-    '/usr/lib',
-    '/usr/lib64',
-    '/lib',
-    '/lib64',
-    '/bin',
-    '/etc/ld.so.cache',
-    '/etc/hosts',
-    '/etc/resolv.conf',
-    '/etc/ssl/certs',
-    linuxPaths().seccomp,
-    runtime,
-  ]
 }
 
 export async function wrapPreview(

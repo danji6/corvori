@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { basename } from 'node:path'
 
 import {
   type ShellInvocation,
@@ -66,6 +67,17 @@ export function prepareShellLaunch(input: LaunchInput, terminal?: Terminal) {
   return { ...invocation, cwd, env: jobEnv(extra, environment) }
 }
 
+/** cmd /s /c strips one outer quote pair and parses the payload verbatim. */
+export function cmdArguments(file: string, args: string[]) {
+  if (
+    process.platform !== 'win32' ||
+    basename(file).toLowerCase() !== 'cmd.exe' ||
+    args.at(-2) !== '/c'
+  )
+    return
+  return [...args.slice(0, -1), '"' + args.at(-1) + '"']
+}
+
 /** Launch a pipe-backed job in its own process group. */
 export function spawnShellPipes(
   input: LaunchInput,
@@ -73,7 +85,9 @@ export function spawnShellPipes(
   terminal?: Exclude<Terminal, 'pty'>,
 ) {
   const { file, args, cwd, env } = prepareShellLaunch(input, terminal)
-  return spawn(file, args, {
+  const verbatim = cmdArguments(file, args)
+  return spawn(file, verbatim ?? args, {
+    windowsVerbatimArguments: !!verbatim,
     cwd,
     env,
     detached: process.platform !== 'win32',

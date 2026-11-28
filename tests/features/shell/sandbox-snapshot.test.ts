@@ -18,11 +18,10 @@ test('each launch snapshots Git exclusions and preserves dependency reads', asyn
     await writeFile(path('nested/public.private'), '')
     await writeFile(path('nested/[a].private'), '')
     const first = await snapshotGitPaths(root)
-    expect(first.hidden.sort()).toEqual(
-      [path('.git'), path('nested/[a].private')].sort(),
-    )
+    expect(first.hidden.sort()).toEqual([path('nested/[a].private')])
     expect(first.readOnly.sort()).toEqual(
       [
+        path('.git'),
         path('.gitignore'),
         path('nested/.gitignore'),
         path('node_modules'),
@@ -38,7 +37,7 @@ test('each launch snapshots Git exclusions and preserves dependency reads', asyn
   }
 })
 
-test('snapshots nested repositories and denies their linked metadata', async () => {
+test('snapshots nested repositories and makes their linked metadata read-only', async () => {
   const base = await realpath(
     await mkdtemp(join(tmpdir(), 'corvori-linked-git-')),
   )
@@ -57,10 +56,10 @@ test('snapshots nested repositories and denies their linked metadata', async () 
     await writeFile(join(nested, '.gitignore'), '*.private\n')
     const privateFile = join(nested, 'implicit.private')
     await writeFile(privateFile, 'test fixture')
-    const { hidden } = await snapshotGitPaths(root)
+    const { hidden, readOnly } = await snapshotGitPaths(root)
     expect(hidden).toContain(privateFile)
-    expect(hidden).toContain(metadata)
-    expect(hidden).toContain(join(nested, '.git'))
+    expect(readOnly).toContain(metadata)
+    expect(readOnly).toContain(join(nested, '.git'))
   } finally {
     await rm(base, { recursive: true, force: true })
   }

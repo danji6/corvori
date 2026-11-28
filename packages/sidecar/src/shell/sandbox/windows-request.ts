@@ -3,13 +3,13 @@ import {
   joinWindowsCommandLine,
 } from '@anthropic-ai/sandbox-runtime/dist/sandbox/mxc-sandbox-utils.js'
 import type { ContainerRequest } from '@microsoft/mxc-sdk/v1'
-import { realpath, stat, writeFile } from 'node:fs/promises'
-import { basename, dirname, join, resolve, win32 } from 'node:path'
+import { realpath, writeFile } from 'node:fs/promises'
+import { basename, dirname, join, parse, resolve } from 'node:path'
 
 import { isOutside } from '../../mcp/workspace/access'
 import type { PreparedShell } from '../launch'
 import { shellInvocation } from '../system-shell'
-import { windowsVolumes } from './windows-volumes'
+import { mountedDrives } from './windows-volumes'
 
 export function windowsWorker() {
   return resolve(
@@ -43,29 +43,12 @@ export async function windowsRequest(
     : shellInvocation(input.command, input.shell)
   const executable = await realpath(shell?.file ?? input.argv![0])
   const name = basename(executable).toLowerCase()
-  const reads = [...input.readonly]
-  const system = process.env.SystemRoot
-  if (!system) throw new Error('Missing Windows system directory')
-  for (const directory of ['System32', 'SysWOW64', 'WinSxS']) {
-    const path = join(system, directory)
-    if (
-      await stat(path).then(
-        (s) => s.isDirectory(),
-        () => false,
-      )
-    )
-      reads.push(path)
-  }
-  const openssl = join(input.temporary, 'openssl.cnf')
-  await writeFile(openssl, '', { flag: 'wx' })
-  reads.push(openssl)
-  const volumes = await windowsVolumes(system)
-  if (
-    input.roots.some(
-      (root) => !volumes.letters.includes(win32.parse(root).root.toUpperCase()),
-    )
-  )
-    throw new Error('Windows workspace requires a mounted local drive')
+  const drives = await mountedDrives()
+  const reads = [
+    ...drives,
+    ...input.roots.map((root) => parse(root).root),
+    ...input.readonly,
+  ]
   if (shell) {
     if (!['cmd.exe', 'powershell.exe', 'pwsh.exe'].includes(name))
       throw new Error('Unsupported Windows sandbox shell')
@@ -91,22 +74,14 @@ export async function windowsRequest(
   const request: ContainerRequest = {
     command,
     workingDirectory: input.cwd,
-    containment: {
-      type: 'processcontainer',
-      config: {
-        filesystem: {
-          enumeratePaths: [...volumes.letters, dirname(input.runtime)],
-        },
-      },
-    },
+    containment: { type: 'processcontainer' },
     filesystem: {
       readonlyPaths: [...new Set(reads)].filter(
-        (p) =>
-          !input.writable.includes(p) &&
-          input.hidden.every((h) => isOutside(h, p)),
+        (path) =>
+          !input.writable.includes(path) && !input.hidden.includes(path),
       ),
       readwritePaths: input.writable,
-      deniedPaths: [...input.hidden, ...volumes.denied],
+      deniedPaths: input.hidden,
     },
     network: {
       egress: { default: input.online ? 'allow' : 'deny' },
@@ -115,11 +90,7 @@ export async function windowsRequest(
         hostLoopback: input.online ? 'allow' : 'deny',
       },
     },
-    environment: {
-      ...input.env,
-      OPENSSL_CONF: openssl,
-      NODE_OPTIONS: '--preserve-symlinks-main --preserve-symlinks',
-    },
+    environment: input.env,
     inheritDefaultEnvironment: false,
     ui: { disable: false, clipboard: 'none', allowInputInjection: false },
   }

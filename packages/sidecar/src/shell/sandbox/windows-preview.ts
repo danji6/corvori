@@ -44,7 +44,9 @@ try {
   process.exitCode = (await child.wait()).exitCode
 } finally {
   if (pty) process.stdin.setRawMode(false)
+  if (child.standardInput) process.stdin.unpipe(child.standardInput)
   process.stdin.pause()
+  if (terminal) process.stdin.unref()
   process.stdout.off('resize', resize)
   process.off('SIGTERM', stop)
   child.dispose()

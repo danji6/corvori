@@ -38,14 +38,9 @@ function prepareMacPtyHelper() {
 }
 
 /** Bundles the sidecar to plain JS so it can run under Node. */
-export async function buildSidecar(
-  windowsQualificationDir?: string,
-): Promise<string> {
+export async function buildSidecar(): Promise<string> {
   prepareMacPtyHelper()
   const result = await Bun.build({
-    define: {
-      CORVORI_WINDOWS_QUALIFICATION: String(!!windowsQualificationDir),
-    },
     entrypoints: [
       SIDECAR_ENTRY,
       resolve(
@@ -83,16 +78,14 @@ export async function buildSidecar(
       'quickjs-emscripten',
     ],
     format: 'esm',
-    outdir: windowsQualificationDir
-      ? join(windowsQualificationDir, 'build/sidecar')
-      : OUT_DIR,
+    outdir: OUT_DIR,
     sourcemap: 'linked',
     target: 'node',
   })
   if (!result.success) {
     throw new AggregateError(result.logs, 'Sidecar build failed')
   }
-  return sidecarBuildEntry(windowsQualificationDir)
+  return sidecarBuildEntry()
 }
 
 /** The embedded Node downloaded by the runner, or the system one. */
