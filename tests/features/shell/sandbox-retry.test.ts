@@ -116,6 +116,15 @@ nativeSuite('native shell retry approval', () => {
     return (await Array.fromAsync(output)).at(-1)!
   }
 
+  async function readFinishedJob(first: ShellToolOutput, toolCallId: string) {
+    const reader = await createShellOutputTool(context)
+    const pages = reader.execute!(
+      { jobId: String(first.jobNumber), wait_seconds: 10 },
+      { toolCallId, messages: [], context: undefined as never },
+    ) as AsyncIterable<ShellToolOutput>
+    return (await Array.fromAsync(pages)).at(-1)!
+  }
+
   async function approveRequest(input: ShellJobInput, toolCallId: string) {
     const config = shellApprovalPolicy({ shell } as unknown as ToolSet)
     const gate = typeof config === 'object' && config.shell
@@ -179,15 +188,7 @@ nativeSuite('native shell retry approval', () => {
     }
   })
 
-  test('Python and dependency imports work, and direct Git queries can inspect metadata', async () => {
-    execFileSync('git', ['init', '-q'], { cwd: sandbox })
-    await mkdir(join(sandbox, 'node_modules', 'sample'), {
-      recursive: true,
-    })
-    await writeFile(
-      join(sandbox, 'node_modules/sample/index.js'),
-      'module.exports = 17',
-    )
+  test('Python writes an ordinary workspace file', async () => {
     const python = await execute(
       {
         command:
@@ -201,16 +202,31 @@ nativeSuite('native shell retry approval', () => {
       text: '',
     })
     expect(await readFile(join(sandbox, 'from-python'), 'utf8')).toBe('ok')
+  })
+
+  test('Node can import a workspace dependency', async () => {
+    await mkdir(join(sandbox, 'node_modules', 'sample'), {
+      recursive: true,
+    })
+    await writeFile(
+      join(sandbox, 'node_modules/sample/index.js'),
+      'module.exports = 17',
+    )
     const node = await execute(
       { command: 'node -p "require(\'sample\')"' },
       'import',
     )
     expect(node.text.trim()).toBe('17')
+  })
+
+  test('only direct Git queries can inspect metadata', async () => {
+    execFileSync('git', ['init', '-q'], { cwd: sandbox })
+    await writeFile(join(sandbox, 'status-marker'), 'ok')
     const status = await execute(
       { command: 'git status --short' },
       'git-status',
     )
-    expect(status.text).toContain('?? from-python')
+    expect(status.text).toContain('?? status-marker')
     expect(status.exitCode).toBe(0)
     const script = await execute(
       { command: windows ? 'type .git\\HEAD' : '/bin/cat .git/HEAD' },
@@ -383,16 +399,7 @@ nativeSuite('native shell retry approval', () => {
         'terminal-first',
       )
       expect(first.status).toBe('background')
-      const reader = await createShellOutputTool(context)
-      const pages = reader.execute!(
-        { jobId: String(first.jobNumber), wait_seconds: 5 },
-        {
-          toolCallId: 'terminal-read',
-          messages: [],
-          context: undefined as never,
-        },
-      ) as AsyncIterable<ShellToolOutput>
-      const failed = (await Array.fromAsync(pages)).at(-1)!
+      const failed = await readFinishedJob(first, 'terminal-read')
       expect(failed.text.trim()).toBe('before')
       expect(failed.exitCode).toBe(42)
       expect(failed.retryCwd).toBe(sandbox)
@@ -429,6 +436,9 @@ nativeSuite('native shell retry approval', () => {
           messages: [],
           context: undefined as never,
         },
+      )
+      expect((await readFinishedJob(first, 'cancel-result')).status).toBe(
+        'killed',
       )
       await waitFor('cancelled child to exit', () => !isAlive(pid), 5000)
     },

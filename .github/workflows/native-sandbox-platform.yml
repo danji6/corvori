@@ -77,6 +77,11 @@ jobs:
         if: runner.os == 'Windows' && steps.mxc.outputs.setup != 'true'
         working-directory: .
         run: go build -o .data/native/gh-fixture.exe ./tests/features/shell/native-sandbox/gh-fixture.go
+      - name: Select a native Python runtime for Windows qualification
+        if: runner.os == 'Windows' && steps.mxc.outputs.setup != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
       - name: Verify the agent-requested retry through the shell tool and sidecar
         if: runner.os != 'Windows' || steps.mxc.outputs.setup != 'true'
         working-directory: .
@@ -84,6 +89,11 @@ jobs:
           CORVORI_NATIVE_TEST: '1'
         shell: bash
         run: NODE_BINARY="$(node -p 'process.execPath')" bun --no-env-file test --timeout 30000 --path-ignore-patterns '**/browser/**' ./tests/features/shell/sandbox-retry.test.ts
+      - name: Report Windows loader failures
+        if: failure() && runner.os == 'Windows' && steps.mxc.outputs.setup != 'true'
+        run: |
+          Get-WinEvent -FilterHashtable @{LogName='Application';ProviderName='SideBySide';StartTime=(Get-Date).AddMinutes(-5)} -ErrorAction SilentlyContinue | Select-Object -First 4 -ExpandProperty Message
+          exit 0
       - name: Measure native launch overhead
         run: node ../../../../.data/native/benchmark.js
       - name: Verify workspace execution and denial attribution

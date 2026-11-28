@@ -9,6 +9,7 @@ import { basename, dirname, join, resolve, win32 } from 'node:path'
 import { isOutside } from '../../mcp/workspace/access'
 import type { PreparedShell } from '../launch'
 import { shellInvocation } from '../system-shell'
+import { windowsVolumes } from './windows-volumes'
 
 export function windowsWorker() {
   return resolve(
@@ -31,21 +32,6 @@ type WindowsLaunch = {
   env: NodeJS.ProcessEnv
   runtime: string
   temporary: string
-}
-
-/** Include each mounted drive letter, even when it supplies no workspace grants. */
-async function mountedDriveRoots() {
-  const roots: string[] = []
-  for (const letter of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') {
-    const root = letter + ':\\'
-    try {
-      await stat(root)
-      roots.push(root)
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-    }
-  }
-  return roots
 }
 
 /** Compile a per-command BaseContainer request with explicit filesystem grants. */
@@ -73,10 +59,10 @@ export async function windowsRequest(
   const openssl = join(input.temporary, 'openssl.cnf')
   await writeFile(openssl, '', { flag: 'wx' })
   reads.push(openssl)
-  const volumes = await mountedDriveRoots()
+  const volumes = await windowsVolumes(system)
   if (
     input.roots.some(
-      (root) => !volumes.includes(win32.parse(root).root.toUpperCase()),
+      (root) => !volumes.letters.includes(win32.parse(root).root.toUpperCase()),
     )
   )
     throw new Error('Windows workspace requires a mounted local drive')
@@ -108,7 +94,9 @@ export async function windowsRequest(
     containment: {
       type: 'processcontainer',
       config: {
-        filesystem: { enumeratePaths: [...volumes, dirname(input.runtime)] },
+        filesystem: {
+          enumeratePaths: [...volumes.letters, dirname(input.runtime)],
+        },
       },
     },
     filesystem: {
@@ -118,7 +106,7 @@ export async function windowsRequest(
           input.hidden.every((h) => isOutside(h, p)),
       ),
       readwritePaths: input.writable,
-      deniedPaths: [...input.hidden, ...volumes],
+      deniedPaths: [...input.hidden, ...volumes.denied],
     },
     network: {
       egress: { default: input.online ? 'allow' : 'deny' },
