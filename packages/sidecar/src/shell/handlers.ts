@@ -139,7 +139,9 @@ async function resolveLaunch(input: StartRequest, scopedGrants: boolean) {
       directory.cwd,
     ]),
   ]
-  const grants = scopedGrants ? await resolvePathGrants(directory.grantRoot, input.allowedPaths ?? []) : []
+  const grants = scopedGrants
+    ? await resolvePathGrants(directory.grantRoot, input.allowedPaths ?? [])
+    : []
   const launch = {
     grantedPaths: grants.map((grant) => grant.absolutePath),
     ...input,
@@ -179,7 +181,10 @@ async function shellLaunch(
       input.workspace.agentHome?.homeId ?? input.workspace.agentHome?.agentId,
       () =>
         withWorkspaceOperation(input.sessionId, async () => {
-          const { launch, roots } = await resolveLaunch(input, requireSandbox || (inspect && input.scopedGrants === true))
+          const { launch, roots } = await resolveLaunch(
+            input,
+            requireSandbox || (inspect && input.scopedGrants === true),
+          )
           if (inspect) {
             if (!previewAvailable())
               throw new Error('Shell sandbox preview is unavailable')

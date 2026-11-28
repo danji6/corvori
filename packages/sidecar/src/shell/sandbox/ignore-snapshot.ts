@@ -30,7 +30,11 @@ export async function snapshotGitPaths(directory: string, emptyRepo?: string) {
   await addIgnoredPaths(root, hidden, readOnly, gitArgs)
   const metadata = new Set<string>()
   await collectProtectedEntries(root, hidden, readOnly, metadata)
-  return { hidden: [...hidden, ...metadata], readOnly: [...readOnly], metadata: [...metadata] }
+  return {
+    hidden: [...hidden, ...metadata],
+    readOnly: [...readOnly],
+    metadata: [...metadata],
+  }
 }
 
 async function addIgnoredPaths(

@@ -92,7 +92,9 @@ export async function createShellTool(context: WorkspaceToolContext) {
     if (input.retry && (!sandbox || planMode))
       throw new ToolError('Sandbox retry is unavailable in this mode')
     const cwdGrant =
-      input.cwd && (!enforced || isUnrestrictedAccess(approvals)) && !parseScopedPath(input.cwd).explicit
+      input.cwd &&
+      (!enforced || isUnrestrictedAccess(approvals)) &&
+      !parseScopedPath(input.cwd).explicit
         ? [input.cwd]
         : []
     fallbackRequests.delete(toolCallId)
@@ -133,7 +135,9 @@ export async function createShellTool(context: WorkspaceToolContext) {
     ),
     needsApproval: async (input, execution) => {
       if (!input.retry)
-        return needsLaunchApproval(input, context, execution.toolCallId)
+        return automatic
+          ? needsLaunchApproval(input, context, execution.toolCallId)
+          : shellNeedsApproval(input.command, context, input.cwd)
       const { job, options } = await launch(
         input,
         execution.toolCallId,

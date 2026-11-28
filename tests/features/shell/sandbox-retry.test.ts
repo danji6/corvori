@@ -15,6 +15,7 @@ import type { ShellToolOutput } from '@cv/core/types/tools'
 import { type ToolSet, streamText } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { execFileSync } from 'node:child_process'
 import {
   copyFile,
   mkdir,
@@ -201,6 +202,58 @@ describe.skipIf(
       expect(await readFile(join(sandbox, 'ordinary'), 'utf8')).toBe('ok')
     } finally {
       delete context.isPlanMode
+    }
+  })
+
+  test('Python and dependency imports work, and direct Git queries can inspect metadata', async () => {
+    execFileSync('git', ['init', '-q'], { cwd: sandbox })
+    await mkdir(join(sandbox, 'node_modules', 'sample'), { recursive: true })
+    await writeFile(
+      join(sandbox, 'node_modules/sample/index.js'),
+      'module.exports = 17',
+    )
+    const python = await execute(
+      { command: "python3 -c \"open('from-python', 'w').write('ok')\"" },
+      'python',
+    )
+    expect({ code: python.exitCode, text: python.text.trim() }).toEqual({
+      code: 0,
+      text: '',
+    })
+    expect(await readFile(join(sandbox, 'from-python'), 'utf8')).toBe('ok')
+    const node = await execute(
+      { command: 'node -p "require(\'sample\')"' },
+      'import',
+    )
+    expect(node.text.trim()).toBe('17')
+    const status = await execute(
+      { command: 'git status --short' },
+      'git-status',
+    )
+    expect(status.text).toContain('?? from-python')
+    expect(status.exitCode).toBe(0)
+    const script = await execute(
+      { command: '/bin/cat .git/HEAD' },
+      'ordinary-git-read',
+    )
+    expect(script.text).not.toContain('refs/heads/')
+  })
+
+  test('a saved file grant opens only its target for a workspace script', async () => {
+    const target = join(root, 'outside')
+    await writeFile(join(root, 'sibling'), 'private fixture')
+    context.approvals = async () => ({ paths: [target] })
+    try {
+      const command = '/bin/cat ../outside && ! /bin/cat ../sibling'
+      expect(await approveRequest({ command }, 'file-grant')).toBe(
+        'not-applicable',
+      )
+      const result = await execute({ command }, 'file-grant')
+      expect(result.text).toContain('fixture')
+      expect(result.text).not.toContain('private fixture')
+      expect(result.exitCode).toBe(0)
+    } finally {
+      delete context.approvals
     }
   })
 

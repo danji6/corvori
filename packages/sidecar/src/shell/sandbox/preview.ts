@@ -10,6 +10,7 @@ import { isOutside } from '../../mcp/workspace/access'
 import type { StartShellJobInput } from '../job-protocol'
 import { shellWord } from '../launch'
 import { withBoundSessionDir } from '../system-shell'
+import { prepareGitQuery } from './git'
 import { githubEnvironment, githubInvocation } from './github'
 import { snapshotGitPaths } from './ignore-snapshot'
 import {
@@ -18,6 +19,7 @@ import {
   runtimeReadPaths,
   wrapPreview,
 } from './preview-platform'
+import { systemTools } from './system-tools'
 
 const execute = promisify(execFile)
 
@@ -53,20 +55,31 @@ async function filesystemPolicy(
   readOnly: boolean,
   binaries: string[],
   grants: string[],
+  git?: Awaited<ReturnType<typeof prepareGitQuery>>,
 ) {
   const emptyRepo = join(dirname(scratch), 'empty.git')
   await execute('/usr/bin/git', ['init', '--bare', '--quiet', emptyRepo])
-  const directories = await Promise.all(roots.map(async (root) =>
-    (await stat(root)).isDirectory() ? root : undefined,
-  ))
+  const directories = await Promise.all(
+    roots.map(async (root) =>
+      (await stat(root)).isDirectory() ? root : undefined,
+    ),
+  )
   const snapshots = await Promise.all(
-    directories.filter((root): root is string => !!root).map((root) => snapshotGitPaths(root, emptyRepo)),
+    directories
+      .filter((root): root is string => !!root)
+      .map((root) => snapshotGitPaths(root, emptyRepo)),
   )
   const metadata = new Set(snapshots.flatMap((snapshot) => snapshot.metadata))
-  const granted = (path: string) => grants.some((grant) => !isOutside(grant, path))
-  const hidden = snapshots.flatMap((snapshot) => snapshot.hidden).filter((path) =>
-    metadata.has(path) || !granted(path),
-  )
+  if (git && git.metadata.some((path) => !metadata.has(path)))
+    throw new Error('Git metadata is outside the selected workspace authority')
+  const granted = (path: string) =>
+    grants.some((grant) => !isOutside(grant, path))
+  const hidden = snapshots
+    .flatMap((snapshot) => snapshot.hidden)
+    .filter(
+      (path) =>
+        !git?.metadata.includes(path) && (metadata.has(path) || !granted(path)),
+    )
   // Pin rules in ancestors of protected entries, even where no nested rule exists at launch.
   const rules = new Set<string>()
   for (const entry of hidden) {
@@ -85,6 +98,7 @@ async function filesystemPolicy(
       literalAllowWithinDeny: [
         ...runtimeReadPaths(runtime),
         ...binaries,
+        ...(git ? [git.view, ...git.metadata] : []),
         scratch,
         ...roots,
       ],
@@ -99,7 +113,9 @@ async function filesystemPolicy(
       literalDenyWithinAllow: [
         ...hidden,
         ...rules,
-        ...snapshots.flatMap((snapshot) => snapshot.readOnly).filter((path) => basename(path) === '.gitignore' || !granted(path)),
+        ...snapshots
+          .flatMap((snapshot) => snapshot.readOnly)
+          .filter((path) => basename(path) === '.gitignore' || !granted(path)),
       ],
     },
   }
@@ -125,7 +141,10 @@ export async function preparePreview(
       'The Linux sandbox worker requires the packaged Node runtime',
     )
   const grants = input.grantedPaths ?? []
-  const writable = await writableRoots([...new Set([...roots, ...grants])], runtime)
+  const writable = await writableRoots(
+    [...new Set([...roots, ...grants])],
+    runtime,
+  )
   const shell = input.shell || '/bin/bash'
   if (
     !['/bin/sh', '/bin/bash', '/bin/zsh', 'bash', 'zsh', 'sh'].includes(shell)
@@ -139,6 +158,14 @@ export async function preparePreview(
   try {
     const scratch = join(temporary, 'tmp')
     await mkdir(scratch)
+    const tools = await systemTools()
+    const git = await prepareGitQuery(
+      input.command,
+      input.cwd,
+      writable,
+      temporary,
+      tools.git,
+    )
     const github = input.githubQuery
       ? await githubInvocation(input.command, writable)
       : undefined
@@ -148,16 +175,20 @@ export async function preparePreview(
       HOME: scratch,
       TMPDIR: scratch,
       TERM: 'xterm-256color',
-      PATH: '/usr/bin:/bin:/usr/sbin:/sbin:' + dirname(runtime),
+      PATH: tools.path + ':/usr/sbin:/sbin:' + dirname(runtime),
       GIT_TERMINAL_PROMPT: '0',
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: '/dev/null',
       GIT_PAGER: 'cat',
       PAGER: 'cat',
     }
-    const command = github
-      ? 'exec ' + [github.file, ...github.args].map(shellWord).join(' ')
-      : input.boundSessionDir
-        ? withBoundSessionDir(input.command, input.boundSessionDir)
-        : input.command
+    const command =
+      git?.command ??
+      (github
+        ? 'exec ' + [github.file, ...github.args].map(shellWord).join(' ')
+        : input.boundSessionDir
+          ? withBoundSessionDir(input.command, input.boundSessionDir)
+          : input.command)
     if (access === 'both' || (github && access === 'filesystem'))
       return {
         prepared: { file: binShell, args: ['-c', command], env },
@@ -174,9 +205,10 @@ export async function preparePreview(
           writable,
           runtime,
           scratch,
-          !!input.readOnlyWorkspace,
-          github ? [github.file] : [],
+          !!input.readOnlyWorkspace || !!git,
+          [...tools.reads, ...(github ? [github.file] : [])],
           grants,
+          git,
         ))),
     }
     return {
