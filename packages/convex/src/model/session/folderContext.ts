@@ -6,6 +6,8 @@ import { error } from '../../errors'
 import { folderWorkspace, readFolderTrail } from './folderTree'
 import type { Session } from './types'
 
+export { workspaceKey } from '@cv/core/workspace/transition'
+
 /** Resolves workspace authority exclusively from the root session's folder. */
 export async function withFolderWorkspace(ctx: QueryCtx, session: Session) {
   const sessions = await readSessionTrail(ctx, session)
@@ -70,14 +72,4 @@ export function sessionGroup(
   pinned?: boolean,
 ) {
   return pinned ? 'pinned' : (folderId ?? 'ungrouped')
-}
-
-export function workspaceKey(workspace: Session['workspace']) {
-  return workspace
-    ? JSON.stringify([
-        workspace.workspaceId,
-        workspace.revision ?? 0,
-        workspace.sources?.map((source) => source.path) ?? [workspace.path],
-      ])
-    : '[]'
 }

@@ -3,6 +3,10 @@ import { v } from 'convex/values'
 
 import { internalMutation, internalQuery } from './_generated/server'
 import { authMutation, authQuery } from './functions'
+import {
+  continueFinalization,
+  reconcileFinishedChanges,
+} from './model/changes/finalization'
 import * as ChangeLocations from './model/changes/locations'
 import * as Changes from './model/changes/sets'
 import * as Chat from './model/chat'
@@ -71,7 +75,7 @@ export const searchMessages = authQuery({
 
 export const sendMessage = authMutation({
   args: V.sendMessageArgsValidator.fields,
-  handler: Chat.sendMessage,
+  handler: (ctx, args) => Chat.sendMessage(ctx, args),
 })
 
 export const beginAttachmentSend = authMutation({
@@ -374,7 +378,12 @@ export const _cleanupChanges = internalMutation({
   handler: Changes.cleanupChanges,
 })
 
-export const _scheduleSettleChanges = internalMutation({
-  args: { changeSetId: v.id('changeSets') },
-  handler: Changes.scheduleSettleChanges,
+export const _continueChangesFinalization = internalMutation({
+  args: ChangesV.continueChangesFinalizationValidator.fields,
+  handler: continueFinalization,
+})
+
+export const _reconcileFinishedChanges = internalMutation({
+  args: { cursor: v.optional(v.string()) },
+  handler: reconcileFinishedChanges,
 })

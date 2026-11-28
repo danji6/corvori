@@ -23,6 +23,8 @@ export type NotificationApprovalAction = Infer<
 /** Activity kinds that can produce durable notifications. */
 export const notificationKindValidator = v.union(
   v.literal('user_message'),
+  v.literal('task_succeeded'),
+  v.literal('task_failed'),
   v.literal('turn_completed'),
   v.literal('approval_required'),
   v.literal('input_required'),
@@ -62,6 +64,7 @@ export type NotificationRequestState = Infer<
 
 /** A notification with denormalized display snapshots. */
 export const notificationSchema = v.object({
+  taskRunId: v.optional(v.id('scheduledTaskRuns')),
   recipientId: v.id('users'),
   sessionId: v.id('sessions'),
   kind: notificationKindValidator,

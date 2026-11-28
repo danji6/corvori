@@ -35,7 +35,7 @@ const defaultVariant: MarkdownComponents = {
 const slimVariant: MarkdownComponents = {
   ...defaultVariant,
   h1: (props) => <T.h1 className="text-2xl" {...props} />,
-  h2: (props) => <T.h2 className="pb-0 text-xl" {...props} />,
+  h2: (props) => <T.h2 className="text-xl" {...props} />,
   h3: (props) => <T.h3 className="text-lg" {...props} />,
   h4: (props) => <T.h4 className="text-md" {...props} />,
   ul: (props) => <ul className="m-0 ml-6 list-disc" {...props} />,
@@ -70,7 +70,7 @@ function DefaultAnchor({ href, ...props }: React.ComponentProps<'a'>) {
 
 function DefaultH2Anchor({ id, ...props }: React.ComponentProps<'h2'>) {
   return (
-    <span className="mt-6 flex items-center justify-between gap-2 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
+    <span className="markdown-heading markdown-heading-divider flex items-center justify-between gap-2 text-3xl font-semibold tracking-tight not-first:mt-4">
       <h2 {...props} id={id} className="grow scroll-m-20" />
     </span>
   )

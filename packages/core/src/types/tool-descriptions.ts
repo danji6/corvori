@@ -34,9 +34,9 @@ const webFetch = 'Fetch a web page and return its main content as markdown.'
 
 const webSearch = 'Search the web and return a list of results.'
 
-const readFile = inline`Read a bounded text page. Use this instead of cat/sed
-  for inspection. When truncated, pass nextByteOffset as byteOffset to continue.
-  Paths default to the project workspace.`
+const readFile = inline`Read a bounded text page or inspect an image. Use only
+  path for images. Use this instead of cat/sed for inspection. When the text is
+  truncated, pass nextByteOffset as byteOffset to continue.`
 
 const readAttachment = inline`
   Read or search an attachment. Start with reference. Use pattern (Go regexp

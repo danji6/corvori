@@ -31,6 +31,7 @@ export const folderPickerArgs = v.object({
   paginationOpts: paginationOptsValidator,
   search: v.optional(v.string()),
   organizationOnly: v.optional(v.boolean()),
+  workspaceOnly: v.optional(v.boolean()),
   excludeBranchId: v.optional(v.id('sessionFolders')),
 })
 

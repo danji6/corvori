@@ -14,6 +14,7 @@ import { wireToolCall } from '@cv/core/tool-dispatch'
 import type { LanguageModel, LanguageModelMiddleware, UIMessage } from 'ai'
 
 import { extractErrorMessage } from '../../errors'
+import { placeFileImagesInPrompt } from './fileImageTransport'
 import { sameDefinition } from './manifest'
 import type { SessionTools, ToolReplay } from './sessionTools'
 
@@ -62,7 +63,7 @@ async function wrapToolTransport(
 function replayMiddleware(replay: ToolReplay): LanguageModelMiddleware {
   return {
     specificationVersion: 'v4',
-    transformParams: async ({ params }) => ({
+    transformParams: async ({ params, model }) => ({
       ...params,
       tools: replay.wireDefinitions.map((definition) => ({
         type: 'function' as const,
@@ -70,7 +71,10 @@ function replayMiddleware(replay: ToolReplay): LanguageModelMiddleware {
         description: definition.description,
         inputSchema: JSON.parse(definition.inputSchema),
       })),
-      prompt: restoreWirePrompt(params.prompt, replay),
+      prompt: restoreWirePrompt(
+        placeFileImagesInPrompt(params.prompt, model.provider),
+        replay,
+      ),
     }),
   }
 }

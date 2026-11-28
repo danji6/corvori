@@ -18,8 +18,16 @@ export type NotificationWorkerAction = {
   userId: string
   notificationId: string
   sessionId?: string
+  taskRunId?: string
   requestId?: string
   openSession?: boolean
+}
+
+/** Opens a task result even if its original session has since been deleted. */
+export function notificationPath(sessionId: string, taskRunId?: string) {
+  return taskRunId
+    ? '/tasks/runs/' + encodeURIComponent(taskRunId)
+    : '/?id=' + encodeURIComponent(sessionId)
 }
 
 /** Prioritizes approval actions when the desktop platform limits button count. */

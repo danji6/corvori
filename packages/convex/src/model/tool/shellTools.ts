@@ -4,7 +4,7 @@ import {
   SHELL_TOOL_NAME,
 } from '@cv/core/const'
 import { TOOL_DESCRIPTIONS, shellToolDescription } from '@cv/core/types'
-import type { ShellToolOutput } from '@cv/core/types/tools'
+import type { ShellToolOutput, ToolApprovals } from '@cv/core/types/tools'
 import { parseScopedPath } from '@cv/core/workspace/scoped-path'
 
 import { ToolError } from '../../errors'
@@ -20,6 +20,7 @@ import {
   type WorkspaceToolContext,
   workspaceArgs,
 } from './context'
+import { approvalsForFilesystemCall } from './filesystemApprovals'
 import { checkShellToolPaths } from './paths'
 import {
   type ShellJobInput,
@@ -52,8 +53,11 @@ export async function createShellTool(context: WorkspaceToolContext) {
           .catch(() => false)
       : false
 
-  async function launch(input: ShellJobInput, toolCallId: string) {
-    const approvals = await context.approvals?.()
+  async function launch(
+    input: ShellJobInput,
+    toolCallId: string,
+    approvals: ToolApprovals | undefined,
+  ) {
     const sandbox =
       preview &&
       !isUnrestrictedAccess(approvals) &&
@@ -91,7 +95,11 @@ export async function createShellTool(context: WorkspaceToolContext) {
     needsApproval: async (input, execution) => {
       if (!input.retry)
         return shellNeedsApproval(input.command, context, input.cwd)
-      const { job, options } = await launch(input, execution.toolCallId)
+      const { job, options } = await launch(
+        input,
+        execution.toolCallId,
+        await context.approvals?.(),
+      )
       if (!input.cwd || !input.description?.trim())
         throw new ToolError(
           'A sandbox retry requires the original working directory and a reason for the requested access',
@@ -104,7 +112,15 @@ export async function createShellTool(context: WorkspaceToolContext) {
     },
     toModelOutput: shellToModelOutput,
     execute: async function* (input, { abortSignal, toolCallId }) {
-      const { job, options } = await launch(input, toolCallId)
+      const approvals = await approvalsForFilesystemCall(
+        context,
+        { id: toolCallId, name: SHELL_TOOL_NAME, input },
+        (current) =>
+          input.retry
+            ? Promise.resolve(true)
+            : shellNeedsApproval(input.command, current, input.cwd),
+      )
+      const { job, options } = await launch(input, toolCallId, approvals)
       yield* trackJob(
         executeShellJob(
           job,

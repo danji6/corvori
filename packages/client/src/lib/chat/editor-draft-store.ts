@@ -50,6 +50,11 @@ export const USER_SETTINGS_DRAFT_KEY = 'user-settings'
 /** Draft key for the agent being created, independent of database IDs. */
 export const NEW_AGENT_DRAFT_KEY = 'new-agent'
 
+/** Draft key for a scheduled task or the new task form. */
+export function taskDraftKey(taskId?: string): string {
+  return taskId ? `task:${taskId}` : 'new-task'
+}
+
 export function getEditorDraft<T>(userId: string, key: string): T | undefined {
   return store(userId).get()[key]?.value as T | undefined
 }

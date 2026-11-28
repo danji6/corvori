@@ -3,6 +3,7 @@ import type { FolderWorkspace } from '@cv/core/types/workspace'
 
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
+import type { ExecutionApprovals, FilesystemCall } from './executionApprovals'
 import type { ShellReadPosition } from './shellContracts'
 
 export type WorkspaceToolContext = {
@@ -22,6 +23,7 @@ export type WorkspaceToolContext = {
   allowInteractiveShells?: boolean
   /** Tool approvals, resolved on every call since they update often. */
   approvals?: () => Promise<ToolApprovals | undefined>
+  taskApprovals?: (call?: FilesystemCall) => Promise<ExecutionApprovals>
   isPlanMode?: () => Promise<boolean>
   /** Watches a background job so it can report back. */
   watchJob?: (job: WatchedJobRef) => Promise<void>

@@ -1,18 +1,31 @@
+import type { ActionCtx } from '@cv/convex/_generated/server'
+import { finishChanges as finalizeCapture } from '@cv/convex/model/changes/actions'
+import {
+  continueFinalization,
+  reconcileFinishedChanges,
+} from '@cv/convex/model/changes/finalization'
 import { markChangesStale } from '@cv/convex/model/changes/locations'
 import {
   appendChanges,
   captureIssue,
   changeSummary,
   finishChanges,
+  finishContext,
   prepareChanges,
   publishChanges,
   releaseChangeGroup,
   reservePublication,
   restoreChanges,
   restoreResult,
+  settleCapture,
 } from '@cv/convex/model/changes/sets'
-import { describe, expect, test } from 'bun:test'
+import { CheckpointManager } from '@cv/sidecar/checkpoints/manager'
+import { describe, expect, spyOn, test } from 'bun:test'
+import { getFunctionName } from 'convex/server'
+import { rm, writeFile } from 'node:fs/promises'
+import path from 'node:path'
 import { lifecycleDatabase } from '~/tests/helpers/lifecycle-db'
+import { checkpointFixture } from '~/tests/helpers/turn-checkpoints'
 
 const workspace = {
   workspaceId: 'workspace',
@@ -67,6 +80,37 @@ const file = (key: string) => ({
   diffStorageId: `blob-${key}` as never,
 })
 const prepareArgs = { streamId: 'stream' as never, generation: 1, workspace }
+
+function finalizerAction(f: ReturnType<typeof fixture>) {
+  const mutations = {
+    'chat:_appendChanges': appendChanges,
+    'chat:_captureChangesIssue': captureIssue,
+    'chat:_continueChangesFinalization': continueFinalization,
+    'chat:_publishChanges': publishChanges,
+    'chat:_releaseChangeGroup': releaseChangeGroup,
+    'chat:_reserveChangesPublication': reservePublication,
+    'chat:_settleChangesCapture': settleCapture,
+  }
+  const ctx = {
+    runQuery: (
+      reference: Parameters<typeof getFunctionName>[0],
+      args: never,
+    ) => {
+      expect(getFunctionName(reference)).toBe('chat:_changesFinishContext')
+      return finishContext(f.ctx, args)
+    },
+    runMutation: (
+      reference: Parameters<typeof getFunctionName>[0],
+      args: never,
+    ) =>
+      mutations[getFunctionName(reference) as keyof typeof mutations](
+        f.ctx,
+        args,
+      ),
+    storage: { store: async () => 'fixture-diff' },
+  } as unknown as ActionCtx
+  return ctx
+}
 
 describe('changes lifecycle', () => {
   test('reserves one identity across continuations and rejects obsolete executions', async () => {
@@ -188,6 +232,99 @@ describe('changes lifecycle', () => {
     expect(f.scheduled).toHaveLength(2)
     await releaseChangeGroup(f.ctx, { groupId: row.groupId })
     expect(f.rows('changeSets')[0].writersSettled).toBe(true)
+  })
+
+  test('replays a lost finalizer after restart so the next session can use the workspace', async () => {
+    const cleanup: string[] = []
+    const f = fixture()
+    try {
+      const sidecar = await checkpointFixture(cleanup)
+      const row = (await prepareChanges(f.ctx, {
+        ...prepareArgs,
+        workspace: sidecar.begin.workspace,
+      }))!
+      const capture = {
+        ...sidecar.begin,
+        groupId: row.groupId,
+        participantId: String(row.streamId),
+      }
+      await sidecar.manager.begin(capture)
+      await writeFile(path.join(sidecar.root, 'change.txt'), 'old turn output')
+      await finishChanges(f.ctx, row.streamId)
+      f.rows('streams').pop()
+
+      const recovered = new CheckpointManager(sidecar.storage)
+      const nextTurn = {
+        ...capture,
+        sessionId: 'moved-session',
+        groupId: 'next-turn',
+        participantId: 'next-turn',
+      }
+      expect(await recovered.begin(nextTurn)).toEqual({ queued: true })
+
+      await reconcileFinishedChanges(f.ctx, {})
+      expect(f.scheduled).toHaveLength(1)
+      f.rows('_scheduled_functions')[0].state = { kind: 'inProgress' }
+      await reconcileFinishedChanges(f.ctx, {})
+      expect(f.scheduled).toHaveLength(1)
+      f.rows('_scheduled_functions')[0].state = { kind: 'failed' }
+      await reconcileFinishedChanges(f.ctx, {})
+      expect(f.scheduled).toHaveLength(2)
+      expect(f.scheduled[1].args).toEqual({ changeSetId: row._id })
+
+      const finishEndpoint = async (
+        url: Parameters<typeof fetch>[0],
+        init?: Parameters<typeof fetch>[1],
+      ) => {
+        expect(String(url)).toEndWith('/checkpoints/finish')
+        const input = JSON.parse(String(init?.body))
+        return Response.json(await recovered.finish(input))
+      }
+      const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+        Object.assign(finishEndpoint, { preconnect: fetch.preconnect }),
+      )
+      try {
+        await finalizeCapture(finalizerAction(f), { changeSetId: row._id })
+      } finally {
+        fetchSpy.mockRestore()
+      }
+
+      expect(row).toMatchObject({ phase: 'ready', writersSettled: true })
+      expect(f.rows('changeFiles')).toHaveLength(1)
+      expect(await recovered.begin(nextTurn)).toEqual({ queued: false })
+      await reconcileFinishedChanges(f.ctx, {})
+      expect(f.scheduled).toHaveLength(2)
+    } finally {
+      await Promise.all(
+        cleanup.map((root) => rm(root, { recursive: true, force: true })),
+      )
+    }
+  })
+
+  test('recovers legacy settlement only after the owning stream has ended', async () => {
+    const f = fixture()
+    const row = (await prepareChanges(f.ctx, prepareArgs))!
+    Object.assign(row, { finished: true, settleScheduled: true })
+    await reconcileFinishedChanges(f.ctx, {})
+    expect(f.scheduled).toHaveLength(0)
+
+    f.rows('streams').pop()
+    await reconcileFinishedChanges(f.ctx, {})
+    expect(f.scheduled[0].args).toEqual({ changeSetId: row._id, sequence: 0 })
+    const scheduled = row.finalizationJobId
+    await continueFinalization(f.ctx, { changeSetId: row._id })
+    expect(f.scheduled).toHaveLength(1)
+
+    f.rows('_scheduled_functions')[0].state = { kind: 'inProgress' }
+    await continueFinalization(f.ctx, {
+      changeSetId: row._id,
+      expectedJobId: scheduled,
+      settlementSequence: 0,
+    })
+    expect(f.scheduled).toHaveLength(2)
+    expect(row.finalizationJobId).not.toBe(scheduled)
+    await reconcileFinishedChanges(f.ctx, {})
+    expect(f.scheduled).toHaveLength(2)
   })
 
   test('marks only the checked location stale and keeps published diffs available', async () => {

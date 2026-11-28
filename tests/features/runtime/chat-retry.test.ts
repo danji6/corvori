@@ -7,6 +7,7 @@ import {
   getRateLimitRetryDelay,
   getTransientRetryDelay,
   isProviderRequestSizeError,
+  mediaRetryReason,
 } from '@cv/convex/model/stream/retry'
 import { describe, expect, test } from 'bun:test'
 
@@ -146,6 +147,23 @@ describe('isProviderRequestSizeError', () => {
     expect(isProviderRequestSizeError(new Error('Invalid API key'))).toBe(false)
     expect(isProviderRequestSizeError({ status: 400 })).toBe(false)
   })
+})
+
+test('retries explicit image input rejection only before output and only once', () => {
+  const error = {
+    responseBody: JSON.stringify({
+      error: { message: 'This model does not support image input' },
+    }),
+  }
+  const attempt = { error, stepHasOutput: false }
+  expect(mediaRetryReason(attempt)).toBe('Provider does not accept image input')
+  expect(
+    mediaRetryReason({ ...attempt, omitActiveMedia: true }),
+  ).toBeUndefined()
+  expect(mediaRetryReason({ ...attempt, stepHasOutput: true })).toBeUndefined()
+  expect(
+    mediaRetryReason({ ...attempt, error: new Error('Invalid image data') }),
+  ).toBeUndefined()
 })
 
 describe('getProviderRetryDelay', () => {

@@ -1,11 +1,16 @@
 import { buildApprovalActions } from '@/lib/chat/tool-approval-policy'
+import { createOpenAI } from '@ai-sdk/openai'
 import { alwaysLabel, approvalHold } from '@cv/convex/lib/tool/approvalPolicy'
 import { rememberApproval } from '@cv/convex/model/chat/approvalMemory'
 import { patchToolApproval } from '@cv/convex/model/chat/approvals'
 import { getSessionWithWorkspace } from '@cv/convex/model/session/folderContext'
 import { getApprovals } from '@cv/convex/model/session/state'
 import { attachApprovalPreviews } from '@cv/convex/model/stream/engineApproval'
+import { offloadToolOutputs } from '@cv/convex/model/stream/engineOutput'
+import { buildProviderHistory } from '@cv/convex/model/stream/history'
+import { OFFLOAD_THRESHOLD } from '@cv/convex/model/stream/toolOutput'
 import type { WorkspaceToolContext } from '@cv/convex/model/tool/context'
+import { replayLanguageModel } from '@cv/convex/model/tool/dispatchTransport'
 import {
   createEditFileTool,
   createReadFileTool,
@@ -14,19 +19,30 @@ import {
 import { callMcpTool } from '@cv/convex/model/tool/mcp'
 import type { ToolApprovals } from '@cv/core/types'
 import { withAgentHome } from '@cv/core/workspace/personal'
+import {
+  FILE_IMAGE_MAX_BYTES,
+  type FileImageOutput,
+  isFileImageOutput,
+} from '@cv/core/workspace/read-image'
+import { type UIMessage, streamText } from 'ai'
 import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { Hono } from 'hono'
+import { createHash } from 'node:crypto'
 import {
   mkdir,
   mkdtemp,
   readFile,
   rm,
   symlink,
+  truncate,
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import sharp from 'sharp'
 import type { ZodType } from 'zod'
+import { SELF, providerData, stored } from '~/tests/helpers/provider-history'
+import { captureStreamFetch } from '~/tests/helpers/provider-middleware'
 import { skillsDatabase } from '~/tests/helpers/skills-db'
 
 let root: string
@@ -142,6 +158,294 @@ test('unrestricted file execution reaches external files without a saved path gr
   } finally {
     approvals = {}
   }
+})
+
+const screenshotInput = { path: 'screenshot' }
+
+async function writeScreenshot(width: number) {
+  const png = await sharp({
+    create: {
+      width,
+      height: 80,
+      channels: 4,
+      background: { r: 12, g: 34, b: 56, alpha: 0.5 },
+    },
+  })
+    .png()
+    .toBuffer()
+  await writeFile(path.join(project, screenshotInput.path), png)
+}
+
+test('read_file sends pixels to the next provider step and replays the saved snapshot', async () => {
+  await writeScreenshot(1600)
+  const read = await createReadFileTool(context)
+  const output = await read.execute!(screenshotInput, options)
+  if (!isFileImageOutput(output)) throw new Error('Expected an image')
+  expect(output).toMatchObject({
+    originalWidth: 1600,
+    originalHeight: 80,
+    width: 1536,
+    height: 77,
+  })
+  expect(JSON.stringify(output).length).toBeLessThan(OFFLOAD_THRESHOLD)
+  const { ctx, parts } = await storeScreenshot(output)
+
+  await writeScreenshot(12)
+  const current = await read.execute!(screenshotInput, options)
+  expect(current).toMatchObject({ width: 12 })
+
+  const history = await screenshotHistory(ctx, parts)
+  await expectScreenshotOnProviderWire(history, output, true)
+
+  for (const history of [
+    await screenshotHistory(ctx, parts, { laterTurn: true }),
+    await screenshotHistory(ctx, parts, { omitMedia: true }),
+  ]) {
+    const serialized = JSON.stringify(history)
+    expect(serialized).toContain('"width":1536')
+    expect(serialized).not.toContain(output.base64)
+  }
+})
+
+test('read_file compresses a detailed screenshot before shrinking below 1000 pixels', async () => {
+  const size = 1400
+  const pixels = createHash('shake256', { outputLength: size ** 2 * 4 })
+    .update('read-file-preview-test')
+    .digest()
+  for (let i = 3; i < pixels.length; i += 4) pixels[i] = 255
+  const png = await sharp(pixels, {
+    raw: { width: size, height: size, channels: 4 },
+  })
+    .png()
+    .toBuffer()
+  await writeFile(path.join(project, screenshotInput.path), png)
+
+  const read = await createReadFileTool(context)
+  const output = await read.execute!(screenshotInput, options)
+  if (!isFileImageOutput(output)) throw new Error('Expected an image')
+  expect(output).toMatchObject({
+    originalWidth: size,
+    originalHeight: size,
+    mediaType: 'image/jpeg',
+  })
+  expect(output.width).toBeGreaterThanOrEqual(1000)
+  expect(output.height).toBe(output.width)
+  expect(Buffer.byteLength(output.base64, 'base64')).toBeLessThanOrEqual(
+    FILE_IMAGE_MAX_BYTES,
+  )
+  const { ctx, parts } = await storeScreenshot(output)
+  const history = await screenshotHistory(ctx, parts)
+  await expectScreenshotOnProviderWire(history, output, false)
+})
+
+test('read_file preserves transparency when compacting a detailed PNG', async () => {
+  const size = 1200
+  const colors = [
+    [14, 25, 41, 64],
+    [10, 200, 70, 255],
+    [200, 20, 40, 100],
+    [21, 21, 21, 255],
+  ]
+  const indices = createHash('shake256', { outputLength: size ** 2 })
+    .update('read-file-alpha-test')
+    .digest()
+  const pixels = Buffer.alloc(indices.length * 4)
+  for (const [i, index] of indices.entries()) {
+    pixels.set(colors[index % colors.length], i * 4)
+  }
+  const png = await sharp(pixels, {
+    raw: { width: size, height: size, channels: 4 },
+  })
+    .png()
+    .toBuffer()
+  expect(png.length).toBeGreaterThan(FILE_IMAGE_MAX_BYTES)
+  const input = { path: 'transparent-detail.png' }
+  await writeFile(path.join(project, input.path), png)
+
+  const read = await createReadFileTool(context)
+  const output = await read.execute!(input, options)
+  if (!isFileImageOutput(output)) throw new Error('Expected an image')
+  expect(output).toMatchObject({
+    mediaType: 'image/png',
+    width: size,
+    height: size,
+  })
+  const preview = Buffer.from(output.base64, 'base64')
+  expect(preview.length).toBeLessThanOrEqual(FILE_IMAGE_MAX_BYTES)
+  const stats = await sharp(preview).stats()
+  expect(stats.channels[3]).toMatchObject({ min: 64, max: 255 })
+})
+
+async function storeScreenshot(output: FileImageOutput) {
+  const part = {
+    type: 'tool-read_file',
+    state: 'output-available',
+    toolCallId: 'call_screenshot',
+    input: screenshotInput,
+    output,
+  } satisfies UIMessage['parts'][number]
+  const blobs = new Map<string, Blob>()
+  const ctx = {
+    runMutation: async () => true,
+    storage: {
+      store: async (blob: Blob) => {
+        blobs.set('screenshot-snapshot', blob)
+        return 'screenshot-snapshot'
+      },
+      get: async (id: string) => blobs.get(id) ?? null,
+    },
+  } as never
+  const parts = await offloadToolOutputs(
+    ctx,
+    [part],
+    new Map(),
+    { streamId: 'stream' as never, generation: 0 },
+    'output' as never,
+  )
+  expect(parts[0]).toMatchObject({ outputRef: 'screenshot-snapshot' })
+  expect(JSON.stringify(parts)).not.toContain(output.base64)
+  return { ctx, parts }
+}
+
+async function expectScreenshotOnProviderWire(
+  history: Awaited<ReturnType<typeof screenshotHistory>>,
+  output: FileImageOutput,
+  hasAlpha: boolean,
+) {
+  const bodies: Record<string, unknown>[] = []
+  const provider = createOpenAI({
+    apiKey: 'test',
+    fetch: captureStreamFetch(bodies),
+  })
+  for (const model of [provider.responses('test'), provider.chat('test')]) {
+    const wrapped = await replayLanguageModel(model, {
+      wireDefinitions: [],
+      wireCalls: new Map(),
+    })
+    await streamText({
+      model: wrapped,
+      messages: history,
+      maxRetries: 0,
+    }).consumeStream()
+  }
+  for (const [index, type] of ['input_image', 'image_url'].entries()) {
+    const body = JSON.stringify(bodies[index])
+    expect(body).toContain(`"type":"${type}"`)
+    const imageData = new RegExp(
+      `data:${output.mediaType};base64,([A-Za-z0-9+/=]+)`,
+    )
+    const data = body.match(imageData)?.[1]
+    expect(data).toBe(output.base64)
+    const image = await sharp(Buffer.from(data!, 'base64')).metadata()
+    expect(image).toMatchObject({
+      width: output.width,
+      height: output.height,
+      hasAlpha,
+    })
+  }
+}
+
+function screenshotHistory(
+  ctx: Parameters<typeof buildProviderHistory>[0],
+  parts: UIMessage['parts'],
+  { laterTurn = false, omitMedia = false } = {},
+) {
+  const data: Parameters<typeof buildProviderHistory>[1] = providerData()
+  if (laterTurn) data.stream.state.processingMessageId = 'next' as never
+  data.stream.omitActiveMedia = omitMedia
+  return buildProviderHistory(ctx, data, [], {
+    toolNames: ['read_file'],
+    historyRows: [
+      {
+        ...stored({ type: 'agent', id: SELF }, 'assistant'),
+        _id: 'output' as never,
+        parts,
+      },
+    ],
+  })
+}
+
+test('checks access before decoding images and rejects invalid image reads', async () => {
+  const read = await createReadFileTool(context)
+  const corrupt = Buffer.from('89504e470d0a1a0a', 'hex')
+  await writeFile(path.join(outside, 'corrupt.png'), corrupt)
+  const external = { path: 'external/corrupt.png' }
+  expect(await needsApproval(read, external)).toBe(true)
+  await expect(
+    callMcpTool('read_file', {
+      sessionId: context.sessionId,
+      workspaceId: context.workspaceId,
+      workspace: context.workspace,
+      ...external,
+    }),
+  ).rejects.toThrow('Path escapes the configured workspace')
+  await expect(read.execute!(external, options)).rejects.toThrow(
+    'Could not read image',
+  )
+
+  const filename = path.join(project, 'oversized.png')
+  await writeFile(filename, corrupt)
+  await truncate(filename, 20 * 1024 * 1024 + 1)
+  await expect(
+    read.execute!({ path: 'oversized.png' }, options),
+  ).rejects.toThrow('20 MiB read limit')
+  await expect(
+    read.execute!({ path: 'oversized.png', limit: 1 }, options),
+  ).rejects.toThrow('do not accept text paging')
+})
+
+test('read_file applies JPEG orientation and reads WebP and animated GIF', async () => {
+  const jpeg = await sharp({
+    create: { width: 4, height: 2, channels: 3, background: 'red' },
+  })
+    .jpeg()
+    .withMetadata({ orientation: 6 })
+    .toBuffer()
+  const webp = await sharp(jpeg).webp().toBuffer()
+  const gif = await sharp(
+    Buffer.from([255, 0, 0, 255, 0, 0, 0, 0, 255, 0, 0, 255]),
+    { raw: { width: 2, height: 2, channels: 3, pageHeight: 1 } },
+  )
+    .gif()
+    .toBuffer()
+
+  const read = await createReadFileTool(context)
+  for (const [name, bytes, width, height] of [
+    ['rotated.jpg', jpeg, 2, 4],
+    ['photo.webp', webp, 4, 2],
+    ['animated.gif', gif, 2, 1],
+  ] as const) {
+    await writeFile(path.join(project, name), bytes)
+    const output = await read.execute!({ path: name }, options)
+    expect(output).toMatchObject({
+      originalWidth: width,
+      originalHeight: height,
+      width,
+      height,
+    })
+    if (name === 'animated.gif' && isFileImageOutput(output)) {
+      const pixels = await sharp(Buffer.from(output.base64, 'base64'))
+        .raw()
+        .toBuffer()
+      expect(Array.from(pixels.subarray(0, 3))).toEqual([255, 0, 0])
+    }
+  }
+})
+
+test('read_file preserves SVG text pagination', async () => {
+  await writeFile(path.join(project, 'icon.svg'), '<svg>\n<path/>\n</svg>')
+  const read = await createReadFileTool(context)
+  const input = { path: 'icon.svg', limit: 1 }
+  const first = JSON.parse((await read.execute!(input, options)) as string)
+  expect(first).toMatchObject({ content: '<svg>', truncated: true })
+  const second = await read.execute!(
+    {
+      ...input,
+      byteOffset: first.nextByteOffset,
+    },
+    options,
+  )
+  expect(JSON.parse(second as string).content).toBe('<path/>')
 })
 
 async function sessionApprovalFixture(scope: 'project' | 'personal') {

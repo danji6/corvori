@@ -13,6 +13,7 @@ import { scheduleTitle } from '../messages'
 import { _save, findCache } from '../session/cache'
 import { _patchSessionLog } from '../session/sessionWorkspace'
 import { getState, patchState } from '../session/state'
+import { recordRunError } from '../tasks/outcomes'
 import { ownsExecution } from './execution'
 
 export async function _saveMeta(
@@ -31,6 +32,9 @@ export async function _saveMeta(
   const stream = await ctx.db.get(streamId)
   if (!ownsExecution(stream, { streamId, generation })) return
 
+  if (stream.taskRunId && toolErrors.length) {
+    await recordRunError(ctx, stream.taskRunId, toolErrors[0])
+  }
   const row = await getProcessingSegmentRow(ctx, stream)
   if (row && stream.state.processingMessageId) {
     // Accumulate step deltas into the segment's slice and the turn total

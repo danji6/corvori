@@ -6,6 +6,7 @@ import { cancelForStream } from '../mcp/operations/records'
 import { scheduleTitle } from '../messages'
 import { settleStream } from '../notifications/requests'
 import { cancelStreamEvaluations } from '../promptEvaluation/records'
+import { settleStoppedRun } from '../tasks/outcomes'
 import { cancelScheduledExecution } from './execution'
 
 type StopOptions = { suppressReport?: boolean }
@@ -68,6 +69,7 @@ export async function requestImmediateStop(
     await settleStream(ctx, stream._id, 'cancelled')
     await cancelScheduledExecution(ctx, stream)
     await finishChanges(ctx, stream._id)
+    await settleStoppedRun(ctx, stream.taskRunId)
     await ctx.db.delete(stream._id)
     await scheduleTitle(ctx, stream.sessionId)
     await ctx.scheduler.runAfter(0, internal.chat._drainCommandQueue, {

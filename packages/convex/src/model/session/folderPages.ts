@@ -76,6 +76,7 @@ export async function picker(ctx: AuthQueryCtx, args: FolderPickerArgs) {
     .map((folder) => view(ctx, folder))
     .filterWith(async (folder) => {
       if (args.organizationOnly && folder.workspace) return false
+      if (args.workspaceOnly && !folder.workspace) return false
       if (folder._id === args.excludeBranchId) return false
       if (
         args.excludeBranchId &&

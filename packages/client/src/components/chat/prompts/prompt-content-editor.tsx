@@ -1,9 +1,9 @@
+import { codeEditorVariants } from '@/components/ui/code-editor'
+import { EditorScrollArea } from '@/components/ui/editor-scroll-area'
 import {
-  EditorScrollArea,
   FullscreenEditor,
-  codeEditorVariants,
   fullscreenFill,
-} from '@/components/ui'
+} from '@/components/ui/fullscreen-editor'
 import { useCodeCompletion } from '@/hooks/code-completion'
 import { useEditorBaseline } from '@/hooks/editor-baseline'
 import { handleSelectAllDelete } from '@/lib/editor-clear'
@@ -44,12 +44,14 @@ export type PromptContentEditorProps = {
   /** Stable id identifying this editor while in fullscreen. */
   fullscreenId: string
   placeholder?: string
+  labelledBy?: string
+  required?: boolean
   autoFocus?: boolean
   className?: string
   ref?: React.Ref<EditorDocumentHandle>
 }
 
-/** Markdown editor for agent prompts. */
+/** Markdown editor for prompts. */
 export function PromptContentEditor({
   value,
   onChange,
@@ -57,6 +59,8 @@ export function PromptContentEditor({
   onBaseline,
   fullscreenId,
   placeholder,
+  labelledBy,
+  required,
   autoFocus = false,
   className,
   ref,
@@ -93,6 +97,8 @@ export function PromptContentEditor({
         'data-slot': 'editor',
         role: 'textbox',
         'aria-multiline': 'true',
+        ...(labelledBy && { 'aria-labelledby': labelledBy }),
+        ...(required && { 'aria-required': 'true' }),
         class: cn('min-h-full p-4', className),
       },
       handleKeyDown: handleSelectAllDelete,

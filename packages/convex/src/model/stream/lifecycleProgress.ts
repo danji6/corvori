@@ -33,6 +33,7 @@ import {
   recordToolDeliveries,
 } from '../shell/outputDeliveries'
 import { hasPendingShellWait } from '../shell/waits'
+import { interruptRun, recordTranscriptError } from '../tasks/outcomes'
 import { ownsExecution } from './execution'
 import { isHistoricalTurn } from './historyBoundary'
 import { STREAM_LEASE_MS, renewStreamLease } from './lease'
@@ -105,14 +106,18 @@ export async function consumeInterjections(
 
   if (!newer) return false
   if (await latestAttachmentSend(ctx, stream.sessionId)) return false
+  if (stream.taskRunId && newer.sender.type === 'user') {
+    await interruptRun(ctx, stream)
+  }
 
   if (row) {
-    await finalizeTurn(ctx, {
+    const segments = await finalizeTurn(ctx, {
       message: current,
       row,
       parts: row.parts,
       metadata: row.metadata,
     })
+    await recordTranscriptError(ctx, stream.taskRunId, segments)
     await reserveSegmentEvaluation(ctx, {
       messageId: current._id,
       invokerId: stream.invokedBy,
