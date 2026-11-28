@@ -15,7 +15,7 @@ import type { ProviderHistorySnapshot } from './historySnapshot'
 import {
   getAutoCompactRetryDelay,
   getProviderRetryDelay,
-  isProviderRequestSizeError,
+  mediaRetryReason,
 } from './retry'
 
 // Max steps before the turn is handed off to a new action
@@ -243,7 +243,7 @@ function recordStep(
   })
 }
 
-/** Retries a rejected payload once with its active media omitted. */
+/** Retries a rejected media payload once with its active media omitted. */
 async function retryWithoutMedia(
   ctx: ActionCtx,
   execution: StreamExecutionArgs,
@@ -251,9 +251,13 @@ async function retryWithoutMedia(
   stepHasOutput: boolean,
   error: unknown,
 ) {
-  if (stepHasOutput || !setup) return false
-  if (setup.stream.omitActiveMedia) return false
-  if (!isProviderRequestSizeError(error)) return false
+  if (!setup) return false
+  const reason = mediaRetryReason({
+    error,
+    stepHasOutput,
+    omitActiveMedia: setup.stream.omitActiveMedia,
+  })
+  if (!reason) return false
 
   const hasActiveMedia =
     setup.hasActiveMedia ||
@@ -264,7 +268,7 @@ async function retryWithoutMedia(
   await ctx.runMutation(internal.streams._scheduleRetry, {
     ...execution,
     retryAt: Date.now(),
-    retryError: 'Provider rejected the active media payload as too large',
+    retryError: reason,
   })
 
   return true

@@ -65,6 +65,20 @@ export function approvalPathsError(paths: string[]): string | null {
   return paths.map(approvalPathSyntaxError).find(Boolean) ?? null
 }
 
+export function taskApprovalPathsError(paths: string[], hasWorkspace: boolean) {
+  const issue = approvalPathsError(paths)
+  if (issue) return issue
+  for (const path of paths) {
+    const absolute = /^(?:[\\/]|[a-z]:[\\/])/i.test(path)
+    if (!absolute && !hasWorkspace)
+      return 'Select a workspace for relative paths.'
+    if (path.split(/[\\/]/).includes('..'))
+      return 'Enter a path without parent directory segments.'
+    if (path.includes('://')) return 'Enter a literal file or directory path.'
+  }
+  return null
+}
+
 export function approvalPathsBytes(paths: string[]): number {
   return new TextEncoder().encode(JSON.stringify(paths)).byteLength
 }

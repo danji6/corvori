@@ -21,6 +21,7 @@ import type {
 import { insertMessage } from '../messageContents'
 import { requireEnabled, requireMember } from '../session/memberships'
 import { ownsExecution, scheduleStream } from '../stream/execution'
+import { scheduleFinalizationIfIdle } from './finalization'
 import {
   checkpointAgents,
   checkpointLocationKey,
@@ -136,9 +137,7 @@ export async function finishChanges(ctx: MutationCtx, streamId: Id<'streams'>) {
   if (row.finished) return
 
   await ctx.db.patch(row._id, { finished: true })
-  await ctx.scheduler.runAfter(0, internal.actions.workspaces._finishChanges, {
-    changeSetId: row._id,
-  })
+  await scheduleFinalizationIfIdle(ctx, row)
 }
 
 export async function finishContext(
@@ -472,20 +471,6 @@ export async function cleanupChanges(
     0,
     internal.actions.workspaces._removeChanges,
     args,
-  )
-}
-
-export async function scheduleSettleChanges(
-  ctx: MutationCtx,
-  args: { changeSetId: Id<'changeSets'> },
-) {
-  const row = await ctx.db.get(args.changeSetId)
-  if (!row || row.settleScheduled) return
-  await ctx.db.patch(row._id, { settleScheduled: true })
-  await ctx.scheduler.runAfter(
-    2000,
-    internal.actions.workspaces._settleChanges,
-    { ...args, sequence: 0 },
   )
 }
 

@@ -249,6 +249,18 @@ async function fanOut(
   }
 }
 
+type TaskNotice = Pick<
+  Doc<'notifications'>,
+  'recipientId' | 'sessionId' | 'sessionTitle' | 'actorName' | 'preview'
+> & {
+  kind: 'task_failed' | 'task_succeeded'
+  taskRunId: Id<'scheduledTaskRuns'>
+}
+
+export async function notifyTaskOutcome(ctx: MutationCtx, event: TaskNotice) {
+  await insertUnreadNotification(ctx, event)
+}
+
 /** Lists the current user's newest notifications for one inbox status. */
 export async function list(
   ctx: AuthQueryCtx,
@@ -344,7 +356,10 @@ export async function discardSession(
   { sessionId }: { sessionId: Id<'sessions'> },
 ) {
   const rows = await forRecipientSession(ctx, ctx.userId, sessionId)
-  await deleteNotifications(ctx, rows.filter(isOrdinaryUnread))
+  await deleteNotifications(
+    ctx,
+    rows.filter((row) => isOrdinaryUnread(row) && !row.taskRunId),
+  )
 }
 
 async function markNotificationsRead(
@@ -365,7 +380,7 @@ export async function clearRead(ctx: AuthMutationCtx) {
   await removeNotificationDocs(ctx, rows)
 }
 
-/** Removes all notifications belonging to a deleted session. */
+/** Removes session activity while keeping task outcomes accessible from run history. */
 export async function removeForSession(
   ctx: MutationCtx,
   sessionId: Id<'sessions'>,
@@ -374,7 +389,10 @@ export async function removeForSession(
     .query('notifications')
     .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
     .collect()
-  await deleteNotifications(ctx, rows)
+  await deleteNotifications(
+    ctx,
+    rows.filter((row) => !row.taskRunId),
+  )
 }
 
 /** Removes a former member's notifications for one session. */

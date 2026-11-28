@@ -28,7 +28,11 @@ import {
   resolveAttachmentHistoryParts,
   resolveAttachmentPart,
 } from './attachmentHistory'
-import { hasOutputRef } from './toolOutput'
+import {
+  hasOutputRef,
+  isFileImagePart,
+  withoutFileImageBytes,
+} from './toolOutput'
 
 export async function resolveParts(
   ctx: ActionCtx,
@@ -60,6 +64,8 @@ export async function resolvePart(
     // Tool parts are stripped off user messages, so this becomes a text part
     return { type: 'text' as const, text: toUserShellBlock(part) }
   }
+  if (isFileImagePart(part) && !attachmentOptions.toolMediaActive)
+    return withoutFileImageBytes(part)
   if (hasOutputRef(part)) {
     return resolveOffloadedOutput(ctx, part)
   }

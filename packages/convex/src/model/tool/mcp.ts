@@ -1,6 +1,7 @@
 import type { McpServer } from '@cv/core/types'
 import { mcpApprovalKey, parseMcpInputSchema } from '@cv/core/types/mcp-catalog'
 import type { ToolApprovals } from '@cv/core/types/tools'
+import type { ContentBlock } from '@modelcontextprotocol/sdk/types.js'
 
 import { ToolError, extractErrorMessage, toolFailure } from '../../errors'
 import { isToolAutoApproved } from '../../lib/tool/approval'
@@ -37,6 +38,21 @@ export async function callMcpTool(
   args: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<string> {
+  return sidecarMcpText(await callSidecarMcpTool(name, args, signal))
+}
+
+export function sidecarMcpText(content: ContentBlock[]) {
+  return content
+    .filter((part) => part.type === 'text')
+    .map((part) => part.text)
+    .join('\n')
+}
+
+export async function callSidecarMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<ContentBlock[]> {
   let closeClient: (() => Promise<void>) | undefined
 
   try {
@@ -57,15 +73,10 @@ export async function callMcpTool(
     const result = await client.callTool({ name, arguments: args }, undefined, {
       signal,
     })
-    const content = result.content as Array<{ type: string; text: string }>
-    const text = content
-      .filter((c) => c.type === 'text')
-      .map((c) => c.text)
-      .join('\n')
-
-    if (result.isError) throw new ToolError(text || 'Tool call failed')
-
-    return text
+    const content = result.content as ContentBlock[]
+    if (result.isError)
+      throw new ToolError(sidecarMcpText(content) || 'Tool call failed')
+    return content
   } catch (error) {
     // ToolError rethrown here for propagation
     throw error instanceof ToolError

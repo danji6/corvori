@@ -12,7 +12,10 @@ import { pageIsFocused } from '@/lib/notification-presence'
 import { toast, toastError } from '@/lib/notifications'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
-import type { NotificationApprovalAction } from '@cv/core/notification-actions'
+import {
+  type NotificationApprovalAction,
+  notificationPath,
+} from '@cv/core/notification-actions'
 import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import {
   type ReactNode,
@@ -112,7 +115,10 @@ function useNotificationState() {
 
   const openSession = useCallback(
     (notification: NotificationItem) => {
-      navigate(`/?id=${notification.sessionId}`, { replace: true })
+      navigate(
+        notificationPath(notification.sessionId, notification.taskRunId),
+        { replace: true },
+      )
       if (!notification.attention) markRead(notification)
     },
     [markRead, navigate],

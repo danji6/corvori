@@ -9,12 +9,14 @@ import {
   stripBom,
 } from '@cv/core/workspace/edit'
 import { assertPersonalScope } from '@cv/core/workspace/personal'
+import type { FileImageOutput } from '@cv/core/workspace/read-image'
 import { mkdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { z } from 'zod'
 
 import { workspaceRoots } from '../../checkpoints/group'
 import { checkpoints } from '../../checkpoints/manager'
+import { readImagePreview } from '../../files/read-image'
 import { readOptionalEditSnapshot } from '../../files/read-snapshot'
 import { readTextPage } from '../../files/read-text'
 import { resolveShellDirectory } from '../../shell/directory'
@@ -39,6 +41,10 @@ export const previewDiffSchema = z.object({
     .optional(),
 })
 
+type WorkspaceRead =
+  | ({ path: string } & Awaited<ReturnType<typeof readTextPage>>)
+  | (FileImageOutput & { content?: never })
+
 async function readWorkspaceFileImpl(input: {
   sessionId: string
   workspaceId: string
@@ -49,7 +55,7 @@ async function readWorkspaceFileImpl(input: {
   offset?: number
   limit?: number
   byteOffset?: number
-}) {
+}): Promise<WorkspaceRead> {
   const workspace = await requireWorkspace(
     input.sessionId,
     input.workspaceId,
@@ -64,6 +70,10 @@ async function readWorkspaceFileImpl(input: {
     input.allowOutsideWorkspace,
   )
   assertPersonalScope(input.workspace, target.absolutePath)
+
+  const image = await readImagePreview(target.absolutePath, input)
+  if (image) return { path: target.relativePath, ...image }
+
   return {
     path: target.relativePath,
     ...(await readTextPage(target.absolutePath, input)),

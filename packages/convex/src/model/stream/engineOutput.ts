@@ -1,11 +1,15 @@
 'use node'
 
+import { isFileImageOutput } from '@cv/core/workspace/read-image'
 import type { UIMessage } from 'ai'
 
 import { internal } from '../../_generated/api'
 import type { Id } from '../../_generated/dataModel'
 import type { ActionCtx } from '../../_generated/server'
-import type { StreamExecutionArgs } from '../../validators/streams'
+import type {
+  StreamExecutionArgs,
+  TrackStreamOutputArgs,
+} from '../../validators/streams'
 import {
   generatedFileCacheKey,
   isGeneratedFilePart,
@@ -13,9 +17,11 @@ import {
 } from './generatedFiles'
 import {
   OFFLOAD_THRESHOLD,
+  isFileImagePart,
   isOffloadableToolPart,
   makeOutputPreview,
   serializeToolOutput,
+  withoutFileImageBytes,
 } from './toolOutput'
 
 export type OffloadOptions = {
@@ -129,26 +135,33 @@ export async function offloadToolOutputs(
       if (cached) return cached
 
       const serialized = serializeToolOutput(output)
-      if (serialized.length <= OFFLOAD_THRESHOLD) return part
+      const hasImage = isFileImagePart(part) && isFileImageOutput(output)
+      if (serialized.length <= OFFLOAD_THRESHOLD && !hasImage) return part
 
       const outputRef = await ctx.storage.store(
         new Blob([serialized], { type: 'application/json' }),
       )
 
-      const tracked = await ctx.runMutation(
-        internal.streams._trackOffloadedOutput,
-        {
-          ...execution,
-          messageId,
-          storageId: outputRef,
-        },
-      )
+      const tracked = await trackToolOutput(ctx, {
+        ...execution,
+        messageId,
+        storageId: outputRef,
+      })
 
-      if (!tracked) return part
+      if (!tracked) return withoutFileImageBytes(part)
       const compact = { ...part, output: makeOutputPreview(output), outputRef }
       cache.set(toolCallId, compact)
       return compact
     }),
   )
   return result as UIMessage['parts']
+}
+
+async function trackToolOutput(ctx: ActionCtx, args: TrackStreamOutputArgs) {
+  try {
+    return await ctx.runMutation(internal.streams._trackOffloadedOutput, args)
+  } catch (error) {
+    await ctx.storage.delete(args.storageId).catch(() => {})
+    throw error
+  }
 }

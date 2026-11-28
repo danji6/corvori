@@ -1,8 +1,13 @@
 import {
+  READ_FILE_TOOL_PART_TYPE,
   SHELL_OUTPUT_TOOL_PART_TYPE,
   SHELL_TOOL_PART_TYPE,
 } from '@cv/core/const'
 import { isMcpResult, mcpResultPreview } from '@cv/core/types/mcp-result'
+import {
+  type FileImageMetadata,
+  isFileImageOutput,
+} from '@cv/core/workspace/read-image'
 
 import type { Id } from '../../_generated/dataModel'
 
@@ -32,6 +37,28 @@ function asRecord(part: unknown): ToolPartRecord | null {
     return null
   }
   return part as ToolPartRecord
+}
+
+/** Matches both a live filesystem image and its compact stored part. */
+export function isFileImagePart(
+  part: unknown,
+): part is ToolPartRecord & { output: FileImageMetadata } {
+  const record = asRecord(part)
+  return (
+    record?.type === READ_FILE_TOOL_PART_TYPE &&
+    record.state === 'output-available' &&
+    (record.output as { kind?: unknown } | null)?.kind === 'image'
+  )
+}
+
+export function withoutFileImageBytes<T>(part: T): T {
+  if (!isFileImagePart(part) || !isFileImageOutput(part.output)) return part
+  return { ...part, output: fileImagePreview(part.output) }
+}
+
+function fileImagePreview(output: FileImageMetadata & { base64: string }) {
+  const { base64: _base64, ...metadata } = output
+  return metadata
 }
 
 export function isOffloadableToolPart(part: unknown): part is ToolPartRecord {
@@ -71,6 +98,7 @@ export function serializeToolOutput(output: unknown): string {
 /** Compact replacement output for fallback render. */
 export function makeOutputPreview(output: unknown): unknown {
   if (isMcpResult(output)) return mcpResultPreview(output)
+  if (isFileImageOutput(output)) return fileImagePreview(output)
   if (typeof output === 'string') return truncateString(output)
   if (!output || typeof output !== 'object') return output
 

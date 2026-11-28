@@ -189,6 +189,7 @@ export function EmptyChat({
 
   return (
     <ChatLayout
+      scrollbar
       bottomInset={keyboardInset}
       mainContent={(bottomPadding) => (
         <ChatScrollArea className="mx-auto w-full flex-1">

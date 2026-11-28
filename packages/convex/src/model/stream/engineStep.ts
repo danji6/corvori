@@ -31,7 +31,7 @@ import {
   insertApprovalNoteMessages,
 } from './history'
 import { assertProviderStepOutput, hasReplayableToolOutputSince } from './retry'
-import { toolStateSignature } from './toolOutput'
+import { toolStateSignature, withoutFileImageBytes } from './toolOutput'
 import { stopWhenInactive } from './transformers'
 import { resolveUsage } from './usage'
 
@@ -319,7 +319,9 @@ export async function consumeProviderStep(
     await patches.close()
     if (patches.rejected) return stopped()
     await setup.cacheDiagnostics?.fail(abortController.signal.aborted)
-    latestParts = await prepareParts(latestParts).catch(() => latestParts)
+    latestParts = await prepareParts(latestParts).catch(() =>
+      latestParts.map(withoutFileImageBytes),
+    )
 
     await tryPatchMessage(ctx, execution, latestParts)
 

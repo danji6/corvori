@@ -89,6 +89,8 @@ export type ImportSessionArgs = Infer<typeof importSessionArgsValidator>
 
 /** A conversation and its settings. */
 export const sessionSchema = v.object({
+  scheduledTaskId: v.optional(v.id('scheduledTasks')),
+  taskRunId: v.optional(v.id('scheduledTaskRuns')),
   ownerId: v.id('users'),
   title: v.optional(v.string()),
   titleGenerationJobId: v.optional(v.id('_scheduled_functions')),

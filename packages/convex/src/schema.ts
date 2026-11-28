@@ -1,6 +1,7 @@
 import { defineSchema, defineTable } from 'convex/server'
 
 import * as V from './validators'
+import { runSchema, taskSchema } from './validators/scheduledTasks'
 
 const schemaValidation = true
 
@@ -27,6 +28,15 @@ export default defineSchema({
 
   sessionState: defineTable(V.sessionStateSchema)
     .index('by_sessionId', ['sessionId']),
+
+  scheduledTasks: defineTable(taskSchema)
+    .index('by_owner_state', ['ownerId', 'state'])
+    .index('by_agent', ['agentId'])
+    .index('by_due', ['state', 'activeRunId', 'nextRunAt'])
+    .searchIndex('search_tasks', { searchField: 'searchText', filterFields: ['ownerId'] }),
+
+  scheduledTaskRuns: defineTable(runSchema)
+    .index('by_task_due', ['taskId', 'scheduledFor']),
 
   scheduledEvents: defineTable(V.scheduledEventSchema)
     .index('by_sessionId', ['sessionId'])
@@ -179,6 +189,7 @@ export default defineSchema({
     .index('by_streamId', ['streamId'])
     .index('by_groupId', ['groupId'])
     .index('by_sessionId', ['sessionId'])
+    .index('by_finished_writersSettled', ['finished', 'writersSettled'])
     .index('by_messageId_version', ['messageId', 'version']),
 
   changeFiles: defineTable(V.changeFileSchema)

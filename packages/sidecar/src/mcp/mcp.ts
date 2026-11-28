@@ -118,6 +118,19 @@ function buildMcpServer(): McpServer {
         limit,
         byteOffset,
       })
+      if ('base64' in result) {
+        const { base64, ...metadata } = result
+        return {
+          content: [
+            { type: 'text' as const, text: formatJson(metadata) },
+            {
+              type: 'image' as const,
+              data: base64,
+              mimeType: metadata.mediaType,
+            },
+          ],
+        }
+      }
       return { content: [{ type: 'text' as const, text: formatJson(result) }] }
     },
   )

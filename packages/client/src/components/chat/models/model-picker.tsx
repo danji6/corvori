@@ -2,8 +2,8 @@ import {
   Combobox,
   type ComboboxContentProps,
   type ComboboxTriggerProps,
-} from '@/components/ui'
-import { useModels } from '@/hooks/chat'
+} from '@/components/ui/combobox'
+import { useModels } from '@/hooks/chat/models'
 import { useProviderDiscoveryCoordinator } from '@/hooks/chat/provider-discovery'
 import type { UIModel } from '@/lib/chat'
 import { cn } from '@/lib/utils'

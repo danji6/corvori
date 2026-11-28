@@ -47,6 +47,7 @@ live in `helpers/`, `setup/`, and `fixtures/`; browser fixtures stay in `browser
 | `providers`     | Connections, model discovery, SDK request adaptation, cache usage        | `test:browser providers`     |
 | `sessions`      | Agents, folders, search, message projections, navigation                 | `test:browser sessions`      |
 | `editor`        | Markdown, completion, source editing, interpreter, evaluation workers    | `test:browser editor`        |
+| `task-scheduler` | Calendar recurrence, missed runs, session launch and run outcomes | — |
 | `notifications` | Delivery, queues, approvals, service worker                              | `test:browser notifications` |
 | `auth`          | Authentication, account security, origins, rate limits                   | `test:browser auth`          |
 | `updates`       | Installation, upgrades, rollback, migration deployment, runtime bundling | —                            |

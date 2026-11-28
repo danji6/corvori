@@ -224,6 +224,10 @@ describe('session model binding', () => {
     })
     const from = modelReference('own', 'before')
     const to = modelReference('own', 'after')
+    tables.scheduledTasks = [
+      { _id: 'own-task', ownerId: OWNER, modelId: from },
+      { _id: 'foreign-task', ownerId: MEMBER, modelId: from },
+    ]
     await updateAgent(ctx as never, {
       agentId,
       modelOverride: { modelId: from, reasoningEffort: 'high' },
@@ -238,6 +242,10 @@ describe('session model binding', () => {
       modelId: to,
       reasoningEffort: 'high',
     })
+    expect(tables.scheduledTasks.map((task) => task.modelId)).toEqual([
+      to,
+      from,
+    ])
   })
 
   test('provider edits refresh metadata without changing the selected id', async () => {

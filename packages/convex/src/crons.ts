@@ -42,6 +42,13 @@ crons.interval(
   internal.streams.prune,
 )
 
+crons.interval(
+  'recover unfinished checkpoints for ended turns',
+  { minutes: 1 },
+  internal.chat._reconcileFinishedChanges,
+  {},
+)
+
 crons.daily(
   'prune orphaned tool outputs',
   { hourUTC: 3, minuteUTC: 30 },
@@ -76,6 +83,12 @@ crons.interval(
   'recover attachment transfers and session file operations',
   { minutes: 1 },
   internal.sessions._sweepSessionFiles,
+)
+
+crons.interval(
+  'recover overdue tasks',
+  { minutes: 1 },
+  internal.scheduledTasks._recover,
 )
 
 export default crons

@@ -66,6 +66,42 @@ export function isProviderRequestSizeError(error: unknown): boolean {
   })
 }
 
+const UNSUPPORTED_IMAGE_INPUT_PATTERNS = [
+  /\b(?:image|vision|multimodal)[_ -]?(?:input[_ -]?)?(?:not[_ -]supported|unsupported)\b/i,
+  /\bunsupported (?:image|vision|multimodal) (?:input|content|modality)\b/i,
+  /\b(?:does not|do not|doesn't|don't|cannot) (?:support|accept) (?:images?|vision|multimodal)\b/i,
+  /\bno endpoints? found that support image input\b/i,
+  /\b(?:only supports?|only accepts?) text input\b/i,
+]
+
+/** Recognizes explicit provider capability errors for image input. */
+function isProviderImageInputError(error: unknown): boolean {
+  return getErrorChain(error).some((value) => {
+    const message = stringifyErrorCandidate(value)
+    return UNSUPPORTED_IMAGE_INPUT_PATTERNS.some((pattern) =>
+      pattern.test(message),
+    )
+  })
+}
+
+type MediaRetryOptions = {
+  error: unknown
+  stepHasOutput: boolean
+  omitActiveMedia?: boolean
+}
+
+export function mediaRetryReason({
+  error,
+  stepHasOutput,
+  omitActiveMedia,
+}: MediaRetryOptions) {
+  if (stepHasOutput || omitActiveMedia) return undefined
+  if (isProviderRequestSizeError(error))
+    return 'Provider rejected the active media payload as too large'
+  if (isProviderImageInputError(error))
+    return 'Provider does not accept image input'
+}
+
 function backoffDelay(retryAttempt: number) {
   return Math.min(
     RETRY_DELAY_MS * 1.25 ** Math.max(0, retryAttempt - 1),

@@ -11,7 +11,10 @@ import {
 import { toastError } from '@/lib/notifications'
 import { api } from '@cv/convex/_generated/api'
 import type { Id } from '@cv/convex/_generated/dataModel'
-import type { NotificationWorkerAction } from '@cv/core/notification-actions'
+import {
+  type NotificationWorkerAction,
+  notificationPath,
+} from '@cv/core/notification-actions'
 import { useMutation } from 'convex/react'
 import { ConvexError } from 'convex/values'
 import { useCallback, useEffect } from 'react'
@@ -43,7 +46,7 @@ export function useNotificationWorker() {
           (action.action === 'show' || action.openSession === true) &&
           action.sessionId
         ) {
-          navigate(`/?id=${encodeURIComponent(action.sessionId)}`)
+          navigate(notificationPath(action.sessionId, action.taskRunId))
           window.focus()
         }
       } catch (error) {

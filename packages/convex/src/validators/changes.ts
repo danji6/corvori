@@ -56,6 +56,7 @@ export const changeSetSchema = v.object({
   operationId: v.optional(v.string()),
   direction: v.optional(v.union(v.literal('revert'), v.literal('reapply'))),
   settleScheduled: v.optional(v.boolean()),
+  finalizationJobId: v.optional(v.id('_scheduled_functions')),
   checkpointId: v.optional(v.string()),
 })
 
@@ -114,6 +115,16 @@ export const settleChangesArgsValidator = v.object({
   changeSetId: v.id('changeSets'),
   sequence: v.number(),
 })
+
+export const continueChangesFinalizationValidator = v.object({
+  changeSetId: v.id('changeSets'),
+  expectedJobId: v.optional(v.id('_scheduled_functions')),
+  settlementSequence: v.optional(v.number()),
+})
+
+export type ContinueChangesFinalizationArgs = Infer<
+  typeof continueChangesFinalizationValidator
+>
 
 export const restoreChangesResultValidator = v.object({
   changeSetId: v.id('changeSets'),

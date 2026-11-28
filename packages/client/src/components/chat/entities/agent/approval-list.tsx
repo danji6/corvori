@@ -1,23 +1,73 @@
-import { Input, RippleButton } from '@/components/ui'
+import { Input } from '@/components/ui/input'
+import { RippleButton } from '@/components/ui/ripple-button'
+import { SettingsList } from '@/components/ui/settings-list'
 import { PlusIcon, XIcon } from 'lucide-react'
-import { useState } from 'react'
+import { type ReactNode, useId, useState } from 'react'
 
-export type ApprovalListProps = {
+type ApprovalListProps = {
   values: string[]
   onChange: (values: string[]) => void
   placeholder: string
   label: string
+  title: string
+  description: ReactNode
+  className?: string
   validate?: (values: string[]) => string | null
 }
 
+type ApprovalFieldProps = Omit<
+  ApprovalListProps,
+  'label' | 'title' | 'description'
+>
+
+export function ShellApprovalList(props: ApprovalFieldProps) {
+  return (
+    <ApprovalList
+      {...props}
+      title="Shell commands"
+      label="Command prefix"
+      description={
+        <>
+          Command prefixes the agent may run without approval, such as{' '}
+          <code>find</code> or <code>git checkout</code>.
+        </>
+      }
+    />
+  )
+}
+
+type PathApprovalListProps = ApprovalFieldProps & { absoluteOnly?: boolean }
+
+export function PathApprovalList({
+  absoluteOnly,
+  ...props
+}: PathApprovalListProps) {
+  const pathHint = absoluteOnly
+    ? 'Enter an absolute path.'
+    : 'Enter an absolute or workspace-relative path.'
+
+  return (
+    <ApprovalList
+      {...props}
+      title="Paths"
+      label="Path"
+      description={`Files and directories the agent may read or edit without approval. ${pathHint}`}
+    />
+  )
+}
+
 /** Entry editor shared by shell and path approvals. */
-export function ApprovalList({
+function ApprovalList({
   values,
   onChange,
   placeholder,
   label,
+  title,
+  description,
+  className,
   validate,
 }: ApprovalListProps) {
+  const descriptionId = useId()
   const [input, setInput] = useState('')
   const value = input.trim()
   const next = [...values, value]
@@ -31,7 +81,14 @@ export function ApprovalList({
   }
 
   return (
-    <div className="space-y-2">
+    <SettingsList.Item
+      className={className}
+      label={title}
+      description={<span id={descriptionId}>{description}</span>}
+      orientation="vertical"
+      unclickable
+      unhoverable
+    >
       <div className="flex gap-2">
         <Input
           value={input}
@@ -43,8 +100,8 @@ export function ApprovalList({
           }}
           placeholder={placeholder}
           aria-label={label}
+          aria-describedby={descriptionId}
           aria-invalid={Boolean(error)}
-          variant="outline"
           size="sm"
           className="max-w-70 font-mono"
         />
@@ -86,6 +143,6 @@ export function ApprovalList({
           ))}
         </div>
       )}
-    </div>
+    </SettingsList.Item>
   )
 }

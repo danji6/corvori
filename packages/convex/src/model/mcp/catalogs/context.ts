@@ -39,7 +39,7 @@ export function mcpContextNote(
       ...guidance.map(guidancePreview),
     )
   }
-  return sections.length ? `\n${sections.join('\n\n')}\n` : undefined
+  return sections.length ? `${sections.join('\n\n')}\n` : undefined
 }
 
 function serverListItem(server: ServerSummary) {

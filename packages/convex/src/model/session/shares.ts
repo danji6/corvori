@@ -128,6 +128,7 @@ export async function redeemInvite(
     sessionId,
     userId: ctx.userId,
     role: 'member',
+    hidden: session.taskRunId ? true : undefined,
     groupKey: 'ungrouped',
     lastMessageAt: session.lastMessageAt,
     title: session.title,

@@ -4,6 +4,7 @@
 export const MAX_SCOPE_PROMPTS = 100
 export const MAX_PROMPT_CONTENT_CHARS = 200_000
 export const MAX_PROMPT_NAME_CHARS = 100
+export const MAX_TASK_PROMPT_CHARS = 16_000
 
 export const MAX_MCP_SERVERS = 100
 
