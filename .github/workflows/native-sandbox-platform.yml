@@ -70,6 +70,9 @@ jobs:
       - name: Verify packaged sandbox startup
         working-directory: .
         run: node .data/build/sidecar/sandbox-check.js packages/sidecar/vendor
+      - name: Qualify workspace isolation on Windows BaseContainer
+        if: runner.os == 'Windows' && steps.mxc.outputs.setup != 'true'
+        run: node windows-workspace.mjs
       - name: Verify the agent-requested retry through the shell tool and sidecar
         if: runner.os != 'Windows'
         working-directory: .
