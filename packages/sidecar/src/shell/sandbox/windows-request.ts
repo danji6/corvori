@@ -107,7 +107,9 @@ export async function windowsRequest(
     workingDirectory: input.cwd,
     containment: {
       type: 'processcontainer',
-      config: { filesystem: { enumeratePaths: volumes } },
+      config: {
+        filesystem: { enumeratePaths: [...volumes, dirname(input.runtime)] },
+      },
     },
     filesystem: {
       readonlyPaths: [...new Set(reads)].filter(

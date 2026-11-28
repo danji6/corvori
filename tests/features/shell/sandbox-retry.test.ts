@@ -4,6 +4,7 @@ import type { WorkspaceToolContext } from '@cv/convex/model/tool/context'
 import type { ShellJobInput } from '@cv/convex/model/tool/shell'
 import { shellApprovalPolicy } from '@cv/convex/model/tool/shellApproval'
 import {
+  createKillShellTool,
   createShellOutputTool,
   createShellTool,
 } from '@cv/convex/model/tool/shellTools'
@@ -17,6 +18,7 @@ import { type ToolSet, streamText } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { execFileSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import {
   mkdir,
   mkdtemp,
@@ -29,6 +31,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nativeGitHubFixture } from '~/tests/helpers/native-shell-github'
 import { nativeShellSidecar } from '~/tests/helpers/native-shell-sidecar'
+import { isAlive } from '~/tests/helpers/shell-registry'
+import { waitFor } from '~/tests/setup/wait'
 
 const windows = process.platform === 'win32'
 const nativeSuite = describe.skipIf(process.env.CORVORI_NATIVE_TEST !== '1')
@@ -397,6 +401,38 @@ nativeSuite('native shell retry approval', () => {
       await terminal.close()
     }
   })
+
+  test.skipIf(!windows)(
+    'cancelling a Windows background job terminates its child',
+    async () => {
+      await writeFile(
+        join(sandbox, 'waiting-child.cjs'),
+        [
+          "require('node:fs').writeFileSync('child-pid', String(process.pid))",
+          'setTimeout(() => {}, 25000)',
+        ].join('\n'),
+      )
+      const command =
+        "node -e \"require('child_process').spawnSync(process.execPath,['waiting-child.cjs'])\""
+      const first = await execute({ command, wait_seconds: 0 }, 'cancel')
+      expect(first.status).toBe('background')
+      const marker = join(sandbox, 'child-pid')
+      await waitFor('sandbox child', () => existsSync(marker))
+      const pid = Number(await readFile(marker, 'utf8'))
+      expect(pid).toBeGreaterThan(0)
+      expect(isAlive(pid)).toBe(true)
+      const kill = await createKillShellTool(context)
+      await kill.execute!(
+        { jobId: String(first.jobNumber) },
+        {
+          toolCallId: 'cancel-child',
+          messages: [],
+          context: undefined as never,
+        },
+      )
+      await waitFor('cancelled child to exit', () => !isAlive(pid), 5000)
+    },
+  )
 
   test('approval history resumes a silent failure exactly once', async () => {
     const command = windows
