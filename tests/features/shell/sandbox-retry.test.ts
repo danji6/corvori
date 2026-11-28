@@ -228,14 +228,6 @@ nativeSuite('native shell retry approval', () => {
     )
     expect(status.text).toContain('?? status-marker')
     expect(status.exitCode).toBe(0)
-    context.isPlanMode = async () => true
-    try {
-      const plan = await execute({ command: 'git status --short' }, 'plan-git')
-      expect(plan.text).toContain('?? status-marker')
-      expect(plan.exitCode).toBe(0)
-    } finally {
-      delete context.isPlanMode
-    }
     const script = await execute(
       { command: windows ? 'type .git\\HEAD' : '/bin/cat .git/HEAD' },
       'ordinary-git-read',
@@ -246,6 +238,26 @@ nativeSuite('native shell retry approval', () => {
       'git-write',
     )
     expect(write.exitCode).not.toBe(0)
+  })
+
+  test('Plan mode can find the Git worktree and report status', async () => {
+    execFileSync('git', ['init', '-q'], { cwd: sandbox })
+    await writeFile(join(sandbox, 'plan-status-marker'), 'fixture')
+    context.isPlanMode = async () => true
+    try {
+      const location = await execute(
+        { command: 'git rev-parse --show-toplevel' },
+        'plan-git-directory',
+      )
+      expect(location.text.trim().replaceAll('\\', '/')).toBe(
+        sandbox.replaceAll('\\', '/'),
+      )
+      const plan = await execute({ command: 'git status --short' }, 'plan-git')
+      expect(plan.text).toContain('?? plan-status-marker')
+      expect(plan.exitCode).toBe(0)
+    } finally {
+      delete context.isPlanMode
+    }
   })
 
   test('scripts can read siblings and a saved file grant permits only that write', async () => {

@@ -18,7 +18,7 @@ Commands may read ordinary files outside the workspace, including files in other
 
 Plan mode keeps its launch checks and a read-only workspace. Recognized Git inspections use the system Git executable with optional locks, hooks, and filesystem monitors disabled. Evaluator and workspace MCP commands use the same filesystem and network policy. Explicit unrestricted shell mode retains host execution.
 
-On compatible Windows 11 hosts, the packaged sidecar uses MXC after the same startup check. Other Windows hosts use the existing approval flow. The administrator-installed helper is available for diagnostics.
+On compatible Windows 11 hosts, the packaged sidecar uses MXC after the same startup check. Normal-mode Git status works on Windows. On the tested Windows 11 MXC host, Git status fails inside a read-only Plan worktree even though Git can locate the repository. Other Windows hosts without MXC use the existing approval flow. The administrator-installed helper is available for diagnostics.
 
 A failed command shows its output and exit status. If the agent needs more access, it requests a retry of that job and explains why. The approval card shows the command, working directory, reason, and requested access. On macOS it also shows the blocked operation and destination when Seatbelt identifies them. A successful command that handled a denied operation finishes normally.
 

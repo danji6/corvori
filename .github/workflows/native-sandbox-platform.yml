@@ -38,7 +38,7 @@ jobs:
         working-directory: .
         run: |
           bun scripts/sidecar.ts --build-only
-          bun build tests/features/shell/native-sandbox/probe.mjs tests/features/shell/native-sandbox/benchmark.mjs --target=node --external @anthropic-ai/sandbox-runtime --outdir .data/native
+          bun build tests/features/shell/native-sandbox/probe.mjs --target=node --external @anthropic-ai/sandbox-runtime --outdir .data/native
       - uses: actions/download-artifact@v4
         if: runner.os == 'Linux'
         with:
@@ -82,6 +82,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      - name: Verify workspace execution and denial attribution
+        run: node ../../../../.data/native/probe.js
       - name: Verify the agent-requested retry through the shell tool and sidecar
         if: runner.os != 'Windows' || steps.mxc.outputs.setup != 'true'
         working-directory: .
@@ -89,15 +91,3 @@ jobs:
           CORVORI_NATIVE_TEST: '1'
         shell: bash
         run: NODE_BINARY="$(node -p 'process.execPath')" bun --no-env-file test --timeout 30000 --path-ignore-patterns '**/browser/**' ./tests/features/shell/sandbox-retry.test.ts
-      - name: Diagnose read-only Git worktree access
-        if: failure() && runner.os == 'Windows' && steps.mxc.outputs.setup != 'true'
-        run: node windows-readonly-git.mjs
-      - name: Report Windows loader failures
-        if: failure() && runner.os == 'Windows' && steps.mxc.outputs.setup != 'true'
-        run: |
-          Get-WinEvent -FilterHashtable @{LogName='Application';ProviderName='SideBySide';StartTime=(Get-Date).AddMinutes(-5)} -ErrorAction SilentlyContinue | Select-Object -First 4 -ExpandProperty Message
-          exit 0
-      - name: Measure native launch overhead
-        run: node ../../../../.data/native/benchmark.js
-      - name: Verify workspace execution and denial attribution
-        run: node ../../../../.data/native/probe.js

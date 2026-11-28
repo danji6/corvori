@@ -1,4 +1,4 @@
-name: Native sandbox prototype
+name: Native shell sandbox
 
 on:
   pull_request:
@@ -17,20 +17,6 @@ permissions:
   contents: read
 
 jobs:
-  windows-hyperv:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, windows-11-arm]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          persist-credentials: false
-      - name: Probe a Hyper-V-isolated Windows workspace
-        run: ./tests/features/shell/native-sandbox/windows-hyperv.ps1
-
   helpers:
     uses: ./.github/workflows/linux-sandbox-helpers.yml
 

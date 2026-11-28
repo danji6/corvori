@@ -86,12 +86,7 @@ export async function windowsRequest(
   const request: ContainerRequest = {
     command,
     workingDirectory: input.cwd,
-    containment: {
-      type: 'processcontainer',
-      ...(!input.writable.includes(input.cwd) && {
-        config: { filesystem: { enumeratePaths: [input.cwd] } },
-      }),
-    },
+    containment: { type: 'processcontainer' },
     filesystem: {
       readonlyPaths: [...new Set(reads)].filter(
         (path) => !input.writable.includes(path) && readable(path, input),

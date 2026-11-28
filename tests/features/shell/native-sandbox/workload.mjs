@@ -1,12 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import console from 'node:console'
-import {
-  appendFileSync,
-  readFileSync,
-  readdirSync,
-  writeFileSync,
-} from 'node:fs'
-import { join } from 'node:path'
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import process from 'node:process'
 
 const [action, file] = process.argv.slice(2)
@@ -14,11 +8,6 @@ const [action, file] = process.argv.slice(2)
 if (action === 'write') {
   writeFileSync(file, 'workspace output')
   console.log('workspace write complete')
-} else if (action === 'scan') {
-  for (const dir of readdirSync('tree')) {
-    const parent = join('tree', dir)
-    for (const name of readdirSync(parent)) readFileSync(join(parent, name))
-  }
 } else if (action === 'child') {
   const child = spawnSync(
     process.execPath,

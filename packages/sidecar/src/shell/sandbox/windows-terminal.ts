@@ -12,13 +12,17 @@ export async function windowsTerminal(
   const child = await spawnWithPty(request, { size: { rows, columns } })
   const input = child.input
   const output = child.output.setEncoding('utf8')
+  let active = true
   const ended = child
     .wait()
     .then(
       (result) => result.exitCode,
       () => null,
     )
-    .finally(() => child.dispose())
+    .finally(() => {
+      active = false
+      child.dispose()
+    })
   return {
     mode: 'pty',
     pid: child.id,
@@ -26,12 +30,16 @@ export async function windowsTerminal(
       output.on('data', cb)
     },
     onExit: (cb) => {
-      void ended.then(cb)
+      void ended.then(cb, () => cb(null))
     },
     write: (data) => {
-      input.write(data)
+      if (active) input.write(data)
     },
-    resize: (columns, rows) => child.resize({ columns, rows }),
-    kill: () => child.kill(),
+    resize: (columns, rows) => {
+      if (active) child.resize({ columns, rows })
+    },
+    kill: () => {
+      if (active) child.kill()
+    },
   }
 }
