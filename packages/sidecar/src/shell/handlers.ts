@@ -33,7 +33,7 @@ import {
   writeStdin,
 } from './registry'
 import { previewAvailable } from './sandbox/preview-platform'
-import { sandboxReady } from './sandbox/readiness'
+import { sandboxReady, sandboxSetupDetail } from './sandbox/readiness'
 import { sandboxRoots } from './sandbox/roots'
 import { pumpShellJobStream } from './stream'
 import { canBindSessionDir, shellPath } from './system-shell'
@@ -125,6 +125,7 @@ export const shellInfo: Handler = async (c) => {
         retryPreview: ready,
         automaticShellExecution: ready,
         platform: process.platform,
+        detail: ready ? undefined : sandboxSetupDetail(),
       },
     })
   } catch (err: unknown) {

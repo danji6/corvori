@@ -6,7 +6,8 @@ import { join } from 'node:path'
 export async function nativeGitHubFixture(root: string, workspace: string) {
   const gh = Bun.which('gh')
   if (!gh) throw new Error('The native CLI test requires gh')
-  const binary = join(workspace, 'fixture-gh')
+  const windows = process.platform === 'win32'
+  const binary = join(workspace, windows ? 'fixture-gh.exe' : 'fixture-gh')
   await copyFile(gh, binary)
   const requests: string[] = []
   const fetch = async (request: Request) => {
@@ -27,6 +28,13 @@ export async function nativeGitHubFixture(root: string, workspace: string) {
         },
       },
     })
+  }
+  if (windows) {
+    const launcher = join(root, 'fixture-launcher.exe')
+    await copyFile('.data/native/gh-fixture.exe', launcher)
+    const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch })
+    await writeFile(join(workspace, 'fixture-proxy'), server.url.origin)
+    return { launcher, server, requests }
   }
   const transport =
     process.platform === 'linux'

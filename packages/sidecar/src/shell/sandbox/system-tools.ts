@@ -1,10 +1,30 @@
 import { execFile } from 'node:child_process'
-import { realpath } from 'node:fs/promises'
+import { realpath, stat } from 'node:fs/promises'
 import { delimiter, dirname, isAbsolute, join } from 'node:path'
 import { promisify } from 'node:util'
 
 const execute = promisify(execFile)
 let tools: ReturnType<typeof findSystemTools> | undefined
+
+/** Locate a full Python installation on the sidecar's startup PATH. */
+async function windowsPython(windows: string) {
+  const system = join(windows, 'System32')
+  const found = await execute(join(system, 'where.exe'), ['python.exe'], {
+    cwd: system,
+    timeout: 3000,
+  }).catch(() => undefined)
+  for (const candidate of found?.stdout.trim().split(/\r?\n/) ?? []) {
+    if (!isAbsolute(candidate)) continue
+    const root = dirname(candidate)
+    if (
+      await stat(join(root, 'Lib/os.py')).then(
+        (file) => file.isFile(),
+        () => false,
+      )
+    )
+      return realpath(root)
+  }
+}
 
 async function findSystemTools() {
   const fallback = {
@@ -18,10 +38,13 @@ async function findSystemTools() {
     if (!programs || !windows) throw new Error('Missing Windows system paths')
     const gitHome = await realpath(join(programs, 'Git'))
     const git = await realpath(join(gitHome, 'cmd', 'git.exe'))
+    const python = await windowsPython(windows)
     return {
       git,
-      path: [dirname(git), join(windows, 'System32')].join(delimiter),
-      reads: [gitHome],
+      path: [dirname(git), python, join(windows, 'System32')]
+        .filter(Boolean)
+        .join(delimiter),
+      reads: python ? [gitHome, python] : [gitHome],
     }
   }
   if (process.platform !== 'darwin') return fallback

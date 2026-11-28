@@ -9,6 +9,11 @@ import { previewAvailable } from './preview-platform'
 
 const execute = promisify(execFile)
 let readiness: Promise<boolean> | undefined
+let detail: string | undefined
+
+export function sandboxSetupDetail() {
+  return detail
+}
 
 /** Verify a real child can write ordinary files while a sibling file stays private. */
 async function probe() {
@@ -49,7 +54,9 @@ async function probe() {
         env,
         timeout: 15000,
       })
-      return stdout === 'ready'
+      if (stdout !== 'ready')
+        throw new Error('Workspace probe did not return its expected output')
+      return true
     } finally {
       await job.cleanup()
     }
@@ -61,7 +68,15 @@ async function probe() {
 export function sandboxReady() {
   if (!previewAvailable()) {
     readiness = undefined
+    detail = 'The packaged workspace sandbox is unavailable on this host'
     return Promise.resolve(false)
   }
-  return (readiness ??= probe().catch(() => false))
+  return (readiness ??= probe().catch((error: unknown) => {
+    // Only this fixed, credential-free startup probe can supply diagnostic output.
+    detail =
+      error instanceof Error
+        ? error.message.slice(0, 1800)
+        : 'Sandbox startup check failed'
+    return false
+  }))
 }

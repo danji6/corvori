@@ -73,6 +73,10 @@ jobs:
       - name: Qualify workspace isolation on Windows BaseContainer
         if: runner.os == 'Windows' && steps.mxc.outputs.setup != 'true'
         run: node windows-workspace.mjs
+      - name: Build the Windows loopback launcher for the installed GitHub CLI
+        if: runner.os == 'Windows' && steps.mxc.outputs.setup != 'true'
+        working-directory: .
+        run: go build -o .data/native/gh-fixture.exe ./tests/features/shell/native-sandbox/gh-fixture.go
       - name: Verify the agent-requested retry through the shell tool and sidecar
         if: runner.os != 'Windows' || steps.mxc.outputs.setup != 'true'
         working-directory: .
