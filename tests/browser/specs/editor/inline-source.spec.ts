@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import type { Editor } from '@tiptap/core'
 import type { SourceFixtureWindow } from '~/tests/browser/inline-source-fixture'
 
 test.beforeEach(async ({ page }) => {
@@ -245,3 +246,22 @@ for (const source of ['**test**', '***test***']) {
     await expect(page.getByLabel('Saved markdown')).toHaveText(`${source} next`)
   })
 }
+
+test('the platform Mod+Enter shortcut inserts a hard break in Markdown', async ({
+  page,
+}) => {
+  await page.goto('/?fixture=inline-source')
+  const editor = page.getByRole('textbox', { name: 'Markdown editor' })
+  await editor.evaluate((element) => {
+    const { editor } = element as HTMLElement & {
+      editor: Editor
+    }
+    editor.commands.setContent('a')
+    editor.commands.setTextSelection(2)
+    editor.view.focus()
+  })
+  await page.keyboard.press('ControlOrMeta+Enter')
+  await page.keyboard.type('b')
+  const markdown = page.getByLabel('Saved markdown')
+  await expect(markdown).toHaveJSProperty('textContent', 'a\nb')
+})

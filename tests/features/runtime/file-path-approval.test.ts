@@ -30,20 +30,19 @@ import { Hono } from 'hono'
 import { createHash } from 'node:crypto'
 import {
   mkdir,
-  mkdtemp,
   readFile,
   rm,
   symlink,
   truncate,
   writeFile,
 } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import sharp from 'sharp'
 import type { ZodType } from 'zod'
 import { SELF, providerData, stored } from '~/tests/helpers/provider-history'
 import { captureStreamFetch } from '~/tests/helpers/provider-middleware'
 import { skillsDatabase } from '~/tests/helpers/skills-db'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 let root: string
 let project: string
@@ -56,7 +55,7 @@ const previousData = process.env.CHAT_SIDECAR_DATA_DIR
 const options = { toolCallId: 'approved-file', messages: [], context: undefined as never } // prettier-ignore
 
 beforeAll(async () => {
-  root = await mkdtemp(path.join(tmpdir(), 'file-path-approval-'))
+  root = await createTempDirectory('file-path-approval-')
   project = path.join(root, 'project')
   outside = path.join(root, 'outside')
   await mkdir(project)

@@ -3,14 +3,14 @@ import { prepareCapabilities } from '@cv/convex/model/stream/capabilities'
 import { _complete } from '@cv/convex/model/stream/lifecycleTerminal'
 import { capabilitySource } from '@cv/convex/model/tool/capabilitySource'
 import { expect, spyOn, test } from 'bun:test'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { captureRequest } from '~/tests/helpers/provider-request'
 import { skillRequests } from '~/tests/helpers/skill-requests'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 async function fixture() {
-  const root = await mkdtemp(path.join(tmpdir(), 'capability-updates-'))
+  const root = await createTempDirectory('capability-updates-')
   const state = skillRequests(root)
   state.agent.tools = []
   return {

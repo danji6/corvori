@@ -5,17 +5,17 @@ import type { OperationStart } from '@cv/sidecar/mcp/external/operation'
 import { McpOperationStore } from '@cv/sidecar/mcp/external/operation-store'
 import { McpRegistry } from '@cv/sidecar/mcp/external/registry'
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { rm } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 /** Creates operation services without launching a throwaway MCP connection. */
 export async function operationServices(
   fixture?: URL,
   fixtureArgs: string[] = [],
 ) {
-  const root = await mkdtemp(path.join(tmpdir(), 'cv-mcp-operation-'))
+  const root = await createTempDirectory('cv-mcp-operation-')
   const registry = new McpRegistry()
   const scope: McpRuntimeScope = {
     key: randomUUID(),

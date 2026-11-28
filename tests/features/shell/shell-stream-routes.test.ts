@@ -15,10 +15,6 @@ import {
   waitForExit,
 } from '~/tests/helpers/shell-registry'
 
-process.env.CHAT_JOB_MODE = 'script'
-
-process.env.CHAT_SIDECAR_DATA_DIR ??= process.cwd()
-
 describe('job stream', () => {
   test('streams live output then a terminal end event', async () => {
     const { jobId } = await start('echo stream-hello')

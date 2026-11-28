@@ -1,11 +1,11 @@
 import { CheckpointManager } from '@cv/sidecar/checkpoints/manager'
 import { CheckpointStorage } from '@cv/sidecar/checkpoints/storage'
-import { mkdir, mkdtemp } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 export async function checkpointFixture(cleanup: string[]) {
-  const base = await mkdtemp(path.join(tmpdir(), 'turn-checkpoint-'))
+  const base = await createTempDirectory('turn-checkpoint-')
   cleanup.push(base)
   const root = path.join(base, 'project')
   await mkdir(root)

@@ -10,7 +10,6 @@ import {
   firstSymlink,
   inspectPath,
   isOutside,
-  pathCandidate,
   resolvePathGrants,
 } from './access'
 import { expandFileLoopGlob } from './file-loop-glob'
@@ -143,7 +142,9 @@ async function expandCandidate(
 
   const matches = fileLoop
     ? await expandFileLoopGlob(root, candidate)
-    : await glob(pathCandidate(root, candidate), {
+    : await glob(candidate, {
+        cwd: root,
+        absolute: true,
         dot: true,
         onlyFiles: false,
         followSymbolicLinks: false,

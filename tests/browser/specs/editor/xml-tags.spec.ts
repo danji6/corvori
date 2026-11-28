@@ -128,3 +128,26 @@ test('typing beside hidden Markdown delimiters still reaches XML input handling'
     '**<tag>body</tag>**',
   )
 })
+
+test('redo restores the typing position after tag completion and smart newline', async ({
+  page,
+}) => {
+  const editor = page.getByTestId('composer').locator('.ProseMirror')
+  const saved = page.getByLabel('Saved markdown')
+  await setContent(editor, paragraph('before <div'), 'before <div'.length)
+  await page.keyboard.type('>')
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(saved).toHaveText('before <div')
+  await page.keyboard.press('ControlOrMeta+Shift+z')
+  await page.keyboard.type('body')
+  await expect(saved).toHaveText('before <div>body</div>')
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(saved).toHaveText('before <div></div>')
+
+  await page.keyboard.press('Shift+Enter')
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(saved).toHaveText('before <div></div>')
+  await page.keyboard.press('ControlOrMeta+Shift+z')
+  await page.keyboard.type('body')
+  await expect(saved).toHaveText('before <div>\n  body\n</div>')
+})

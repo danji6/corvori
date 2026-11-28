@@ -9,21 +9,13 @@ import {
 } from '@cv/sidecar/mcp/workspace/workspace'
 import { resolveShellDirectory } from '@cv/sidecar/shell/directory'
 import { afterAll, beforeAll, expect, spyOn, test } from 'bun:test'
-import {
-  link,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { link, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import {
   CheckpointBarrierStorage,
   checkpointDeadline,
 } from '~/tests/helpers/checkpoint-barrier'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 const original = new TextEncoder().encode('original attachment\n')
 const previousData = process.env.CHAT_SIDECAR_DATA_DIR
@@ -33,7 +25,7 @@ let storage: ReturnType<typeof Bun.serve>
 let uploaded: ArrayBuffer | undefined
 
 beforeAll(async () => {
-  root = await mkdtemp(path.join(tmpdir(), 'session-attachments-'))
+  root = await createTempDirectory('session-attachments-')
   process.env.CHAT_SIDECAR_DATA_DIR = path.join(root, 'data')
   app = createApp((_, next) => next())
   storage = Bun.serve({
