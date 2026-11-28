@@ -29,12 +29,18 @@ try {
     Set-Content -LiteralPath (Join-Path $shared.FullName 'input.txt') 'workspace-fixture'
     # The container sees a disposable projected directory. The real repository is never mounted.
     $mount = "type=bind,source=$($shared.FullName),target=C:\work"
-    $command = "if exist `"$outside`" exit /b 21 & type C:\work\input.txt && echo result>C:\work\written.txt"
-    & $docker.Source run --rm --isolation=hyperv --network none --mount $mount $image cmd.exe /d /s /c $command
+    @(
+        '@echo off'
+        "if exist `"$outside`" exit /b 21"
+        'type C:\work\input.txt || exit /b 22'
+        'cmd.exe /d /c copy /y C:\work\input.txt C:\work\written.txt'
+        'exit /b %ERRORLEVEL%'
+    ) | Set-Content -LiteralPath (Join-Path $shared.FullName 'verify.cmd') -Encoding ascii
+    & $docker.Source run --rm --isolation=hyperv --network none --mount $mount $image cmd.exe /d /c C:\work\verify.cmd
     if ($LASTEXITCODE -ne 0) {
         throw "Hyper-V workspace command returned $LASTEXITCODE. See the engine error above."
     }
-    if ((Get-Content (Join-Path $shared.FullName 'written.txt') -Raw).Trim() -ne 'result') {
+    if ((Get-Content (Join-Path $shared.FullName 'written.txt') -Raw).Trim() -ne 'workspace-fixture') {
         throw 'The sandboxed write was not visible in the shared directory.'
     }
     Add-Content $env:GITHUB_STEP_SUMMARY 'Hyper-V workspace fixture passed on x64 with networking disabled.'
