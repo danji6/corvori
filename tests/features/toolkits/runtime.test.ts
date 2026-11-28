@@ -15,19 +15,19 @@ import {
 } from '@cv/sidecar/toolkits/manifest'
 import { expect, test } from 'bun:test'
 import { Hono } from 'hono'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mcpBackendFixture } from '~/tests/helpers/mcp-backend'
 import { mcpText } from '~/tests/helpers/mcp-result'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 test('linked toolkit uses 250 tools without per-call approval and rechecks live access', async () => {
   const f = await mcpBackendFixture(
     new URL('../../fixtures/mcp/catalog.mjs', import.meta.url),
   )
   const original = globalThis.fetch
-  const root = await mkdtemp(path.join(tmpdir(), 'cv-linked-runtime-'))
+  const root = await createTempDirectory('cv-linked-runtime-')
   const app = new Hono()
   app.onError((cause, c) => c.json({ error: cause.message }, 500))
   app.route(

@@ -4,11 +4,11 @@ import { dispatchLanguageModel } from '@cv/convex/model/tool/dispatchTransport'
 import { generateText } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { captureRequest } from '~/tests/helpers/provider-request'
 import { skillRequests } from '~/tests/helpers/skill-requests'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 async function writeSkill(
   root: string,
@@ -24,7 +24,7 @@ async function writeSkill(
 }
 
 test('enabling Skills in an existing chat makes assigned instructions readable through the dispatcher', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'assigned-skill-'))
+  const root = await createTempDirectory('assigned-skill-')
   const fixture = skillRequests(root)
   const previousData = process.env.CHAT_SIDECAR_DATA_DIR
   process.env.CHAT_SIDECAR_DATA_DIR = path.join(root, 'data')
@@ -131,7 +131,7 @@ test('enabling Skills in an existing chat makes assigned instructions readable t
 })
 
 test('project edits and discovery toggles append context without rewriting the provider prefix', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'skill-prefix-'))
+  const root = await createTempDirectory('skill-prefix-')
   const fixture = skillRequests(root)
   try {
     await writeSkill(root, 'Review code')
@@ -203,7 +203,7 @@ test('project edits and discovery toggles append context without rewriting the p
 })
 
 test('compaction and agent changes reannounce skill context, and stale generations cannot persist notes', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'skill-prefix-'))
+  const root = await createTempDirectory('skill-prefix-')
   const fixture = skillRequests(root)
   try {
     await writeSkill(root, 'Review code')
@@ -230,7 +230,7 @@ test('compaction and agent changes reannounce skill context, and stale generatio
 })
 
 test('skill notes do not interrupt tool execution, and listing rechecks live discovery and permissions', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'skill-prefix-'))
+  const root = await createTempDirectory('skill-prefix-')
   const fixture = skillRequests(root)
   try {
     await writeSkill(root, 'Review code')
@@ -265,7 +265,7 @@ test('skill notes do not interrupt tool execution, and listing rechecks live dis
 })
 
 test('OpenAI and Anthropic wire requests retain the existing prefix after a skill update', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'skill-prefix-'))
+  const root = await createTempDirectory('skill-prefix-')
   const fixture = skillRequests(root)
   try {
     await writeSkill(root, 'Review code')
@@ -289,8 +289,8 @@ test('OpenAI and Anthropic wire requests retain the existing prefix after a skil
 })
 
 test('folder renames, source changes, and personal-folder changes preserve the full provider prefix', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'workspace-prefix-'))
-  const other = await mkdtemp(path.join(tmpdir(), 'workspace-prefix-'))
+  const root = await createTempDirectory('workspace-prefix-')
+  const other = await createTempDirectory('workspace-prefix-')
   const fixture = skillRequests(root)
   try {
     await writeSkill(root, 'Review original project')
@@ -380,7 +380,7 @@ test('folder renames, source changes, and personal-folder changes preserve the f
 })
 
 test('tools captured with personal-folder guidance retain it after the home disappears', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'workspace-prefix-'))
+  const root = await createTempDirectory('workspace-prefix-')
   const fixture = skillRequests(root)
   try {
     fixture.agent.home = { path: '/fixture-personal-home', revision: 1 }
@@ -405,7 +405,7 @@ test('tools captured with personal-folder guidance retain it after the home disa
 })
 
 test('agent presentation changes do not reformat previously introduced history', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'history-prefix-'))
+  const root = await createTempDirectory('history-prefix-')
   const fixture = skillRequests(root)
   try {
     const messageId = await fixture.db.insert('messages', {

@@ -1,11 +1,11 @@
 import { checkPaths } from '@cv/sidecar/mcp/workspace/check-paths'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 /** Exercise the real MCP client and path resolver without touching a running sidecar. */
 export async function startPathSidecar() {
-  const root = await mkdtemp(path.join(tmpdir(), 'approval-sidecar-'))
+  const root = await createTempDirectory('approval-sidecar-')
   await mkdir(path.join(root, 'src'))
   await mkdir(path.join(root, '.git'))
   await writeFile(path.join(root, 'src', 'file.txt'), 'fixture')

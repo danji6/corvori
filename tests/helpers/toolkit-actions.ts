@@ -6,15 +6,14 @@ import { toolkitRoutes } from '@cv/sidecar/toolkits/routes'
 import { expect } from 'bun:test'
 import { getFunctionName } from 'convex/server'
 import { Hono } from 'hono'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
+import { rm } from 'node:fs/promises'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 import { skillsDatabase } from './skills-db'
 
 /** Exercises public toolkit actions through the sidecar routes and real model mutations. */
 export async function toolkitActionsFixture() {
-  const root = await mkdtemp(path.join(tmpdir(), 'cv-toolkit-actions-'))
+  const root = await createTempDirectory('cv-toolkit-actions-')
   const original = globalThis.fetch
   const previousSecret = process.env.SIDECAR_SECRET
   process.env.SIDECAR_SECRET = 'toolkit-fixture'

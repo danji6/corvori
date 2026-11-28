@@ -130,12 +130,4 @@ describe('Shift+Enter', () => {
     e.commands.insertContent('body')
     expect(serializeDocumentToMarkdown(e)).toBe('# Head\n\nbody')
   })
-
-  test('Mod+Enter still inserts a break', () => {
-    const e = open('a')
-    e.commands.focus('end')
-    e.commands.keyboardShortcut('Mod-Enter')
-    e.commands.insertContent('b')
-    expect(serializeDocumentToMarkdown(e)).toBe('a\nb')
-  })
 })

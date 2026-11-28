@@ -1,16 +1,16 @@
 import { expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { captureRequest } from '~/tests/helpers/provider-request'
 import { skillRequests } from '~/tests/helpers/skill-requests'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 type WireMessage = { role: string; content: unknown }
 
 test.each([false, true])(
   'reservation and preparation announce the workspace once (personal folder: %s)',
   async (personalFolder) => {
-    const root = await mkdtemp(path.join(tmpdir(), 'context-notes-'))
+    const root = await createTempDirectory('context-notes-')
     const fixture = skillRequests(root)
     try {
       if (personalFolder) {

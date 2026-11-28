@@ -5,9 +5,9 @@ import { createShellTool } from '@cv/convex/model/tool/shellTools'
 import type { ShellToolOutput } from '@cv/core/types/tools'
 import { ensureSessionDirectory } from '@cv/sidecar/session-files/storage'
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 let base: string
 let sessionRoot: string
@@ -26,7 +26,7 @@ function restoreEnvironment(previous: Record<string, string | undefined>) {
 }
 
 async function createFixture() {
-  base = await mkdtemp(path.join(tmpdir(), 'shell-session-dir-'))
+  base = await createTempDirectory('shell-session-dir-')
   const project = path.join(base, 'project')
   await mkdir(path.join(project, 'src'), { recursive: true })
   await writeFile(path.join(project, 'Nuke Sim.html'), 'fixture\n')

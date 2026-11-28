@@ -16,10 +16,6 @@ import {
   waitForExit,
 } from '~/tests/helpers/shell-registry'
 
-process.env.CHAT_JOB_MODE = 'script'
-
-process.env.CHAT_SIDECAR_DATA_DIR ??= process.cwd()
-
 describe('job registry', () => {
   test('blocks keyboard writes to a running job when interactivity is disabled', async () => {
     const { jobId } = await startReady()
@@ -41,7 +37,7 @@ describe('job registry', () => {
     expect(result.status).toBe('killed')
   })
 
-  test.each([undefined, false])(
+  test.skipIf(process.platform !== 'linux').each([undefined, false])(
     'rejects terminal input when allowed is %s',
     async (allowInteractiveShells) => {
       const { jobId } = await start('read line; echo "got:$line"', {
@@ -55,12 +51,15 @@ describe('job registry', () => {
     },
   )
 
-  test('rejects interactive background jobs without a watcher', async () => {
-    const { jobId } = await start('read line', { background: true })
-    const result = await waitForExit(jobId)
-    expect(result.status).toBe('killed')
-    expect(result.output).toContain('Interactive shells are disabled')
-  })
+  test.skipIf(process.platform !== 'linux')(
+    'rejects interactive background jobs without a watcher',
+    async () => {
+      const { jobId } = await start('read line', { background: true })
+      const result = await waitForExit(jobId)
+      expect(result.status).toBe('killed')
+      expect(result.output).toContain('Interactive shells are disabled')
+    },
+  )
 
   test('rejects alternate-screen programs by default', async () => {
     const { jobId } = await start("printf '\\033[?1049h'; sleep 30")
@@ -147,9 +146,7 @@ describe('job registry', () => {
 
   /**
    * A job that pipes into a pager only dies if the whole group is signalled:
-   * the leader defers the signal until its child exits. Every spawn mode goes
-   * through the same `killProcessTree`; node-pty cannot run under bun, so this
-   * covers it in script mode.
+   * the leader defers the signal until its child exits.
    */
   test('killing a job takes its children down with it', async () => {
     const { jobId } = await start('sleep 30 & echo "child:$!"; wait')
@@ -167,39 +164,45 @@ describe('job registry', () => {
     await waitFor(() => !isAlive(child))
   })
 
-  test('reports waiting while a job blocks reading stdin', async () => {
-    const { jobId } = await start('read line; echo "got:$line"', {
-      allowInteractiveShells: true,
-    })
-    await waitFor(() => pollShellJob(jobId, session.sessionId, 0).waiting)
-
-    writeStdin(jobId, session.sessionId, 'ping\n')
-    const result = await waitForExit(jobId)
-    expect(result.waiting).toBe(false)
-    expect(result.status).toBe('done')
-    expect(result.exitCode).toBe(0)
-    expect(result.output).toContain('got:ping')
-  })
-
-  test('detects a no-echo prompt reading directly from /dev/tty', async () => {
-    const { jobId } = await start(
-      'bash -c \'read -r -s -u 3 -p "Test input: " value 3</dev/tty; ' +
-        'printf "\\nReceived %d characters\\n" "${#value}"\'',
-      { allowInteractiveShells: true },
-    )
-
-    try {
+  test.skipIf(process.platform !== 'linux')(
+    'reports waiting while a job blocks reading stdin',
+    async () => {
+      const { jobId } = await start('read line; echo "got:$line"', {
+        allowInteractiveShells: true,
+      })
       await waitFor(() => pollShellJob(jobId, session.sessionId, 0).waiting)
-      writeStdin(jobId, session.sessionId, 'dummy\r')
 
+      writeStdin(jobId, session.sessionId, 'ping\n')
       const result = await waitForExit(jobId)
+      expect(result.waiting).toBe(false)
+      expect(result.status).toBe('done')
       expect(result.exitCode).toBe(0)
-      expect(result.output).toContain('Received 5 characters')
-      expect(result.output).not.toContain('dummy')
-    } finally {
-      killShellJob(jobId, session.sessionId)
-    }
-  })
+      expect(result.output).toContain('got:ping')
+    },
+  )
+
+  test.skipIf(process.platform !== 'linux')(
+    'detects a no-echo prompt reading directly from /dev/tty',
+    async () => {
+      const { jobId } = await start(
+        'bash -c \'read -r -s -u 3 -p "Test input: " value 3</dev/tty; ' +
+          'printf "\\nReceived %d characters\\n" "${#value}"\'',
+        { allowInteractiveShells: true },
+      )
+
+      try {
+        await waitFor(() => pollShellJob(jobId, session.sessionId, 0).waiting)
+        writeStdin(jobId, session.sessionId, 'dummy\r')
+
+        const result = await waitForExit(jobId)
+        expect(result.exitCode).toBe(0)
+        expect(result.output).toContain('Received 5 characters')
+        expect(result.output).not.toContain('dummy')
+      } finally {
+        killShellJob(jobId, session.sessionId)
+      }
+    },
+  )
 
   test('reports waiting when a job enters the alternate screen', async () => {
     const { jobId } = await start("printf '\\033[?1049h'; sleep 30", {
@@ -212,17 +215,20 @@ describe('job registry', () => {
     expect(result.waiting).toBe(false)
   })
 
-  test("ignores a nested job's private terminal wait", async () => {
-    const { jobId } = await start(
-      "script -qefc 'read line' /dev/null >/dev/null 2>&1 & sleep 30",
-    )
-    await Bun.sleep(1_500)
+  test.skipIf(process.platform !== 'linux')(
+    "ignores a nested job's private terminal wait",
+    async () => {
+      const { jobId } = await start(
+        "script -qefc 'read line' /dev/null >/dev/null 2>&1 & sleep 30",
+      )
+      await Bun.sleep(1_500)
 
-    expect(pollShellJob(jobId, session.sessionId, 0).waiting).toBe(false)
+      expect(pollShellJob(jobId, session.sessionId, 0).waiting).toBe(false)
 
-    killShellJob(jobId, session.sessionId)
-    await waitForExit(jobId)
-  })
+      killShellJob(jobId, session.sessionId)
+      await waitForExit(jobId)
+    },
+  )
 
   test('kill_session only kills foreground jobs', async () => {
     const fg = await startReady()

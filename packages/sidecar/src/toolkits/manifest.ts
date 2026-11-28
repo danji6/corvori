@@ -13,9 +13,9 @@ import { expandHome } from '../mcp/workspace/paths'
 
 /** Reads the exact root manifest without running toolkit code or walking directories. */
 export async function inspectToolkit(source: string): Promise<ToolkitSnapshot> {
-  const root = await realpath(path.resolve(expandHome(source)))
-
-  await assertPlainPath(path.resolve(expandHome(source)))
+  const requested = await toolkitSourcePath(path.resolve(expandHome(source)))
+  const root = await realpath(requested)
+  await assertPlainPath(requested)
   if (!(await stat(root)).isDirectory())
     throw new Error('Toolkit root must be a directory')
 
@@ -58,6 +58,19 @@ export async function inspectToolkit(source: string): Promise<ToolkitSnapshot> {
       .update(raw)
       .digest('hex'),
   }
+}
+
+/** Accept macOS system aliases while leaving the remaining path for symlink checks. */
+async function toolkitSourcePath(requested: string): Promise<string> {
+  if (process.platform !== 'darwin') return requested
+
+  for (const alias of ['/var', '/tmp']) {
+    if (requested !== alias && !requested.startsWith(alias + path.sep)) continue
+    const canonical = '/private' + alias
+    if ((await realpath(alias)) === canonical)
+      return canonical + requested.slice(alias.length)
+  }
+  return requested
 }
 
 /** Resolves explicit relative paths and the default cwd from the toolkit root. */

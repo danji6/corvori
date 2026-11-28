@@ -1,9 +1,8 @@
 import * as checkpoints from '@cv/sidecar/checkpoints/manager'
 import { CheckpointStorage } from '@cv/sidecar/checkpoints/storage'
 import { afterAll, beforeAll, spyOn } from 'bun:test'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
+import { rm } from 'node:fs/promises'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 /** Installs a real checkpoint manager with storage scoped to the test file. */
 export function setupCheckpoints(): void {
@@ -11,7 +10,7 @@ export function setupCheckpoints(): void {
   let restore: (() => void) | undefined
 
   beforeAll(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'test-checkpoints-'))
+    root = await createTempDirectory('test-checkpoints-')
     const manager = new checkpoints.CheckpointManager(
       new CheckpointStorage(root),
     )

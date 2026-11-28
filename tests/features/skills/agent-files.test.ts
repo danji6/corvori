@@ -16,7 +16,6 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import {
   chmod,
   mkdir,
-  mkdtemp,
   open,
   readFile,
   rename,
@@ -25,8 +24,8 @@ import {
   symlink,
   writeFile,
 } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 let root: string
 let source: string
@@ -37,7 +36,7 @@ const metadata =
   '---\nname: code-review\ndescription: Review code changes.\n---\nFollow the checklist.\n'
 
 beforeAll(async () => {
-  root = await mkdtemp(path.join(tmpdir(), 'agent-files-'))
+  root = await createTempDirectory('agent-files-')
   process.env.CHAT_SIDECAR_DATA_DIR = path.join(root, 'data')
   source = path.join(root, 'source')
   await mkdir(path.join(source, 'scripts'), { recursive: true })

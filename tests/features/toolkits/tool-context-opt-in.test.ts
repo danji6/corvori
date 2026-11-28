@@ -5,13 +5,13 @@ import { publish } from '@cv/convex/model/toolkits/publication'
 import { mcpResult } from '@cv/core/types/mcp-result'
 import { inspectToolkit } from '@cv/sidecar/toolkits/manifest'
 import { expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { skillRequests } from '~/tests/helpers/skill-requests'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 async function rootWithSkill() {
-  const root = await mkdtemp(path.join(tmpdir(), 'tool-context-opt-in-'))
+  const root = await createTempDirectory('tool-context-opt-in-')
   await mkdir(path.join(root, '.agents/skills/review'), { recursive: true })
   await writeFile(
     path.join(root, '.agents/skills/review/SKILL.md'),
@@ -136,7 +136,7 @@ test('project skills can be read with Skills alone while their source is enabled
 })
 
 test('an empty skill directory exposes no skill tools or automatic catalog', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'empty-skills-'))
+  const root = await createTempDirectory('empty-skills-')
   const f = skillRequests(root)
   try {
     f.rows('sessionCache').splice(0)

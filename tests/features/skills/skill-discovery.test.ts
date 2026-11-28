@@ -1,15 +1,15 @@
 import { importPage } from '@cv/sidecar/agent-files/import-discovery'
 import { runFileOperation } from '@cv/sidecar/agent-files/operations'
 import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { skillZip } from '~/tests/helpers/skill-zip'
+import { createTempDirectory } from '~/tests/helpers/temp-directory'
 
 let root: string
 const previousData = process.env.CHAT_SIDECAR_DATA_DIR
 beforeAll(async () => {
-  root = await mkdtemp(path.join(tmpdir(), 'skill-discovery-'))
+  root = await createTempDirectory('skill-discovery-')
   process.env.CHAT_SIDECAR_DATA_DIR = path.join(root, 'data')
 })
 afterAll(async () => {
