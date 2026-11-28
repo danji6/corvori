@@ -17,6 +17,13 @@ const dependency = join(workspace, 'node_modules')
 const outside = join(root, 'sibling')
 const ignored = join(workspace, 'ignored')
 const server = createServer((_request, response) => response.end('fixture'))
+function ancestors(path) {
+  const directories = []
+  for (let parent = dirname(path); ; parent = dirname(parent)) {
+    directories.push(parent)
+    if (parent === dirname(parent)) return directories
+  }
+}
 try {
   await mkdir(dependency, { recursive: true })
   await mkdir(outside)
@@ -34,7 +41,7 @@ try {
       "function accessible(fn) { try { fn(); return true } catch (e) { if (!['EACCES','EPERM','ENOENT'].includes(e.code)) throw e; return false } }",
       'const read = (p) => accessible(() => fs.readFileSync(p))',
       "const write = (p) => accessible(() => fs.writeFileSync(p, 'fixture'))",
-      "const results = { ordinary: write('result'), dependencyRead: read('node_modules/sample'), dependencyWrite: write('node_modules/sample'), ignored: read('ignored'), outside: read(outside), linked: read('linked/sample') }",
+      "const results = { ordinary: write('result'), dependencyRead: read('node_modules/sample'), dependencyWrite: write('node_modules/sample'), ignored: read('ignored'), outside: read(outside), listSibling: accessible(() => fs.readdirSync(require('node:path').dirname(outside))), linked: read('linked/sample') }",
       "fetch('http://127.0.0.1:' + port, {signal: AbortSignal.timeout(2500)}).then(r => r.text()).catch(() => '').then(body => console.log(JSON.stringify({...results, online: body === 'fixture'})))",
     ].join('\n'),
   )
@@ -47,6 +54,16 @@ try {
         String(server.address().port),
       ]),
       workingDirectory: workspace,
+      containment: {
+        type: 'processcontainer',
+        config: {
+          filesystem: {
+            enumeratePaths: [
+              ...new Set([...ancestors(workspace), ...ancestors(runtime)]),
+            ],
+          },
+        },
+      },
       filesystem: {
         readonlyPaths: [runtime, dependency],
         readwritePaths: [workspace],
@@ -86,6 +103,7 @@ try {
         dependencyWrite: false,
         ignored: false,
         outside: false,
+        listSibling: false,
         linked: false,
         online,
       })
