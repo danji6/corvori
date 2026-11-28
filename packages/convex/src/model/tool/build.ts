@@ -149,6 +149,16 @@ export async function getEnabledTools(
             resources?.settings?.allowInteractiveShells ?? false,
           approvals,
           taskApprovals,
+          manuallyApproved:
+            ctx && execution
+              ? async (call) => {
+                  const current = await ctx.runQuery(
+                    internal.streams._getExecutionApprovals,
+                    { ...execution, call },
+                  )
+                  return current.manuallyApproved === true
+                }
+              : undefined,
           // Plan mode can be entered or approved mid-turn
           isPlanMode: ctx ? () => isPlanMode(ctx, sessionId) : undefined,
           ...jobWatch(session, options),

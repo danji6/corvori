@@ -4,6 +4,7 @@ import {
   SHELL_TOOL_NAME,
 } from '@cv/core/const'
 import { hasGitHubQueryGrant } from '@cv/core/shell/direct-command'
+import { stableStringify } from '@cv/core/stable-json'
 import { TOOL_DESCRIPTIONS, shellToolDescription } from '@cv/core/types'
 import type { ShellToolOutput, ToolApprovals } from '@cv/core/types/tools'
 import { parseScopedPath } from '@cv/core/workspace/scoped-path'
@@ -48,7 +49,7 @@ export async function createShellTool(context: WorkspaceToolContext) {
     capability?.version === 2 && capability.automaticShellExecution === true
   const preview =
     automatic || (capability?.version === 1 && capability.retryPreview)
-  const fallbackRequests = new Set<string>()
+  const fallbackRequests = new Map<string, string>()
 
   async function needsLaunchApproval(
     input: ShellJobInput,
@@ -74,7 +75,7 @@ export async function createShellTool(context: WorkspaceToolContext) {
       },
     ).catch(() => undefined)
     if (!probe?.ready) {
-      fallbackRequests.add(toolCallId)
+      fallbackRequests.set(toolCallId, stableStringify(input))
       return true
     }
     if (!input.cwd) return false
@@ -90,10 +91,25 @@ export async function createShellTool(context: WorkspaceToolContext) {
     approvals: ToolApprovals | undefined,
   ) {
     const planMode = await context.isPlanMode?.()
+    const requestedFallback = fallbackRequests.get(toolCallId)
+    fallbackRequests.delete(toolCallId)
+    if (requestedFallback !== undefined) {
+      const approved =
+        requestedFallback === stableStringify(input) &&
+        (await context.manuallyApproved?.({
+          id: toolCallId,
+          name: SHELL_TOOL_NAME,
+          input,
+        }))
+      if (!approved)
+        throw new ToolError(
+          'Running the command without the sandbox requires a fresh approval.',
+        )
+    }
     const enforced =
       automatic &&
       supportsSandboxShell(context.shell) &&
-      !fallbackRequests.has(toolCallId)
+      requestedFallback === undefined
     const sandbox =
       !isUnrestrictedAccess(approvals) &&
       (enforced || (preview && !automatic && !planMode))
@@ -105,7 +121,6 @@ export async function createShellTool(context: WorkspaceToolContext) {
       !parseScopedPath(input.cwd).explicit
         ? [input.cwd]
         : []
-    fallbackRequests.delete(toolCallId)
     const job = {
       ...workspaceArgs(context),
       ...jobRef(context, toolCallId),

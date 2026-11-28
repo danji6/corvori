@@ -250,10 +250,27 @@ describe.skipIf(
     try {
       await expect(execute(input, 'capability')).rejects.toThrow()
       expect(await approveRequest(input, 'fallback')).toBe('user-approval')
+      await expect(execute(input, 'fallback')).rejects.toThrow('fresh approval')
       expect(calls).toEqual(['/shell/sandbox/start', '/shell/sandbox/check'])
     } finally {
       process.env.SIDECAR_URL = sidecar.url
       older.stop(true)
+    }
+  })
+
+  test('a revoked scheduled-task grant stops the queued GitHub invocation', async () => {
+    const before = requests.length
+    context.taskApprovals = async (call) =>
+      call
+        ? { approvals: { shell: ['gh'] }, taskApprovalRevision: 1 }
+        : { approvals: {}, taskApprovalRevision: 2 }
+    try {
+      await expect(
+        execute({ command: 'gh pr list --repo danji6/corvori' }, 'queued'),
+      ).rejects.toThrow('still needs approval')
+      expect(requests).toHaveLength(before)
+    } finally {
+      delete context.taskApprovals
     }
   })
 

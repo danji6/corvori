@@ -23,6 +23,7 @@ export type WorkspaceToolContext = {
   allowInteractiveShells?: boolean
   /** Tool approvals, resolved on every call since they update often. */
   approvals?: () => Promise<ToolApprovals | undefined>
+  manuallyApproved?: (call: FilesystemCall) => Promise<boolean>
   taskApprovals?: (call?: FilesystemCall) => Promise<ExecutionApprovals>
   isPlanMode?: () => Promise<boolean>
   /** Watches a background job so it can report back. */
