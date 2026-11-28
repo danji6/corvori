@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { realpath } from 'node:fs/promises'
-import { dirname, isAbsolute, join } from 'node:path'
+import { delimiter, dirname, isAbsolute, join } from 'node:path'
 import { promisify } from 'node:util'
 
 const execute = promisify(execFile)
@@ -11,6 +11,18 @@ async function findSystemTools() {
     git: '/usr/bin/git',
     path: '/usr/bin:/bin',
     reads: [] as string[],
+  }
+  if (process.platform === 'win32') {
+    const programs = process.env.ProgramFiles
+    const windows = process.env.SystemRoot
+    if (!programs || !windows) throw new Error('Missing Windows system paths')
+    const gitHome = await realpath(join(programs, 'Git'))
+    const git = await realpath(join(gitHome, 'cmd', 'git.exe'))
+    return {
+      git,
+      path: [dirname(git), join(windows, 'System32')].join(delimiter),
+      reads: [gitHome],
+    }
   }
   if (process.platform !== 'darwin') return fallback
   const selected = await execute('/usr/bin/xcode-select', ['-p'], {

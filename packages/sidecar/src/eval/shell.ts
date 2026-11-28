@@ -96,6 +96,7 @@ async function launch(
               : 'exec ' + args.map(shellWord).join(' '),
         },
         roots,
+        typeof command === 'string' ? undefined : args,
       )
   const start = () =>
     spawnShellPipes(

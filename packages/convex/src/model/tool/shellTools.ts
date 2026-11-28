@@ -62,7 +62,7 @@ export async function createShellTool(context: WorkspaceToolContext) {
     if (isUnrestrictedAccess(approvals)) return false
     if (
       !automatic ||
-      !supportsSandboxShell(current.shell) ||
+      !supportsSandboxShell(current.shell, capability?.platform) ||
       (await current.isPlanMode?.())
     )
       return shellNeedsApproval(input.command, current, input.cwd)
@@ -108,7 +108,7 @@ export async function createShellTool(context: WorkspaceToolContext) {
     }
     const enforced =
       automatic &&
-      supportsSandboxShell(context.shell) &&
+      supportsSandboxShell(context.shell, capability?.platform) &&
       requestedFallback === undefined
     const sandbox =
       !isUnrestrictedAccess(approvals) &&
@@ -211,6 +211,7 @@ async function shellCapability() {
   const info = await getSidecar<{
     sandbox?: {
       version: number
+      platform?: string
       retryPreview?: boolean
       automaticShellExecution?: boolean
     }
@@ -218,7 +219,11 @@ async function shellCapability() {
   return info?.sandbox
 }
 
-function supportsSandboxShell(shell?: string) {
+function supportsSandboxShell(shell?: string, platform?: string) {
+  if (platform === 'win32')
+    return (
+      !shell || /^(?:.*[\\/])?(?:cmd|powershell|pwsh)(?:\.exe)?$/i.test(shell)
+    )
   return !shell || /^(?:\/bin\/)?(?:sh|bash|zsh)$/.test(shell)
 }
 

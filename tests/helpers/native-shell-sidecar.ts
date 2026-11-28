@@ -6,7 +6,10 @@ export async function nativeShellSidecar(
   mode: 'pipe' | 'pty',
   cli?: { CORVORI_GH_BINARY: string; GH_TOKEN: string },
 ) {
-  const entry = await buildSidecar()
+  // Keep the qualification build below the installation so Node resolves the pinned native packages.
+  const windowsBuild =
+    process.platform === 'win32' ? '.data/windows-qualification' : undefined
+  const entry = await buildSidecar(windowsBuild)
   const reservation = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,
@@ -18,6 +21,15 @@ export async function nativeShellSidecar(
   const child = Bun.spawn([resolveNodeBinary(), entry], {
     env: {
       ...cli,
+      ...(process.platform === 'win32' && {
+        ProgramFiles: process.env.ProgramFiles,
+        SystemRoot: process.env.SystemRoot,
+        LOCALAPPDATA: process.env.LOCALAPPDATA,
+        USERPROFILE: process.env.USERPROFILE,
+        TEMP: process.env.TEMP,
+        TMP: process.env.TMP,
+        CHAT_DATA_DIR: windowsBuild,
+      }),
       PATH: process.env.PATH,
       TMPDIR: process.env.TMPDIR,
       SIDECAR_SECRET: 'corvori-test-sidecar-credential',

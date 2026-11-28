@@ -2,7 +2,7 @@ import { directGitHubQuery } from '@cv/core/shell/direct-command'
 import { execFile } from 'node:child_process'
 import { realpath } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { isAbsolute, resolve } from 'node:path'
+import { isAbsolute, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 
 import { isOutside } from '../../mcp/workspace/access'
@@ -16,7 +16,15 @@ export async function githubInvocation(command: string, roots: string[]) {
   const configured = process.env.CORVORI_GH_BINARY
   const candidates = configured
     ? [configured]
-    : ['/usr/bin/gh', '/opt/homebrew/bin/gh', '/usr/local/bin/gh']
+    : process.platform === 'win32'
+      ? [
+          join(
+            process.env.ProgramFiles ?? 'C:\\Program Files',
+            'GitHub CLI',
+            'gh.exe',
+          ),
+        ]
+      : ['/usr/bin/gh', '/opt/homebrew/bin/gh', '/usr/local/bin/gh']
   for (const path of candidates) {
     if (!isAbsolute(path))
       throw new Error('Configure an absolute GitHub CLI path')
@@ -39,6 +47,9 @@ export async function githubEnvironment(
   if (!token) {
     const config = resolve(
       process.env.GH_CONFIG_DIR ||
+        (process.platform === 'win32' &&
+          process.env.APPDATA &&
+          join(process.env.APPDATA, 'GitHub CLI')) ||
         resolve(
           process.env.XDG_CONFIG_HOME || resolve(homedir(), '.config'),
           'gh',
@@ -53,7 +64,12 @@ export async function githubEnvironment(
           cwd: scratch,
           env: {
             HOME: homedir(),
-            PATH: '/usr/bin:/bin',
+            ...(process.platform === 'win32'
+              ? {
+                  SystemRoot: process.env.SystemRoot,
+                  LOCALAPPDATA: process.env.LOCALAPPDATA,
+                }
+              : { PATH: '/usr/bin:/bin' }),
             GH_CONFIG_DIR: trusted,
             GH_PROMPT_DISABLED: '1',
           },

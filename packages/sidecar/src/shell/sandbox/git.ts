@@ -1,7 +1,7 @@
 import { directShellWords } from '@cv/core/shell/direct-command'
 import { execFile } from 'node:child_process'
 import { copyFile, lstat, mkdir, symlink } from 'node:fs/promises'
-import { isAbsolute, join } from 'node:path'
+import { dirname, isAbsolute, join, normalize } from 'node:path'
 import { promisify } from 'node:util'
 
 import { isOutside } from '../../mcp/workspace/access'
@@ -28,6 +28,10 @@ async function linkMetadata(source: string, destination: string, name: string) {
     if (!entry.isFile() || entry.size > 4096)
       throw new Error('Invalid Git HEAD')
     await copyFile(file, target)
+  } else if (process.platform === 'win32') {
+    // Junctions and ordinary copies work without granting the sidecar symlink privileges.
+    if (entry.isDirectory()) await symlink(file, target, 'junction')
+    else if (entry.isFile()) await copyFile(file, target)
   } else await symlink(file, target)
 }
 
@@ -56,14 +60,17 @@ export async function prepareGitQuery(
     {
       cwd,
       env: {
-        PATH: '/usr/bin:/bin',
+        PATH: dirname(git),
+        ...(process.platform === 'win32' && {
+          SystemRoot: process.env.SystemRoot,
+        }),
         GIT_CONFIG_NOSYSTEM: '1',
-        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
       },
     },
   ).catch(() => undefined)
   if (!info) return
-  const paths = info.stdout.trimEnd().split('\n')
+  const paths = info.stdout.trimEnd().split(/\r?\n/).map(normalize)
   if (paths.length !== 3 || paths.some((path) => !isAbsolute(path))) return
   const [worktree, metadata, common] = paths
   if (!roots.some((root) => !isOutside(root, worktree))) return
@@ -89,6 +96,7 @@ export async function prepareGitQuery(
     ...args,
   ]
   return {
+    argv,
     command: 'exec ' + argv.map(shellWord).join(' '),
     view,
     metadata: [metadata, common],

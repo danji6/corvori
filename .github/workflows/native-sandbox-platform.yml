@@ -74,12 +74,12 @@ jobs:
         if: runner.os == 'Windows' && steps.mxc.outputs.setup != 'true'
         run: node windows-workspace.mjs
       - name: Verify the agent-requested retry through the shell tool and sidecar
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' || steps.mxc.outputs.setup != 'true'
         working-directory: .
         env:
           CORVORI_NATIVE_TEST: '1'
         shell: bash
-        run: NODE_BINARY="$(command -v node)" bun --no-env-file test --path-ignore-patterns '**/browser/**' ./tests/features/shell/sandbox-retry.test.ts
+        run: NODE_BINARY="$(node -p 'process.execPath')" bun --no-env-file test --timeout 30000 --path-ignore-patterns '**/browser/**' ./tests/features/shell/sandbox-retry.test.ts
       - name: Measure native launch overhead
         run: node ../../../../.data/native/benchmark.js
       - name: Verify workspace execution and denial attribution

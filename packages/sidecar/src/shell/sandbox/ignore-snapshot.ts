@@ -3,6 +3,8 @@ import { readdir, realpath } from 'node:fs/promises'
 import { basename, isAbsolute, join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 
+import { systemTools } from './system-tools'
+
 const execute = promisify(execFile)
 const dependencies = new Set(['node_modules', '.venv'])
 
@@ -13,8 +15,9 @@ export async function snapshotGitPaths(directory: string, emptyRepo?: string) {
   const readOnly = new Set<string>()
   let gitArgs: string[] = []
   if (emptyRepo) {
+    const { git } = await systemTools()
     try {
-      await execute('/usr/bin/git', ['rev-parse', '--git-dir'], {
+      await execute(git, ['rev-parse', '--git-dir'], {
         cwd: root,
         env: { ...process.env, LC_ALL: 'C' },
         timeout: 10000,
@@ -43,8 +46,9 @@ async function addIgnoredPaths(
   readOnly: Set<string>,
   gitArgs: string[] = [],
 ) {
+  const { git } = await systemTools()
   const { stdout } = await execute(
-    process.platform === 'darwin' ? '/usr/bin/git' : 'git',
+    git,
     [
       ...gitArgs,
       '-c',
@@ -84,8 +88,9 @@ async function addIgnoredPaths(
 
 /** Hide both the worktree index and the shared repository behind a .git file. */
 async function addLinkedMetadata(directory: string, hidden: Set<string>) {
+  const { git } = await systemTools()
   const { stdout } = await execute(
-    'git',
+    git,
     ['rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir'],
     { cwd: directory, timeout: 10_000 },
   )

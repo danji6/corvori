@@ -8,7 +8,7 @@ import { promisify } from 'node:util'
 
 import { isOutside } from '../../mcp/workspace/access'
 import type { StartShellJobInput } from '../job-protocol'
-import { shellWord } from '../launch'
+import { type PreparedShell, shellWord } from '../launch'
 import { shellInvocation, withBoundSessionDir } from '../system-shell'
 import { prepareGitQuery } from './git'
 import { githubEnvironment, githubInvocation } from './github'
@@ -20,6 +20,7 @@ import {
 } from './preview-platform'
 import { sandboxRoots } from './roots'
 import { systemTools } from './system-tools'
+import { windowsRequest } from './windows-request'
 
 const execute = promisify(execFile)
 
@@ -33,7 +34,8 @@ async function filesystemPolicy(
   git?: Awaited<ReturnType<typeof prepareGitQuery>>,
 ) {
   const emptyRepo = join(dirname(scratch), 'empty.git')
-  await execute('/usr/bin/git', ['init', '--bare', '--quiet', emptyRepo])
+  const { git: executable } = await systemTools()
+  await execute(executable, ['init', '--bare', '--quiet', emptyRepo])
   const directories = await Promise.all(
     roots.map(async (root) =>
       (await stat(root)).isDirectory() ? root : undefined,
@@ -69,7 +71,7 @@ async function filesystemPolicy(
   return {
     readConfig: {
       denyOnly: [],
-      literalDenyOnly: ['/', ...hidden],
+      literalDenyOnly: process.platform === 'win32' ? hidden : ['/', ...hidden],
       literalAllowWithinDeny: [
         ...runtimeReadPaths(runtime),
         ...binaries,
@@ -80,7 +82,11 @@ async function filesystemPolicy(
     },
     writeConfig: {
       allowOnly: [],
-      literalAllowOnly: ['/dev/null', scratch, ...(readOnly ? [] : roots)],
+      literalAllowOnly: [
+        ...(process.platform === 'win32' ? [] : ['/dev/null']),
+        scratch,
+        ...(readOnly ? [] : roots),
+      ],
       denyWithinAllow:
         process.platform === 'darwin'
           ? ['**/.gitignore', '**/.git', '**/node_modules', '**/.venv']
@@ -102,8 +108,14 @@ function runtimeEnvironment(runtime: string, path: string, scratch: string) {
   const systemRoot = process.env.SystemRoot
   if (!systemRoot) throw new Error('Missing Windows system directory')
   return {
-    PATH: [dirname(runtime), join(systemRoot, 'System32')].join(delimiter),
+    PATH: [dirname(runtime), path, join(systemRoot, 'System32')].join(
+      delimiter,
+    ),
     SystemRoot: systemRoot,
+    LOCALAPPDATA: scratch,
+    APPDATA: scratch,
+    ComSpec: join(systemRoot, 'System32/cmd.exe'),
+    PATHEXT: '.COM;.EXE;.BAT;.CMD',
     USERPROFILE: scratch,
     TEMP: scratch,
     TMP: scratch,
@@ -115,7 +127,12 @@ export async function preparePreview(
   input: StartShellJobInput,
   roots: string[],
   access?: ShellRetryAccess,
-) {
+  directArgv?: string[],
+): Promise<{
+  prepared: PreparedShell
+  tag?: string
+  cleanup: () => Promise<void>
+}> {
   const outside = access === 'both'
   if (!outside && !previewAvailable())
     throw new Error('Shell sandbox preview is unavailable')
@@ -185,6 +202,36 @@ export async function preparePreview(
       temporary,
       tools.git,
     )
+    const permissions = await filesystemPolicy(
+      writable,
+      runtime,
+      scratch,
+      !!input.readOnlyWorkspace || !!git,
+      [...tools.reads, ...(github ? [github.file] : [])],
+      grants,
+      git,
+    )
+    if (windows) {
+      const prepared = await windowsRequest({
+        roots: writable,
+        runtime,
+        env,
+        temporary,
+        cwd: input.cwd,
+        shell: input.shell,
+        command: original,
+        argv:
+          git?.argv ?? (github && [github.file, ...github.args]) ?? directArgv,
+        hidden: permissions.readConfig.literalDenyOnly,
+        readonly: [
+          ...permissions.readConfig.literalAllowWithinDeny,
+          ...permissions.writeConfig.literalDenyWithinAllow,
+        ],
+        writable: permissions.writeConfig.literalAllowOnly,
+        online: !!github || access === 'network',
+      })
+      return { prepared, cleanup }
+    }
     const command =
       git?.command ??
       (github
@@ -196,15 +243,7 @@ export async function preparePreview(
       commandId: randomUUID(),
       binShell,
       needsNetworkRestriction: !github && access !== 'network',
-      ...(await filesystemPolicy(
-        writable,
-        runtime,
-        scratch,
-        !!input.readOnlyWorkspace || !!git,
-        [...tools.reads, ...(github ? [github.file] : [])],
-        grants,
-        git,
-      )),
+      ...permissions,
     }
     const prepared = await wrapPreview(policy, temporary, runtime, env)
     const tag =

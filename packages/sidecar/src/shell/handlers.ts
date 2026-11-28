@@ -124,6 +124,7 @@ export const shellInfo: Handler = async (c) => {
         version: 2,
         retryPreview: ready,
         automaticShellExecution: ready,
+        platform: process.platform,
       },
     })
   } catch (err: unknown) {

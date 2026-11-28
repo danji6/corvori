@@ -38,9 +38,14 @@ function prepareMacPtyHelper() {
 }
 
 /** Bundles the sidecar to plain JS so it can run under Node. */
-export async function buildSidecar(): Promise<string> {
+export async function buildSidecar(
+  windowsQualificationDir?: string,
+): Promise<string> {
   prepareMacPtyHelper()
   const result = await Bun.build({
+    define: {
+      CORVORI_WINDOWS_QUALIFICATION: String(!!windowsQualificationDir),
+    },
     entrypoints: [
       SIDECAR_ENTRY,
       resolve(
@@ -52,6 +57,10 @@ export async function buildSidecar(): Promise<string> {
         'packages/sidecar/src/shell/sandbox/linux-preview.ts',
       ),
       resolve(projectRoot, 'packages/sidecar/src/eval/worker.ts'),
+      resolve(
+        projectRoot,
+        'packages/sidecar/src/shell/sandbox/windows-preview.ts',
+      ),
       resolve(projectRoot, 'packages/sidecar/src/mcp/external/stdio-supervisor.ts'), // prettier-ignore
     ],
     naming: '[name].[ext]',
@@ -60,6 +69,7 @@ export async function buildSidecar(): Promise<string> {
       '@anthropic-ai/sandbox-runtime',
       '@anthropic-ai/sandbox-runtime/*',
       '@modelcontextprotocol/sdk',
+      '@microsoft/mxc-sdk/v1',
       '@mozilla/readability',
       'hono',
       'linkedom',
@@ -73,14 +83,16 @@ export async function buildSidecar(): Promise<string> {
       'quickjs-emscripten',
     ],
     format: 'esm',
-    outdir: OUT_DIR,
+    outdir: windowsQualificationDir
+      ? join(windowsQualificationDir, 'build/sidecar')
+      : OUT_DIR,
     sourcemap: 'linked',
     target: 'node',
   })
   if (!result.success) {
     throw new AggregateError(result.logs, 'Sidecar build failed')
   }
-  return sidecarBuildEntry()
+  return sidecarBuildEntry(windowsQualificationDir)
 }
 
 /** The embedded Node downloaded by the runner, or the system one. */

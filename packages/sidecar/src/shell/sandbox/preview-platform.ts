@@ -5,6 +5,9 @@ import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 
 import type { PreparedShell } from '../launch'
+import { windowsWorker } from './windows-request'
+
+declare const CORVORI_WINDOWS_QUALIFICATION: boolean
 
 const macSystemPaths = [
   '/bin',
@@ -49,6 +52,12 @@ export function previewAvailable() {
   if (override === '0' || (process.versions.bun && override !== '1'))
     return false
   if (process.platform === 'darwin') return existsSync('/usr/bin/sandbox-exec')
+  if (process.platform === 'win32')
+    return (
+      typeof CORVORI_WINDOWS_QUALIFICATION !== 'undefined' &&
+      CORVORI_WINDOWS_QUALIFICATION &&
+      existsSync(windowsWorker())
+    )
   return (
     process.platform === 'linux' &&
     Object.values(linuxPaths()).every((path) => existsSync(path))
@@ -56,6 +65,7 @@ export function previewAvailable() {
 }
 
 export function runtimeReadPaths(runtime: string) {
+  if (process.platform === 'win32') return [runtime]
   if (process.platform === 'darwin') return [...macSystemPaths, runtime]
   return [
     '/usr/bin',

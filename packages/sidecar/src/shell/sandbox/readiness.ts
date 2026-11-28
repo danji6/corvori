@@ -17,19 +17,38 @@ async function probe() {
   try {
     await mkdir(cwd)
     await writeFile(join(root, 'private'), 'private')
+    const windows = process.platform === 'win32'
+    if (windows) {
+      await writeFile(
+        join(cwd, 'probe.cjs'),
+        [
+          "const fs = require('node:fs')",
+          "fs.writeFileSync('probe', 'ready')",
+          "try { fs.readFileSync('../private'); process.exitCode = 1 }",
+          "catch (error) { if (!['EPERM', 'EACCES', 'ENOENT'].includes(error.code)) throw error }",
+          "process.stdout.write(fs.readFileSync('probe'))",
+        ].join('\n'),
+      )
+    }
     const job = await preparePreview(
       {
         sessionId: 'probe',
         workspaceId: 'probe',
         cwd,
-        command:
-          'printf ready > probe && ! /bin/cat ../private && /bin/cat probe',
+        shell: windows ? 'cmd.exe' : undefined,
+        command: windows
+          ? 'node probe.cjs'
+          : 'printf ready > probe && ! /bin/cat ../private && /bin/cat probe',
       },
       [cwd],
     )
     try {
       const { file, args, env } = job.prepared
-      const { stdout } = await execute(file, args, { cwd, env, timeout: 10000 })
+      const { stdout } = await execute(file, args, {
+        cwd: job.prepared.cwd ?? cwd,
+        env,
+        timeout: 15000,
+      })
       return stdout === 'ready'
     } finally {
       await job.cleanup()

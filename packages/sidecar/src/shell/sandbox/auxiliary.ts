@@ -6,7 +6,8 @@ import { sandboxReady } from './readiness'
 export async function prepareAuxiliaryShell(
   input: StartShellJobInput,
   roots: string[],
+  directArgv?: string[],
 ) {
   if (!(await sandboxReady())) return
-  return preparePreview(input, [...new Set(roots)])
+  return preparePreview(input, [...new Set(roots)], undefined, directArgv)
 }

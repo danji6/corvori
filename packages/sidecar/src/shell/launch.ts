@@ -13,7 +13,10 @@ export type ShellEnvironment = {
   SESSION_DIR?: string
 }
 
-export type PreparedShell = ShellInvocation & { env: NodeJS.ProcessEnv }
+export type PreparedShell = ShellInvocation & {
+  env: NodeJS.ProcessEnv
+  cwd?: string
+}
 
 type LaunchInput = {
   prepared?: PreparedShell
@@ -34,7 +37,7 @@ export function prepareShellLaunch(input: LaunchInput, terminal?: Terminal) {
   if (input.prepared) {
     const { file, args, env } = input.prepared
     if (!terminal || terminal === 'pty')
-      return { file, args, env, cwd: input.cwd }
+      return { file, args, env, cwd: input.prepared.cwd ?? input.cwd }
     // util-linux script takes a shell string. Quote each word of the already prepared native invocation.
     const words = [file, ...args].map(shellWord)
     const sized = `stty cols ${terminal.cols} rows ${terminal.rows} 2>/dev/null; exec ${words.join(' ')}`
