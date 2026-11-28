@@ -28,6 +28,7 @@ import { reserveSegmentEvaluation } from '../promptEvaluation/reserve'
 import { getSavedModel } from '../provider/providers'
 import { consume as consumeEvent } from '../scheduledEvents'
 import { patchState } from '../session/state'
+import { recordTranscriptError } from '../tasks/outcomes'
 import { ownsExecution, scheduleStream } from './execution'
 import {
   canCheckCompactionThreshold,
@@ -165,7 +166,7 @@ async function startThresholdCompaction(
   mode: SessionMode | undefined,
 ) {
   const { boundary } = snapshot
-  const output = await prepareSummaryOutput(ctx, snapshot, stream.invokedBy)
+  const output = await prepareSummaryOutput(ctx, snapshot, stream)
   await announceThresholdCompaction(ctx, stream, output.processingMessageId)
 
   await ctx.db.patch(stream._id, {
@@ -213,20 +214,22 @@ async function announceThresholdCompaction(
 async function prepareSummaryOutput(
   ctx: MutationCtx,
   { message, row, hasOutput }: CompactionSnapshot,
-  invokedBy: Id<'users'>,
+  stream: RunningStream,
 ) {
+  const invokedBy = stream.invokedBy
   if (!hasOutput) {
     await detachContextNotes(ctx, message)
     return { processingMessageId: message._id, processingContentId: row._id }
   }
 
   const parts = finalizeMessageParts(row.parts)
-  await finalizeTurn(ctx, {
+  const segments = await finalizeTurn(ctx, {
     message,
     row,
     parts,
     metadata: row.metadata,
   })
+  await recordTranscriptError(ctx, stream.taskRunId, segments)
   await reserveSegmentEvaluation(ctx, {
     messageId: message._id,
     invokerId: invokedBy,

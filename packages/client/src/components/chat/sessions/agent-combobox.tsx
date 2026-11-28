@@ -1,4 +1,4 @@
-import { Combobox } from '@/components/ui'
+import { Combobox } from '@/components/ui/combobox'
 import type { Id } from '@cv/convex/_generated/dataModel'
 
 import { SessionAvatar } from './session-avatar'
@@ -13,6 +13,7 @@ type AgentComboboxProps = {
   agents: AgentItem[]
   value?: string
   onValueChange: (value: string) => void
+  noDeselect?: boolean
   open?: boolean
   onOpenChange?: (open: boolean) => void
   onOpenChangeComplete?: (open: boolean) => void
@@ -32,6 +33,7 @@ export function AgentCombobox({
   agents,
   value,
   onValueChange,
+  noDeselect,
   open,
   onOpenChange,
   onOpenChangeComplete,
@@ -45,6 +47,7 @@ export function AgentCombobox({
     <Combobox
       value={value}
       onValueChange={onValueChange}
+      noDeselect={noDeselect}
       open={open}
       onOpenChange={onOpenChange}
       onOpenChangeComplete={onOpenChangeComplete}

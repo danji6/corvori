@@ -33,6 +33,7 @@ export async function showDesktopNotification(
       userId,
       notificationId: notification._id,
       sessionId: notification.sessionId,
+      taskRunId: notification.taskRunId,
     },
     actions: notification.approvalActions?.length
       ? desktopApprovalActions(notification.approvalActions, maxActions)

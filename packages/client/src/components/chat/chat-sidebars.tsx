@@ -2,6 +2,7 @@ import {
   BouncyButton,
   Pill,
   QuickTooltip,
+  RippleButton,
   Sidebar,
   useSidebar,
 } from '@/components/ui'
@@ -14,8 +15,14 @@ import {
   setSidebarState,
 } from '@/lib/ui-settings'
 import { cn } from '@/lib/utils'
-import { PanelLeftIcon, PanelRightIcon, SearchIcon } from 'lucide-react'
+import {
+  CalendarClockIcon,
+  PanelLeftIcon,
+  PanelRightIcon,
+  SearchIcon,
+} from 'lucide-react'
 import { memo } from 'react'
+import { useLocation } from 'wouter'
 
 import type { SidebarShellProps } from '../ui/sidebar'
 import { ManageAgentsButton } from './entities/agent/agent-settings'
@@ -74,6 +81,29 @@ function ChatSidebar({
   )
 }
 
+function TasksButton({ collapsed = false }: { collapsed?: boolean }) {
+  const { isMobile, close } = useSidebar()
+  const [, navigate] = useLocation()
+  return (
+    <RippleButton
+      aria-label="Tasks"
+      variant="stealth"
+      size={collapsed ? 'icon' : 'default'}
+      className={cn(
+        'text-muted-foreground rounded-full',
+        !collapsed && 'h-11 w-full font-bold',
+      )}
+      onClick={() => {
+        navigate('/tasks')
+        if (isMobile) close()
+      }}
+    >
+      <CalendarClockIcon />
+      {!collapsed && 'Tasks'}
+    </RippleButton>
+  )
+}
+
 const LeftSidebar = memo(function LeftSidebar() {
   const newSession = useNewSession()
 
@@ -94,6 +124,9 @@ const LeftSidebar = memo(function LeftSidebar() {
           </Sidebar.Header>
           <Sidebar.Footer className="items-center">
             <UpdateButton collapsed />
+            <QuickTooltip text="Tasks" side="right">
+              <TasksButton collapsed />
+            </QuickTooltip>
             <QuickTooltip text="Manage Agents" side="right">
               <ManageAgentsButton collapsed />
             </QuickTooltip>
@@ -115,6 +148,7 @@ const LeftSidebar = memo(function LeftSidebar() {
           </Sidebar.Content>
           <Sidebar.Footer>
             <UpdateButton />
+            <TasksButton />
             <ManageAgentsButton />
             <ChatSettingsButton />
           </Sidebar.Footer>

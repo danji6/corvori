@@ -13,6 +13,14 @@ export function notificationBody(notification: NotificationItem): string {
       return notification.preview || 'Approval required'
     case 'input_required':
       return (notification.preview || `${notification.actorName} has questions for you`) // prettier-ignore
+    case 'task_succeeded':
+      return notification.preview
+        ? 'Task completed · ' + notification.preview
+        : 'Task completed'
+    case 'task_failed':
+      return notification.preview
+        ? 'Task failed · ' + notification.preview
+        : 'Task failed'
     case 'turn_error':
       return `${notification.actorName}'s turn ended with an error`
     case 'turn_completed':

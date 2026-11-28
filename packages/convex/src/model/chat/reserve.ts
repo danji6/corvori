@@ -10,8 +10,10 @@ import { assertAgentAvailable } from '../skills/access'
 import { scheduleStream } from '../stream/execution'
 import { latestHistoryAnchor } from '../stream/historyBoundary'
 import { STREAM_LEASE_MS } from '../stream/lifecycle'
+import { interruptRun } from '../tasks/outcomes'
 
 type ReserveStreamArgs = {
+  taskRunId?: Id<'scheduledTaskRuns'>
   sessionId: Id<'sessions'>
   agentId: Id<'agents'>
   invokedBy: Id<'users'>
@@ -52,6 +54,7 @@ export async function reserveStream(ctx: MutationCtx, args: ReserveStreamArgs) {
 
   const streamId = await ctx.db.insert('streams', {
     generation: 0,
+    taskRunId: args.taskRunId,
     sessionId: args.sessionId,
     agentId: args.agentId,
     invokedBy: args.invokedBy,
@@ -72,6 +75,7 @@ export async function reserveStream(ctx: MutationCtx, args: ReserveStreamArgs) {
 }
 
 type TurnReservation = {
+  taskRunId?: Id<'scheduledTaskRuns'>
   session: Doc<'sessions'>
   /** The message the turn should read up to. */
   messageId: Id<'messages'>
@@ -95,8 +99,10 @@ export async function reserveOrDebounceTurn(
     silent,
     activeStream,
     deferTitle,
+    taskRunId,
   }: TurnReservation,
 ) {
+  if (activeStream?.taskRunId) await interruptRun(ctx, activeStream)
   const debounceMs = session.settings?.agentDebounceMs ?? 0
   const willStream =
     Boolean(activeStream) || (!silent && Boolean(session.activeAgentId))
@@ -109,6 +115,7 @@ export async function reserveOrDebounceTurn(
       boundaryId: messageId,
       command: { kind: 'invoke' },
       delayMs: debounceMs,
+      taskRunId,
     })
   } else if (activeStream?.command.kind === 'compact') {
     const command = activeStream.command

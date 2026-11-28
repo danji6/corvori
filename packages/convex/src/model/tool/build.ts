@@ -46,6 +46,7 @@ import { createAskTool } from './ask'
 import { createAttachmentTransferTool } from './attachmentTransfers'
 import { createReadAttachmentTool } from './attachments'
 import type { PlanToolContext, WorkspaceToolContext } from './context'
+import type { FilesystemCall } from './executionApprovals'
 import {
   createEditFileTool,
   createReadFileTool,
@@ -98,6 +99,7 @@ export type ToolBuildOptions = {
   agentId?: Id<'agents'>
   invokedBy?: Id<'users'>
   execution?: StreamExecutionArgs
+  taskInvocation?: boolean
   shellWindowDeadline?: number
 }
 
@@ -113,11 +115,22 @@ export async function getEnabledTools(
 ): Promise<ToolSet> {
   const ctx = options?.ctx
   const sessionId = session ? sharedSessionId(session) : undefined
+  const execution = options?.execution
+  const taskApprovals =
+    options?.taskInvocation && ctx && execution
+      ? (call?: FilesystemCall) =>
+          ctx.runQuery(internal.streams._getExecutionApprovals, {
+            ...execution,
+            call,
+          })
+      : undefined
 
   // Approvals can be remembered mid-turn
-  const approvals = session
-    ? () => resolveApprovals(session, options)
-    : undefined
+  const approvals = taskApprovals
+    ? async () => (await taskApprovals()).approvals
+    : session
+      ? () => resolveApprovals(session, options)
+      : undefined
 
   const workspace: WorkspaceToolContext | undefined =
     session && sessionId
@@ -135,6 +148,7 @@ export async function getEnabledTools(
           allowInteractiveShells:
             resources?.settings?.allowInteractiveShells ?? false,
           approvals,
+          taskApprovals,
           // Plan mode can be entered or approved mid-turn
           isPlanMode: ctx ? () => isPlanMode(ctx, sessionId) : undefined,
           ...jobWatch(session, options),

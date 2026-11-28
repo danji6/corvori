@@ -78,4 +78,10 @@ crons.interval(
   internal.sessions._sweepSessionFiles,
 )
 
+crons.interval(
+  'recover overdue tasks',
+  { minutes: 1 },
+  internal.scheduledTasks._recover,
+)
+
 export default crons

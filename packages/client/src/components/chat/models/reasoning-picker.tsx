@@ -1,8 +1,12 @@
-import { Select, type SelectTriggerProps, Switch } from '@/components/ui'
-import { useBreakpoint } from '@/hooks'
-import { normalizeReasoningEffort } from '@/hooks/chat'
+import { Select, type SelectTriggerProps } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { useBreakpoint } from '@/hooks/breakpoint'
 import type { ReasoningEffort, UIModel } from '@/lib/chat'
 import { cn } from '@/lib/utils'
+import {
+  defaultModelReasoning,
+  normalizeReasoningEffort,
+} from '@cv/core/model-reasoning'
 import { BrainIcon } from 'lucide-react'
 
 const REASONING_OPTIONS: { value: ReasoningEffort; label: string }[] = [
@@ -20,6 +24,7 @@ export type ReasoningPickerProps = SelectTriggerProps & {
   onValueChange: (value: ReasoningEffort) => void
   model: UIModel | null
   onInherit?: () => void
+  placeholder?: string
   /** Hide the label on mobile. */
   compactMobile?: boolean
 }
@@ -32,14 +37,19 @@ export function ReasoningPicker({
   model,
   compactMobile,
   onInherit,
+  placeholder,
   ...props
 }: ReasoningPickerProps) {
   const isMobile = useBreakpoint('sm') && !!compactMobile
+  const showFormSelect = !!onInherit || placeholder !== undefined
 
   const reasoning =
     onInherit && !model
       ? (value ?? 'auto')
-      : normalizeReasoningEffort(value, model?.reasoning)
+      : normalizeReasoningEffort(
+          value,
+          model?.reasoning ?? defaultModelReasoning(),
+        )
   const inherited = !!onInherit && value === undefined
 
   const supported =
@@ -52,7 +62,7 @@ export function ReasoningPicker({
       option.value === 'none' ||
       supported.has(option.value),
   )
-  const inheritedOptions =
+  const formOptions =
     model?.reasoning?.type === 'none'
       ? [{ value: 'none', label: 'None' }]
       : model?.reasoning?.type === 'binary'
@@ -64,19 +74,20 @@ export function ReasoningPicker({
           ? REASONING_OPTIONS
           : options
   const items = onInherit
-    ? [
-        { value: '__inherit__', label: 'Inherit' },
-        ...inheritedOptions,
-      ]
-    : options
-  const selectedValue = inherited ? '__inherit__' : reasoning
-  const selectedLabel = items.find(
-    (option) => option.value === selectedValue,
-  )?.label
+    ? [{ value: '__inherit__', label: 'Inherit' }, ...formOptions]
+    : showFormSelect
+      ? formOptions
+      : options
+  const selected = inherited
+    ? '__inherit__'
+    : placeholder === undefined
+      ? reasoning
+      : value
+  const selectedItem = items.find((option) => option.value === selected)
 
-  if (!onInherit && model?.reasoning?.type === 'none') return null
+  if (!showFormSelect && model?.reasoning?.type === 'none') return null
 
-  if (!onInherit && model?.reasoning?.type === 'binary') {
+  if (!showFormSelect && model?.reasoning?.type === 'binary') {
     const checked = reasoning !== 'none'
     return (
       <div className="flex h-10 w-full items-center">
@@ -93,10 +104,10 @@ export function ReasoningPicker({
   return (
     <Select
       items={items}
-      value={selectedValue}
+      value={selectedItem?.value ?? null}
       onValueChange={(value) => {
         if (value === '__inherit__') onInherit?.()
-        else onValueChange(value as ReasoningEffort)
+        else if (value) onValueChange(value as ReasoningEffort)
       }}
       disabled={disabled}
     >
@@ -108,12 +119,12 @@ export function ReasoningPicker({
         {...props}
       >
         <BrainIcon />
-        {!isMobile && selectedLabel}
+        {!isMobile && (selectedItem?.label ?? placeholder)}
       </Select.Trigger>
       <Select.Content
         alignItemWithTrigger={false}
         className={
-          onInherit
+          showFormSelect
             ? 'w-72 max-w-[calc(100dvw-2rem)]'
             : 'w-[calc(min(fit-content,100%,120px))]'
         }

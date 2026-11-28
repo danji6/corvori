@@ -24,6 +24,7 @@ import { assertAgentIdle } from './skills/access'
 import { start as startFileOperation } from './skills/operations'
 import { prepareHomeRemoval } from './skills/removal'
 import { stopForSession } from './stream/lifecycle'
+import { refreshAgentName } from './tasks/definitions'
 
 /** What the agent pickers and lists render. */
 export type AgentSummary = Pick<
@@ -178,6 +179,8 @@ export async function update(
   if (patch.tools || unset?.includes('tools'))
     await revokeMcp(ctx, { agentId }, 'Agent tool selection changed')
   await ctx.db.patch(agentId, { ...patch, ...cleared })
+  if (patch.name && patch.name !== agent.name)
+    await refreshAgentName(ctx, agentId, patch.name)
 }
 
 export async function remove(

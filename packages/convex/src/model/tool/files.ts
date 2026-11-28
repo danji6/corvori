@@ -13,6 +13,8 @@ import {
 
 import { ToolError } from '../../errors'
 import { type WorkspaceToolContext, fileWorkspaceArgs } from './context'
+import type { FilesystemCall } from './executionApprovals'
+import { approvalsForFilesystemCall } from './filesystemApprovals'
 import { callMcpTool } from './mcp'
 import { fileNeedsApproval } from './paths'
 
@@ -27,13 +29,17 @@ export async function createReadFileTool(context: WorkspaceToolContext) {
     inputSchema: z.strictObject(readFileFields),
     needsApproval: ({ path }) =>
       fileNeedsApproval(READ_FILE_TOOL_NAME, path, context),
-    execute: async ({ path, offset, limit, byteOffset }) =>
+    execute: async (input, { toolCallId }) =>
       callMcpTool(READ_FILE_TOOL_NAME, {
-        ...(await approvedFileArgs(context)),
-        path,
-        offset,
-        limit,
-        byteOffset,
+        ...(await approvedFileArgs(context, {
+          id: toolCallId,
+          name: READ_FILE_TOOL_NAME,
+          input,
+        })),
+        path: input.path,
+        offset: input.offset,
+        limit: input.limit,
+        byteOffset: input.byteOffset,
       }),
   })
 }
@@ -47,10 +53,16 @@ async function assertNotPlanMode(context: WorkspaceToolContext) {
 }
 
 /** Carries this invocation's passed approval gate without saving a path grant. */
-async function approvedFileArgs(context: WorkspaceToolContext) {
+async function approvedFileArgs(
+  context: WorkspaceToolContext,
+  call: FilesystemCall & { input: { path: string } },
+) {
+  const approvals = await approvalsForFilesystemCall(context, call, (current) =>
+    fileNeedsApproval(call.name, call.input.path, current),
+  )
   return {
     ...fileWorkspaceArgs(context),
-    allowedPaths: (await context.approvals?.())?.paths,
+    allowedPaths: approvals?.paths,
     allowOutsideWorkspace: true,
   }
 }
@@ -66,12 +78,16 @@ export async function createWriteFileTool(context: WorkspaceToolContext) {
     inputSchema: z.strictObject(writeFileFields),
     needsApproval: ({ path }) =>
       fileNeedsApproval(WRITE_FILE_TOOL_NAME, path, context),
-    execute: async ({ path, content }) => {
+    execute: async (input, { toolCallId }) => {
       await assertNotPlanMode(context)
       return callMcpTool(WRITE_FILE_TOOL_NAME, {
-        ...(await approvedFileArgs(context)),
-        path,
-        content,
+        ...(await approvedFileArgs(context, {
+          id: toolCallId,
+          name: WRITE_FILE_TOOL_NAME,
+          input,
+        })),
+        path: input.path,
+        content: input.content,
       })
     },
   })
@@ -88,12 +104,16 @@ export async function createEditFileTool(context: WorkspaceToolContext) {
     inputSchema: z.strictObject(editFileFields),
     needsApproval: ({ path }) =>
       fileNeedsApproval(EDIT_FILE_TOOL_NAME, path, context),
-    execute: async ({ path, edits }) => {
+    execute: async (input, { toolCallId }) => {
       await assertNotPlanMode(context)
       return callMcpTool(EDIT_FILE_TOOL_NAME, {
-        ...(await approvedFileArgs(context)),
-        path,
-        edits,
+        ...(await approvedFileArgs(context, {
+          id: toolCallId,
+          name: EDIT_FILE_TOOL_NAME,
+          input,
+        })),
+        path: input.path,
+        edits: input.edits,
       })
     },
   })

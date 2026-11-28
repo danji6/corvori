@@ -141,6 +141,7 @@ async function currentTools({
       messageCreatedAt: data.output._creationTime,
       agentId: data.agent._id,
       invokedBy: data.stream.invokedBy,
+      taskInvocation: !!data.stream.taskRunId,
       execution: {
         streamId: data.stream._id,
         generation: data.stream.generation,

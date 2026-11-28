@@ -9,6 +9,7 @@ import { deleteVersions } from '../messageContents'
 import { removeForSession as removeNotifications } from '../notifications/records'
 import { cancelForSession as cancelScheduledEvents } from '../scheduledEvents'
 import { remove as removeStream, stopForSession } from '../stream/lifecycle'
+import { settleRun } from '../tasks/outcomes'
 import { removeAuthorProfiles } from './authorProfileLifecycle'
 import { removeForSession as removeSessionCache } from './cache'
 import { requireOwner } from './memberships'
@@ -44,6 +45,10 @@ export async function remove(
       internal.actions.sessions._runSessionFileOperation,
       { operationId },
     )
+  }
+  if (session.taskRunId) {
+    await settleRun(ctx, session.taskRunId, 'failed', 'Session deleted.')
+    await ctx.db.patch(session.taskRunId, { sessionId: undefined })
   }
   await revokeMcp(ctx, { sessionId }, 'Session deleted')
   await stopForSession(ctx, sessionId)

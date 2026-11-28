@@ -17,7 +17,8 @@ self.addEventListener('activate', (event) => {
 // Retain the selected action until an authenticated page acknowledges it.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const { userId, notificationId, sessionId } = event.notification.data || {}
+  const { userId, notificationId, sessionId, taskRunId } =
+    event.notification.data || {}
   if (typeof userId !== 'string' || !userId || !notificationId) return
   const action = event.action === 'dismiss' ? 'read' : event.action || 'show'
   if (action !== 'read' && action !== 'show' && !APPROVAL_ACTIONS.has(action))
@@ -29,6 +30,7 @@ self.addEventListener('notificationclick', (event) => {
       userId,
       notificationId,
       sessionId,
+      taskRunId,
       requestId: `${notificationId}:${action}`,
     }),
   )

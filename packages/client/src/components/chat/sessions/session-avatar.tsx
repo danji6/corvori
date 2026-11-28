@@ -1,5 +1,5 @@
-import { Avatar, type AvatarProps } from '@/components/ui'
-import { useAvatarThumbnail } from '@/hooks/chat'
+import { Avatar, type AvatarProps } from '@/components/ui/avatar'
+import { useAvatarThumbnail } from '@/hooks/chat/avatars'
 import { useStableValue } from '@/hooks/stable-value'
 import type { Id } from '@cv/convex/_generated/dataModel'
 import { BotIcon } from 'lucide-react'

@@ -40,6 +40,11 @@ import {
   releaseEvaluation,
 } from '../promptEvaluation/records'
 import { reserveSegmentEvaluation } from '../promptEvaluation/reserve'
+import {
+  recordTranscriptError,
+  settleRun,
+  settleStoppedRun,
+} from '../tasks/outcomes'
 import { ownsExecution } from './execution'
 import { cleanUpOffloadedOutputs } from './lifecycleCleanup'
 import { killSessionJobs } from './lifecycleControl'
@@ -96,12 +101,13 @@ export async function completeStream(
   }
 
   if (row && message) {
-    await finalizeTurn(ctx, {
+    const segments = await finalizeTurn(ctx, {
       message,
       row,
       parts,
       metadata: row.metadata,
     })
+    await recordTranscriptError(ctx, stream.taskRunId, segments)
   } else {
     await ctx.db.patch(processingMessageId, { status: 'done' })
   }
@@ -154,8 +160,15 @@ export async function completeStream(
   // A finished sub-agent turn reports back to its parent session
   await deliverChildReport(ctx, stream, { kind: 'complete' })
 
-  // The automatic follow-up owns the eventual completion notification
-  if (!followUpReserved) {
+  const successor =
+    stream.taskRunId && followUpReserved
+      ? await ctx.db
+          .query('streams')
+          .withIndex('by_sessionId', (q) => q.eq('sessionId', stream.sessionId))
+          .first()
+      : null
+  const endsTask = stream.taskRunId && successor?.taskRunId !== stream.taskRunId
+  if (endsTask || !followUpReserved) {
     // Retries may span segments, so preview the selected message version
     const previewParts = message
       ? (await listSelectedSegments(ctx, message)).flatMap((row) => row.parts)
@@ -166,13 +179,24 @@ export async function completeStream(
         ? 'Compaction finished'
         : notificationPreviewFromParts(previewParts)
 
-    await notifyAgentEvent(ctx, {
-      sessionId: stream.sessionId,
-      agentId: stream.agentId,
-      kind: 'turn_completed',
-      preview: previewMessage,
-      sourceMessageId: stream.state.processingMessageId,
-    })
+    if (stream.taskRunId) {
+      const problem =
+        message?.metadata?.error || message?.metadata?.toolErrors?.[0]
+      await settleRun(
+        ctx,
+        stream.taskRunId,
+        problem ? 'failed' : 'succeeded',
+        problem || previewMessage,
+      )
+    } else {
+      await notifyAgentEvent(ctx, {
+        sessionId: stream.sessionId,
+        agentId: stream.agentId,
+        kind: 'turn_completed',
+        preview: previewMessage,
+        sourceMessageId: stream.state.processingMessageId,
+      })
+    }
   }
 
   // Scheduled, not inline: a bad command must not roll back this turn
@@ -257,12 +281,16 @@ export async function failStream(
 
   await handleStreamEnd(ctx, stream, 'failed')
 
-  await notifyAgentEvent(ctx, {
-    sessionId: stream.sessionId,
-    agentId: stream.agentId,
-    kind: 'turn_error',
-    sourceMessageId: stream.state.processingMessageId,
-  })
+  if (stream.taskRunId) {
+    await settleRun(ctx, stream.taskRunId, 'failed', message)
+  } else {
+    await notifyAgentEvent(ctx, {
+      sessionId: stream.sessionId,
+      agentId: stream.agentId,
+      kind: 'turn_error',
+      sourceMessageId: stream.state.processingMessageId,
+    })
+  }
 
   // A failed sub-agent still reports back so the parent can react
   await deliverChildReport(ctx, stream, { kind: 'failed', message })
@@ -276,6 +304,8 @@ export async function _finalizeStopped(
 ) {
   const stream = await ctx.db.get(streamId)
   if (!stream || stream.state.phase !== 'stopping') return
+
+  await settleStoppedRun(ctx, stream.taskRunId)
 
   // Turn stopped before it materialized a message, just drop the stream
   if (!stream.state.processingMessageId) {

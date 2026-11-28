@@ -24,7 +24,10 @@ export async function refreshForOwner(
   ownerId: Id<'users'>,
   renames?: ReadonlyMap<string, string>,
 ) {
-  if (renames?.size) await refreshRecentModel(ctx, ownerId, renames)
+  if (renames?.size) {
+    await refreshRecentModel(ctx, ownerId, renames)
+    await refreshTaskModels(ctx, ownerId, renames)
+  }
   const providers = await resolveProviders(ctx, ownerId)
 
   const agents = await ctx.db
@@ -66,4 +69,19 @@ async function refreshRecentModel(
   if (!settings?.recentModel) return
   const recentModel = renames.get(settings.recentModel)
   if (recentModel) await ctx.db.patch(settings._id, { recentModel })
+}
+
+async function refreshTaskModels(
+  ctx: MutationCtx,
+  ownerId: Id<'users'>,
+  renames: ReadonlyMap<string, string>,
+) {
+  const tasks = await ctx.db
+    .query('scheduledTasks')
+    .withIndex('by_owner_state', (q) => q.eq('ownerId', ownerId))
+    .collect()
+  for (const task of tasks) {
+    const modelId = task.modelId && renames.get(task.modelId)
+    if (modelId) await ctx.db.patch(task._id, { modelId })
+  }
 }

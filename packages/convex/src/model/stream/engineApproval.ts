@@ -53,24 +53,38 @@ export async function attachApprovalPreviews(
   const workspaceId = setup.workspace?.workspaceId
   if (!workspaceId) return parts
 
-  const approvals = await ctx.runQuery(internal.sessions._getApprovals, {
-    sessionId: setup.stream.sessionId,
-  })
   const context = {
     sessionId: setup.workspaceSessionId,
     workspaceId,
     workspace: setup.workspace,
     shell: setup.toolRuntime?.current.shell,
-    allowedPaths: mergeToolApprovals(
-      approvals ?? undefined,
-      setup.agent.autoApprove,
-    )?.paths,
+    allowedPaths: await previewPaths(ctx, setup),
   }
   const result = await Promise.all(
     parts.map((part) => withApprovalPreview(context, part)),
   )
 
   return result as UIMessage['parts']
+}
+
+async function previewPaths(
+  ctx: ActionCtx,
+  { stream, agent }: NonNullable<Awaited<ReturnType<typeof prepare>>>,
+) {
+  if (stream.taskRunId) {
+    const { approvals } = await ctx.runQuery(
+      internal.streams._getExecutionApprovals,
+      {
+        streamId: stream._id,
+        generation: stream.generation,
+      },
+    )
+    return approvals?.paths
+  }
+  const approvals = await ctx.runQuery(internal.sessions._getApprovals, {
+    sessionId: stream.sessionId,
+  })
+  return mergeToolApprovals(approvals ?? undefined, agent.autoApprove)?.paths
 }
 
 async function withApprovalPreview(

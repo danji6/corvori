@@ -71,7 +71,7 @@ export const searchMessages = authQuery({
 
 export const sendMessage = authMutation({
   args: V.sendMessageArgsValidator.fields,
-  handler: Chat.sendMessage,
+  handler: (ctx, args) => Chat.sendMessage(ctx, args),
 })
 
 export const beginAttachmentSend = authMutation({
