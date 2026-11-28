@@ -47,7 +47,6 @@ try {
     new URL('./windows-workspace-child.cjs', import.meta.url),
     script,
   )
-  const qualified = new Set()
   const libraries = []
   for (const name of ['System32', 'SysWOW64', 'WinSxS']) {
     const path = join(process.env.SystemRoot, name)
@@ -59,91 +58,75 @@ try {
     )
       libraries.push(path)
   }
-  for (const denyVolume of [false, true]) {
-    for (const online of [false, true]) {
-      try {
-        const request = {
-          command: joinWindowsCommandLine([
-            runtime,
-            script,
-            join(outside, 'sample'),
-            String(server.address().port),
-          ]),
-          workingDirectory: workspace,
-          containment: {
-            type: 'processcontainer',
-            config: {
-              filesystem: {
-                enumeratePaths: [
-                  ...new Set([parse(workspace).root, parse(runtime).root]),
-                ],
-              },
-            },
-          },
+  for (const online of [false, true]) {
+    const request = {
+      command: joinWindowsCommandLine([
+        runtime,
+        script,
+        join(outside, 'sample'),
+        String(server.address().port),
+      ]),
+      workingDirectory: workspace,
+      containment: {
+        type: 'processcontainer',
+        config: {
           filesystem: {
-            readonlyPaths: [runtime, dependency, opensslConfig, ...libraries],
-            readwritePaths: [workspace],
-            deniedPaths: [
-              ignored,
-              ...(denyVolume ? [parse(workspace).root] : []),
+            enumeratePaths: [
+              ...new Set([parse(workspace).root, parse(runtime).root]),
             ],
           },
-          network: {
-            egress: { default: online ? 'allow' : 'deny' },
-            ingress: {
-              default: online ? 'allow' : 'deny',
-              hostLoopback: online ? 'allow' : 'deny',
-            },
-          },
-          ui: { disable: false, clipboard: 'none', allowInputInjection: false },
-          environment: {
-            SystemRoot: process.env.SystemRoot,
-            LOCALAPPDATA: process.env.LOCALAPPDATA,
-            PATH: dirname(runtime),
-            OPENSSL_CONF: opensslConfig,
-            NODE_OPTIONS: '--preserve-symlinks-main --preserve-symlinks',
-          },
-          inheritDefaultEnvironment: false,
-          timeoutMs: 15000,
-        }
-        const facts = probe(request)
-        assert.equal(facts.tier, 'base-container', JSON.stringify(facts))
-        const child = await spawn(request)
-        try {
-          const [stdout, stderr, exit] = await Promise.all([
-            text(child.standardOutput),
-            text(child.standardError),
-            child.wait(),
-          ])
-          assert.equal(exit.exitCode, 0, stderr)
-          const result = JSON.parse(stdout.trim())
-          console.log({ online, denyVolume, result })
-          assert.deepEqual(result, {
-            ordinary: true,
-            dependencyRead: true,
-            dependencyWrite: false,
-            ignored: false,
-            outside: false,
-            listSibling: false,
-            shared: false,
-            linked: false,
-            online,
-          })
-          qualified.add(String(denyVolume) + ':' + String(online))
-        } finally {
-          child.dispose()
-        }
-      } catch (error) {
-        console.error({ online, denyVolume, failure: error.message })
-      }
+        },
+      },
+      filesystem: {
+        readonlyPaths: [runtime, dependency, opensslConfig, ...libraries],
+        readwritePaths: [workspace],
+        deniedPaths: [ignored, parse(workspace).root],
+      },
+      network: {
+        egress: { default: online ? 'allow' : 'deny' },
+        ingress: {
+          default: online ? 'allow' : 'deny',
+          hostLoopback: online ? 'allow' : 'deny',
+        },
+      },
+      ui: { disable: false, clipboard: 'none', allowInputInjection: false },
+      environment: {
+        SystemRoot: process.env.SystemRoot,
+        LOCALAPPDATA: process.env.LOCALAPPDATA,
+        PATH: dirname(runtime),
+        OPENSSL_CONF: opensslConfig,
+        NODE_OPTIONS: '--preserve-symlinks-main --preserve-symlinks',
+      },
+      inheritDefaultEnvironment: false,
+      timeoutMs: 15000,
+    }
+    const facts = probe(request)
+    assert.equal(facts.tier, 'base-container', JSON.stringify(facts))
+    const child = await spawn(request)
+    try {
+      const [stdout, stderr, exit] = await Promise.all([
+        text(child.standardOutput),
+        text(child.standardError),
+        child.wait(),
+      ])
+      assert.equal(exit.exitCode, 0, stderr)
+      const result = JSON.parse(stdout.trim())
+      console.log({ online, result })
+      assert.deepEqual(result, {
+        ordinary: true,
+        dependencyRead: true,
+        dependencyWrite: false,
+        ignored: false,
+        outside: false,
+        listSibling: false,
+        shared: false,
+        linked: false,
+        online,
+      })
+    } finally {
+      child.dispose()
     }
   }
-  assert.ok(
-    [false, true].some(
-      (mode) => qualified.has(mode + ':false') && qualified.has(mode + ':true'),
-    ),
-    'No Windows policy passed both network modes',
-  )
 } finally {
   server.close()
   await rm(root, { recursive: true, force: true })

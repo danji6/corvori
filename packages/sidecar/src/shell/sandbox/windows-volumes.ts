@@ -5,7 +5,7 @@ import { promisify } from 'node:util'
 
 const execute = promisify(execFile)
 
-/** Include named local volumes, directory mount points, and mapped drive letters. */
+/** Collect mount points for the qualification build's mounted-volume tests. */
 export async function windowsVolumes(system: string) {
   const system32 = join(system, 'System32')
   const { stdout } = await execute(join(system32, 'mountvol.exe'), [], {
@@ -31,5 +31,6 @@ export async function windowsVolumes(system: string) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
     }
   }
-  return { letters, denied: [...new Set([...letters, ...mounted, ...volumes])] }
+  // BaseContainer rejects volume GUID paths. Release builds keep the approval gate.
+  return { letters, denied: [...new Set([...letters, ...mounted])] }
 }

@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, realpath, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, delimiter, dirname, join } from 'node:path'
+import { basename, delimiter, dirname, join, win32 } from 'node:path'
 import { promisify } from 'node:util'
 
 import { isOutside } from '../../mcp/workspace/access'
@@ -112,6 +112,8 @@ function runtimeEnvironment(runtime: string, path: string, scratch: string) {
       delimiter,
     ),
     SystemRoot: systemRoot,
+    windir: systemRoot,
+    SystemDrive: win32.parse(systemRoot).root.slice(0, -1),
     LOCALAPPDATA: scratch,
     APPDATA: scratch,
     ComSpec: join(systemRoot, 'System32/cmd.exe'),

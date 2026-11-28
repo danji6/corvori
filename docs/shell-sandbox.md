@@ -16,7 +16,7 @@ Restart the sidecar after installing the update and start a new chat. In normal 
 
 Plan mode keeps its launch checks and a read-only workspace. Recognized direct Git inspections use a read-only metadata view. Evaluator and workspace MCP commands use the same filesystem and network policy. Explicit unrestricted shell mode retains host execution.
 
-Windows uses its existing shell approval flow until its initial workspace sandbox is integrated. The Windows native suite exercises a failed sandboxed command and its one-time host retry with MXC and the provisioned helper.
+Windows release builds use the existing approval flow. CI tests the packaged sidecar with MXC separately on Windows 11. MXC can inherit reads granted to all app packages by the host. Denying a specific volume can fence those reads on that volume. Automatic Windows execution requires a boundary that also covers files on other volumes and shares. [Microsoft’s filesystem policy](https://github.com/microsoft/mxc/blob/main/docs/backends/process-container/filesystem.md)
 
 A failed command shows its output and exit status. If the agent needs more access, it requests a retry of that job and explains why. The approval card shows the command, working directory, reason, and requested access. On macOS it also shows the blocked operation and destination when Seatbelt identifies them. A successful command that handled a denied operation finishes normally.
 
